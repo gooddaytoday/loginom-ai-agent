@@ -25,11 +25,12 @@ story("built-ins: each activates without each other built-in", async ({ page }) 
     // The window this host serves has no OS, so OS-specific built-ins are left out as the app leaves them out.
     const composition: readonly Entry[] = builtins
     const definitions = composition.filter((definition) => !definition.os)
-    const rows = ["", ...definitions.map((definition) => definition.id)]
+    const builtinIDs = new Set(definitions.map((definition) => definition.id))
+    const rows = ["", ...builtinIDs]
     const results = []
 
     for (const disabled of rows) {
-      const host = mountPlugins({ definitions, disabled: disabled ? [disabled] : [] })
+      const host = mountPlugins({ definitions, builtins: builtinIDs, disabled: disabled ? [disabled] : [] })
       host.release()
       await until(() => host.ready())
       results.push({

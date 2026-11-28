@@ -795,6 +795,7 @@ export type Project = {
   canonical: AbsolutePath
   vcs?: ProjectVcs
   name?: string
+  experimental?: { hidden?: boolean }
   icon?: ProjectIcon
   commands?: ProjectCommands
   time: ProjectTime
@@ -1878,6 +1879,7 @@ export type ProjectUpdated = {
     canonical: AbsolutePath
     vcs?: ProjectVcs
     name?: string
+    experimental?: { hidden?: boolean }
     icon?: ProjectIcon
     commands?: ProjectCommands
     time: ProjectTime
@@ -4811,6 +4813,23 @@ export type ExperimentalJobListInput = {
 }
 
 export type ExperimentalJobListOutput = { data: Array<JobInfo> }["data"]
+
+export type ExperimentalProjectListOutput = Array<Project>
+
+export type ExperimentalProjectRegisterInput = {
+  readonly directory: string
+  readonly name?: string | undefined
+  readonly experimental?: { readonly hidden?: boolean } | undefined
+}
+
+export type ExperimentalProjectRegisterOutput = Project
+
+export type ExperimentalProjectForgetInput = {
+  readonly projectID: string
+  readonly includeVisible?: boolean | undefined
+}
+
+export type ExperimentalProjectForgetOutput = void
 
 export type ShellListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
 

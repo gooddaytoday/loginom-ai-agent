@@ -64,6 +64,7 @@ test("exposes every standard HTTP API group", () => {
     "schedule",
     "artifacts",
     "job",
+    "project",
     "migration",
     "usage",
     "config",
@@ -171,6 +172,7 @@ test("nests a method under client.experimental exactly when its route is experim
   ])
   expect(Object.keys(client.shell)).toEqual(["list", "create", "get", "output", "remove"])
   expect(Object.keys(client.project)).toEqual(["list", "update"])
+  expect(Object.keys(client.experimental.project)).toEqual(["list", "register", "forget"])
   expect(Object.keys(client.worktree)).toEqual(["list", "create", "remove", "refresh"])
 })
 

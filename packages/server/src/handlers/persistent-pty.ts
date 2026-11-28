@@ -1,4 +1,5 @@
 import { PersistentPty } from "@opencode/core/persistent-pty"
+import { Project } from "@opencode/core/project"
 import { PtyTicket } from "@opencode/core/pty/ticket"
 import {
   ForbiddenError,
@@ -36,6 +37,19 @@ export const PersistentPtyHandler = HttpApiBuilder.group(Api, "server.experiment
     return handlers
       .handleRaw("media.get", (ctx) => mediaGet(ctx.params.hash, ctx.request))
       .handle("job.list", (ctx) => job.list(ctx.query))
+      .handle("project.experimental.list", () =>
+        Project.Service.use((project) => project.list({ includeHidden: true })),
+      )
+      .handle("project.experimental.register", (ctx) =>
+        Project.Service.use((project) =>
+          project.register(ctx.payload).pipe(Effect.mapError(({ message }) => new InvalidRequestError({ message }))),
+        ),
+      )
+      .handle("project.experimental.forget", (ctx) =>
+        Project.Service.use((project) => project.forget(ctx.params.projectID, ctx.query)).pipe(
+          Effect.as(HttpApiSchema.NoContent.make()),
+        ),
+      )
       .handle("artifacts.providers", (ctx) => artifact.providers(ctx.query, ctx.request))
       .handle("artifacts.list", (ctx) => artifact.list(ctx.query, ctx.request))
       .handle("artifacts.create", (ctx) => artifact.create(ctx.query, ctx.payload, ctx.request))

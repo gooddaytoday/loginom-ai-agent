@@ -14,6 +14,7 @@ export const ProjectTable = sqliteTable("project", {
   worktree: absoluteColumn().notNull(),
   vcs: text().$type<ProjectSchema.Vcs["type"]>(),
   name: text(),
+  hidden: integer({ mode: "boolean" }).notNull().default(false),
   icon_url: text(),
   icon_url_override: text(),
   icon_color: text(),
@@ -49,15 +50,20 @@ export const ProjectDirectoryTable = sqliteTable(
 export function upsertProject(
   db: DatabaseClient | Transaction,
   project: { readonly id: ProjectSchema.ID; readonly canonical: AbsolutePath; readonly vcs?: ProjectSchema.Vcs },
+  metadata?: { readonly name?: string; readonly hidden?: boolean },
 ) {
   const vcs = project.vcs?.type
   return db
     .insert(ProjectTable)
-    .values({ id: project.id, worktree: project.canonical, vcs, sandboxes: [] })
+    .values({ id: project.id, worktree: project.canonical, vcs, sandboxes: [], ...metadata })
     .onConflictDoUpdate({
       target: ProjectTable.id,
-      set: { vcs: vcs ?? null },
-      setWhere: vcs ? or(isNull(ProjectTable.vcs), ne(ProjectTable.vcs, vcs)) : isNotNull(ProjectTable.vcs),
+      set: { vcs: vcs ?? null, ...metadata },
+      setWhere: metadata
+        ? undefined
+        : vcs
+          ? or(isNull(ProjectTable.vcs), ne(ProjectTable.vcs, vcs))
+          : isNotNull(ProjectTable.vcs),
     })
     .run()
 }

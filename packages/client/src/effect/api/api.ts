@@ -2559,6 +2559,28 @@ export type ExperimentalJobListOperation<E = never> = (
   input?: ExperimentalJobListInput,
 ) => Effect.Effect<ExperimentalJobListOutput, E>
 
+export type ExperimentalProjectListOutput = ReadonlyArray<Project.Info>
+export type ExperimentalProjectListOperation<E = never> = () => Effect.Effect<ExperimentalProjectListOutput, E>
+
+export type ExperimentalProjectRegisterInput = {
+  readonly directory: AbsolutePath
+  readonly name?: string | undefined
+  readonly experimental?: { readonly hidden?: boolean | undefined } | undefined
+}
+export type ExperimentalProjectRegisterOutput = Project.Info
+export type ExperimentalProjectRegisterOperation<E = never> = (
+  input: ExperimentalProjectRegisterInput,
+) => Effect.Effect<ExperimentalProjectRegisterOutput, E>
+
+export type ExperimentalProjectForgetInput = {
+  readonly projectID: Project.ID
+  readonly includeVisible?: boolean | undefined
+}
+export type ExperimentalProjectForgetOutput = void
+export type ExperimentalProjectForgetOperation<E = never> = (
+  input: ExperimentalProjectForgetInput,
+) => Effect.Effect<ExperimentalProjectForgetOutput, E>
+
 export interface ExperimentalApi<E = never> {
   readonly persistentPty: {
     readonly read: ExperimentalPersistentPtyReadOperation<E>
@@ -2589,6 +2611,11 @@ export interface ExperimentalApi<E = never> {
     readonly delete: ExperimentalArtifactsDeleteOperation<E>
   }
   readonly job: { readonly list: ExperimentalJobListOperation<E> }
+  readonly project: {
+    readonly list: ExperimentalProjectListOperation<E>
+    readonly register: ExperimentalProjectRegisterOperation<E>
+    readonly forget: ExperimentalProjectForgetOperation<E>
+  }
 }
 
 export type ShellListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }

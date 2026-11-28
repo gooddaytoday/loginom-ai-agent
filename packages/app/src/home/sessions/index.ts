@@ -3,8 +3,7 @@ import { pathKey } from "@/workspaces/path-key"
 import { mergeRootSessionIndex } from "@/runtime/server/session-index"
 import { SESSION_RECENT_LIMIT, SESSION_RECENT_WINDOW } from "@/runtime/server/global-sync/types"
 
-// One bounded page of the newest root sessions. Home shows 64 and the sidebar a handful per project, so older history
-// is reached through the titlebar's server-backed search instead of downloading every session on startup.
+// One bounded page of the newest root sessions. Project navigation and search fetch older history on demand.
 export const HOME_SESSION_PAGE_LIMIT = 500
 
 export const HOME_SESSION_LIMIT = 64

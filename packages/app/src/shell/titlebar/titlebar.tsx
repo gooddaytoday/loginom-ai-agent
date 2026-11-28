@@ -13,6 +13,16 @@ import { useLayout } from "@/shell/state/layout"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
+import {
+  forgetNavigationWorkspace,
+  hiddenWorkspace,
+  PluginNavigation,
+  registerNavigationWorkspace,
+  useDiscardNavigationDraft,
+  useManagedNavigationConnection,
+  useShellNavigation,
+} from "@/runtime/plugin/navigation"
+import { showToast } from "@/shell/notifications/toast"
 import { useSettings } from "@/settings/model"
 import { WindowsAppMenu } from "./windows-menu"
 import { createTitlebarHistory } from "./history"
@@ -77,6 +87,9 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
   const command = useCommand()
   const language = useLanguage()
   const settings = useSettings()
+  const navigation = useShellNavigation()
+  const managedConnection = useManagedNavigationConnection()
+  const newConversation = () => navigation()?.value.newSessionTitle ?? language.t("command.session.new")
 
   const openSettings = useSettingsDialog()
   const dialog = useDialog()
@@ -206,11 +219,13 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
 
             const tabs = useTabs()
             const tabsStore = tabs.store
+            onCleanup(tabs.onDraftDisposed(useDiscardNavigationDraft()))
 
             createEffect(() => {
               if (
                 settings.appearance.tabLayout() === "vertical" &&
-                (settings.general.sidebarOrganize() === "projects" || settings.general.sidebarOrganize() === "customize") &&
+                (settings.general.sidebarOrganize() === "projects" ||
+                  settings.general.sidebarOrganize() === "customize") &&
                 !mobile()
               )
                 return
@@ -224,6 +239,70 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
             const session = routeSync.session
             const currentTab = routeSync.currentTab
             const pluginPage = useActivePluginPage()
+
+            const openNavigationDraft = (
+              server: ServerConnection.Key,
+              draftID: string,
+              directory?: string,
+              model?: ReturnType<ComposerState["model"]["current"]>,
+              projectID?: string,
+            ) => {
+              const policy = navigation()?.value
+              const ctx = global.serverCtx(server)
+
+              if (!policy || !ctx || server !== ServerConnection.Key.make("sidecar")) return false
+
+              const signal = AbortSignal.timeout(15_000)
+
+              const timedOut = () =>
+                showToast({
+                  variant: "error",
+                  title: language.t("common.requestFailed"),
+                  description: language.t("session.new.workspaceTimedOut"),
+                })
+
+              signal.addEventListener("abort", timedOut, { once: true })
+              const forget = (directory: string) => forgetNavigationWorkspace(ctx, directory)
+
+              const open = async () => {
+                let hidden = hiddenWorkspace(ctx, directory, projectID)
+
+                if (directory && hidden === undefined) {
+                  await ctx.data.project.sync({ includeHidden: true }).catch(() => undefined)
+                  hidden = hiddenWorkspace(ctx, directory, projectID)
+                }
+
+                signal.throwIfAborted()
+
+                const chosen = await policy.draft({
+                  directory,
+                  draftID,
+                  signal,
+                  hidden: hidden !== false,
+                  register: (input) => registerNavigationWorkspace(ctx, input),
+                  forget,
+                })
+
+                try {
+                  signal.throwIfAborted()
+                  signal.removeEventListener("abort", timedOut)
+
+                  await tabs.newDraft({ server, directory: chosen, draftID }, "", model)
+                } catch (error) {
+                  if (hidden !== false)
+                    await policy.discardDraft({ directory: chosen, forget: () => forget(chosen) }).catch(() => undefined)
+                  throw error
+                }
+              }
+
+              void open()
+                .catch(() => {
+                  if (!signal.aborted) showToast({ variant: "error", title: language.t("common.requestFailed") })
+                })
+                .finally(() => signal.removeEventListener("abort", timedOut))
+
+              return true
+            }
 
             makeEventListener(window, SESSION_TABS_REMOVED_EVENT, (event) => {
               const detail = readSessionTabsRemovedDetail(event)
@@ -242,6 +321,8 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
 
                   if (pending) {
                     const model = tabs.stateValue<ComposerState>(pending.draft, "prompt")?.model.current()
+
+                    if (openNavigationDraft(route.server, draftID, pending.draft.directory, model)) return true
                     void tabs.newDraft({ server: route.server, directory: pending.draft.directory, draftID }, "", model)
 
                     return true
@@ -258,6 +339,17 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                   }
 
                   const model = tabs.stateValue<ComposerState>(sessionTab, "prompt")?.model.current()
+
+                  if (
+                    openNavigationDraft(
+                      route.server,
+                      draftID,
+                      activeSession.location.directory,
+                      model,
+                      activeSession.projectID,
+                    )
+                  )
+                    return true
                   void tabs.newDraft(
                     { server: sessionTab.server, directory: activeSession.location.directory, draftID },
                     "",
@@ -273,6 +365,8 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                   if (activeTab?.type !== "draft") return false
 
                   const model = tabs.stateValue<ComposerState>(activeTab, "prompt")?.model.current()
+
+                  if (openNavigationDraft(activeTab.server, draftID, activeTab.directory, model)) return true
                   void tabs.newDraft({ server: activeTab.server, directory: activeTab.directory, draftID }, "", model)
 
                   return true
@@ -291,6 +385,14 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
 
                   const projects = conn ? global.serverCtx(ServerConnection.key(conn))?.projects : undefined
 
+                  if (route.type === "page") {
+                    const local = global.servers.list().find((item) => item.type === "sidecar")
+
+                    if (local && openNavigationDraft(ServerConnection.key(local), draftID)) return true
+                  } else if (conn && openNavigationDraft(ServerConnection.key(conn), draftID, selection.directory)) {
+                    return true
+                  }
+
                   const project =
                     projects?.list().find((item) => item.worktree === selection.directory) ??
                     projects?.last() ??
@@ -308,6 +410,21 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
             }
 
             const openNewTab = () => openDraft(uuid())
+
+            const mobileNewTab = (title: string) => (
+              <button
+                type="button"
+                data-action="mobile-tabs-new-session"
+                class="flex h-7 w-full shrink-0 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-base hover:bg-v2-background-bg-layer-02 focus-visible:outline-none focus-visible:bg-v2-background-bg-layer-02"
+                onClick={() => {
+                  openNewTab()
+                  closeMobileTabs()
+                }}
+              >
+                <Icon name="plus" />
+                {title}
+              </button>
+            )
 
             const toggleHome = () => tabs.toggleHome({ home: layout.route().type === "home", current: currentTab() })
 
@@ -391,7 +508,9 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                 id: "home.toggle",
                 title: language.t("home.title"),
                 category: language.t("command.category.view"),
-                keybind: windows() ? "alt+home" : "mod+b",
+                keybind: windows() || (managedConnection() && navigation()?.value.sidebarShortcut === "mod+b")
+                  ? "alt+home"
+                  : "mod+b",
                 hidden: true,
                 onSelect: () => {
                   if (layout.route().type !== "home") layout.home.searchFocus.request()
@@ -427,7 +546,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                 {
                   ...newTabCommand,
                   category: "tab",
-                  title: language.t("command.session.new"),
+                  title: managedConnection() ? newConversation() : language.t("command.session.new"),
                   hidden: true,
                   onSelect: openNewTab,
                 },
@@ -576,6 +695,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                   fallback={
                     <MobileDrawer
                       open={selectMobileTabsOpen(mobileTabsState())}
+                      side={managedConnection() ? "left" : "bottom"}
                       onOpenChange={(open) => dispatchMobileTabs({ type: "drawer.changed", open })}
                       onContentPresentChange={(present) => dispatchMobileTabs({ type: "content.present", present })}
                     >
@@ -625,36 +745,35 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                       <MobileDrawerContent>
                         <MobileDrawerLabel class="sr-only">{language.t("titlebar.tabs")}</MobileDrawerLabel>
                         <div data-slot="mobile-tabs-drawer" data-corvu-no-drag>
+                          <Show when={managedConnection()}>{mobileNewTab(newConversation())}</Show>
                           <div data-slot="mobile-tabs-drawer-list">
-                            <TitlebarTabStrip
-                              orientation="vertical"
-                              tabs={tabsStore}
-                              currentTab={currentTab()}
-                              onNavigate={(tab) => {
-                                tabs.select(tab)
-                                closeMobileTabs()
-                              }}
-                              onClose={(tab) => {
-                                const index = tabsStore.findIndex((item) => tabKey(item) === tabKey(tab))
+                            <Show
+                              when={managedConnection()}
+                              fallback={
+                                <TitlebarTabStrip
+                                  orientation="vertical"
+                                  tabs={tabsStore}
+                                  currentTab={currentTab()}
+                                  onNavigate={(tab) => {
+                                    tabs.select(tab)
+                                    closeMobileTabs()
+                                  }}
+                                  onClose={(tab) => {
+                                    const index = tabsStore.findIndex((item) => tabKey(item) === tabKey(tab))
 
-                                if (index !== -1) tabsStoreActions.closeTab(index)
-                              }}
-                              onCloseTabs={(items, keep) => tabsStoreActions.closeTabs(items.map(tabKey), keep)}
-                              onReorder={(keys) => tabsStoreActions.reorder(keys)}
-                            />
+                                    if (index !== -1) tabsStoreActions.closeTab(index)
+                                  }}
+                                  onCloseTabs={(items, keep) => tabsStoreActions.closeTabs(items.map(tabKey), keep)}
+                                  onReorder={(keys) => tabsStoreActions.reorder(keys)}
+                                />
+                              }
+                            >
+                              {(conn) => (
+                                <PluginNavigation connection={conn()} tab={currentTab()} onNavigate={closeMobileTabs} />
+                              )}
+                            </Show>
                           </div>
-                          <button
-                            type="button"
-                            data-action="mobile-tabs-new-session"
-                            class="flex h-7 w-full shrink-0 items-center gap-2 rounded-[6px] px-2 text-[13px] leading-4 text-v2-text-text-base hover:bg-v2-background-bg-layer-02 focus-visible:outline-none focus-visible:bg-v2-background-bg-layer-02"
-                            onClick={() => {
-                              openNewTab()
-                              closeMobileTabs()
-                            }}
-                          >
-                            <Icon name="plus" />
-                            {language.t("command.session.new")}
-                          </button>
+                          <Show when={!managedConnection()}>{mobileNewTab(language.t("command.session.new"))}</Show>
                           <div class="flex shrink-0 flex-col gap-1 border-t border-v2-border-border-muted pt-2">
                             <PluginPageNav onNavigate={closeMobileTabs} />
                             <button
@@ -780,12 +899,16 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                                 vertical
                                 onNewTab={openNewTab}
                                 keybind={command.keybindParts("tab.new")}
+                                newTabTitle={managedConnection() ? newConversation() : undefined}
                               />
                             </div>
                             <PluginPageNav />
                             <div class="h-4 w-full shrink-0" aria-hidden="true" />
                             <div class="flex min-h-0 flex-1 flex-col gap-1">
                               <Switch fallback={verticalTabStrip()}>
+                                <Match when={managedConnection()}>
+                                  {(conn) => <PluginNavigation connection={conn()} tab={currentTab()} />}
+                                </Match>
                                 <Match when={settings.appearance.tabLayout() === "inbox"}>
                                   <SidebarInbox />
                                 </Match>
@@ -806,6 +929,16 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                               <div data-slot="vertical-tabs-footer" class="mt-2 flex w-full shrink-0 flex-col">
                                 <TitlebarItems items={titlebarItems} vertical />
                               </div>
+                            </Show>
+                            <Show when={managedConnection()}>
+                              <button
+                                type="button"
+                                class="mt-2 flex h-7 w-full shrink-0 items-center gap-2 rounded-md px-2 text-start text-sm hover:bg-v2-overlay-simple-overlay-hover"
+                                onClick={() => openSettings()}
+                              >
+                                <Icon name="settings-gear" size="small" />
+                                {language.t("sidebar.settings")}
+                              </button>
                             </Show>
                           </Portal>
                         )}

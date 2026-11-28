@@ -1,8 +1,12 @@
-import { session, WebContentsView } from "electron"
+import { app, session, WebContentsView } from "electron"
 import type { Embed, Plugin } from "@opencode/plugin/gui/main"
 import { DashboardPreview } from "./contract"
+import { ManagedFolders } from "./folders"
+import { managedFolders } from "./folders-main"
 
 const setup: Plugin.MainSetup = (ctx) => {
+  ctx.provide(ManagedFolders, managedFolders(app.getPath("documents"), app.getPath("userData")))
+
   const views = new Map<number, Embed>()
   const partition = "loginom-dashboard-preview"
   const previewSession = session.fromPartition(partition)

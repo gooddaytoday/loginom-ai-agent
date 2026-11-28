@@ -1,9 +1,10 @@
 import { Project } from "@opencode/schema/project"
 import { Schema, SchemaGetter, Struct } from "effect"
-import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/http-api"
-import { ProjectNotFoundError } from "../errors.js"
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/http-api"
+import { InvalidRequestError, ProjectNotFoundError } from "../errors.js"
 
 const root = "/api/project"
+const experimental = "/api/experimental/project"
 const UpdatePayload = Schema.Struct(Struct.omit(Project.UpdateInput.fields, ["projectID"]))
 const BooleanFromString = Schema.Literals(["true", "false"]).pipe(
   Schema.decodeTo(Schema.Boolean, {
@@ -45,3 +46,40 @@ export const ProjectGroup = HttpApiGroup.make("server.project")
       description: "Project routes.",
     }),
   )
+
+export const ExperimentalProjectEndpoints = [
+  HttpApiEndpoint.get("project.experimental.list", experimental, {
+    success: Schema.Array(Project.Info),
+  }).annotateMerge(
+    OpenApi.annotations({
+      identifier: "experimental.project.list",
+      summary: "List projects including hidden projects",
+      description:
+        "List known projects including hidden projects. Experimental: may change without compatibility guarantees.",
+    }),
+  ),
+  HttpApiEndpoint.post("project.experimental.register", experimental, {
+    payload: Project.RegisterInput,
+    success: Project.Info,
+    error: InvalidRequestError,
+  }).annotateMerge(
+    OpenApi.annotations({
+      identifier: "experimental.project.register",
+      summary: "Register project",
+      description:
+        "Register a directory with display metadata. Experimental: may change without compatibility guarantees.",
+    }),
+  ),
+  HttpApiEndpoint.delete("project.experimental.forget", `${experimental}/:projectID`, {
+    params: { projectID: Project.ID },
+    query: Schema.Struct({ includeVisible: BooleanFromString.pipe(Schema.optional) }),
+    success: HttpApiSchema.NoContent,
+  }).annotateMerge(
+    OpenApi.annotations({
+      identifier: "experimental.project.forget",
+      summary: "Forget a missing project without sessions",
+      description:
+        "Forget a hidden project with no directory or sessions. Set includeVisible=true to also allow non-VCS visible projects. Experimental: may change without compatibility guarantees.",
+    }),
+  ),
+] as const

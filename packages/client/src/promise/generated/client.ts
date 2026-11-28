@@ -273,6 +273,11 @@ import type {
   ExperimentalArtifactsViewOutput,
   ExperimentalJobListInput,
   ExperimentalJobListOutput,
+  ExperimentalProjectListOutput,
+  ExperimentalProjectRegisterInput,
+  ExperimentalProjectRegisterOutput,
+  ExperimentalProjectForgetInput,
+  ExperimentalProjectForgetOutput,
   ShellListInput,
   ShellListOutput,
   ShellCreateInput,
@@ -1722,6 +1727,43 @@ export function make(options: ClientOptions) {
             },
             requestOptions,
           ).then((value) => value.data),
+      },
+      project: {
+        list: (requestOptions?: RequestOptions) =>
+          request<ExperimentalProjectListOutput>(
+            {
+              method: "GET",
+              path: `/api/experimental/project`,
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        register: (input: ExperimentalProjectRegisterInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalProjectRegisterOutput>(
+            {
+              method: "POST",
+              path: `/api/experimental/project`,
+              body: { directory: input["directory"], name: input["name"], experimental: input["experimental"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        forget: (input: ExperimentalProjectForgetInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalProjectForgetOutput>(
+            {
+              method: "DELETE",
+              path: `/api/experimental/project/${encodeURIComponent(input.projectID)}`,
+              query: { includeVisible: input["includeVisible"] },
+              successStatus: 204,
+              declaredStatuses: [400, 401],
+              empty: true,
+            },
+            requestOptions,
+          ),
       },
       migration: {
         v1: {

@@ -488,7 +488,13 @@ test("restores dropped tool files from the server once they are shown again", as
 test("restoring dropped tool files keeps live progress made while the server read was in flight", async () => {
   const listeners = new Set<Parameters<CreateDataInput["event"]["listen"]>[0]>()
   const screenshot = `data:image/png;base64,${"A".repeat(4096)}`
-  const tool = (id: string, state: object) => ({ type: "tool", id, name: "execute", time: { created: 1, ran: 1 }, state })
+  const tool = (id: string, state: object) => ({
+    type: "tool",
+    id,
+    name: "execute",
+    time: { created: 1, ran: 1 },
+    state,
+  })
   const running = { status: "running", input: {}, metadata: {} }
   const assistant = (content: object[]) => ({
     id: "msg_assistant",
@@ -547,7 +553,11 @@ test("restoring dropped tool files keeps live progress made while the server rea
     read.resolve(
       Response.json({
         data: assistant([
-          tool("call_shot", { status: "completed", input: {}, content: [{ type: "file", uri: screenshot, mime: "image/png" }] }),
+          tool("call_shot", {
+            status: "completed",
+            input: {},
+            content: [{ type: "file", uri: screenshot, mime: "image/png" }],
+          }),
           tool("call_work", running),
         ]),
       }),
@@ -746,7 +756,7 @@ test("updates authoritative cached project metadata from live events", async () 
     baseUrl: "http://opencode.local",
     fetch: async (input, init) => {
       const request = input instanceof Request ? input : new Request(input, init)
-      if (!request.url.endsWith("/api/project")) throw new Error(`Unexpected request: ${request.url}`)
+      if (!request.url.endsWith("/api/experimental/project")) throw new Error(`Unexpected request: ${request.url}`)
       requests++
       return Response.json([original, unrelated])
     },
@@ -764,7 +774,7 @@ test("updates authoritative cached project metadata from live events", async () 
   }))
 
   try {
-    await setup.data.project.sync()
+    await setup.data.project.sync({ includeHidden: true })
     expect(setup.data.project.get(original.id)).toEqual(original)
 
     const updated: OpenCodeEvent = {
@@ -775,6 +785,7 @@ test("updates authoritative cached project metadata from live events", async () 
         ...original,
         canonical: "/projects/renamed",
         name: "Updated custom name",
+        experimental: { hidden: true },
         time: { ...original.time, updated: 2 },
       },
     }
@@ -782,6 +793,10 @@ test("updates authoritative cached project metadata from live events", async () 
 
     expect(setup.data.project.get(original.id)?.canonical).toBe("/projects/renamed")
     expect(setup.data.project.get(original.id)?.name).toBe("Updated custom name")
+    expect(setup.data.project.list().map((project) => project.id)).toEqual([unrelated.id])
+    expect(setup.data.project.list({ includeHidden: true })).toContainEqual(
+      expect.objectContaining({ id: original.id, experimental: { hidden: true } }),
+    )
     expect(setup.data.project.get(unrelated.id)).toEqual(unrelated)
     expect(requests).toBe(1)
 

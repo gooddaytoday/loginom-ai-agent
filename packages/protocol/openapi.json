@@ -13619,6 +13619,154 @@
         "summary": "List background jobs"
       }
     },
+    "/api/experimental/project": {
+      "get": {
+        "tags": ["persistentPty"],
+        "operationId": "experimental.project.list",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Project"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "List known projects including hidden projects. Experimental: may change without compatibility guarantees.",
+        "summary": "List projects including hidden projects"
+      },
+      "post": {
+        "tags": ["persistentPty"],
+        "operationId": "experimental.project.register",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Register a directory with display metadata. Experimental: may change without compatibility guarantees.",
+        "summary": "Register project",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Project.RegisterInput"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/experimental/project/{projectID}": {
+      "delete": {
+        "tags": ["persistentPty"],
+        "operationId": "experimental.project.forget",
+        "parameters": [
+          {
+            "name": "projectID",
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Project.ID"
+            },
+            "required": true
+          },
+          {
+            "name": "includeVisible",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "required": false
+          }
+        ],
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "<No Content>"
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Forget a hidden project with no directory or sessions. Set includeVisible=true to also allow non-VCS visible projects. Experimental: may change without compatibility guarantees.",
+        "summary": "Forget a missing project without sessions"
+      }
+    },
     "/api/shell": {
       "get": {
         "tags": ["shell"],
@@ -21709,6 +21857,15 @@
           "name": {
             "type": "string"
           },
+          "experimental": {
+            "type": "object",
+            "properties": {
+              "hidden": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
           "icon": {
             "$ref": "#/components/schemas/Project.Icon"
           },
@@ -21754,6 +21911,28 @@
             "type": "string"
           }
         },
+        "additionalProperties": false
+      },
+      "Project.RegisterInput": {
+        "type": "object",
+        "properties": {
+          "directory": {
+            "$ref": "#/components/schemas/AbsolutePath"
+          },
+          "name": {
+            "type": "string"
+          },
+          "experimental": {
+            "type": "object",
+            "properties": {
+              "hidden": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["directory"],
         "additionalProperties": false
       },
       "Project.Time": {
@@ -27271,6 +27450,15 @@
               },
               "name": {
                 "type": "string"
+              },
+              "experimental": {
+                "type": "object",
+                "properties": {
+                  "hidden": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "icon": {
                 "$ref": "#/components/schemas/Project.Icon"

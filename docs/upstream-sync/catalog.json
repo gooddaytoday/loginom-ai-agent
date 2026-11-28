@@ -166,6 +166,25 @@
       "paths": ["packages/desktop/**"]
     },
     {
+      "id": "CAT-22",
+      "title": "Conversation folders and Desktop navigation (C1.4a)",
+      "paths": [
+        "packages/app/src/new-session/composer-adapter.ts", "packages/app/src/new-session/session-create-outcome.ts",
+        "packages/app/src/runtime/server/sync.tsx",
+        "packages/app/src/runtime/plugin/navigation.tsx", "packages/app/src/shell/tabs/tabs.tsx",
+        "packages/app/src/home/sessions/controller.tsx", "packages/app/src/home/sessions/index.ts",
+        "packages/app/src/home/sessions/records.ts", "packages/app/src/home/sessions/records.test.ts",
+        "packages/app/src/shell/shell.tsx", "packages/app/src/shell/titlebar/titlebar.tsx",
+        "packages/app/src/shell/mobile-drawer.tsx", "packages/app/src/shell/mobile-drawer.css",
+        "packages/app/src/shell/titlebar/tab-nav.tsx", "packages/app/component-tests/conversation-sidebar.spec.ts",
+        "packages/app/component-tests/plugin-host.spec.ts",
+        "packages/app/src/shell/titlebar/recently-closed-tabs-menu.tsx",
+        "packages/app/src/shell/sidebar-peek.ts", "packages/app/src/shell/sidebar-toggle.tsx",
+        "packages/app/component-tests/plugin-graph.spec.ts",
+        "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
+      ]
+    },
+    {
       "id": "CAT-21",
       "title": "Built-in plugin top-level pages",
       "paths": [
@@ -218,6 +237,15 @@
       }
     },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
-    { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
+    {
+      "id": "CAT-12",
+      "title": "Core identity and shared packages",
+      "paths": [
+        "packages/core/src/project.ts", "packages/core/src/project/sql.ts", "packages/core/src/database/migration/*_project-visibility.ts",
+        "packages/schema/src/project.ts", "packages/protocol/src/groups/project.ts", "packages/protocol/src/groups/experimental.ts",
+        "packages/server/src/handlers/persistent-pty.ts",
+        "packages/client/src/solid/data.ts", "packages/**"
+      ]
+    }
   ]
 }

@@ -1,4 +1,5 @@
 import { Predicate } from "effect"
+import { ClientError, isSessionNotFoundError } from "@opencode/client/promise"
 import { base64Encode } from "@opencode/util/encode"
 import { Session } from "@opencode/schema/session"
 import { createMemo, createSignal, onCleanup, startTransition, untrack } from "solid-js"
@@ -7,6 +8,12 @@ import { useComposerState } from "@/composer/persistence"
 import { createComposerControls, createComposerModelSelection } from "@/composer/selection"
 import { createComposerProjectControls } from "./project/controller"
 import { useLanguage } from "@/runtime/i18n/language"
+import {
+  forgetNavigationWorkspace,
+  hiddenWorkspace,
+  registerNavigationWorkspace,
+  useShellNavigation,
+} from "@/runtime/plugin/navigation"
 import { useLocal } from "@/providers/models/selection"
 import { useData, useServer } from "@/runtime/server/current"
 import { useServerSDK } from "@/runtime/server/client"
@@ -14,6 +21,7 @@ import { useTabs } from "@/shell/tabs/tabs"
 import { createWorktree } from "@/workspaces/create"
 import { showToast } from "@/shell/notifications/toast"
 import type { DraftMcpControls } from "./mcp"
+import { failedSessionCreate } from "./session-create-outcome"
 import {
   createNewSessionStartState,
   isNewSessionStartActive,
@@ -93,6 +101,7 @@ export function createNewSessionComposerAdapter(props: {
   const serverSDK = useServerSDK()
   const tabs = useTabs()
   const language = useLanguage()
+  const navigation = useShellNavigation()
   const model = createComposerModelSelection({ agent: () => local.agent.current() })
   const controls = createComposerControls({ model })
 
@@ -107,6 +116,17 @@ export function createNewSessionComposerAdapter(props: {
       const projectDirectory = props.root()
       const worktree = props.worktree()
       const directory = worktree === "main" ? projectDirectory : worktree
+
+      const prepare =
+        server.conn.type === "sidecar"
+          ? navigation()?.value.prepare({
+              hidden: hiddenWorkspace(server.ctx, projectDirectory) === true,
+              prompt: message.text,
+              register: (input) => registerNavigationWorkspace(server.ctx, input),
+              forget: (directory) => forgetNavigationWorkspace(server.ctx, directory),
+            })
+          : undefined
+
       const sessionID = Session.ID.create()
       const settled = Promise.withResolvers<Started>()
 
@@ -115,14 +135,15 @@ export function createNewSessionComposerAdapter(props: {
           type: "start",
           sessionID,
           workspace:
-            worktree === "create"
+            worktree === "create" || prepare
               ? { type: "new", projectDirectory, branch: props.branch() }
               : { type: "existing", directory },
           mcp: props.mcp.capture(),
-          toggling: worktree !== "create" && props.mcp.toggling(directory),
+          toggling: !prepare && worktree !== "create" && props.mcp.toggling(directory),
         },
         (attempt) => {
           const started = props.captureStarted()
+
           const pending = tabs.prepareSession(
             props.draftID,
             { server: server.key, sessionId: sessionID },
@@ -132,6 +153,18 @@ export function createNewSessionComposerAdapter(props: {
           // Aborted when the attempt ends: MCP preparation stops between steps and a late Session create is undone.
           const ended = new AbortController()
           let timer: ReturnType<typeof setTimeout> | undefined
+          let prepared: Awaited<ReturnType<NonNullable<typeof prepare>>> | undefined
+          let creating: Promise<unknown> | undefined
+          let preserveWorkspace = false
+
+          const finish = async (keep: boolean) => {
+            const workspace = prepared
+            prepared = undefined
+
+            if (workspace && !keep) await creating
+
+            await workspace?.finish(keep || preserveWorkspace).catch(() => undefined)
+          }
 
           const end = () => {
             clearTimeout(timer)
@@ -142,6 +175,7 @@ export function createNewSessionComposerAdapter(props: {
             // Settles before awaiting the tab, so a disposed attempt starts no request.
             if (effect.type === "attempt.abort") {
               end()
+              void finish(false)
               settled.resolve(undefined)
 
               return
@@ -167,13 +201,23 @@ export function createNewSessionComposerAdapter(props: {
             if (effect.type === "worktree.create") {
               if (ended.signal.aborted) return
               props.start.dispatch(
-                await createWorktree({
-                  api: serverSDK.api,
-                  data,
-                  directory: effect.projectDirectory,
-                  project: data.location.info({ directory: effect.projectDirectory })?.project,
-                  branch: effect.branch,
-                }).then(
+                await (
+                  prepare
+                    ? prepare().then(async (workspace) => {
+                        prepared = workspace
+
+                        if (ended.signal.aborted) await finish(false)
+
+                        return workspace.directory
+                      })
+                    : createWorktree({
+                        api: serverSDK.api,
+                        data,
+                        directory: effect.projectDirectory,
+                        project: data.location.info({ directory: effect.projectDirectory })?.project,
+                        branch: effect.branch,
+                      })
+                ).then(
                   (directory) => ({ type: "worktree.created", attempt, directory }) as const,
                   (error) => ({ type: "worktree.failed", attempt, message: errorMessage(language, error) }) as const,
                 ),
@@ -196,33 +240,52 @@ export function createNewSessionComposerAdapter(props: {
 
             if (effect.type === "session.create") {
               if (ended.signal.aborted) return
-              props.start.dispatch(
-                await data.session
-                  .create({
-                    id: effect.sessionID,
-                    agent: selection.agent,
-                    model: {
-                      id: selection.model.modelID,
-                      providerID: selection.model.providerID,
-                      variant: selection.variant,
-                    },
-                    location: { directory: effect.directory },
-                  })
-                  .request.then(
-                    () => {
-                      // The attempt ended first, so the prompt was never sent and the Session is still empty.
-                      if (ended.signal.aborted) void data.session.remove(effect.sessionID).catch(() => undefined)
 
-                      return { type: "session.created", attempt } as const
-                    },
-                    (error) => ({ type: "session.failed", attempt, message: errorMessage(language, error) }) as const,
-                  ),
-              )
+              const creation = data.session
+                .create({
+                  id: effect.sessionID,
+                  agent: selection.agent,
+                  model: {
+                    id: selection.model.modelID,
+                    providerID: selection.model.providerID,
+                    variant: selection.variant,
+                  },
+                  location: { directory: effect.directory },
+                })
+                .request.then(
+                  async () => {
+                    // The attempt ended first, so the prompt was never sent and the Session is still empty.
+                    if (ended.signal.aborted) {
+                      await data.session.remove(effect.sessionID).catch(() => {
+                        preserveWorkspace = true
+                      })
+                    }
+
+                    return { type: "session.created", attempt } as const
+                  },
+                  async (error) => {
+                    if (prepare) {
+                      const recognized = error instanceof ClientError || isSessionNotFoundError(error) ? error : undefined
+                      const outcome = await failedSessionCreate(serverSDK.api.session, effect.sessionID, recognized)
+
+                      preserveWorkspace = outcome.type !== "missing"
+
+                      if (outcome.type === "created") data.session.remember(outcome.session)
+                    }
+
+                    return { type: "session.failed", attempt, message: errorMessage(language, error) } as const
+                  },
+                )
+
+              creating = creation
+              props.start.dispatch(await creation)
 
               return
             }
 
             if (effect.type === "session.promote") {
+              void finish(true)
+
               const cleanupReady = startTransition(() => {
                 local.session.promote(effect.directory, effect.sessionID, {
                   agent: selection.agent,
@@ -264,9 +327,10 @@ export function createNewSessionComposerAdapter(props: {
               await data.project.sync().catch(() => undefined)
             }
 
-            await pending.rollback(effect.worktree?.directory)
+            void finish(false)
+            await pending.rollback(prepare ? undefined : effect.worktree?.directory)
 
-            if (effect.worktree) props.mcp.remember(effect.worktree.directory, effect.worktree.mcp)
+            if (!prepare && effect.worktree) props.mcp.remember(effect.worktree.directory, effect.worktree.mcp)
             settled.resolve(undefined)
           }
         },

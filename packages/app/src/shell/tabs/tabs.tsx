@@ -108,6 +108,8 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
     const servers = useServers()
     const pluginServers = usePluginServers()
     const platform = usePlatform()
+    const draftDisposers = new Set<(draft: DraftTab) => void>()
+    const notifyDraftDisposed = (draft: DraftTab) => draftDisposers.forEach((dispose) => dispose(draft))
     const [store, setStore, _, ready] = persisted(Persist.window("tabs"), TabStorage.Tabs, [])
 
     const [recent, setRecent, , recentReady] = persisted(Persist.window("tabs.recent"), TabStorage.Recent, {
@@ -293,6 +295,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
 
       memory.remove(tabKey(effect.draft))
       removeDraftPersisted(effect.draft.draftID)
+      notifyDraftDisposed(effect.draft)
     }
 
     onCleanup(memory.dispose)
@@ -370,7 +373,10 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       removeInfo(key)
       removeRegions(key)
 
-      if (tab.type === "draft") removeDraftPersisted(tab.draftID)
+      if (tab.type === "draft") {
+        removeDraftPersisted(tab.draftID)
+        notifyDraftDisposed(tab)
+      }
     }
 
     const preview = createSessionPreview({
@@ -506,6 +512,13 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
 
         return tab
       },
+      onDraftDisposed(dispose: (draft: DraftTab) => void) {
+        draftDisposers.add(dispose)
+
+        return () => {
+          draftDisposers.delete(dispose)
+        }
+      },
       /** Opens a draft tab; pass `draftID` to know it before the draft opens. */
       async newDraft(
         draft: Omit<DraftTab, "type" | "draftID"> & { draftID?: string },
@@ -529,6 +542,10 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       },
       updateDraft(draftID: string, draft: Partial<Omit<DraftTab, "type" | "draftID">>) {
         void startTransition(() => {
+          const previous = store.find((tab): tab is DraftTab => tab.type === "draft" && tab.draftID === draftID)
+
+          if (previous && draft.directory && draft.directory !== previous.directory) notifyDraftDisposed(previous)
+
           setStore(
             (tab) => tab.type === "draft" && tab.draftID === draftID,
             produce((tab) => Object.assign(tab, draft)),

@@ -173,7 +173,7 @@ export function TabNavItem(
   const projectName = createMemo(() => {
     const session = props.session
 
-    if (!session) return
+    if (!session || serverCtx()?.data.project.get(session.projectID)?.experimental?.hidden) return
 
     return displayName(project() ?? { worktree: session.location.directory })
   })

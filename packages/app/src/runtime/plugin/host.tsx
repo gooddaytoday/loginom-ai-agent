@@ -26,6 +26,7 @@ import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry }
 import {
   Page,
   QuestionRenderer,
+  ShellNavigation,
   ToolRenderer,
   type BuiltinCatalog,
   type BuiltinContext,
@@ -836,6 +837,9 @@ function createHost(input: HostInput) {
 
         if (registry.id === Page.id && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add pages")
+
+        if (registry.id === ShellNavigation.id && !input.builtins?.has(plugin))
+          throw new Error("Only built-in plugins can add shell navigation")
 
         let active = toolRenderer
         let claimed: string | undefined

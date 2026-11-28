@@ -160,11 +160,12 @@ story("a restored plugin page shows a loader while waiting for settings and whil
   await host.evaluate((host) => host.unmount())
 })
 
-for (const registry of ["page", "question.renderer"]) {
+for (const registry of ["page", "question.renderer", "shell-navigation"]) {
   story(`a third-party plugin cannot register ${registry} with a public registry token`, async ({ page }) => {
     const result = await page.evaluate(async ({ fixture, registry }) => {
       const { mountPluginHost, Registry, until } = await import(fixture)
       const host = mountPluginHost()
+
       const contribution =
         registry === "page" ? { id: "overview", title: "Third-party page" } : { matches: () => true, render: () => null }
 
@@ -1078,6 +1079,7 @@ story(
 story("the new-session slot renders nothing without a plugin", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
     const { mountPlugins, BuiltinSlot, until } = await import(fixture)
+
     const host = mountPlugins({
       definitions: [
         {
@@ -1088,16 +1090,19 @@ story("the new-session slot renders nothing without a plugin", async ({ page }) 
         },
       ],
     })
+
     try {
       const heading = () => host.container.querySelector('[data-testid="draft-heading"]')
       await until(() => heading()?.textContent === "Draft heading")
       host.define([])
       await until(() => heading()?.textContent === "")
+
       return { elements: heading()?.childElementCount, errors: host.escaped() }
     } finally {
       host.unmount()
     }
   }, fixture)
+
   expect(result).toEqual({ elements: 0, errors: [] })
 })
 

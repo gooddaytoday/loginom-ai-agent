@@ -120,6 +120,7 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`worktree\` text NOT NULL,
           \`vcs\` text,
           \`name\` text,
+          \`hidden\` integer DEFAULT false NOT NULL,
           \`icon_url\` text,
           \`icon_url_override\` text,
           \`icon_color\` text,

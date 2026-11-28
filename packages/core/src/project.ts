@@ -2,7 +2,7 @@ export * as Project from "./project.js"
 
 import { Cache, Context, Duration, Effect, Layer, Schedule, Schema, Scope } from "effect"
 import { ChildProcess } from "effect/process"
-import { and, asc, desc, eq, gte, isNotNull, isNull, lt, lte, ne, sql } from "drizzle-orm"
+import { and, asc, desc, eq, gte, isNotNull, isNull, lt, lte, ne, notExists, or, sql } from "drizzle-orm"
 import path from "path"
 import { AbsolutePath } from "./schema.js"
 import { Bus } from "./bus.js"
@@ -14,8 +14,10 @@ import { AppProcess } from "@opencode/util/process"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { Hash } from "@opencode/util/hash"
 import { ProjectSchema } from "./project/schema.js"
+import type { Project as ProjectContract } from "@opencode/schema/project"
 import { ProjectTable, upsertProject } from "./project/sql.js"
 import { ProjectIcon } from "./project/icon.js"
+import { SessionTable } from "./session/sql.js"
 import { WorktreeTable } from "./worktree/sql.js"
 
 export const ID = ProjectSchema.ID
@@ -35,6 +37,10 @@ export type UpdateInput = ProjectSchema.UpdateInput
 
 export class NotFoundError extends Schema.TaggedError<NotFoundError>()("Project.NotFoundError", {
   projectID: ID,
+}) {}
+
+export class RegistrationError extends Schema.TaggedError<RegistrationError>()("Project.RegistrationError", {
+  message: Schema.String,
 }) {}
 
 export interface Resolved {
@@ -75,6 +81,7 @@ const Now = Context.Reference<() => number>("@opencode/Project/Now", { defaultVa
 export interface ListInput {
   /** Includes archived Projects when true. */
   readonly archived?: boolean
+  readonly includeHidden?: boolean
 }
 
 export interface ResolveOptions {
@@ -89,6 +96,8 @@ export interface ActivateOptions {
 
 export interface Interface {
   readonly list: (input?: ListInput) => Effect.Effect<ReadonlyArray<Info>>
+  readonly register: (input: ProjectContract.RegisterInput) => Effect.Effect<Info, RegistrationError>
+  readonly forget: (id: ID, options?: { includeVisible?: boolean }) => Effect.Effect<void>
   readonly update: (input: UpdateInput) => Effect.Effect<Info, NotFoundError>
   /** Records Project activity for recency ordering, at most once per minute per Project. */
   readonly activate: (projectID: ID, options?: ActivateOptions) => Effect.Effect<void>
@@ -114,6 +123,7 @@ function fromRow(row: typeof ProjectTable.$inferSelect): Info {
     canonical: row.worktree,
     vcs: row.vcs ?? undefined,
     name: row.name ?? undefined,
+    ...(row.hidden ? { experimental: { hidden: true } } : {}),
     icon,
     commands: row.commands ?? undefined,
     time: {
@@ -138,14 +148,17 @@ const layer = Layer.effect(
     const scope = yield* Scope.Scope
 
     const announcing = new Set<string>()
-    const persist = Effect.fnUntraced(function* (project: Resolved) {
+    const persist = Effect.fnUntraced(function* (
+      project: Resolved,
+      metadata?: { readonly name?: string; readonly hidden?: boolean },
+    ) {
       const previous = yield* db
         .select({ canonical: ProjectTable.worktree })
         .from(ProjectTable)
         .where(eq(ProjectTable.id, project.id))
         .get()
         .pipe(Effect.orDie)
-      yield* upsertProject(db, project).pipe(Effect.orDie)
+      yield* upsertProject(db, project, metadata).pipe(Effect.orDie)
       const unarchived = yield* db
         .update(ProjectTable)
         .set({ time_archived: null, time_updated: sql`${ProjectTable.time_updated}` })
@@ -251,7 +264,12 @@ const layer = Layer.effect(
       const rows = yield* db
         .select()
         .from(ProjectTable)
-        .where(input?.archived ? undefined : isNull(ProjectTable.time_archived))
+        .where(
+          and(
+            input?.archived ? undefined : isNull(ProjectTable.time_archived),
+            input?.includeHidden ? undefined : eq(ProjectTable.hidden, false),
+          ),
+        )
         .orderBy(desc(ProjectTable.time_active), asc(ProjectTable.id))
         .all()
         .pipe(Effect.orDie)
@@ -504,7 +522,47 @@ const layer = Layer.effect(
       )
     })
 
-    return Service.of({ list, update, activate, resolve, sweep })
+    const register = Effect.fn("Project.register")(function* (input: ProjectContract.RegisterInput) {
+      const directory = AbsolutePath.make(yield* fs.resolve(input.directory))
+      if (!(yield* fs.isDir(directory))) return yield* new RegistrationError({ message: "Project directory not found" })
+      const resolved = yield* resolve(directory, { persist: false })
+      if (resolved.canonical !== directory)
+        return yield* new RegistrationError({ message: "Directory belongs to another project" })
+      yield* persist(resolved, { name: input.name, hidden: input.experimental?.hidden })
+      const row = yield* db.select().from(ProjectTable).where(eq(ProjectTable.id, resolved.id)).get().pipe(Effect.orDie)
+      if (!row) return yield* Effect.die(new Error("Registered project not found"))
+      const project = fromRow(row)
+      yield* bus.publish(ProjectSchema.Event.Updated, project)
+      return project
+    })
+
+    const forget = Effect.fn("Project.forget")(function* (id: ID, options?: { includeVisible?: boolean }) {
+      const filter = and(
+        eq(ProjectTable.id, id),
+        ne(ProjectTable.id, ID.global),
+        or(eq(ProjectTable.hidden, true), options?.includeVisible ? isNull(ProjectTable.vcs) : undefined),
+      )
+      const row = yield* db
+        .select({ directory: ProjectTable.worktree })
+        .from(ProjectTable)
+        .where(filter)
+        .get()
+        .pipe(Effect.orDie)
+      if (!row || (yield* fs.exists(row.directory).pipe(Effect.orElseSucceed(() => true)))) return
+      yield* db
+        .delete(ProjectTable)
+        .where(
+          and(
+            filter,
+            eq(ProjectTable.worktree, row.directory),
+            notExists(db.select({ id: SessionTable.id }).from(SessionTable).where(eq(SessionTable.project_id, id))),
+          ),
+        )
+        .run()
+        .pipe(Effect.orDie)
+    })
+
+    return Service.of({ list, register, forget, update, activate, resolve, sweep })
   }),
 )
 

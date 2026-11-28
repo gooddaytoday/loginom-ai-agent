@@ -3,17 +3,19 @@ import type { SessionInfo } from "@opencode/client/promise"
 import type { LocalProject } from "@/shell/state/layout"
 import { buildHomeSessionRecords, homeSessionLocation } from "./records"
 
-const session = (id: string, directory: string, projectID: string) =>
+const session = (id: string, directory: string, projectID: string): SessionInfo =>
   ({
     id,
     projectID,
     title: id,
     location: { directory },
     time: { created: 1, updated: 1 },
-  }) as SessionInfo
+    cost: 0,
+    tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+  })
 
 describe("buildHomeSessionRecords", () => {
-  const opened = { id: "project-a", worktree: "/repo/a" } as LocalProject
+  const opened: LocalProject = { id: "project-a", worktree: "/repo/a" }
   const sessions = [session("a", "/repo/a", "project-a"), session("b", "/repo/b", "project-b")]
 
   test("includes sessions outside added projects when unfiltered", () => {
@@ -25,6 +27,18 @@ describe("buildHomeSessionRecords", () => {
 
     expect(records.map((record) => record.session.id)).toEqual(["a", "b"])
     expect(records[1]?.project).toMatchObject({ id: "project-b", worktree: "/repo/b" })
+  })
+
+  test("does not label a conversation with its hidden workspace folder", () => {
+    const [record] = buildHomeSessionRecords({
+      sessions: () => [session("Review results", "/managed/2026-11-28 initial prompt", "private-workspace")],
+      projectDirectories: () => undefined,
+      projects: () => [],
+      hiddenProject: (id) => id === "private-workspace",
+    })
+
+    expect(record?.session.title).toBe("Review results")
+    expect(record?.projectName).toBe("")
   })
 
   test("filters sessions when a project is selected", () => {
@@ -49,7 +63,7 @@ describe("buildHomeSessionRecords", () => {
   })
 
   test("prefers the added project whose directory matches over a sibling entry with the same ID", () => {
-    const nested = { id: "project-a", worktree: "/repo/a/packages/app" } as LocalProject
+    const nested: LocalProject = { id: "project-a", worktree: "/repo/a/packages/app" }
 
     const records = buildHomeSessionRecords({
       sessions: () => [session("n", "/repo/a/packages/app", "project-a")],
