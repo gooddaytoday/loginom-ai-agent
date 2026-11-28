@@ -986,13 +986,18 @@ export async function createBridge(config, session, { browserTransport: managedB
       closing ??= (async () => {
         const normalCleanup = config.closeSavedPackageOnShutdown === true;
         let lifecycleCleanupFailed=false;
-        for(const cleanup of [()=>actionRuntime?.closeArtifactDeliveries({
-          verifyCancelled:normalCleanup&&!recovery.unsettled()&&!clipboardUncertain&&heldLeases.size===0,
-        }),()=>actionRuntime?.closeNodeOperations?.(),
-          ()=>actionRuntime?.cleanupServerCache(),()=>recovery.close()]){
+        let artifactVerificationExpired=false;
+        try {
+          const delivery=await actionRuntime?.closeArtifactDeliveries({
+            verifyCancelled:normalCleanup&&!recovery.unsettled()&&!clipboardUncertain&&heldLeases.size===0,
+          });
+          artifactVerificationExpired=delivery?.verificationDeadlineElapsed===true;
+          lifecycleCleanupFailed=artifactVerificationExpired;
+        } catch {lifecycleCleanupFailed=true;}
+        for(const cleanup of [()=>actionRuntime?.closeNodeOperations?.(),()=>actionRuntime?.cleanupServerCache(),()=>recovery.close()]){
           try{await cleanup();}catch{lifecycleCleanupFailed=true;}
         }
-        if(config.storageDirectories&&actionRuntime){
+        if(config.storageDirectories&&actionRuntime&&!artifactVerificationExpired){
           // Diagnostics are read without the connection guard, including after
           // a disconnect. They never certify package or transport cleanup.
           try{
@@ -1142,7 +1147,8 @@ export async function createBridge(config, session, { browserTransport: managedB
             ...(normalCleanup ? {package_path:packagePath ?? null, policy:unsavedDraft?'unsaved_draft':openedPackage||failedOpen?'opened_saved_package':'last_confirmed_own_save'} : {})};
           try {
             await writeFile(join(session.directory,normalCleanup?'saved-package-cleanup.json':'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
-            await recordExecution({event:normalCleanup?'managed_saved_package_cleanup':config.acceptanceCleanupPackage?'isolated_package_cleanup':'saved_package_cleanup', cleanup});
+            // An expired verification can still occupy the journal queue.
+            if(!artifactVerificationExpired)await recordExecution({event:normalCleanup?'managed_saved_package_cleanup':config.acceptanceCleanupPackage?'isolated_package_cleanup':'saved_package_cleanup', cleanup});
           } catch (error) {
             if (config.acceptanceCleanupPackage) throw error;
             cleanup = {...cleanup, status:'BLOCKED', reason:'CLEANUP_EVIDENCE_UNCONFIRMED'};

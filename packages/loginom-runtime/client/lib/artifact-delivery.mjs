@@ -20,18 +20,18 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
  };
  const snapshot=job=>structuredClone({operation_id:job.id,state:job.state,phase:job.phase,
   upload_operation_id:job.uploadId,outcome:job.outcome??null,error:job.error??null,...(job.largeUpload?{status:job.status,bytes:job.bytes??0,total_bytes:job.artifact.bytes,percent:job.artifact.bytes?Math.min(100,(job.bytes??0)/job.artifact.bytes*100):job.status==='ready'?100:0,elapsed_ms:now()-job.started,deadline_at:job.deadline,poll_after_ms:5000}: {})});
- const recordCompletion=async(job,artifact,proof)=>{
+ const completionProof=(job,artifact,proof)=>{
   requireValue(proof?.bytes_verified===true&&proof.upload_completion_verified===true&&proof.destination===artifact.upload.destination
     &&proof.bytes===artifact.bytes&&proof.sha256===artifact.sha256,'Final transfer proof mismatch');
-  const result={status:'SUCCEEDED',upload_operation_id:job.uploadId,destination:proof.destination,bytes:proof.bytes,sha256:proof.sha256,
-    verification_id:proof.verification_id,cleanup_complete:true,upload_completion_verified:true};
-  await acknowledge(job,'artifact_delivery_completed',{result});
-  return result;
+  return {upload_operation_id:job.uploadId,destination:proof.destination,bytes:proof.bytes,sha256:proof.sha256,
+    verification_id:proof.verification_id,cleanup_complete:true};
  };
  const finish=async(job,artifact,final)=>{
   const outcome=final.output?.outcome;
   requireValue(final.output?.state==='resolved'&&final.output?.cleanup_confirmed===true&&outcome.status==='SUCCEEDED','Final transfer proof mismatch');
-  job.outcome=await recordCompletion(job,artifact,outcome.output?.server_copy_verification);job.phase='completed';job.error=null;
+  const result={status:'SUCCEEDED',...completionProof(job,artifact,outcome.output?.server_copy_verification),upload_completion_verified:true};
+  await acknowledge(job,'artifact_delivery_completed',{result});
+  job.outcome=result;job.phase='completed';job.error=null;
  };
  async function run(job,artifact,signal,resumeId=null,shutdownDeadline) {
   let submitted=job.uploadStarted===true,effectPossible=submitted;
@@ -314,7 +314,14 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    let shutdownResult;
    const verification=await runtime.verifyDeliveredArtifact({operationId:job.uploadId,verificationId:job.id+(duringShutdown?':shutdown-verify':':verify'),
     observationId:destination.observation_id,signal,onDispatched:()=>{job.verificationStarted=true;job.verificationState='dispatched';},
-    ...(duringShutdown?{shutdownDeadline,acknowledgeShutdown:async proof=>{shutdownResult=await recordCompletion(job,artifact,proof);}}:{})});
+    ...(duringShutdown?{shutdownDeadline,acknowledgeShutdown:async proof=>{
+     const evidence=completionProof(job,artifact,proof);
+     await acknowledge(job,'artifact_delivery_verification_proof',{proof:evidence,deadline_at:deadline});
+     return ()=>{
+      shutdownResult={status:'SUCCEEDED',...evidence,upload_completion_verified:true};
+      return acknowledge(job,'artifact_delivery_completed',{result:shutdownResult});
+     };
+    }}:{})});
    if(job.conflictRejected&&verification.status!=='SUCCEEDED'&&verification.cleanup_complete===true)job.verificationState='settled';
    const lostVerification=!duringShutdown&&verification.error?.code==='BROWSER_CALL_UNCERTAIN';
    requireValue(lostVerification||verification.status==='SUCCEEDED'&&verification.cleanup_complete===true&&verification.output?.bytes_verified===true,'Destination bytes require inspection');
@@ -459,9 +466,20 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    if(now()>=deadline)return;
    const artifact=artifactStore.getUploadGrant(job.artifact.artifact_id,job.artifact.upload.grant_id);
    if(JSON.stringify(artifact)!==JSON.stringify(job.artifact))return;
+   const controller=new AbortController();
+   let timer;
+   const expired=new Promise(resolve=>{
+    timer=setTimeout(()=>{
+     controller.abort(Error('Artifact verification deadline elapsed'));
+     resolve(true);
+    },Math.max(0,deadline-now()));
+   });
    active=job;job.state='running';
-   job.promise=run(job,artifact,undefined,null,deadline);
-   await job.promise;
+   try {
+    job.promise=run(job,artifact,controller.signal,null,deadline);
+    const verificationDeadlineElapsed=await Promise.race([job.promise.then(()=>job.phase!=='completed'&&now()>=deadline),expired]);
+    return {verificationDeadlineElapsed};
+   } finally {clearTimeout(timer);}
   },
  });
 }

@@ -2489,7 +2489,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // Shutdown uses one absolute cutoff through readback, hashing, cleanup and
     // durable delivery acknowledgement. Receipt recovery uses it as well.
     const checkDeadline=()=>{
-      if(attempt.acknowledgeShutdown&&now()>=attempt.deadline)throw Error('Artifact verification deadline elapsed');
+      if(!attempt.acknowledgeShutdown)return;
+      attempt.shutdownSignal?.throwIfAborted();
+      if(now()>=attempt.deadline)throw Error('Artifact verification deadline elapsed');
     };
     checkDeadline();
     if(!attempt.rawRecorded) {
@@ -2540,17 +2542,27 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           ...(attempt.checkpoint.existing_file_check?{existing_file_reused:true,artifact_id:artifact.artifact_id,bytes:artifact.bytes,sha256:artifact.sha256}:{}),
           transfer_postcondition:'destination_bytes_digest_and_size',server_copy_verification:summary}};
       const completedVerification={...structuredClone(outcome),output:{...outcome.output,upload_completion_verified:true}};
-      if(!attempt.transferRecorded) {await remember(operation,'transfer_completed',completedUpload);attempt.transferRecorded=true;checkDeadline();}
-      await remember(attempt,'verification_completed',completedVerification);
-      checkDeadline();
+      let publishShutdown;
       if(attempt.acknowledgeShutdown){
-        await attempt.acknowledgeShutdown(summary);
+        publishShutdown=await attempt.acknowledgeShutdown(summary);
         checkDeadline();
+      } else {
+        if(!attempt.transferRecorded) {await remember(operation,'transfer_completed',completedUpload);attempt.transferRecorded=true;}
+        await remember(attempt,'verification_completed',completedVerification);
       }
       operation.outcome=completedUpload;operation.transportUncertain=false;operation.cleanupConfirmed=true;
       attempt.outcome=completedVerification;attempt.settled=true;
       auxiliary.set(attempt.id,{signature:attempt.signature,outcome:structuredClone(completedVerification)});
       if(pending===operation)pending=null;
+      if(publishShutdown){
+        // The proof was durably acknowledged before settlement. These records
+        // report the committed verdict and are followed by the bridge audit.
+        void Promise.allSettled([
+          remember(operation,'transfer_completed',completedUpload),
+          remember(attempt,'verification_completed',completedVerification),
+          publishShutdown(),
+        ]);
+      }
       return completedVerification;
     }
     if(attempt.checkpoint.existing_file_check&&raw.cleanup_complete===true){
@@ -4375,9 +4387,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       buildDownload(options);
       running=true;
       try {
-        if(duringShutdown)await operation.verification.lease.release();
+        if(duringShutdown){await operation.verification.lease.release();signal?.throwIfAborted();}
         const lease=await artifactStore.stageDownload(operation.parameters.artifact_id);
-        const attempt={id:verificationId,signature,lease,...(duringShutdown?{acknowledgeShutdown}:{}),action:{action_key:'artifact.verify',revision:'1',capability:'artifact.verify'},
+        const attempt={id:verificationId,signature,lease,...(duringShutdown?{acknowledgeShutdown,shutdownSignal:signal}:{}),action:{action_key:'artifact.verify',revision:'1',capability:'artifact.verify'},
           parameters:{upload_operation_id:operationId,observation_id:observationId,file_ref:fileRef},checkpoint:{artifact:options.artifact,
             ...(existingFile?{existing_file_check:true}:{}),
             ...(discover?{discovery:{workflow_ref:snapshot.workflow_ref,document:snapshot.dom_epoch.document,active_tab_ref:snapshot.active_tab_ref}}:{})},deadline:shutdownDeadline??now()+60000};
