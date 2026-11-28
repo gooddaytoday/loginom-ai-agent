@@ -1,5 +1,11 @@
 import { createKeyed, SettingsPage, type Plugin } from "@opencode/plugin/gui"
-import { ShellNavigation, type NavigationActivity, type NavigationSession, type ShellNavigationInput } from "@opencode/plugin/gui/builtin"
+import {
+  Page as PluginPage,
+  ShellNavigation,
+  type NavigationActivity,
+  type NavigationSession,
+  type ShellNavigationInput,
+} from "@opencode/plugin/gui/builtin"
 import { createMemo, lazy, Suspense } from "solid-js"
 import type definition from "./index"
 import { availableProjectName, conversationTitle, ManagedFolders } from "./folders"
@@ -59,6 +65,19 @@ function Navigation(props: {
 }
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
+  const Catalog = lazy(() => import("./catalog-page"))
+  ctx.add(PluginPage, {
+    id: "catalog",
+    nav: {},
+    get title() {
+      return ctx.t("catalog.title")
+    },
+    render: () => (
+      <Suspense>
+        <Catalog />
+      </Suspense>
+    ),
+  })
   const Page = lazy(() => import("./page"))
   ctx.add(SettingsPage, {
     id: "loginom",

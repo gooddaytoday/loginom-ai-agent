@@ -58,7 +58,7 @@ export const AcknowledgeRecovery = Schema.Struct({ revision: NonNegativeInt, ids
 export type API = {
   read(): Promise<View>
   status(): Promise<View>
-  check(candidate: Candidate, settings?: boolean): Promise<typeof Validation.Type>
+  check(candidate: Candidate, settings?: boolean, signal?: AbortSignal): Promise<typeof Validation.Type>
   save(input: typeof Save.Type, settings?: boolean): Promise<View>
   cancelPending(input: typeof Cancel.Type): Promise<View>
   acknowledgeRecovery(input: typeof AcknowledgeRecovery.Type): Promise<View>

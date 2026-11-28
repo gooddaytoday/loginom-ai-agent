@@ -454,6 +454,11 @@ export type SessionMessageCompactionRunning = {
   summary: string
 }
 
+export type SessionMessageInterruption = {
+  reason: "user" | "shutdown" | "superseded" | "inactivity" | "restart"
+  lastKnown?: { at: number; stepID?: SessionMessageID }
+}
+
 export type UsageLimitsBudgetModel = { providerID: ProviderID; modelID: string; name: string; spent?: MoneyUSD }
 
 export type SessionGenerateResponse = { data: { text: string; tokens: TokenUsageInfo; cost: MoneyUSD } }
@@ -582,15 +587,6 @@ export type SessionMessageCompactionFailed = {
   error: SessionStructuredError
   cost?: MoneyUSD
   tokens?: TokenUsageInfo
-}
-
-export type SessionMessageIdle = {
-  id: SessionMessageID
-  metadata?: { [x: string]: JsonValue }
-  time: { created: number }
-  type: "idle"
-  outcome: "succeeded" | "failed" | "interrupted"
-  error?: SessionStructuredError
 }
 
 export type FormNumberField = {
@@ -1101,6 +1097,16 @@ export type ModelVariant = {
 
 export type PermissionRuleset = Array<PermissionRule>
 
+export type SessionMessageIdle = {
+  id: SessionMessageID
+  metadata?: { [x: string]: JsonValue }
+  time: { created: number }
+  type: "idle"
+  outcome: "succeeded" | "failed" | "interrupted"
+  error?: SessionStructuredError
+  interruption?: SessionMessageInterruption
+}
+
 export type UsageLimitsBudget = {
   id: string
   limit: MoneyUSD
@@ -1353,7 +1359,11 @@ export type SessionExecutionInterrupted = {
   type: "session.execution.interrupted"
   durable: { aggregateID: string; seq: EventSeq; version: 1 }
   location?: LocationRef
-  data: { sessionID: SessionID; reason: "user" | "shutdown" | "superseded" | "inactivity" }
+  data: {
+    sessionID: SessionID
+    reason: "user" | "shutdown" | "superseded" | "inactivity" | "restart"
+    lastKnown?: { at: number; stepID?: SessionMessageID }
+  }
 }
 
 export type SessionInstructionsUpdated = {
