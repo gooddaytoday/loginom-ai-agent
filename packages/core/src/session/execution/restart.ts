@@ -46,14 +46,11 @@ export interface Options {
    * commands still run and report, but no recovered notice wakes a session: it waits for the user.
    */
   readonly resumeTurns?: boolean
-  /** Tools that require the user to check state before continuing a turn found unfinished at startup. */
-  readonly blocksResumeForTool?: (tool: string) => boolean
 }
 
 const DEFAULT_MAX_ATTEMPTS = 10
 
 type Notices = Pick<Session.Interface, "synthetic">
-type Parked = ReadonlyMap<SessionSchema.ID, SessionMessage.Interruption["lastKnown"]>
 
 export interface Interface {
   /**
@@ -101,10 +98,7 @@ export const layer = (options?: Options) =>
 
       const wake = Effect.fnUntraced(function* (sessionID: SessionSchema.ID) {
         const owner = yield* store.get(sessionID)
-        if (!owner || owner.revert) return
-        if (!(yield* execution.isActive(sessionID)) && (yield* SessionHistory.wasInterruptedByRestart(db, sessionID)))
-          return
-        yield* execution.wake(sessionID)
+        if (owner && !owner.revert) yield* execution.wake(sessionID)
       })
 
       const prepareResume = Effect.fnUntraced(function* (sessionID: SessionSchema.ID) {
@@ -358,7 +352,7 @@ export const layer = (options?: Options) =>
         background: Job.Background,
         recovery: Extract<Job.Recovery, { kind: "subagent" }>,
         notices: Notices,
-        parked: Parked,
+        lastKnown: SessionMessage.Interruption["lastKnown"],
       ): Effect.fn.Return<boolean> {
         const child = yield* store.get(recovery.childSessionID)
         if (!child || child.parentID !== recovery.parentSessionID || !(yield* store.get(recovery.parentSessionID))) {
@@ -373,8 +367,8 @@ export const layer = (options?: Options) =>
         }
 
         if (yield* execution.isActive(recovery.childSessionID)) return false
-        if (options?.resumeTurns === false || parked.has(recovery.childSessionID)) {
-          yield* leaveToUser(recovery.childSessionID, parked.get(recovery.childSessionID))
+        if (options?.resumeTurns === false) {
+          yield* leaveToUser(recovery.childSessionID, lastKnown)
           yield* deliverSubagentSafe(notices, background.notificationID, recovery, {
             status: "cancelled",
             error: SUBAGENT_LEFT,
@@ -425,16 +419,11 @@ export const layer = (options?: Options) =>
           const suspended = new Set(
             [...(yield* store.listSuspended()), ...children].filter((sessionID) => !active.has(sessionID)),
           )
-          const parked = new Map<SessionSchema.ID, SessionMessage.Interruption["lastKnown"]>()
-          if (options?.resumeTurns === false || options?.blocksResumeForTool) {
+          const lastKnown = new Map<SessionSchema.ID, SessionMessage.Interruption["lastKnown"]>()
+          if (options?.resumeTurns === false) {
+            // Recovery can update messages, so capture the last activity before settling any jobs.
             for (const sessionID of suspended) {
-              // Capture only what the old process persisted, before reattaching tools or admitting recovery notices.
-              const turn = yield* SessionHistory.readTurnForRestart(
-                db,
-                sessionID,
-                options.resumeTurns === false ? undefined : options.blocksResumeForTool,
-              )
-              if (options.resumeTurns === false || turn.blocked) parked.set(sessionID, turn.lastKnown)
+              lastKnown.set(sessionID, yield* SessionHistory.lastKnownActivity(db, sessionID))
             }
           }
           const state = { defer: true }
@@ -493,7 +482,7 @@ export const layer = (options?: Options) =>
             Effect.fnUntraced(function* (background) {
               const recovery = background.recovery
               if (recovery.kind !== "subagent" || !(yield* recoverable(background))) return
-              if (yield* recoverSubagent(background, recovery, notices, parked))
+              if (yield* recoverSubagent(background, recovery, notices, lastKnown.get(recovery.childSessionID)))
                 resumable.push({ background, recovery })
             }),
             { discard: true },
@@ -504,10 +493,9 @@ export const layer = (options?: Options) =>
           const resumed = yield* execution.active
           const direct = yield* Effect.filter(
             (yield* store.listSuspended()).filter((sessionID) => !resumed.has(sessionID) && !children.has(sessionID)),
-            (sessionID) =>
-              options?.resumeTurns === false || parked.has(sessionID)
-                ? leaveToUser(sessionID, parked.get(sessionID))
-                : prepareResume(sessionID),
+            options?.resumeTurns === false
+              ? (sessionID) => leaveToUser(sessionID, lastKnown.get(sessionID))
+              : prepareResume,
           )
           yield* Effect.forEach(
             direct,

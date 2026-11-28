@@ -1,7 +1,7 @@
 import { expect } from "bun:test"
 import path from "node:path"
 import { OpenCode } from "@opencode/client"
-import { Effect, Exit, Option, Scope } from "effect"
+import { Effect, Exit, Option, Schedule, Scope } from "effect"
 import { HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http"
 import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
@@ -224,8 +224,9 @@ it.live("pairing links sign in browsers with a cookie and API clients with a tok
     expect(redeemed.status).toBe(200)
     const session = (yield* Effect.promise(() => redeemed.json())) as { token: string }
     expect(
-      (yield* request("/api/info", { headers: { authorization: `Basic ${btoa(`loginom-ai-agent:${session.token}`)}` } }))
-        .status,
+      (yield* request("/api/info", {
+        headers: { authorization: `Basic ${btoa(`loginom-ai-agent:${session.token}`)}` },
+      })).status,
     ).toBe(200)
     expect((yield* request(`/auth/connect/${client.code}`)).status).toBe(401)
     expect((yield* request("/auth/connect/unknown")).status).toBe(401)
@@ -252,9 +253,9 @@ it.live("server info lists remote URLs alongside local addresses while they are 
     const base = HttpServer.formatAddress(server.address)
     const info = () =>
       Effect.promise(() =>
-        fetch(new URL("/api/info", base), { headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` } }).then(
-          (response) => response.json() as Promise<{ urls: ReadonlyArray<string> }>,
-        ),
+        fetch(new URL("/api/info", base), {
+          headers: { authorization: `Basic ${btoa("loginom-ai-agent:secret")}` },
+        }).then((response) => response.json() as Promise<{ urls: ReadonlyArray<string> }>),
       )
 
     expect((yield* info()).urls).toEqual([base, "https://example.opentunnel.xyz"])
@@ -311,12 +312,10 @@ it.live(
         ),
       )
 
-      const window = modelProbe("window disconnect probe", true)
+      const window = modelProbe("window disconnect probe")
       const manual = modelProbe("user stop probe")
-      const loginom = modelProbe("Loginom restart probe", true)
-      const ordinary = modelProbe("ordinary restart probe")
-      const probes = [ordinary, loginom, manual, window]
-      let restarted = false
+      const loginom = modelProbe("Loginom restart probe")
+      const probes = [window, manual, loginom]
       const model = Bun.serve({
         hostname: "127.0.0.1",
         port: 0,
@@ -326,9 +325,8 @@ it.live(
           if (!probe || new URL(request.url).pathname !== "/v1/chat/completions" || !body.includes('"model":"chat"'))
             return new Response("Unexpected model request", { status: 422 })
           probe.requests++
-          if (!restarted && probe.withTool && probe.requests === 1) return modelStream({ tool: true })
-          if (restarted) probe.recovered.resolve()
-          return modelStream(restarted ? {} : { probe })
+          if (probe === loginom && probe.requests === 1) return modelStream({ tool: true })
+          return modelStream({ probe })
         },
       })
       yield* Effect.addFinalizer(() => Effect.promise(() => model.stop(true)))
@@ -344,6 +342,7 @@ it.live(
             database: { path: path.join(dir, "sessions.db") },
             events: { persist: true },
             models: { fetch: false, snapshot: false },
+            resumeTurns: false,
             fs: { filewatcher: false, fff: false },
             config: {
               directory: config,
@@ -413,43 +412,42 @@ it.live(
         const pending = await create("Loginom recovery")
         await first.api.session.prompt({ sessionID: pending.id, text: loginom.prompt })
         await loginom.started.promise
-        const history = await first.api.message.list({ sessionID: pending.id })
-        expect(history.data).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({
-              type: "assistant",
-              content: expect.arrayContaining([
-                expect.objectContaining({
-                  type: "tool",
-                  name: "loginom_find",
-                  state: expect.objectContaining({ status: "completed" }),
-                }),
-              ]),
-            }),
-          ]),
-        )
-        // Reuse the successful Loginom session to exercise a later turn without Loginom tools.
-        await first.api.session.prompt({ sessionID: live.id, text: ordinary.prompt })
-        await ordinary.started.promise
-        return { loginom: pending.id, ordinary: live.id, stopped: stopped.id }
+        return { loginom: pending.id, stopped: stopped.id }
       })
+      const steps = yield* Effect.promise(() =>
+        first.api.message.list({ sessionID: before.loginom, type: "assistant", order: "desc", limit: 2 }),
+      ).pipe(
+        Effect.repeat({ schedule: Schedule.spaced("20 millis"), until: (history) => history.data.length === 2 }),
+        Effect.timeout("10 seconds"),
+      )
+      const [step, toolStep] = steps.data
+      if (step?.type !== "assistant" || toolStep?.type !== "assistant") throw new Error("Missing steps before restart")
+      expect(toolStep.content).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: "tool",
+            name: "loginom_find",
+            state: expect.objectContaining({ status: "completed" }),
+          }),
+        ]),
+      )
       yield* Scope.close(firstScope, Exit.void)
       for (const probe of probes) probe.release.resolve()
-      restarted = true
       const beforeRestart = Date.now()
       const second = yield* boot
+      // Startup recovery runs independently of the server accepting requests.
+      yield* Effect.promise(() => second.api.session.get({ sessionID: before.loginom })).pipe(
+        Effect.repeat({
+          schedule: Schedule.spaced("20 millis"),
+          until: (session) => session.outcome === "interrupted",
+        }),
+        Effect.timeout("10 seconds"),
+      )
       yield* Effect.promise(async () => {
-        // Recovery runs in the background. A request to the ordinary turn proves it reached the auto-resume path.
-        await ordinary.recovered.promise
-        await second.api.experimental.session.wait({ sessionID: before.ordinary })
-        await second.api.experimental.session.wait({ sessionID: before.loginom })
-        expect((await second.api.session.get({ sessionID: before.ordinary })).outcome).toBe("succeeded")
-        expect((await second.api.session.get({ sessionID: before.loginom })).outcome).toBe("interrupted")
         const history = await second.api.message.list({ sessionID: before.loginom, order: "desc" })
-        const step = history.data.find((message) => message.type === "assistant")
         const end = history.data.find((message) => message.type === "idle")
         const known = end?.interruption?.lastKnown
-        if (!known || !step) throw new Error("Missing restart progress")
+        if (!known) throw new Error("Missing restart progress")
         expect(end?.interruption?.reason).toBe("restart")
         expect(known.stepID).toBe(step.id)
         expect(known.at).toBeGreaterThanOrEqual(step.time.created)
@@ -459,20 +457,18 @@ it.live(
           { data: end?.interruption },
         ])
         expect(await interruptionLog(second.api, before.stopped)).toMatchObject([{ data: { reason: "user" } }])
-        expect([window.requests, manual.requests, loginom.requests, ordinary.requests]).toEqual([2, 1, 2, 2])
+        expect([window.requests, manual.requests, loginom.requests]).toEqual([1, 1, 2])
       })
     }),
   45_000,
 )
 
-function modelProbe(prompt: string, withTool = false) {
+function modelProbe(prompt: string) {
   return {
     prompt,
-    withTool,
     requests: 0,
     started: Promise.withResolvers<void>(),
     release: Promise.withResolvers<void>(),
-    recovered: Promise.withResolvers<void>(),
   }
 }
 

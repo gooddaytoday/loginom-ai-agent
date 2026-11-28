@@ -1409,8 +1409,18 @@ describe("SessionRestart background recovery", () => {
       const jobs = yield* Job.Service
       const parent = Session.ID.make("ses_subagent_left_parent")
       const child = Session.ID.make("ses_subagent_left_child")
-      yield* seedSessions(database, [parent], { time_suspended: Date.now() })
-      yield* seedSessions(database, [child], { parent_id: parent, time_suspended: Date.now() })
+      const claimedAt = Date.now()
+      yield* seedSessions(database, [parent], { time_suspended: claimedAt })
+      yield* seedSessions(database, [child], { parent_id: parent, time_suspended: claimedAt })
+      const assistantMessageID = SessionMessage.ID.create()
+      const stepStartedAt = Date.now()
+      yield* bus.publish(SessionEvent.Step.Started, {
+        sessionID: parent,
+        assistantMessageID,
+        agent: Agent.ID.make("build"),
+        model: { id: ID.make("fixture"), providerID: Provider.ID.make("test") },
+        started: stepStartedAt,
+      })
       yield* jobs.start({
         id: child,
         type: "subagent",
@@ -1447,9 +1457,14 @@ describe("SessionRestart background recovery", () => {
 
       // Neither turn ran; both ended interrupted, with no restart notice, and their claims are released.
       expect(drained).toEqual([])
-      expect(interrupted.map((event) => event.data)).toMatchObject([
-        { sessionID: child, reason: "restart", lastKnown: { at: expect.any(Number) } },
-        { sessionID: parent, reason: "restart", lastKnown: { at: expect.any(Number) } },
+      expect(interrupted.map((event) => event.data)).toEqual([
+        { sessionID: child, reason: "restart", lastKnown: { at: claimedAt } },
+        { sessionID: parent, reason: "restart", lastKnown: { at: expect.any(Number), stepID: assistantMessageID } },
+      ])
+      expect(interrupted[1]?.data.lastKnown?.at).toBeGreaterThanOrEqual(stepStartedAt)
+      const store = yield* SessionStore.Service
+      expect(yield* store.messages({ sessionID: parent, type: "idle" })).toMatchObject([
+        { interruption: { reason: "restart", lastKnown: interrupted[1]?.data.lastKnown } },
       ])
       expect(notices).toEqual([])
       expect(yield* claims(database)).toEqual({ [parent]: false, [child]: false })
@@ -1457,66 +1472,6 @@ describe("SessionRestart background recovery", () => {
       expect(yield* restarted.pendingBackground).toEqual([])
       expect(yield* SessionInbox.list(database.db, parent)).toMatchObject([
         { payload: { metadata: { source: "subagent", childID: child, state: "cancelled" } } },
-      ])
-    }),
-  )
-
-  it.live("keeps a restarted parent parked when a recovered child reports", () =>
-    Effect.gen(function* () {
-      const database = yield* Database.Service
-      const bus = yield* Bus.Service
-      const jobs = yield* Job.Service
-      const parent = Session.ID.make("ses_parked_parent")
-      const child = Session.ID.make("ses_recovered_child")
-      yield* seedSessions(database, [parent], { time_suspended: Date.now() })
-      yield* seedSessions(database, [child], { parent_id: parent, time_suspended: Date.now() })
-      const assistantMessageID = SessionMessage.ID.create()
-      yield* bus.publish(SessionEvent.Step.Started, {
-        sessionID: parent,
-        assistantMessageID,
-        agent: Agent.ID.make("build"),
-        model: { id: ID.make("fixture"), providerID: Provider.ID.make("test") },
-        started: Date.now(),
-      })
-      const call = { sessionID: parent, assistantMessageID, id: "call-write" }
-      yield* bus.publish(SessionEvent.Tool.Input.Started, { ...call, name: "loginom_dock_action_run" })
-      yield* bus.publish(SessionEvent.Tool.Called, { ...call, input: {}, executed: false })
-      yield* jobs.start({
-        id: child,
-        type: "subagent",
-        recovery: {
-          kind: "subagent",
-          parentSessionID: parent,
-          childSessionID: child,
-          agent: "explore",
-          description: "Inspect recovery",
-        },
-        run: Effect.never,
-      })
-      yield* jobs.background(child)
-
-      const drained: Session.ID[] = []
-      const scope = yield* Scope.fork(yield* Effect.scope)
-      const restarted = yield* Job.make.pipe(Effect.provideService(Scope.Scope, scope))
-      const context = yield* buildExecution(
-        scope,
-        ({ sessionID }) => Effect.sync(() => void drained.push(sessionID)),
-        { blocksResumeForTool: (tool) => tool === "loginom_dock_action_run" },
-        restarted,
-      )
-      const execution = Context.get(context, SessionExecution.Service)
-      yield* Context.get(context, SessionRestart.Service).resumeSuspendedSessions
-      yield* restarted.wait({ id: child })
-      yield* execution.awaitIdle(child)
-      yield* execution.awaitIdle(parent)
-      expect(drained).toEqual([child])
-      expect(yield* SessionInbox.list(database.db, parent)).toMatchObject([
-        { payload: { metadata: { source: "subagent", childID: child, state: "completed" } } },
-      ])
-      const store = yield* SessionStore.Service
-      const messages = yield* store.messages({ sessionID: parent, type: "idle" })
-      expect(messages).toMatchObject([
-        { interruption: { reason: "restart", lastKnown: { stepID: assistantMessageID } } },
       ])
     }),
   )

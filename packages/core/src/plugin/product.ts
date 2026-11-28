@@ -30,9 +30,6 @@ export const plugins: readonly InternalPlugin[] = [
 ]
 export const ids: readonly string[] = plugins.map((plugin) => plugin.id)
 
-export const blocksResumeForTool = (tool: string) =>
-  tool.startsWith("loginom_") || tool === "dashboard_publish" || tool === "dashboard_delete"
-
 // Whether plugin packages from config and plugin directories load (В-80). The library keeps OpenCode's default for its
 // own tests and embedders; the product server turns packages off (`pluginPackages: false`, `cli/src/server-process.ts`).
 export class Packages extends Context.Service<Packages, { readonly allowed: boolean }>()(
