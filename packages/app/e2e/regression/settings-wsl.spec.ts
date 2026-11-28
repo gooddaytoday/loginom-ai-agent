@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test"
 import { NO_PROVIDER, REMOTE_SERVER, SERVER, project } from "../utils/app"
 import { mockOpenCodeServer } from "../utils/mock-server"
 
-test.use({ viewport: { width: 1280, height: 900 } })
+// Use the fixture's Russian locale without the English preference seeded by the shared E2E config.
+test.use({ storageState: { cookies: [], origins: [] }, viewport: { width: 1280, height: 900 } })
 
 test("desktop settings offer WSL while SSH and pairing stay hidden", async ({ page }) => {
   await mockOpenCodeServer(page, {
@@ -22,9 +23,10 @@ test("desktop settings offer WSL while SSH and pairing stay hidden", async ({ pa
     })}`,
   )
   const settings = page.getByTestId("settings-screen")
-  const server = settings.getByRole("tab", { name: "Серверы", exact: true })
+  const server = settings.getByRole("tab", { name: /^Серверы?$/ })
 
   await expect(server).toBeVisible()
+  await expect(settings.getByRole("tab", { name: "Общие", exact: true })).toBeVisible()
   await expect(settings.getByRole("tab", { name: "Сопряжение", exact: true })).toHaveCount(0)
 
   await server.click()
@@ -45,7 +47,6 @@ test("desktop settings offer WSL while SSH and pairing stay hidden", async ({ pa
   await expect(page.getByLabel("WSL actions")).toHaveText("start:wsl:Ubuntu")
 })
 
-
 test("a narrow WSL row offers a runnable Loginom setup command after installing the CLI", async ({ page, context }) => {
   await page.setViewportSize({ width: 500, height: 900 })
   await context.grantPermissions(["clipboard-read", "clipboard-write"])
@@ -60,8 +61,8 @@ test("a narrow WSL row offers a runnable Loginom setup command after installing 
     `/e2e/utils/settings-wsl.html?${new URLSearchParams({ server: SERVER, mode: "stopped", locale: "ru", cli: "missing" })}`,
   )
   const settings = page.getByTestId("settings-screen")
-  await settings.getByRole("button", { name: "Предпочтения", exact: true }).click()
-  await page.getByRole("menuitemradio", { name: "Серверы", exact: true }).click()
+  await settings.getByRole("button", { name: "Общие", exact: true }).click()
+  await page.getByRole("menuitemradio", { name: /^Серверы?$/ }).click()
   const ubuntu = settings.getByRole("region", { name: "Ubuntu", exact: true })
   const hint = ubuntu.getByText("Чтобы инструменты Loginom работали в WSL, выполните loginom setup в дистрибутиве")
   await expect(hint).toHaveCount(0)

@@ -127,6 +127,16 @@ export function withSystemProxy(entries: readonly Entry[], proxy: Effect.Success
   return entries.map((entry): Entry => {
     const main = entry.mainEntry
 
+    if (entry.id === "wsl" && main) {
+      return {
+        ...entry,
+        mainEntry: async () => {
+          const { loginomWslMain } = await import("@opencode/gui-plugins/loginom-gui/wsl-main")
+          return { default: loginomWslMain(() => proxy.setting().enabled) }
+        },
+      }
+    }
+
     if (entry.id !== "loginom-gui" || !main) return entry
 
     return {

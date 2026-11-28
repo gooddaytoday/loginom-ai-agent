@@ -778,7 +778,7 @@ export const builtins = compose({
   pairing: { ...pairing, mainEntry: () => import("./pairing/main") },
   updater: { ...updater, mainEntry: () => import("./updater/main") },
   ssh: { ...ssh, mainEntry: () => import("./ssh/main") },
-  wsl: { ...wsl, mainEntry: () => import("./wsl/main") },
+  wsl: { ...wsl, mainEntry: () => import("./loginom-gui/wsl-main") },
   "microsoft-office": microsoftOffice,
   sources,
   goal,

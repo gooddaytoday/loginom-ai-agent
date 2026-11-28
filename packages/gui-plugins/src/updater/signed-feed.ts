@@ -16,7 +16,7 @@ import type { AppUpdater } from "electron-updater"
 
 type UpdateChannel = "stable" | "unstable"
 declare const LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY: string | null
-const updateKeys =
+export const updateKeys =
   typeof LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY !== "undefined" && LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY
     ? [LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY]
     : UPDATE_PUBLIC_KEYS
@@ -130,8 +130,8 @@ function updateSources(
 
 // Only transport failures carry this type. Parsing, signature, TLS trust and
 // target validation errors must never select another source.
-class UpdateTransportError extends Error {}
-class UpdateHttpError extends Error {
+export class UpdateTransportError extends Error {}
+export class UpdateHttpError extends Error {
   readonly statusCode: number
   constructor(statusCode: number) {
     super("LOGINOM_UPDATE_FEED_HTTP_" + statusCode)
@@ -139,7 +139,7 @@ class UpdateHttpError extends Error {
   }
 }
 
-function isUpdateTransportError(error: unknown) {
+export function isUpdateTransportError(error: unknown) {
   if (error instanceof UpdateTransportError) return true
   if (!(error instanceof Error)) return false
   const failure = error as Error & { code?: string; statusCode?: number }
@@ -240,18 +240,10 @@ export async function loadSignedUpdate(input: {
       } else {
         feed = source.feed
       }
-      const transport = (url: string) => {
-        if (source.kind !== "s3") return url
-        if (!source.config) throw Error("LOGINOM_UPDATE_S3_CONFIG_UNAVAILABLE")
-        const original = new URL(url)
-        const signed = presignUpdateGet(source.config, original.pathname.slice(1))
-        if (new URL(signed).origin !== original.origin) throw Error("LOGINOM_UPDATE_S3_TARGET_INVALID")
-        return signed
-      }
       // Sequential reads ensure an invalid primary signature is never hidden by
       // a racing transport error. Every request has a total wall-clock deadline.
-      const raw = await read(transport(new URL(input.file, feed).href))
-      const signature = await read(transport(new URL(input.file + ".sig", feed).href))
+      const raw = await read(updateAssetUrl(source, feed, input.file))
+      const signature = await read(updateAssetUrl(source, feed, input.file + ".sig"))
       const signed = verifyUpdateManifest(raw, signature.toString("utf8"), feed, input.keys)
       if (release && release.tag_name !== "v" + signed.version) throw Error("LOGINOM_UPDATE_RELEASE_MISMATCH")
       // An older signed feed (an S3 mirror behind GitHub, or an installed
@@ -261,12 +253,7 @@ export async function loadSignedUpdate(input: {
         source: source.kind,
         feed,
         signed,
-        url: (file, signed = true) =>
-          source.kind === "github"
-            ? new URL(file.slice(file.lastIndexOf("/") + 1), feed).href
-            : signed
-              ? transport(new URL(file.startsWith("releases/") ? "../" + file : file, feed).href)
-              : new URL(file.startsWith("releases/") ? "../" + file : file, feed).href,
+        url: (file, signed) => updateAssetUrl(source, feed, file, signed),
       }
     } catch (error) {
       if (source.kind === "github" && error instanceof UpdateHttpError && error.statusCode === 404) return undefined
@@ -275,6 +262,18 @@ export async function loadSignedUpdate(input: {
     }
   }
   throw Error("LOGINOM_UPDATE_SOURCES_UNAVAILABLE (" + failures.join("; ") + ")")
+}
+
+/** Resolve flat GitHub assets or immutable release paths in the configured update feed. */
+export function updateAssetUrl(source: UpdateSource, feed: string, file: string, signed = true) {
+  if (source.kind === "github") return new URL(file.slice(file.lastIndexOf("/") + 1), feed).href
+
+  const target = new URL(file.startsWith("releases/") ? "../" + file : file, feed)
+  if (source.kind !== "s3" || !signed) return target.href
+  if (!source.config) throw Error("LOGINOM_UPDATE_S3_CONFIG_UNAVAILABLE")
+  const url = presignUpdateGet(source.config, target.pathname.slice(1))
+  if (new URL(url).origin !== target.origin) throw Error("LOGINOM_UPDATE_S3_TARGET_INVALID")
+  return url
 }
 
 export function updateNotificationLink(selected: SelectedUpdate, file: string) {

@@ -25,15 +25,13 @@ export async function downloadWslArchive(input: {
   keys?: readonly string[]
 }) {
   const name = wslArchiveName(input.version)
-  const [checksum, signature] = await Promise.all([input.get(name + ".sha256"), input.get(name + ".sha256.sig")])
-  if (!checksum.ok || !signature.ok) throw Error("WSL_CLI_METADATA_UNAVAILABLE")
+  const checksum = await input.get(name + ".sha256")
+  if (!checksum.ok) throw Error("WSL_CLI_METADATA_UNAVAILABLE")
+  const bytes = new Uint8Array(await checksum.arrayBuffer())
+  const signature = await input.get(name + ".sha256.sig")
+  if (!signature.ok) throw Error("WSL_CLI_METADATA_UNAVAILABLE")
 
-  const digest = wslArchiveDigest(
-    input.version,
-    new Uint8Array(await checksum.arrayBuffer()),
-    await signature.text(),
-    input.keys,
-  )
+  const digest = wslArchiveDigest(input.version, bytes, await signature.text(), input.keys)
   const response = await input.get(name)
   if (!response.ok || !response.body) throw Error("WSL_CLI_ARCHIVE_UNAVAILABLE")
 

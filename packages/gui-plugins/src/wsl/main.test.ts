@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
 import type { Cleanup, MainContext } from "@opencode/plugin/gui/main"
 import type { Wsl, WslServersState } from "./contract"
-import setup from "./main"
+import setup from "../loginom-gui/wsl-main"
 
 const path = process.env.PATH
 
@@ -39,7 +39,7 @@ test("main starts a server saved by the new client and keeps a migrated 0.4 serv
 
   const ctx = {
     cli: { version: "2.3.0" },
-    app: { packaged: true },
+    app: { packaged: true, version: "2.3.0" },
     log: { write: () => undefined },
     t: (key: string) => key,
     storage: {

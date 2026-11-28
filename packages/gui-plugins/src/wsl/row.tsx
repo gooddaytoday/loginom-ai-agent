@@ -7,13 +7,13 @@ import { createMemo, Show } from "solid-js"
 import { usePlugin, type IpcClient, type ServerRow } from "@opencode/plugin/gui"
 import type { Wsl, WslServersState } from "./contract"
 import { wslRowView } from "./row-view"
-import { wslCliPath } from "./product-cli-path"
 
 export default function WslRow(props: {
   row: ServerRow
   distro: string
   state: () => WslServersState | undefined
   api: () => IpcClient<(typeof Wsl)["spec"]> | undefined
+  setupCommand: string
   run: (action: () => Promise<void>) => void
 }) {
   const plugin = usePlugin()
@@ -21,7 +21,7 @@ export default function WslRow(props: {
 
   const copySetup = () =>
     props.run(async () => {
-      await navigator.clipboard.writeText(`"${wslCliPath}" loginom setup`)
+      await navigator.clipboard.writeText(props.setupCommand)
       showToast({ variant: "success", title: plugin.t("server.setupCopied") })
     })
 

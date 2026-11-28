@@ -1,10 +1,9 @@
 import { Option, Schema } from "effect"
 import { builtinMainContext } from "@opencode/plugin/gui/builtin"
-import type { Plugin } from "@opencode/plugin/gui/main"
+import type { MainContext } from "@opencode/plugin/gui/main"
 import { Wsl } from "./contract"
-import { createWslRuntime } from "./runtime"
+import { createWslRuntime, type WslRuntime } from "./runtime"
 import { createWslServersController, wslServerIdForDistro } from "./servers"
-import { discoverProductCli, installProductCli } from "./product-cli"
 import { spawnWslSidecar } from "./sidecar"
 
 // A record is kept when it names a distro; an id that is missing or not a non-empty string is derived from the distro.
@@ -16,12 +15,22 @@ const Autostart = Schema.Struct({ autostart: Schema.Literal(true) })
 
 const Saved = Schema.Struct({ servers: Schema.Array(Schema.Unknown) })
 
-const setup: Plugin.MainSetup = (ctx) => {
-  const cli = ctx.cli
+type WslCliAdapter = {
+  discover: () => string
+  install: (input: {
+    ctx: MainContext
+    runtime: WslRuntime
+    distro: string
+    version: string
+    logFailure: (code: string) => void
+  }) => Promise<void>
+}
+
+export function setupWsl(ctx: MainContext, cli: WslCliAdapter) {
   const packaged = ctx.app.packaged
   const desktopLog = ctx.log
   const t = ctx.t
-  const runtime = createWslRuntime(t, { discover: discoverProductCli })
+  const runtime = createWslRuntime(t, cli)
 
   // The distros main serves; stored before in the desktop settings file. Read leniently like that file: one bad record
   // must not drop the others.
@@ -35,7 +44,7 @@ const setup: Plugin.MainSetup = (ctx) => {
     desktopLog.write(level, `[wsl] ${message}`, data)
 
   const controller = createWslServersController({
-    cli: { version: cli.version },
+    cli: { version: ctx.app.version },
     runtime,
     t,
     log,
@@ -55,9 +64,13 @@ const setup: Plugin.MainSetup = (ctx) => {
       }),
     writeServers: (servers) => saved.set({ servers }),
     installCli: (distro, build) =>
-      installProductCli(runtime, distro, build.version, t, ctx.signal, (code) =>
-        log("error", "WSL CLI installation", { distro, code }),
-      ),
+      cli.install({
+        ctx,
+        runtime,
+        distro,
+        version: build.version,
+        logFailure: (code) => log("error", "WSL CLI installation", { distro, code }),
+      }),
     spawnSidecar: (distro, signal) => {
       log("info", "spawning wsl sidecar", { distro })
 
@@ -90,5 +103,3 @@ const setup: Plugin.MainSetup = (ctx) => {
   // В-101: imported 0.4 entries have no autostart flag and stay stopped.
   controller.startConfiguredServers()
 }
-
-export default setup

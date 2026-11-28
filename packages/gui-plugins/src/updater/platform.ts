@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
-import { app, autoUpdater, net, shell, type AuthInfo } from "electron"
+import { app, autoUpdater, shell, type AuthInfo } from "electron"
 import pkg from "electron-updater"
 import { Effect, Match } from "effect"
 import { Product } from "@loginom-ai-agent/product"
@@ -19,6 +19,7 @@ import {
 } from "./signed-feed"
 import type { Platform } from "./machine"
 import { updateProxy } from "./proxy"
+import { updateRequest } from "./request"
 
 const updateClient = pkg.autoUpdater
 
@@ -78,26 +79,7 @@ export const make = Effect.fn("Updater.platform")(function* (
   updateClient.disableDifferentialDownload = true
 
   const read = (url: string, timeout?: number) =>
-    readUpdateBytes(
-      url,
-      (url) => {
-        const request = net.request({ url, session: updateClient.netSession, redirect: "manual" })
-        request.on("login", login)
-        let redirects = 0
-        request.on("redirect", (_status, _method, location) => {
-          if (++redirects > 5 || !URL.canParse(location) || new URL(location).protocol !== "https:") {
-            request.emit("error", Error("LOGINOM_UPDATE_REDIRECT_INVALID"))
-
-            return
-          }
-
-          request.followRedirect()
-        })
-
-        return request
-      },
-      timeout,
-    )
+    readUpdateBytes(url, (url) => updateRequest(url, updateClient.netSession, login), timeout)
 
   const failure = (message: string) => Error(redactUpdateMessage(message))
   let approved: Awaited<ReturnType<typeof checkAutomaticUpdate>>

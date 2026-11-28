@@ -11,6 +11,7 @@
     "./terminal": "./src/terminal/index.ts",
     "./debug/options": "./src/debug/options.ts",
     "./loginom-gui/contract": "./src/loginom-gui/contract.ts",
+    "./loginom-gui/wsl-main": "./src/loginom-gui/wsl-main.ts",
     "./updater/proxy-preference": "./src/updater/proxy-preference.ts"
   },
   "scripts": {
