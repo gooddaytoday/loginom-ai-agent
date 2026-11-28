@@ -436,7 +436,8 @@ export function createServerNotificationState(input: {
       return
     }
 
-    if (event.type === "session.execution.succeeded") handleSessionIdle(event.data.sessionID, event.id)
+    if (event.type === "session.status" && event.data.status.type === "idle")
+      handleSessionIdle(event.data.sessionID, event.id)
   })
 
   onCleanup(() => {
