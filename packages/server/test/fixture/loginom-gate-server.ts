@@ -153,7 +153,7 @@ await Effect.runPromise(
         assert(turn, `Unexpected model input for scenario ${scenario}: ${prompt}`)
         const answer = request.messages.slice(user + 1)
         const uploadedPath = /Attached file: `([^`]+)`/.exec(prompt ?? "")?.[1]
-        if ("admitUpload" in turn && turn.admitUpload) {
+        if (turn.admitUpload) {
           assert(uploadedPath && path.basename(uploadedPath) === salesFile)
           const relative = path.relative(path.join(root, "tmp", "uploads"), uploadedPath)
           assert(relative && !relative.startsWith("..") && !path.isAbsolute(relative))
@@ -170,12 +170,12 @@ await Effect.runPromise(
         const results = answer.flatMap((message) =>
           message.role === "tool" ? message.content.filter((part) => part.name.startsWith("loginom_dock_")) : [],
         )
-        const repeatStop = "repeatStop" in turn && turn.repeatStop
+        const repeatStop = turn.repeatStop ?? false
         assert.equal(results.length, turn.calls.length + Number(repeatStop))
         for (const [index, call] of turn.calls.entries()) {
           const name = `loginom_${call.name}`
           const part = results[index]
-          assert.equal(part?.name, name)
+          assert(part?.name === name, `Missing result for ${name}`)
           const result = part.result
           const receipt = JSON.stringify(call.receipt)
           if (call.receipt.status === "FAILED" || call.receipt.status === "AMBIGUOUS") {

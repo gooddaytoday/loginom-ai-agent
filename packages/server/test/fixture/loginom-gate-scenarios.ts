@@ -89,7 +89,9 @@ const repeatedApply: DockCall = {
   receipt: output("gate-repeat", "filter", 8),
 }
 
-export const gateScenarios = {
+export type GateScenario = "7" | "8" | "9" | "10"
+
+export const gateScenarios: Record<GateScenario, readonly Turn[]> = {
   "7": [],
   "8": [
     {
@@ -203,9 +205,7 @@ export const gateScenarios = {
       reply: `Пакет сохранён в Loginom по пути ${packagePath}.`,
     },
   ],
-} satisfies Record<string, Turn[]>
-
-export type GateScenario = keyof typeof gateScenarios
+}
 
 export function modelCalls(turn: Turn, uploadedPath: string | undefined) {
   const dock = turn.calls.map((call) => ({ tool: `loginom_${call.name}`, input: call.input }))
