@@ -8,6 +8,7 @@ import { Global } from "@opencode/util/global"
 import { Effect, Stream } from "effect"
 import path from "path"
 import { Permission } from "../permission.js"
+import { Wildcard } from "../util/wildcard.js"
 
 const plan = Agent.ID.make("plan")
 
@@ -29,6 +30,7 @@ export const Plugin = define({
   effect: Effect.fn(function* (ctx) {
     const global = yield* Global.Service
     const directory = path.join(global.home, ".loginom-ai-agent", "plan")
+    const planFiles = path.join(directory, "*")
     const enterReminder = enter(directory)
     yield* ctx.agent.transform((editor) => {
       editor.update(plan, (item) => {
@@ -37,9 +39,16 @@ export const Plugin = define({
         item.mode = "primary"
         item.permissions.push({ action: "question", resource: "*", effect: "allow" })
         item.permissions.push({ action: "edit", resource: "*", effect: "deny" })
-        item.permissions.push({ action: "edit", resource: path.join(directory, "*"), effect: "allow" })
+        item.permissions.push({ action: "edit", resource: planFiles, effect: "allow" })
       })
     })
+
+    yield* ctx.permission.hook("evaluate", (event) =>
+      Effect.sync(() => {
+        if (event.agent !== plan || event.action !== "edit" || event.effect === "deny") return
+        if (event.resources.some((resource) => !Wildcard.match(resource, planFiles))) event.effect = "deny"
+      }),
+    )
 
     yield* ctx.tool.hook("execute.after", (event) => {
       if (event.agent !== plan) return Effect.void

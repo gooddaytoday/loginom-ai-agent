@@ -184,7 +184,7 @@ export async function readNativeVariableCells(port,metadata,{deadline,stable},ca
 
 // The native reader indexes the ordered list passed to GetReader; array row
 // ranges are bound to their parent row, rather than inferred from leaf counts.
-export async function readTreePortSource(source,call,track,decode,native) {
+export async function readTreePortSource(source,call,track,decode,native,schemaOnly=false,allowPreview=false) {
  const need=(ok,reason)=>{if(!ok)throw Error(reason);};
  const schema=[],definitions=[];
  const rpc=async(name,fn,parameters={})=>call(async()=>{try{return await fn();}catch(error){
@@ -223,50 +223,74 @@ export async function readTreePortSource(source,call,track,decode,native) {
   return index;
  };
  const root=await acquire('root',()=>source.get_RootNodeDef());await visit(root,null,'',0);
+ if(schemaOnly)return {schema};
  const reader=await acquire('reader',()=>source.GetReader(definitions));
  const variants=schema.some(n=>n.type==='variant');
  need(!variants||typeof native==='function','tree_variant_reader_required');
  const readVariant=variants?await native(reader):null;
- let nodeCount=0,maxDepth=0;
- const count=depth=>{need(++nodeCount<=256,'tree_instance_limit');need(depth<=16,'tree_depth_limit');maxDepth=Math.max(maxDepth,depth);};
- const bytes=tree=>need(new TextEncoder().encode(JSON.stringify(tree)).length<=1024*1024,'tree_response_byte_limit');
- const instance=async(index,row,path,depth,arrayItem=false)=>{
-  const def=schema[index];count(depth);
+ const limits={max_nodes:256,max_depth:16,max_bytes:1024*1024};
+ const instances=[];
+ const result={schema,instances,complete:true,node_count:0,max_depth:0,limits};
+ const encoder=new TextEncoder();
+ const bytes=value=>encoder.encode(JSON.stringify(value)).length;
+ // Reserve enough space for the largest possible counters and the incomplete flag.
+ let used=bytes({...result,complete:false,node_count:limits.max_nodes,max_depth:limits.max_depth});
+ need(used<=limits.max_bytes,'tree_response_byte_limit');
+ const bounded=reason=>{
+  if(!allowPreview)throw Error(reason);
+  result.complete=false;
+  return false;
+ };
+ const append=(record,depth)=>{
+  const parent=record.parent===null?null:instances[record.parent];
+  const cost=bytes(record)+Number(instances.length>0)
+   +(parent?String(record.index).length+Number(parent.children.length>0):0);
+  if(used+cost>limits.max_bytes){
+   need(instances.length>0,'tree_response_byte_limit');
+   return bounded('tree_response_byte_limit');
+  }
+  used+=cost;
+  instances.push(record);
+  if(parent)parent.children.push(record.index);
+  result.max_depth=Math.max(result.max_depth,depth);
+  return true;
+ };
+ const instance=async(index,row,path,depth,parent,arrayItem=false)=>{
+  if(instances.length===limits.max_nodes)return bounded('tree_instance_limit');
+  need(depth<=limits.max_depth,'tree_depth_limit');
+  const def=schema[index],base={index:instances.length,parent,schema_index:index,path};
   if(def.is_array&&!arrayItem){
    // The root has no parent row: GetRowCount is its complete native range.
    const start={$:0},size={$:rows};
    if(index!==0)await rpc('row_range',()=>reader.GetRowRange(index,row,start,size),{schema_index:index,parent_row:row});
    need(Number.isSafeInteger(start.$)&&start.$>=0&&Number.isSafeInteger(size.$)&&size.$>=0
-    &&size.$<=256-nodeCount&&Number.isSafeInteger(start.$+size.$),'tree_instance_limit');
-   const children=[];
-   for(let i=0;i<size.$;i++)children.push(await instance(index,start.$+i,path+'/'+i,depth+1,true));
-   const value={schema_index:index,path,type:'array',children};bytes(value);return value;
+    &&Number.isSafeInteger(start.$+size.$),'tree_instance_limit');
+   if(!append({...base,type:'array',children:[]},depth))return false;
+   if(!allowPreview)need(size.$<=limits.max_nodes-instances.length,'tree_instance_limit');
+   for(let i=0;i<size.$;i++)
+    if(!await instance(index,start.$+i,path+'/'+i,depth+1,base.index,true))return false;
+   return true;
   }
   if(def.is_container){
-   // Root rows exist by GetRowCount; array records exist by GetRowRange.
-   // GetContainerExists is for an ordinary optional object, not those records.
+   // Array records exist by GetRowRange. Only ordinary object containers
+   // require GetContainerExists.
    if(index!==0&&!def.is_array)need(await rpc('container',()=>reader.GetContainerExists(index,row),{schema_index:index,row})===true,'tree_absent_container');
-   const children=[];
-   for(const child of def.children)children.push(await instance(child,row,path+'/'+pointer(schema[child].name),depth+1));
-   const value={schema_index:index,path,type:'object',children};bytes(value);return value;
+   if(!append({...base,type:'object',children:[]},depth))return false;
+   for(const child of def.children)
+    if(!await instance(child,row,path+'/'+pointer(schema[child].name),depth+1,base.index))return false;
+   return true;
   }
   const decoded=def.type==='variant'
    ?{cell:await rpc('variant_value',()=>readVariant(row,index),{schema_index:index,row}),limitations:[]}
    :decode(await rpc('value',()=>reader.AsVariant(index,row),{schema_index:index,row}),def.type);
   need(decoded.limitations.length===0,'tree_unverified_precision');
-  const value={schema_index:index,path,...decoded.cell};bytes(value);return value;
+  return append({...base,...decoded.cell},depth);
  };
  const rows=await rpc('row_count',()=>reader.GetRowCount(0),{schema_index:0});
  need(schema[0].is_array?Number.isSafeInteger(rows)&&rows>=0:rows===1,'tree_document_count');
- const document=await instance(0,0,'',0);
- const instances=[];
- const flatten=(node,parent)=>{
-  const {children,...value}=node,index=instances.length,record={index,parent,...value,...(children?{children:[]}: {})};
-  instances.push(record);if(children)for(const child of children)record.children.push(flatten(child,index));return index;
- };flatten(document,null);
- const result={schema,instances,complete:true,node_count:nodeCount,max_depth:maxDepth,
-  limits:{max_nodes:256,max_depth:16,max_bytes:1024*1024}};
- bytes(result);return result;
+ await instance(0,0,'',0,null);
+ result.node_count=instances.length;
+ return result;
 }
 
 // Serialized into the native callback; keep this decoder independent of module closures.
@@ -325,7 +349,11 @@ export function decodePortCell(raw,type) {
 
 export function makeNodePortOutputCode(binding,request,options,quality=null) {
  validatePreparedNodeContext(binding);
- if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).filter(k=>!['typedVariants','variantEmptyIsNull'].includes(k)).sort().join(','))
+ if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).filter(k=>!['typedVariants','variantEmptyIsNull','treeSchemaOnly','treePreview'].includes(k)).sort().join(','))
+  ||Object.hasOwn(request,'treeSchemaOnly')&&(request.treeSchemaOnly!==true||request.port!==0||request.sampleRows!==0
+   ||Object.hasOwn(request,'rowOffset'))
+  ||Object.hasOwn(request,'treePreview')&&(request.treePreview!==true||request.port!==0
+   ||Object.hasOwn(request,'treeSchemaOnly')||Object.hasOwn(request,'rowOffset'))
   ||Object.hasOwn(request,'typedVariants')&&typeof request.typedVariants!=='boolean'
   ||Object.hasOwn(request,'variantEmptyIsNull')&&(request.variantEmptyIsNull!==true||request.typedVariants!==true)
   ||!Number.isInteger(request.port)||request.port<0||request.port>99
@@ -348,6 +376,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
  const target=inventory.ports?.find(p=>p.index===request.port);
  if(!inventory.verified||JSON.stringify(inventory.node_context)!==JSON.stringify(before))return {verified:false,cleanup_complete:false,reason:'output_context'};
  if(!target?.active)return {verified:false,cleanup_complete:true,reason:'inactive_output'};
+ if((request.treeSchemaOnly||request.treePreview)&&target.kind!=='tree')return {verified:false,cleanup_complete:true,reason:'not_a_tree_output'};
  const result=await page.evaluate(async ({binding:b,request:q,options:o,before,target,decoder,treeReader,quality,variant})=>{
   const decode=eval(' ('+decoder+')'),readTree=eval(' ('+treeReader+')');
   const need=(ok,code)=>{if(!ok){reason=code;throw Error('Port read refused');}},value=(obj,key)=>Object.getOwnPropertyDescriptor(obj??{},key)?.value;
@@ -429,9 +458,9 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
      const nativeDecode=eval('('+variant.decode+')'),adapt=eval('('+variant.adapt+')');
      nativeReader=await eval('('+variant.read+')')(reader,{deadline:o.deadline,treeValue:true,stable:()=>{live();stable();need(dataSource.GetReader===getter,'tree_reader_changed');}},nativeDecode,eval('('+variant.collect+')'),variant.pins,variant.treePins);
      return async(row,index)=>{const raw=await nativeReader.read(row,index);return adapt(raw,{type:'variant'},{dateProfile:'loginom-7.4.2-native-oadate',civilTime:raw.civilTime},nativeDecode);};
-    });
+    },q.treeSchemaOnly,q.treePreview);
     result={port:q.port,port_guid:baseline.portGuid,port_kind:'tree',fresh:true,execution_id:q.execution.execution_id,
-     freshness_basis:'completed_execution_port_source',tree,sample_complete:true};
+     freshness_basis:'completed_execution_port_source',tree,sample_complete:tree.complete===true};
    }else{
    const rowCount=await dataSource.get_RowCount();live();stable();
    need(Number.isSafeInteger(rowCount)&&rowCount>=0,'row_count');

@@ -404,6 +404,45 @@ describe("loginom.product permissions (B2.6a)", () => {
   )
 
   it.live(
+    "profile settings cannot enable edits outside the Plan directory or shadow a narrower wildcard deny",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const profile = path.join(test.dir, "global", "config", "loginom-ai-agent.jsonc")
+        const at = `location[directory]=${encodeURIComponent(test.dir)}`
+        const secret = { action: "*", resource: "*.secret", effect: "deny" }
+        yield* Effect.promise(() => Bun.write(profile, JSON.stringify({ permissions: [secret] })))
+        const response = yield* test.call(
+          `/api/experimental/config?${at}`,
+          { permissions: [...settingRules("write", "allow"), ...settingRules("read", "ask")] },
+          "PATCH",
+        )
+        expect(response.status).toBe(204)
+        const config = yield* test.call(`/api/config?${at}`)
+        expect(config.body.find((entry: { profile?: boolean }) => entry.profile)?.info.permissions.at(-1)).toEqual(
+          secret,
+        )
+        yield* until(() =>
+          test.call(`/api/agent?${at}`).pipe(
+            Effect.map((result) => {
+              const build = result.body.data.find((agent: { id: string }) => agent.id === "build")
+              return build && settingEffect("read", build.permissions) === "ask" ? true : undefined
+            }),
+          ),
+        )
+        const id = yield* test.create("profile change")
+        const edit = { action: "edit", resources: ["src/main.ts"], source }
+        expect((yield* test.ask(id, edit)).effect).toBe("allow")
+        expect((yield* test.ask(id, { ...edit, agent: "plan" })).effect).toBe("deny")
+        const planFile = path.join(test.dir, "home", ".loginom-ai-agent", "plan", "review.md")
+        expect((yield* test.ask(id, { ...edit, resources: [planFile], agent: "plan" })).effect).toBe("allow")
+        expect((yield* test.ask(id, { action: "read", resources: ["data.secret"], source })).effect).toBe("deny")
+        expect((yield* test.ask(id, { action: "read", resources: ["inside.txt"], source })).effect).toBe("ask")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "defaults: project files without a question, the other kinds ask, reading outside the project asks, the terminal is off",
     () =>
       Effect.gen(function* () {

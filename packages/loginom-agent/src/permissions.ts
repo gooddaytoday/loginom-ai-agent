@@ -23,6 +23,7 @@ import type { ToolContext } from "@opencode/plugin/promise/tool"
 import type { Permission } from "@opencode/schema/permission"
 
 export type { Kind } from "@loginom-ai-agent/product/permissions"
+export { settingEffect } from "@loginom-ai-agent/product/permissions"
 
 /** The kinds as the user sees them in «Настройки → Разрешения». */
 export const kinds: Record<Kind, string> = {

@@ -69,7 +69,9 @@ export async function guardLoginomConnection(page, binding, storageSession) {
   return {connected:false};
  },{b:binding,mode,storageSession});
  const fail=reason=>{if(reason==='identity')throw Error('Loginom account or document changed; prepare the workspace again');
-  throw Error('Loginom connection is disconnected; original session recovery unverified ('+reason+'); inspect the pending operation before continuing');};
+  const error=Error('Loginom connection is disconnected; original session recovery unverified ('+reason+'); inspect the pending operation before continuing');
+  if(reason==='awaiting_original_attempt')error.code='LOGINOM_RECONNECT_PENDING';
+  throw error;};
  const before=await inspect('observe');
  if(before.reason)fail(before.reason);
  if(before.connected)return;

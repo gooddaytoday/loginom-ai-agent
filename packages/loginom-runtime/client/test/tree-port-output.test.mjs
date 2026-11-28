@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {decodePortCell,readTreePortSource} from '../lib/node-port-output.mjs';
 import {compactNodeResult} from '../lib/user-results.mjs';
+import {previewWireSize,USER_PREVIEW_WIRE_BUDGET} from '../lib/user-preview-budget.mjs';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeTreeOutputPortSchema} from '../lib/node-result-schema.mjs';
 import {readFile} from 'node:fs/promises';
@@ -129,6 +130,30 @@ test('tree_io public schema and compaction preserve the complete schema and inst
  assert.deepEqual(result.output.ports,[port]);
  const bad=structuredClone(port);bad.tree.complete=false;assert.equal(validate(bad).valid,false);
 });
+test('user delivery trims an oversized tree preview without changing the local receipt',async()=>{
+ const tree=await read();
+ const carrier={operation_id:'op',state:'settled',outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{
+  execution:{status:'completed',execution_id:'exec'},output:{status:'partial',execution_id:'exec',evidence_ref:'receipt',ports:[{
+   port:0,port_guid:'port',port_kind:'tree',fresh:true,execution_id:'exec',
+   freshness_basis:'completed_execution_port_source',tree,sample_complete:false}]}}}};
+ tree.complete=false;
+ for(const n of tree.instances)if(n.type==='string'&&n.is_null===false)n.value='x'.repeat(20000);
+ const original=structuredClone(tree);
+ const result=compactNodeResult(carrier);
+ assert.ok(previewWireSize(result)<=USER_PREVIEW_WIRE_BUDGET);
+ assert.deepEqual(tree,original);
+ const [port]=result.output.ports;
+ assert.equal(result.execution.status,'completed');
+ assert.equal(result.output.status,'partial');
+ assert.equal(port.sample_complete,false);
+ assert.equal(port.tree.complete,false);
+ assert.equal(port.tree.node_count,port.tree.instances.length);
+ assert.ok(port.tree.node_count<tree.node_count);
+ assert.ok(port.tree.instances.every(n=>n.children?.every(i=>port.tree.instances[i].parent===n.index)??true));
+ assert.match(result.limitations.join(' '),/exact total was not read/);
+ assert.equal(new AjvJsonSchemaValidator().getValidator(nodeTreeOutputPortSchema)(port).valid,true);
+});
+
 test('tree_io reads datetime leaves as civil milliseconds and requires the native capability for Variant leaves',async()=>{
  // Temporal-based datetime decoding is covered in the browser integration test;
  // here the tree reader must admit the type and keep the decoded civil cell.
@@ -233,4 +258,12 @@ test('root object arrays enumerate the native root rows without querying a nonex
  assert.deepEqual(tree.instances.filter(n=>n.type==='string').map(n=>n.value),['A','B']);
  const validate=new AjvJsonSchemaValidator().getValidator(nodeTreeOutputPortSchema);
  assert.equal(validate({port:0,port_guid:'port',port_kind:'tree',fresh:true,execution_id:'exec',freshness_basis:'completed_execution_port_source',tree,sample_complete:true}).valid,true);
+});
+
+test('a private schema read neither loads nor truncates the native tree instances',async()=>{
+ const {source,call,track}=fixture({count:257,noteType:6});
+ source.GetReader=()=>assert.fail('schema read must not construct an instance reader');
+ const result=await readTreePortSource(source,call,track,decodePortCell,undefined,true);
+ assert.deepEqual(Object.keys(result),['schema']);
+ assert.deepEqual(result.schema.map(n=>n.path),['','/id','/active','/items','/items/sku','/items/qty','/items/price','/items/note']);
 });

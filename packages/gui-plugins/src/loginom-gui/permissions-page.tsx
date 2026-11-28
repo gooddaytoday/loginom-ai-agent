@@ -1,149 +1,130 @@
-import { permissionKinds, settingEffect, settingRules, type Kind } from "@loginom-ai-agent/product/permissions"
-import { usePlugin } from "@opencode/plugin/gui"
-import type { SettingsPage } from "@opencode/plugin/gui"
-import type { Permission } from "@opencode/schema/permission"
-import { createMemo, createResource, createSignal, For, onCleanup, Show } from "solid-js"
+import { permissionDefaults, permissionKinds, type Kind } from "@loginom-ai-agent/product/permissions"
+import { createKeyed, usePlugin, type SettingsPage } from "@opencode/plugin/gui"
+import { createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js"
 import type definition from "./index"
-import { useProfileClient } from "./profile-client"
+import { initialPermissions, permissionPatch, permissionView, transitionPermissions } from "./permissions-machine"
+import { profileService } from "./profile-service"
 
 const effects = ["allow", "ask", "deny"] as const
-
-type Settings = {
-  rules: Permission.Ruleset
-  beforeProfile: Permission.Ruleset
-  afterProfile: Permission.Ruleset
-}
 
 export default function PermissionsPage(props: Pick<Parameters<SettingsPage["render"]>[0], "workspace">) {
   const ctx = usePlugin<typeof definition>()
   const ui = ctx.ui
-  const client = useProfileClient()
+  const service = createMemo(() => profileService(ctx))
 
   const source = createMemo(() => {
-    const server = client()
+    const server = service()
 
     if (!server) return
     const workspace = props.workspace
-    const directory = workspace && ctx.servers.get(workspace.server)?.client === server ? workspace.directory : undefined
+    const directory = workspace?.server === server.id ? workspace.directory : undefined
 
-    return { server, directory }
+    return { client: server.client, directory }
   })
 
-  const lifetime = new AbortController()
-  onCleanup(() => lifetime.abort())
-  const signal = () => AbortSignal.any([lifetime.signal, AbortSignal.timeout(12_000)])
+  const [state, setState] = createSignal(initialPermissions)
+  let controller: AbortController | undefined
+  onCleanup(() => controller?.abort())
 
-  const [settings, { mutate, refetch }] = createResource(
-    source,
-    async ({ server, directory }): Promise<Settings | undefined> => {
-      const location = directory ? { directory } : undefined
-      const entries = await server.config.get({ location }, { signal: signal() }).catch(() => undefined)
+  function dispatch(event: Parameters<typeof transitionPermissions>[1]) {
+    const previous = untrack(state)
+    const next = transitionPermissions(previous, event)
 
-      if (!entries) return
-      const documents = entries.filter((entry) => entry.type === "document")
-      const profile = documents.findIndex((entry) => entry.profile)
-      const rules = (entries: typeof documents) => entries.flatMap((entry) => entry.info.permissions ?? [])
+    if (next === previous) return
+    setState(next)
 
-      return {
-        rules: rules(documents.filter((entry) => entry.profile)),
-        beforeProfile: profile === -1 ? [] : rules(documents.slice(0, profile)),
-        afterProfile: rules(documents.slice(Math.max(0, profile)).filter((entry) => !entry.profile)),
-      }
-    },
-  )
+    if (next.attempt === previous.attempt) return
+    controller?.abort()
+    const target = untrack(source)
 
-  const [saving, setSaving] = createSignal(false)
-  const [failed, setFailed] = createSignal(false)
+    if (!target || (next.type !== "loading" && next.type !== "saving")) return
+    controller = new AbortController()
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)])
+    void request(target, next, signal)
+  }
 
-  async function save(permissions: Permission.Ruleset) {
-    const target = source()
-    const current = settings()
-
-    if (!target || !current || !permissions.length || saving()) return
-    setFailed(false)
-    setSaving(true)
-
-    const same = (left: Permission.Rule, right: Permission.Rule) =>
-      left.action === right.action && left.resource === right.resource
-
-    const removePermissions = permissions.filter((rule) =>
-      permissionKinds.some((kind) =>
-        settingRules(kind).some((entry) => same(entry, rule) && entry.effect === rule.effect),
-      ),
-    )
-
-    const updates = permissions.filter((rule) => !removePermissions.includes(rule))
-    mutate({
-      ...current,
-      rules: [
-        ...current.rules
-          .filter((rule) => !removePermissions.some((entry) => same(entry, rule)))
-          .map((rule) => updates.find((entry) => same(entry, rule)) ?? rule),
-        ...updates.filter((rule) => !current.rules.some((entry) => same(entry, rule))),
-      ],
-    })
+  async function request(
+    target: NonNullable<ReturnType<typeof source>>,
+    next: Extract<ReturnType<typeof transitionPermissions>, { type: "loading" | "saving" }>,
+    signal: AbortSignal,
+  ) {
+    const directory = target.directory
+    const location = directory ? { directory } : undefined
 
     try {
-      await target.server.experimental.config.update({ permissions: updates, removePermissions }, { signal: signal() })
+      if (next.type === "saving")
+        await target.client.experimental.config.update(permissionPatch(next.selected), {
+          signal,
+          headers: directory ? { "x-opencode-directory": encodeURIComponent(directory) } : undefined,
+        })
+
+      const entries = await target.client.config.get({ location }, { signal })
+      dispatch({ type: "loaded", attempt: next.attempt, entries })
     } catch {
-      if (source() === target && !lifetime.signal.aborted) {
-        mutate(current)
-        setFailed(true)
-        void refetch()
-      }
-    } finally {
-      if (!lifetime.signal.aborted) setSaving(false)
+      dispatch({ type: "failed", attempt: next.attempt })
     }
   }
 
-  const current = (kind: Kind) => settingEffect(kind, settings()?.rules ?? [])
+  const reload = () => dispatch({ type: source() ? "load" : "disconnect" })
+  createKeyed(source, reload, { otherwise: reload })
+
+  const current = (kind: Kind) => permissionView(state(), kind).value
   const label = (effect: ReturnType<typeof current>) => ctx.t(`permission_${effect}`)
-  const disabled = () => saving() || settings.loading
+  const disabled = () => state().type !== "ready"
+
+  const issue = () => {
+    const current = state()
+
+    if (current.type === "error") return current.issue
+
+    if (current.type === "idle") return "permissionsLoadFailed"
+  }
 
   const Override = (props: { kind: Kind }) => {
-    const effect = () => {
-      const config = settings()
-
-      if (!config) return
-      const effective = settingEffect(props.kind, [...config.beforeProfile, ...config.rules, ...config.afterProfile])
-
-      if (effective !== current(props.kind)) return label(effective)
-    }
+    const row = () => permissionView(state(), props.kind)
+    const message = (effect: ReturnType<typeof current> | undefined) => (effect ? label(effect) : undefined)
 
     return (
-      <Show when={effect()}>
-        {(value) => (
-          <span class="text-12-regular text-text-base">{ctx.t("permissionsProjectOverride", { effect: value() })}</span>
-        )}
-      </Show>
+      <>
+        <Show when={message(row().workspaceOverride)}>
+          {(value) => (
+            <span class="text-12-regular text-text-base">{ctx.t("permissionsProjectOverride", { effect: value() })}</span>
+          )}
+        </Show>
+        <Show when={message(row().profileOverride)}>
+          {(value) => (
+            <span role="status" class="text-12-regular text-text-base">
+              {ctx.t("permissionsProfileOverride", { effect: value() })}
+            </span>
+          )}
+        </Show>
+      </>
     )
   }
 
   return (
     <ui.SettingsLayout title={ctx.t("permissionsTitle")} description={ctx.t("permissionsDescription")}>
-      <Show when={settings.loading || saving()}>
-        <p role="status">{ctx.t(saving() ? "saving" : "permissionsLoading")}</p>
+      <Show when={state().type === "loading" || state().type === "saving"}>
+        <p role="status">{ctx.t(state().type === "saving" ? "saving" : "permissionsLoading")}</p>
       </Show>
-      <Show when={failed() || (!settings.loading && (!client() || !settings()))}>
-        <p role="alert" class="text-12-regular text-text-danger-base">
-          {ctx.t(failed() ? "permissionsSaveFailed" : "permissionsLoadFailed")}
-        </p>
-        <ui.Button
-          onClick={() => {
-            setFailed(false)
-            void refetch()
-          }}
-        >
-          {ctx.t("permissionsReload")}
-        </ui.Button>
+      <Show when={issue()}>
+        {(value) => (
+          <>
+            <p role="alert" class="text-12-regular text-text-danger-base">{ctx.t(value())}</p>
+            <ui.Button onClick={reload}>{ctx.t("permissionsReload")}</ui.Button>
+          </>
+        )}
       </Show>
-      <Show when={client() && settings()}>
+      <Show when={state().type === "ready" || state().type === "saving"}>
         <ui.SettingsSection
           footer={
             <div class="pt-3">
               <ui.Button
-                disabled={saving() || settings.loading}
-                onClick={() => void save(permissionKinds.flatMap((kind) => settingRules(kind)))}
+                disabled={disabled()}
+                onClick={() => dispatch({
+                  type: "save",
+                  selected: permissionKinds.map((kind) => ({ kind, effect: permissionDefaults[kind] })),
+                })}
               >
                 {ctx.t("permissionsReset")}
               </ui.Button>
@@ -161,7 +142,7 @@ export default function PermissionsPage(props: Pick<Parameters<SettingsPage["ren
                     onChange={(event) => {
                       const effect = effects.find((value) => value === event.currentTarget.value)
 
-                      if (effect) void save(settingRules(kind, effect))
+                      if (effect) dispatch({ type: "save", selected: [{ kind, effect }] })
                     }}
                   >
                     <Show when={current(kind) === "mixed"}>
@@ -191,7 +172,9 @@ export default function PermissionsPage(props: Pick<Parameters<SettingsPage["ren
                 hideLabel
                 disabled={disabled()}
                 checked={current("terminal") === "ask"}
-                onChange={(checked) => void save(settingRules("terminal", checked ? "ask" : "deny"))}
+                onChange={(checked) =>
+                  dispatch({ type: "save", selected: [{ kind: "terminal", effect: checked ? "ask" : "deny" }] })
+                }
               />
               <Override kind="terminal" />
             </div>

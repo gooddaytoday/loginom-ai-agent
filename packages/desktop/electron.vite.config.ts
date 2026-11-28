@@ -1,4 +1,5 @@
 import { defineConfig } from "electron-vite"
+import { createPublicKey } from "node:crypto"
 import type { Plugin } from "vite"
 import { pickerPlugin } from "./script/picker"
 import { nodePtyPackage } from "./script/utils"
@@ -11,6 +12,16 @@ function resolveChannel() {
   if (raw === "latest") return "prod"
 
   return "dev"
+}
+
+function resolveFixtureUpdateKey(env: NodeJS.ProcessEnv) {
+  if (env.LOGINOM_AI_AGENT_UPDATE_TEST_BUILD !== "1") return null
+  if (env.GITHUB_ACTIONS === "true" && !env.GITHUB_WORKFLOW_REF?.includes("/.github/workflows/loginom-windows.yml@"))
+    return null
+  const pem = env.LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY
+  if (!pem?.startsWith("-----BEGIN PUBLIC KEY-----") || createPublicKey(pem).asymmetricKeyType !== "ed25519")
+    throw Error("LOGINOM_UPDATE_TEST_PUBLIC_KEY_INVALID")
+  return pem
 }
 
 const appPlugin = (await import("@opencode/app/vite")).default
@@ -45,8 +56,10 @@ export default defineConfig(({ command }) => {
       define: {
         // Local renderer/server mode still uses the dev application identity and updater policy.
         "import.meta.env.LOGINOM_AI_AGENT_CHANNEL": JSON.stringify(channel === "local" ? "dev" : channel),
-        // Loginom AI Agent (B4.12): Product.updateFeed, the only feed the updater checks; without it the updater is off.
         LOGINOM_AI_AGENT_UPDATE_FEED: JSON.stringify(process.env.LOGINOM_AI_AGENT_UPDATE_FEED?.trim() || null),
+        LOGINOM_AI_AGENT_UPDATE_GITHUB_API: JSON.stringify(process.env.LOGINOM_AI_AGENT_UPDATE_GITHUB_API?.trim() || null),
+        LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD: JSON.stringify(process.env.LOGINOM_AI_AGENT_UPDATE_GITHUB_DOWNLOAD?.trim() || null),
+        LOGINOM_AI_AGENT_UPDATE_TEST_PUBLIC_KEY: JSON.stringify(resolveFixtureUpdateKey(process.env)),
       },
       build: {
         minify: command === "build",

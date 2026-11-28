@@ -119,7 +119,7 @@ export class Info extends Schema.Class<Info>("Config.Info")({
 export const Patch = Schema.Struct({
   shell: Schema.NullOr(Schema.String).pipe(optional),
   permissions: Permission.Ruleset.pipe(optional).annotate({
-    description: "Replace matching rules in place and insert new catch-all resources before rules for the same action",
+    description: "Replace matching rules in place and insert new catch-all resources before narrower matching rules",
   }),
   removePermissions: Schema.Array(Schema.Struct({ action: Schema.String, resource: Schema.String })).pipe(optional),
 }).annotate({ identifier: "Config.Patch" })

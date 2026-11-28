@@ -67,10 +67,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "Gemini е претоварен в момента",
   "ui.sessionTurn.error.freeUsageExceeded": "Безплатното използване е превишено",
   "ui.sessionTurn.error.addCredits": "Добавете кредити",
-  "dialog.usageExceeded.freeTier.title": "Безплатният лимит е достигнат",
-  "dialog.usageExceeded.freeTier.description":
-    "Абонирайте се за OpenCode Go за надежден достъп до най-добрите модели с отворен код за $10/месец.",
-  "dialog.usageExceeded.freeTier.actionLabel": "Абонирайте се",
   "ui.sessionTurn.status.delegating": "Делегиране на работа",
   "ui.sessionTurn.status.planning": "Планиране на следващите стъпки",
   "ui.sessionTurn.status.gatheringContext": "Изследване",

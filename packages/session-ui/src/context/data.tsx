@@ -7,6 +7,8 @@ import type {
 } from "@opencode/client/promise"
 import { createSimpleContext } from "@opencode/ui/context"
 import { PreloadMultiFileDiffResult } from "@pierre/diffs/ssr"
+import type { JSX } from "solid-js"
+import type { ToolProps } from "../tools/tool-renderer"
 
 export type SessionSummary = Pick<SessionInfo, "id" | "parentID" | "title" | "time">
 
@@ -60,6 +62,18 @@ export type ReadMediaUrlFn = (uri: string, mime: string, signal?: AbortSignal) =
 
 export type PeekMediaUrlFn = (uri: string, mime: string) => string | undefined
 
+/** A host-rendered tool card with its display title and a fallback supplied by the timeline. */
+export type ToolRenderContribution = {
+  readonly title: string
+  render(props: ToolProps, fallback: () => JSX.Element): JSX.Element
+}
+
+/** Lookups scoped to the host that owns the session's contributed tools. */
+export type ToolRenderers = {
+  find(tool: string): ToolRenderContribution | undefined
+  separate(): ReadonlySet<string> | undefined
+}
+
 export const {
   use: useData,
   provider: DataProvider,
@@ -77,6 +91,7 @@ export const {
     shellRunning?: (id: string) => boolean
     shellOutput?: (input: ShellOutputInput) => Promise<ShellOutputOutput>
     turnDiff?: TurnDiffSource
+    toolRenderers?: ToolRenderers
     readMedia?: ReadMediaUrlFn
     peekMedia?: PeekMediaUrlFn
     onNavigateToSession?: NavigateToSessionFn
@@ -110,6 +125,7 @@ export const {
       get turnDiff() {
         return props.turnDiff
       },
+      toolRenderers: props.toolRenderers,
       readMedia: props.readMedia,
       peekMedia: props.peekMedia,
     }

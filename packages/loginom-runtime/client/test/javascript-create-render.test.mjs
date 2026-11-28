@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
-import {mutateGraph} from '../lib/node-target-browser.mjs';
+import {createNodeTargetBrowserAdapter,mutateGraph} from '../lib/node-target-browser.mjs';
 import {samePlacementGraph} from '../lib/node-placement.mjs';
 
-function fixture(t, fault) {
+function fixture(t, fault, addOnly=false) {
  t.mock.timers.enable({apis:['Date'],now:10000});
  const prefix='MF;TF-1',rootTid=prefix+';ModelForm;cmpDiagram',tabTid='tab';
  const palette=prefix+';ModelForm;colVendors_Компоненты>Программирование>JavaScript;TreeText';
@@ -28,7 +28,8 @@ function fixture(t, fault) {
   const element=elements.get(JSON.parse(selector.slice(10,-1)));
   return {count:async()=>element?1:0,isVisible:async()=>true,isEnabled:async()=>true,boundingBox:async()=>rect,evaluate:async(fn,args)=>evaluate(fn,args,element)};
  },mouse:{move:async()=>{},down:async()=>{held=true;drags++;},up:async()=>{if(held)created=true;held=false;}},keyboard:{press:async()=>{}}};
- const task={deadline:40000,request:{document_id:'doc',workflow_ref:before.workflow_ref},types:NODE_TYPES,effect:{id:'effect',kind:'create',before,parameters:{type:'programming.javascript',position:{x:600,y:380}}}};
+ page.evaluateHandle=async()=>({getProperty:async()=>({jsonValue:async()=>[],dispose:async()=>{}}),dispose:async()=>{}});
+ const task={deadline:40000,request:{document_id:'doc',workflow_ref:before.workflow_ref},types:NODE_TYPES,effect:{id:'effect',kind:'create',before,parameters:{type:'programming.javascript',position:{x:600,y:380},...(addOnly?{add_only:true}:{})}}};
  const read=async()=>{
   if(!created)return structuredClone(before);
   reads++;
@@ -39,8 +40,18 @@ function fixture(t, fault) {
   if(Date.now()<26000 || fault==='deadline' || fault==='cancel')throw Error('page.evaluate: Error: Visible port identity is not rendered');
   return {...before,nodes:[{ref:{node_id:native.FGuid},type:'programming.javascript',position:{x:600,y:380}}]};
  };
- const reveal=async args=>{await args.guard();return {fully_visible:true,point:{x:900,y:480}};};
- return {run:()=>mutateGraph(page,task,read,null,null,null,reveal,samePlacementGraph),counts:()=>({drags,reads}),now:()=>Date.now()};
+ const reveal=async args=>{await args.guard();return {fully_visible:!['hidden','closed_then_hidden'].includes(fault),point:{x:900,y:480}};};
+ const window={
+  settle:async(_page,_binding,{onOwnedWindow})=>{
+   if(['owned_window','closed_then_hidden'].includes(fault))onOwnedWindow?.('new-js');
+   if(fault==='foreign_window'||fault==='owned_window')throw Error('Native window did not settle');
+   t.mock.timers.tick(16000);
+   const graph=await read();
+   if(fault==='wrong_type')graph.nodes[0].type='transform.sorting';
+   return graph;
+  },
+ };
+ return {run:()=>mutateGraph(page,task,read,null,null,null,reveal,samePlacementGraph,undefined,undefined,window),counts:()=>({drags,reads}),now:()=>Date.now()};
 }
 test('one JavaScript create waits read-only past 15s for its port under the original deadline',async t=>{
  const f=fixture(t),r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);
@@ -60,4 +71,79 @@ for(const fault of ['foreign_type','foreign_owner','changed_owner','deadline','c
 test('JavaScript create cancelled before the gesture has no possible effect',async t=>{
  const f=fixture(t,'cancel_before'),r=await f.run();assert.equal(r.status,'NOT_APPLIED',r.error);assert.equal(r.effect_possible,false);
  assert.equal(f.counts().drags,0);assert.equal(r.cleanup_complete,true);assert.match(r.error,/cancelled/);assert.equal(r.after,undefined);
+});
+
+for(const [fault,cleanup,dispatched,error] of [
+ ['foreign_window',true,true,/window did not settle/],
+ ['owned_window',false,true,/window did not settle/],
+ ['wrong_type',true,true,/type mismatch/],
+ ['hidden',true,true,/not fully visible/],
+ ['closed_then_hidden',true,true,/not fully visible/],
+ ['cancel_before',true,false,/cancelled/],
+])test('add_only native cleanup receipt: '+fault,async t=>{
+ const f=fixture(t,fault,true),reply=await f.run();
+ assert.equal(reply.status,dispatched?'AMBIGUOUS':'NOT_APPLIED',reply.error);
+ assert.equal(reply.effect_possible,dispatched);
+ assert.equal(reply.cleanup_complete,cleanup);
+ assert.equal(reply.add_only_window_pending,cleanup?undefined:true);
+ assert.equal(reply.add_only_window_node_id,cleanup?undefined:'new-js');
+ assert.equal(f.counts().drags,Number(dispatched));
+ assert.match(reply.error,error);
+});
+
+for(const selector of ['.x-window','[role="alertdialog"]','[data-tid$=";WizrdMCF"]'])test('add_only graph reader refuses visible '+selector,async()=>{
+ const tab={classList:{contains:()=>true}},dialog={getBoundingClientRect:()=>({width:20,height:20})};
+ const document={querySelectorAll:query=>query==='[data-tid="tab"]'?[tab]:query.includes(selector)?[dialog]:[]};
+ const navigation_path=selector.includes('WizrdMCF')?[{tid:'graph-crumb',label:'Graph'}]:[];
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'tab',navigation_path}};
+ const origin='https://example.invalid',build='7.4.2';
+ const context={document,location:{origin},bg:{app:{Version:build}},getComputedStyle:()=>({visibility:'visible'}),
+  __loginomDockPreparationV1:{document,id:'doc',receipts:new Map([['r',{phase:'verified',workflowId:'wf',tab}]])}};
+ const page={evaluate:async(fn,args)=>runInNewContext('('+fn.toString()+')',context)(args)};
+ const adapter=createNodeTargetBrowserAdapter({origin,build,requireNoNativeWindow:true,
+  execute:async code=>Function('return ('+code+')')()(page)});
+ await assert.rejects(adapter.observe(request,Date.now()+1000),{code:'NODE_ADD_ONLY_GRAPH_BLOCKED'});
+});
+
+test('add_only graph read still waits for its transient activity mask',async()=>{
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',navigation_path:[]}};
+ const graph={document_id:'doc',interaction_ready:true};
+ let masked=true,waits=0;
+ const page={
+  async evaluate(){
+   if(masked)throw Error('Graph is blocked');
+   return graph;
+  },
+  async waitForFunction(_probe,selector){
+   assert.match(selector,/\.bg-mask-message/);
+   waits++;
+   masked=false;
+  },
+ };
+ const adapter=createNodeTargetBrowserAdapter({origin:'https://example.invalid',build:'7.4.2',requireNoNativeWindow:true,
+  execute:async code=>Function('return ('+code+')')()(page)});
+ assert.deepEqual(await adapter.observe(request,Date.now()+1000),graph);
+ assert.equal(waits,1);
+});
+
+for(const scenario of ['quiet','idle:false','different first','different second','deadline'])test('add_only browser cleanup proof: '+scenario,async t=>{
+ t.mock.timers.enable({apis:['Date'],now:10000});
+ const graph={complete:true,document_id:'doc',workflow_ref:{workflow_id:'wf',navigation_path:[]},interaction_ready:scenario!=='idle:false'};
+ const deadline=10100+(scenario==='deadline'?0:700);
+ let reads=0,waits=0;
+ const page={
+  async evaluate(_read,probe){
+   assert.match(probe.window_blocker_selector,/WizrdMCF/);
+   assert.equal(probe.request.document_id,'doc');
+   reads++;
+   if(scenario===(reads===1?'different first':'different second'))return {...graph,links:[{source:'changed'}]};
+   return graph;
+  },
+  async waitForTimeout(ms){waits++;assert.equal(ms,200);t.mock.timers.tick(ms);},
+ };
+ const adapter=createNodeTargetBrowserAdapter({origin:'https://example.invalid',build:'7.4.2',requireNoNativeWindow:true,
+  execute:async code=>Function('return ('+code+')')()(page)});
+ assert.equal(await adapter.verifyAddOnlyCleanup(graph,deadline),scenario==='quiet');
+ assert.equal(reads,['idle:false','different first'].includes(scenario)?1:2);
+ assert.equal(waits,reads-1);
 });

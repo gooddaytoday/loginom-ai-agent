@@ -24,6 +24,7 @@ import { Connection } from "@opencode/schema/connection"
 import { WellKnown } from "./wellknown.js"
 import { AppProcess } from "@opencode/util/process"
 import { ChildProcess } from "effect/process"
+import { Wildcard } from "./util/wildcard.js"
 
 export function latest<K extends keyof Info>(entries: readonly Entry[], key: K): Info[K] | undefined {
   return entries.findLast((entry): entry is Document => entry.type === "document" && entry.info[key] !== undefined)
@@ -129,7 +130,6 @@ export const layer = (options?: Options) =>
       const wellknown = yield* WellKnown.Service
       const processes = yield* AppProcess.Service
       const integrations = new Map<string, ConfigIntegration.Document>()
-      // Integrations set their documents from outside this layer, so their reloads run with its services.
       const context = yield* Effect.context<FSUtil.Service | Global.Service | Location.Service>()
       const reloadLock = Semaphore.makeUnsafe(1)
       const updateLock = Semaphore.makeUnsafe(1)
@@ -491,7 +491,8 @@ export const layer = (options?: Options) =>
           )
           for (const { file, text, updated } of edits)
             if (text !== updated) yield* fs.writeWithDirs(file, updated.endsWith("\n") ? updated : `${updated}\n`)
-          yield* requestReload
+          if (patch.permissions?.length || patch.removePermissions?.length) yield* reload().pipe(Effect.provide(context))
+          else yield* requestReload
         },
         (effect) => updateLock.withPermit(effect),
       )
@@ -567,7 +568,13 @@ function patchDocument(text: string, patch: Patch) {
     if (present.has(pair) && !removed.has(pair)) continue
     const narrower =
       rule.resource === "*"
-        ? updated.findIndex((entry) => entry?.action === rule.action && typeof entry.resource === "string")
+        ? updated.findIndex(
+            (entry) =>
+              typeof entry?.action === "string" &&
+              Wildcard.match(rule.action, entry.action) &&
+              typeof entry.resource === "string" &&
+              entry.resource !== "*",
+          )
         : -1
     updated.splice(narrower === -1 ? updated.length : narrower, 0, rule)
   }

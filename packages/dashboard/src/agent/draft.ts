@@ -15,14 +15,31 @@ export async function revokeDashboardDraft(key: string) {
   await shared?.then(server => server.revoke(key), () => undefined)
 }
 
-export async function draftDashboard(input: {
+type DraftInput = {
   work: string; resources: DashboardResources; signal?: AbortSignal; expectedDraftId?: string | null
   // The server that serves the draft: the process-wide one, unless the caller owns one and closes it itself.
   server?: (page: string) => ReturnType<typeof draftServer>
-}) {
+}
+
+export async function draftDashboard(input: DraftInput) {
+  const result = await buildDraft(input)
+  if (typeof result === "string") return result
+  const { url, withCurrentSnapshot } = result
+  const checked = await selfCheck({ resources: input.resources, url, signal: input.signal })
+  if (!withCurrentSnapshot(() => true)) return STOPPED
+  return `Черновик: ${url}\nПроверка типов и сборка: успешно.\nСамопроверка страницы: ${checked.ok ? "успешно" : "ошибка (" + checked.state + ")\n" + checked.errors.join("\n")}`
+}
+
+export async function previewDashboard(input: DraftInput & { snapshotId: string }) {
+  const result = await buildDraft(input, input.snapshotId)
+  if (typeof result !== "string") return result.url
+}
+
+async function buildDraft(input: DraftInput, snapshotId?: string) {
   const work = await realpath(input.work)
   const saved = readDashboardSnapshot(work)
   if (!saved) return NO_SAMPLE
+  if (snapshotId !== undefined && saved.control.snapshotId !== snapshotId) return STOPPED
   if (input.expectedDraftId !== undefined && input.expectedDraftId !== (saved.control.draftId ?? null)) return STOPPED
   const builds = join(work, "..", "control", "draft")
   const withCurrentSnapshot = <T>(run: () => T) => {
@@ -63,9 +80,7 @@ export async function draftDashboard(input: {
     },
   }))
   if (!url) return STOPPED
-  const checked = await selfCheck({ resources: input.resources, url, signal: input.signal })
-  if (!withCurrentSnapshot(() => true)) return STOPPED
-  return `Черновик: ${url}\nПроверка типов и сборка: успешно.\nСамопроверка страницы: ${checked.ok ? "успешно" : "ошибка (" + checked.state + ")\n" + checked.errors.join("\n")}`
+  return { url, withCurrentSnapshot }
 }
 
 function sharedServer(page: string) {

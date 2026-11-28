@@ -48,10 +48,11 @@ NULL сопоставляется с NULL, пустая строка отдел�
 <!-- /mode -->
 
 <!-- mode: exact regex mixed external -->
-`output_mode:"replace"` меняет поле; add сохраняет его и создаёт `_Replace`.
-Флаг `_Replaced` — boolean. other.null меняет и исходный NULL, флаг true.
-Незаданные поля/правила и output_mode сохраняются. Повторное выполнение:
-parameters={}, inputs=[], mappings=[] с прежним mode. Для порядка столбцов
-задай полный output mapping с autosync=false. Выполни, прочитай таблицу
-и сохрани пакет.
+`output_mode:"replace"` меняет поле, add сохраняет его и даёт `_Replace`.
+`_Replaced` — boolean. `other.null` меняет и исходный NULL, флаг true.
+Пропуск полей, правил и `output_mode` сохраняет их. Повтор: прежний mode,
+`parameters:{},inputs:[],mappings:[]`.
+Раскладку меняй только по просьбе об именах, подписях, порядке или составе.
+Для порядка — полный `mappings[].fields`. Без запроса сохрани автоподстройку.
+Явный `autosync` имеет приоритет. Выполни узел и проверь сводку порта.
 <!-- /mode -->
