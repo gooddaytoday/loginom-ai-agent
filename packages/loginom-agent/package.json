@@ -7,7 +7,9 @@
   "license": "MIT",
   "exports": {
     ".": "./src/index.ts",
-    "./host": "./src/host.ts"
+    "./host": "./src/host.ts",
+    "./package-list": "./src/package-list-contract.ts",
+    "./package-references": "./src/package-references-contract.ts"
   },
   "scripts": {
     "typecheck": "bun check --no-script",

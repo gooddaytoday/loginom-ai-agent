@@ -164,7 +164,7 @@ function trackPageNetwork(page) {
 
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
-export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reload, signal, sameOrigin = false } = {}) {
+export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reload, signal, sameOrigin = false, reportSessionLimit = false } = {}) {
   const started = performance.now()
   let phase = "goto", phaseStarted = started, original
   const emit = async event => { try { await onPhase?.(event) } catch { /* Diagnostics cannot change login. */ } }
@@ -278,18 +278,23 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
         // ShowAuthError marks these native Loginom fields. Read only the
         // presence of an error, never return its text across the boundary.
         try {
-          return ["edtUsername", "edtPassword", "pnlLoginFormFields"].some(name => {
+          const errors = ["edtUsername", "edtPassword", "pnlLoginFormFields"].flatMap(name => {
             const element = document.querySelector(`[data-tid="LoginForm;Login;${name}"]`)
             const field = element && globalThis.Ext?.getCmp(element.id)
-            return field?.isVisible?.(true) === true && field.getActiveErrors?.().some(message => typeof message === "string" && message.trim().length > 0)
-          }) ? "rejected" : false
+            return field?.isVisible?.(true) === true ? field.getActiveErrors?.() ?? [] : []
+          }).filter(message => typeof message === "string" && message.trim().length > 0)
+          if (errors.some(message => /превышено количество сессий[, ]+допустимых по вашей лицензии/iu.test(message)))
+            return "session_limit"
+          return errors.length ? "rejected" : false
         } catch { return false }
       }, null, { timeout: remaining(30_000) })).catch(error => {
         original = error
         throw Error("LOGINOM_LOGIN_UNAVAILABLE")
       })
       try {
-        if (await response.jsonValue() === "rejected") throw Error("LOGINOM_LOGIN_REJECTED")
+        const status = await response.jsonValue()
+        if (status === "session_limit" && reportSessionLimit) throw Error("LOGINOM_SESSION_LIMIT")
+        if (status === "rejected" || status === "session_limit") throw Error("LOGINOM_LOGIN_REJECTED")
       } finally { await response.dispose() }
     }
     phase = "identity"; phaseStarted = performance.now()
@@ -302,7 +307,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     const ended = performance.now()
     // Only the sanitized diagnostic crosses the browser/host boundary. Never
     // retain the original Error/stack: Playwright call logs can echo inputs.
-    const code = ["LOGINOM_LOGIN_REJECTED", "LOGINOM_ACCOUNT_MISMATCH"].includes(error?.message) ? error.message : "LOGINOM_LOGIN_UNAVAILABLE"
+    const code = ["LOGINOM_LOGIN_REJECTED", "LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_SESSION_LIMIT"].includes(error?.message) ? error.message : "LOGINOM_LOGIN_UNAVAILABLE"
     throw Error(code, { cause: { login: loginFailure(original ?? error, candidate,
       phase, ended - phaseStarted, ended - started) } })
   } finally {
@@ -417,7 +422,7 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
 }
 
 export async function loginBrowser({ browserPath, profile, candidate, httpCachePath, headless = false, keepOpen = false, signal, onContextCreated, downloadsPath,
-  deadline = Date.now() + 150_000, onRetry, onPhase, validationLogout = false }) {
+  deadline = Date.now() + 150_000, onRetry, onPhase, validationLogout = false, reportSessionLimit = false }) {
   signal?.throwIfAborted()
   const phase = onPhase ?? (async () => {})
   const dependenciesStarted = performance.now()
@@ -510,7 +515,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
     await phase({ phase: "login", status: "starting", attempt: attempt + 1 })
     const page = context.pages()[0] ?? (await context.newPage())
     const result = await loginPage(page, candidate, { deadline, themeState, onThemeReload: record, onPhase: phase,
-      sameOrigin: validationLogout })
+      sameOrigin: validationLogout, reportSessionLimit })
       .then(async result => {
         await phase({ phase: "login", status: "ready", attempt: attempt + 1, duration_ms: Math.round(performance.now() - loginStarted) })
         return result
@@ -534,7 +539,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
       await record({ phase: "login_retry", attempt: 2, reason: error.message, login: error.cause?.login ?? null })
       continue
     }
-    if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED", "LOGINOM_FOCUS_SETUP_FAILED", "LOGINOM_LOGOUT_UNCONFIRMED"].includes(error?.message)) throw error
+    if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED", "LOGINOM_FOCUS_SETUP_FAILED", "LOGINOM_LOGOUT_UNCONFIRMED", "LOGINOM_SESSION_LIMIT"].includes(error?.message)) throw error
     throw Error("LOGINOM_LOGIN_UNAVAILABLE", error?.cause?.login ? { cause: error.cause } : undefined)
   } finally {
     clearTimeout(timer)

@@ -14,6 +14,10 @@ import { BrowserRecovery } from "./browser-recovery"
 import { connectionSettings } from "./connection-settings"
 import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
+import { Definition as Packages } from "./package-list-contract"
+import { packageListHandlers } from "./package-list"
+import { Definition as PackageReferences } from "./package-references-contract"
+import { packageReferencesHandlers } from "./package-references"
 import { dashboardTools } from "./dashboard-tools"
 import { dockTools } from "./dock"
 import { fileTools } from "./file-profile"
@@ -108,8 +112,10 @@ const permission = {
   events: {},
 } as const
 
-export default Plugin.define({
-  id: "loginom.product",
+export const pluginID = "loginom.product"
+
+export default (ownsSession: (sessionID: string) => Promise<boolean>) => Plugin.define({
+  id: pluginID,
   setup: async (ctx) => {
     // Access grants (G1), keyed by the exact session ID: a subsession, a fork and a scheduled wake run in another
     // session or arrive as a new prompt, so none of them inherits a grant. A grant lives for one task, as in 0.4: from the
@@ -535,6 +541,8 @@ export default Plugin.define({
         return url ? { url } : {}
       },
     })
+    await ctx.rpc.register(Packages, packageListHandlers())
+    await ctx.rpc.register(PackageReferences, packageReferencesHandlers(ownsSession))
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {
         const input = value as { sessionID: string; requestID: string }

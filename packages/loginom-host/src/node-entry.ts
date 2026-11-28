@@ -7,10 +7,13 @@ import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
+import { ReadFolder } from "./package-folder"
+import { ReadReferences } from "./package-references-contract"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
 const events = new EventEmitter()
+const folderReads = new Map<string, AbortController>()
 const operations = new Set<Promise<void>>()
 const settingsChecks = new Map<string, AbortController>()
 const stopped = Promise.withResolvers<void>()
@@ -135,6 +138,31 @@ async function dispatch(message: unknown) {
     if (message.method === "dashboard.read") {
       const result = await state.host.readDashboard(Schema.decodeUnknownSync(DashboardRead)(input))
       reply({ id: message.id, result })
+      return
+    }
+    if (message.method === "packages.list" || message.method === "packages.references" || message.method === "packages.cancel") {
+      if (!input || typeof input !== "object" || !("requestId" in input) || typeof input.requestId !== "string")
+        throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      if (message.method === "packages.cancel") {
+        folderReads.get(input.requestId)?.abort(Error("LOGINOM_PACKAGE_FOLDER_CANCELLED"))
+        reply({ id: message.id, result: {} })
+        return
+      }
+      if (folderReads.has(input.requestId)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      const decoded = message.method === "packages.list"
+        ? (Schema.is(ReadFolder)(input) ? { method: "list", input } as const : undefined)
+        : (Schema.is(ReadReferences)(input) ? { method: "references", input } as const : undefined)
+      if (!decoded) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      const controller = new AbortController()
+      folderReads.set(input.requestId, controller)
+      try {
+        const result = decoded.method === "list"
+          ? await state.host.readPackageFolder(decoded.input, controller.signal)
+          : await state.host.readPackageReferences(decoded.input, controller.signal)
+        reply({ id: message.id, result })
+      } finally {
+        folderReads.delete(input.requestId)
+      }
       return
     }
     if (!message.method.startsWith("connection.")) {

@@ -17,6 +17,9 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
+import { decodeFolderListing, ReadFolder } from "./package-folder"
+import { readReferenceTarget, scanPackageReferences } from "./package-references"
+import { ReadReferences, referencesNotChecked } from "./package-references-contract"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -365,13 +368,15 @@ export async function createLoginomHost(options: {
   async function launch(
     connection: ActiveConnection,
     chat: string,
-    purpose: "validation" | "dashboard" | "chat",
+    purpose: "validation" | "dashboard" | "chat" | "packageScan" | { packageFolder: string },
     signal?: AbortSignal,
     deadline?: number,
     validationHttpCache = false,
     validationLogout = false,
   ) {
     const validation = purpose === "validation"
+    const packageFolder = typeof purpose === "object" ? purpose.packageFolder : undefined
+    const packageStorage = packageFolder !== undefined || purpose === "packageScan"
     const startupDeadline = deadline ?? Date.now() + (validation ? 210_000 : 120_000)
     signal?.throwIfAborted()
     const timeout = AbortSignal.timeout(Math.max(1, startupDeadline - Date.now()))
@@ -388,7 +393,7 @@ export async function createLoginomHost(options: {
             }),
       )
     const waitStarted = performance.now()
-    const stateDir = join(root, validation ? "validation" : "runtime")
+    const stateDir = join(root, validation ? "validation" : packageStorage ? "package-list" : "runtime")
     const waitFailure = async (error: unknown): Promise<never> => {
       await mkdir(stateDir, { recursive: true, mode: 0o700 })
         .then(() =>
@@ -461,17 +466,19 @@ export async function createLoginomHost(options: {
         node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
         entry: join(resources, "runtime/src/managed-entry.mjs"),
         resources,
-        stateDir: join(root, validation ? "validation" : "runtime"),
+        stateDir,
         generation: connection.generation,
         chat,
         connection,
         validation,
+        packageFolder,
+        packageScan: purpose === "packageScan" || undefined,
         validationHttpCache: httpCache,
         validationLogout,
         // CLI supplies its explicit browser policy for background launches too.
-        headless: purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true),
-        closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
-        browserRecovery: !validation && options.browserRecovery === true,
+        headless: packageStorage || (purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true)),
+        closeSavedPackageOnShutdown: !validation && !packageStorage && options.closeSavedPackageOnShutdown === true,
+        browserRecovery: !validation && !packageStorage && options.browserRecovery === true,
         environment,
         actionManifestUri: manifest.actionManifestUri,
         actionManifestSha256: manifest.actionManifestSha256,
@@ -636,11 +643,60 @@ export async function createLoginomHost(options: {
       lease.release()
     }
   }
+  const packageReads = new Map<AbortController, Promise<unknown>>()
+  function trackPackageRead<Result>(work: (signal: AbortSignal) => Promise<Result>, signal?: AbortSignal) {
+    const controller = new AbortController()
+    const pending = work(signal ? AbortSignal.any([signal, controller.signal]) : controller.signal)
+    packageReads.set(controller, pending)
+    void pending.finally(() => packageReads.delete(controller)).catch(() => undefined)
+    return pending
+  }
+  async function withPackageRuntime<Result>(
+    generation: number,
+    purpose: "packageScan" | { packageFolder: string },
+    signal: AbortSignal,
+    work: (runtime: Awaited<ReturnType<typeof launch>>) => Promise<Result>,
+    deadline?: number,
+  ) {
+    signal.throwIfAborted()
+    const chat = randomUUID()
+    const lease = service.acquire(chat)
+    if (!lease) throw Error("LOGINOM_CONNECTION_NOT_READY")
+    let cleanupConfirmed = true
+    try {
+      const current = generations.get(generation)
+      if (!current || lease.generation !== generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
+      const runtime = await launch(current.connection, chat, purpose, signal, deadline)
+      cleanupConfirmed = false
+      try {
+        signal.throwIfAborted()
+        return await work(runtime)
+      } finally {
+        await runtime.close()
+        cleanupConfirmed = true
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED") cleanupConfirmed = false
+      if (!cleanupConfirmed) shutdown.failed = true
+      throw error
+    } finally {
+      lease.release()
+      if (cleanupConfirmed)
+        await rm(join(root, "package-list", "generations", String(lease.generation), "chats", chat), {
+          recursive: true,
+          force: true,
+        }).catch(() => {
+          shutdown.failed = true
+          throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+        })
+    }
+  }
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
   function beginClose() {
     service.beginClose()
     resourceController.abort()
     for (const controller of dashboardOperations.keys()) controller.abort(new Error("DASHBOARD_CANCELLED"))
+    for (const controller of packageReads.keys()) controller.abort(new Error("LOGINOM_PACKAGE_FOLDER_CANCELLED"))
   }
   return {
     ...service,
@@ -676,6 +732,52 @@ export async function createLoginomHost(options: {
     },
     browserRecovery: options.browserRecovery === true,
     references,
+    readPackageFolder(input: ReadFolder, signal?: AbortSignal) {
+      if (!Schema.is(ReadFolder)(input)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      return trackPackageRead(async (signal) => {
+        const result = await withPackageRuntime(input.generation, { packageFolder: input.folder }, signal,
+          async ({ ready }) => decodeFolderListing("listing" in ready ? ready.listing : undefined, input.folder))
+        signal.throwIfAborted()
+        return result
+      }, signal)
+    },
+    readPackageReferences(input: ReadReferences, signal?: AbortSignal) {
+      if (!Schema.is(ReadReferences)(input)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      return trackPackageRead(async (signal) => {
+        const current = generations.get(input.generation)
+        if (!current) return referencesNotChecked("unavailable")
+        const target = await readReferenceTarget(root, input, signal)
+        if (!target) return referencesNotChecked("no_copy")
+        return scanPackageReferences(
+          { ...target, homeFolder: `/${current.connection.username}` },
+          (work, stop, deadline) => withPackageRuntime(input.generation, "packageScan", stop, async (runtime) => {
+            const request = async (operation: "packageList" | "packageRead", path: string) => {
+              stop.throwIfAborted()
+              const stopped = Promise.withResolvers<never>()
+              const abort = () => stopped.reject(stop.reason)
+              stop.addEventListener("abort", abort, { once: true })
+              try {
+                return await Promise.race([runtime.request(operation, path, Math.max(1, deadline - Date.now())), stopped.promise])
+              } finally {
+                stop.removeEventListener("abort", abort)
+              }
+            }
+            await work({
+              list: async (folder) => decodeFolderListing(await request("packageList", folder), folder, true),
+              read: async (path) => {
+                const content = await request("packageRead", path)
+                if (typeof content !== "string" || content.length > Math.ceil(16 * 1024 * 1024 / 3) * 4)
+                  throw Error("LOGINOM_REPLY_INVALID")
+                const bytes = Buffer.from(content, "base64")
+                if (bytes.toString("base64") !== content) throw Error("LOGINOM_REPLY_INVALID")
+                return new Uint8Array(bytes)
+              },
+            })
+          }, deadline),
+          signal,
+        )
+      }, signal)
+    },
     async readDashboard(input: DashboardRead, signal?: AbortSignal): Promise<PublicationSource | null> {
       if (!Schema.is(DashboardRead)(input)) throw new Error("DASHBOARD_INPUT_INVALID")
       const result = await dashboardOperation("dashboardRead", input, signal)
@@ -705,7 +807,7 @@ export async function createLoginomHost(options: {
     async close() {
       beginClose()
       await verifiedResources
-      await Promise.allSettled([...dashboardOperations.values()])
+      await Promise.allSettled([...dashboardOperations.values(), ...packageReads.values()])
       await service.close()
       // Startup failures and retired or unexpectedly exited children retain
       // cleanup uncertainty even if a later runtime succeeds.
