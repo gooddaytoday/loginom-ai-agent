@@ -49,6 +49,7 @@ story(
 
       return mountPluginPages()
     }, fixture)
+
     const nav = page.getByRole("navigation", { name: "Plugin pages" })
     const entry = nav.getByRole("button", { name: "Example plugin page", exact: true })
 
@@ -78,6 +79,87 @@ story("a plugin page that fails to render shows a way back to Home", async ({ pa
   await page.getByRole("button", { name: "Back to Home" }).click()
   await expect(page.getByRole("heading", { name: "Fixture Home" })).toBeVisible()
   await host.evaluate((host) => host.unmount())
+})
+
+story("a restored plugin page shows a loader while waiting for settings and while loading", async ({ page }) => {
+  const host = await page.evaluateHandle(async (fixture) => {
+    const { mountLoadingPluginPage } = await import(fixture)
+
+    return mountLoadingPluginPage()
+  }, fixture)
+
+  const loader = page.getByRole("img", { name: "Loading", exact: true })
+  const unavailable = page.getByRole("heading", { name: "Plugin page unavailable" })
+  expect(await host.evaluate((host) => host.status())).toBeUndefined()
+  expect(await loader.isVisible()).toBe(true)
+  await expect(unavailable).toHaveCount(0)
+
+  await host.evaluate((host) => host.releaseSettings())
+  await expect(loader).toBeVisible()
+  await expect(unavailable).toHaveCount(0)
+
+  await host.evaluate((host) => host.fail(0, new Error("Fixture load failed")))
+  await expect(unavailable).toBeVisible()
+  await expect(loader).toHaveCount(0)
+  await host.evaluate((host) => host.unmount())
+})
+
+story("a third-party plugin cannot register a page with a public registry token", async ({ page }) => {
+  const result = await page.evaluate(async (fixture) => {
+    const { mountPluginHost, Registry, until } = await import(fixture)
+    const host = mountPluginHost()
+
+    try {
+      host.load((ctx: Context) => ctx.add(Registry.define("page"), { id: "overview", title: "Third-party page" }))
+      await until(() => host.status() === "failed" || host.status() === "active")
+
+      return { status: host.status(), pages: host.entries("page") }
+    } finally {
+      host.unmount()
+    }
+  }, fixture)
+
+  expect(result).toEqual({ status: "failed", pages: 0 })
+})
+
+story("the narrow session header and timeline preferences are restricted to built-in plugins", async ({ page }) => {
+  const results = await page.evaluate(async (fixture) => {
+    const { mountPluginHost, Registry, until } = await import(fixture)
+    const result = []
+
+    for (const builtin of [false, true]) {
+      const host = mountPluginHost({
+        builtins: new Set(builtin ? ["fixture"] : []),
+      })
+
+      let hasTimeline = false
+
+      try {
+        host.load((ctx: Context) => {
+          hasTimeline = "timeline" in ctx
+          ctx.add(Registry.define("slot"), () => ({
+            at: "session.header.mobile",
+            render: () => "Header action",
+          }))
+        })
+        await until(() => host.status() === "failed" || host.status() === "active")
+        result.push({
+          status: host.status(),
+          slots: host.entries("slot"),
+          hasTimeline,
+        })
+      } finally {
+        host.unmount()
+      }
+    }
+
+    return result
+  }, fixture)
+
+  expect(results).toEqual([
+    { status: "failed", slots: 0, hasTimeline: false },
+    { status: "active", slots: 1, hasTimeline: true },
+  ])
 })
 
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {

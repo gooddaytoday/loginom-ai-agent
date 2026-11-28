@@ -98,8 +98,7 @@ const getBase = (channel: keyof typeof Product.channels): Configuration => {
       "resources/**/*",
       // Loginom AI Agent (B4.7): the bundled CLI and its version file carry the product name (script/utils.ts).
       `!resources/${Product.cliExecutable}*`,
-      // Loginom AI Agent (B4.8a): the Loginom resources ship next to app.asar. The 0.4 S3 read key for updates waits
-      // for the updater that reads it (stage C).
+      // Loginom AI Agent: the Loginom resources and optional updater S3 read key ship next to app.asar.
       "!resources/loginom{,/**/*}",
       "!resources/updates-s3.json",
       // Keep only the target platform's node-pty prebuild when cross-packaging with --cpu=*.
@@ -128,6 +127,7 @@ const getBase = (channel: keyof typeof Product.channels): Configuration => {
         filter: [Product.cliExecutable, `${Product.cliExecutable}.exe`, `${Product.cliExecutable}.version`],
       },
       { from: "resources/loginom", to: "loginom" },
+      { from: "resources", to: ".", filter: ["updates-s3.json"] },
       // Loginom AI Agent (B4.6b): the window icon that windows/early.ts and windows/appearance.ts read from
       // process.resourcesPath/icons, as in 0.4. Without dock.png: installed macOS apps keep the bundle ICNS in the
       // Dock, which 0.4 got by skipping setDockIcon when packaged.

@@ -204,14 +204,17 @@ It then falls back to the quote's composer tile without closing the editor or di
 
 Built-in window plugins can import `ToolRenderer` from `@opencode/plugin/gui/builtin` and call
 `ctx.add(ToolRenderer, { tool, title, separate, render })` in setup for a tool they own. The host rejects native or
-already registered tool names and withdraws the renderer when the plugin unloads. A namespace such as `example_*`
-covers tools under that prefix. An exact name wins over prefixes. The longest prefix wins among matching prefixes.
-`separate: true` gives visible calls their own row in grouped timelines. The renderer receives live data, including
-partial input. Set `handlesFailure: true` to draw failures. The timeline shows a tool error card if rendering throws
-and retries rendering at the next call status.
+already registered tool names and withdraws the renderer when the plugin unloads. `separate: true` gives visible calls
+their own row in grouped timelines. The renderer receives live data, including partial input. The timeline shows a tool
+error card if rendering throws and retries rendering at the next call status. An exact tool name takes priority over
+namespace prefixes ending in `*`. A renderer can provide `handlesFailure(metadata, error)` to render a failure from a
+validated receipt or a recognized error code. It also receives the recorded error as `props.error`. Render safe copy
+for recognized codes and leave other failures to the standard error card.
 
-`builtinContext(ctx).timeline` reads and sets the app's saved Compact and Detailed presets. A built-in can use
-`session.header.mobile` to put a control beside the session location on narrow screens.
+Built-in plugins can add conversation header actions to the public `session.header` slot and to the narrow-screen
+`session.header.mobile` slot via `BuiltinSlot`. Use `builtinContext(ctx).timeline` to read and set the app's persisted
+compact or detailed preset. The host restricts the narrow-screen slot, timeline preset access and `ToolRenderer` to
+built-in plugins.
 
 [Lifetimes](#lifetimes) shows `createKeyed` in files.
 
@@ -343,13 +346,14 @@ to the displayed repository or worktree instead of adding a second menu item.
 | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `onIdle(fn)`                                            | Runs work while the main thread is idle, e.g. a lazy chunk's preload                           |
 | `BuiltinPanel`, `BuiltinPanelTab`                       | `legacy` stored keys of a panel; `first` and stable `dom` ids of a tab                         |
+| `Page`                                                  | Top-level plugin pages with optional navigation entries                                        |
 | `BuiltinCommand`                                        | `follows`: share another command's shortcut inside `scope`                                     |
 | `BuiltinStore`, `BuiltinStoreFrom`                      | Window stores imported from parts of the app's own keys                                        |
 | `builtinContext(ctx)`                                   | `ctx.desktop.forceFocus`, `ctx.locale.setDirection`                                            |
 | `builtinMainContext(ctx)`, `MainStoreFrom`, `Lifecycle` | Main stores imported from settings files or other namespaces, and `lifecycle.restart(handoff)` |
 | `builtinCatalog(catalog)`, `BuiltinCatalog`             | Locales other than English as loaders, loaded when the user picks the locale                   |
 
-Each registry token has the same id as the public one, so the host reads every item through it. The host builds every context with the built-in members; `builtinContext` and `builtinMainContext` only type them. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
+Registry tokens that extend a public registry share its id, so the host reads every item through it. The host accepts `Page` registrations only from built-in plugins. The host builds every context with the built-in members; `builtinContext` and `builtinMainContext` only type them. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
 
 ```ts
 i18n: builtinCatalog({ en, de: () => import("./i18n/de") }),
@@ -779,7 +783,7 @@ export const builtins = compose({
   "microsoft-office": microsoftOffice,
   sources,
   goal,
-  "loginom-gui": loginomGui,
+  "loginom-gui": loginom,
 })
 ```
 
@@ -805,9 +809,12 @@ export const builtins = compose({
   "microsoft-office": { ...microsoftOffice, windowEntry: eager(microsoftOfficeRenderer) },
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
   goal: { ...goal, windowEntry: eager(goalRenderer) },
-  "loginom-gui": { ...loginomGui, windowEntry: eager(loginomGuiRenderer) },
+  "loginom-gui": { ...loginom, windowEntry: eager(loginomRenderer) },
 })
 ```
+
+The Loginom connection page manages the desktop sidecar’s profile. The web page uses its own origin and can use a single
+local service in development. If neither target is available, the page shows that the service is unavailable.
 
 Your own plugin takes the same steps:
 

@@ -1,0 +1,279 @@
+{
+  "sources": {
+    "node, failure": "#1471 32f1f5fbe451c71425473cb01087937c686a4a2d: nodeResultReply, loginomFeedMetadata, withLoginomMetadata",
+    "output": "#1504 d4c352d4fed848b23ea69177aab99258444dab6d: nodeResultReply, loginomFeedMetadata",
+    "save": "#1484 e743ae4ec038199a57ac877b13de93e116b1c446: loginomSaveMetadata",
+    "waiting, configuring, reading": "#1471 32f1f5fbe451c71425473cb01087937c686a4a2d: withStepProgress",
+    "nativeNodeFailure, nativeFailureWithoutNode, nativeLaunchMessage": "#1514 2a41d8090ce97099f45775cd8f741d58ccc52f0b: nodeFailureMetadata",
+    "graphConflict": "#1471 32f1f5fbe451c71425473cb01087937c686a4a2d: loginomFeedMetadata with the NODE_GRAPH_CONFLICT code from #1481",
+    "busyStart, busyEnd": "#1487 86b8727e3935cae887fe61bc259c0a2636d6bbde: createProtectedOperation",
+    "executing, stalled, resumed": "#1460: withStepProgress with a simulated clock"
+  },
+  "node": {
+    "v": 1,
+    "operationId": "import",
+    "state": "settled",
+    "attempt": 1,
+    "status": "SUCCEEDED",
+    "phase": "node_ready",
+    "node": {
+      "guid": "node-guid",
+      "label": "Импорт CSV",
+      "type": "imports.text"
+    },
+    "executionId": "exec",
+    "executionStatus": "completed",
+    "effectPossible": true,
+    "cleanupComplete": true,
+    "limitations": [
+      "Output port 0: only 1 of 2400 rows returned. Do not report unseen rows or a complete ranking from this preview. Compute report statistics in nodes and request the needed output."
+    ],
+    "kind": "execute",
+    "ports": [
+      {
+        "index": 0,
+        "guid": "table-port",
+        "rowCount": 2400,
+        "columnCount": 1,
+        "preview": {
+          "schema": [
+            {
+              "index": 0,
+              "name": "Value",
+              "type": "string"
+            }
+          ],
+          "sample": [
+            [
+              {
+                "type": "string",
+                "value": "A",
+                "precision": "source_text",
+                "is_null": false
+              }
+            ]
+          ],
+          "sampleComplete": false
+        }
+      }
+    ]
+  },
+  "output": {
+    "v": 1,
+    "operationId": "import",
+    "state": "settled",
+    "attempt": 1,
+    "status": "SUCCEEDED",
+    "phase": "node_ready",
+    "node": {
+      "guid": "node-guid",
+      "label": "Импорт CSV",
+      "type": "imports.text"
+    },
+    "executionId": "exec",
+    "executionStatus": "completed",
+    "effectPossible": true,
+    "cleanupComplete": true,
+    "limitations": [
+      "Output port 0: only 1 of 2400 rows returned. Do not report unseen rows or a complete ranking from this preview. Compute report statistics in nodes and request the needed output."
+    ],
+    "kind": "execute",
+    "ports": [
+      {
+        "index": 0,
+        "guid": "table-port",
+        "rowCount": 2400,
+        "columnCount": 1,
+        "preview": {
+          "schema": [
+            {
+              "index": 0,
+              "name": "Value",
+              "type": "string"
+            }
+          ],
+          "sample": [
+            [
+              {
+                "type": "string",
+                "value": "A",
+                "precision": "source_text",
+                "is_null": false
+              }
+            ]
+          ],
+          "sampleComplete": false
+        },
+        "details": {
+          "delivered": {
+            "kind": "preview"
+          },
+          "sampleLimitation": "more_rows_not_delivered"
+        }
+      }
+    ],
+    "evidence": [
+      {
+        "kind": "tableRead",
+        "port": 0,
+        "portGuid": "table-port",
+        "rowsRead": 1,
+        "rowCount": 2400,
+        "executionId": "exec"
+      }
+    ],
+    "outputConfiguration": {
+      "kind": "unavailable",
+      "reason": "configuration_not_confirmed"
+    }
+  },
+  "failure": {
+    "v": 1,
+    "operationId": "failure",
+    "state": "settled",
+    "attempt": 1,
+    "status": "FAILED",
+    "phase": "node_ready",
+    "node": {
+      "guid": "node-guid",
+      "label": "Импорт CSV",
+      "type": "imports.text"
+    },
+    "executionId": "exec",
+    "executionStatus": "failed",
+    "effectPossible": true,
+    "cleanupComplete": true,
+    "limitations": [],
+    "nextStep": {
+      "tool": "dock_operation_inspect",
+      "instruction": "Inspect the original operation; do not repeat an unresolved effect."
+    },
+    "error": {
+      "code": "NODE_EXECUTION_FAILED",
+      "message": "Loginom не ответил",
+      "source": "loginom",
+      "attribution": "verified_node"
+    },
+    "kind": "execute"
+  },
+  "save": {
+    "v": 1,
+    "operationId": "save",
+    "state": "settled",
+    "status": "SUCCEEDED",
+    "kind": "save",
+    "evidence": [
+      {
+        "kind": "saved",
+        "path": "/user/ABC-анализ.lgp"
+      },
+      {
+        "kind": "savedGraphRead",
+        "nodeCount": 2,
+        "scope": "activeWorkflow"
+      }
+    ]
+  },
+  "waiting": {
+    "version": 1,
+    "phase": "waiting",
+    "nodeType": null,
+    "substep": null,
+    "startedAt": 1700000000000,
+    "lastReplyAt": null,
+    "stalledSince": null
+  },
+  "configuring": {
+    "version": 1,
+    "phase": "configuring",
+    "nodeType": "transform.group_data",
+    "substep": {
+      "kind": "fields",
+      "index": 2,
+      "total": 3
+    },
+    "startedAt": 1700000000000,
+    "lastReplyAt": null,
+    "stalledSince": null
+  },
+  "reading": {
+    "version": 1,
+    "phase": "reading",
+    "nodeType": "transform.group_data",
+    "substep": {
+      "kind": "fields",
+      "index": 7,
+      "total": 8
+    },
+    "startedAt": 1700000000000,
+    "lastReplyAt": null,
+    "stalledSince": null
+  },
+  "nativeNodeFailure": {
+    "kind": "node_failed",
+    "message": "В источнике отсутствует столбец «Дата»",
+    "node": {
+      "document_id": "sales",
+      "workflow_id": "main",
+      "node_id": "{fc94c88b-6b37-451b-9d57-a9378122d8a3}"
+    }
+  },
+  "nativeFailureWithoutNode": {
+    "kind": "node_failed",
+    "message": "Поле «Выручка» не найдено"
+  },
+  "nativeLaunchMessage": {
+    "kind": "post_launch_message",
+    "message": "Нет доступа к источнику"
+  },
+  "graphConflict": {
+    "v": 1,
+    "operationId": "sales-run",
+    "state": "settled",
+    "status": "NOT_APPLIED",
+    "error": {
+      "code": "NODE_GRAPH_CONFLICT",
+      "message": "The live workflow changed before the action was verified.",
+      "source": "runtime"
+    }
+  },
+  "busyStart": {
+    "version": 1,
+    "windowId": "85401f5f-cc15-4fd3-a2cb-5ad0d67d97c6",
+    "operationId": "sales-run",
+    "active": true
+  },
+  "busyEnd": {
+    "version": 1,
+    "windowId": "85401f5f-cc15-4fd3-a2cb-5ad0d67d97c6",
+    "operationId": "sales-run",
+    "active": false
+  },
+  "executing": {
+    "version": 1,
+    "phase": "executing",
+    "nodeType": "transform.group_data",
+    "substep": null,
+    "startedAt": 1700000078000,
+    "lastReplyAt": 1700000100000,
+    "stalledSince": null
+  },
+  "stalled": {
+    "version": 1,
+    "phase": "executing",
+    "nodeType": "transform.group_data",
+    "substep": null,
+    "startedAt": 1700000078000,
+    "lastReplyAt": 1700000100000,
+    "stalledSince": 1700000100000
+  },
+  "resumed": {
+    "version": 1,
+    "phase": "executing",
+    "nodeType": "transform.group_data",
+    "substep": null,
+    "startedAt": 1700000078000,
+    "lastReplyAt": 1700000200000,
+    "stalledSince": null
+  }
+}

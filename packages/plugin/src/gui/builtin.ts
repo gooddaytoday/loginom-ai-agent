@@ -50,6 +50,8 @@ export interface ToolRendererProps {
   readonly status?: string
   /** The output text, once available. */
   readonly output?: string
+  /** The recorded tool error text, when the call failed. */
+  readonly error?: string
   /** Whether disclosure starts open. */
   readonly defaultOpen?: boolean
   /** The current disclosure state, if controlled by the timeline. */
@@ -69,8 +71,12 @@ export interface ToolRenderer {
   readonly title: string
   /** Keep visible calls on their own rows, even when tool activity is grouped. */
   readonly separate?: boolean
-  /** Draw failed calls as well. Defaults to the timeline's standard tool error card. */
-  readonly handlesFailure?: boolean
+  /**
+   * Return true when the renderer can safely explain a failure. The timeline otherwise uses its standard error card.
+   * @param metadata - The metadata recorded on the failed tool call.
+   * @param error - The recorded tool error text.
+   */
+  handlesFailure?(metadata: ToolRendererProps["metadata"], error: string): boolean
   /**
    * Draws a call under the plugin context. The host shows its tool error card if this throws.
    * @param props - Live call data and the timeline's display options.
@@ -417,8 +423,7 @@ export interface BuiltinContext extends Context {
  * ```
  */
 export function builtinContext(ctx: Context): BuiltinContext {
-  // SAFETY: the app's window host builds every context as a `BuiltinContext` (its HostApi factories are typed by it),
-  // and built-ins run only in that host.
+  // SAFETY: the app's window host attaches the built-in APIs to the built-in plugins that call this helper.
   return ctx as BuiltinContext
 }
 

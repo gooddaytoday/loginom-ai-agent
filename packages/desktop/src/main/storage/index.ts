@@ -7,6 +7,7 @@ import { openDatabase } from "./database"
 import { setStorageSnapshotProvider } from "./snapshot"
 import { createDraftStore } from "./drafts"
 import { importLegacyStores } from "./legacy"
+import { importProductLegacyStores } from "./product-legacy"
 import { createStateStore } from "./state"
 import { readEnableState } from "../plugin/enable-state"
 
@@ -32,6 +33,12 @@ export const layer = Layer.effect(
           : Effect.logInfo("imported legacy store files", { imported: result.imported, files: result.removed }),
       ),
       Effect.catch((error) => Effect.logWarning("failed to import legacy store files", { error })),
+    )
+    yield* importProductLegacyStores(storage.db, userData).pipe(
+      Effect.tap((imported) =>
+        imported > 0 ? Effect.logInfo("imported product legacy store files", { imported }) : Effect.void,
+      ),
+      Effect.catch((error) => Effect.logWarning("failed to import product legacy store files", { error })),
     )
     const wire = (_event: Electron.Event | undefined, win: BrowserWindow) => win.on("session-end", storage.flush)
     app.on("before-quit", storage.flush)
