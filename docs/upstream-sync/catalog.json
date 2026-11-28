@@ -92,8 +92,11 @@
         "packages/core/src/session/history.ts", "packages/protocol/openapi.json",
         "packages/core/src/session/message-updater.ts", "packages/schema/src/session-event.ts",
         "packages/schema/src/session-message.ts", "packages/client/src/effect/api/api.ts",
-        "packages/app/src/runtime/server/data.test.ts"
-      ]
+        "packages/app/src/runtime/server/data.test.ts", "packages/server/test/fetch.test.ts"
+      ],
+      "notes": {
+        "packages/server/test/fetch.test.ts": "Use a session-level edit rule to test routing without relying on agent startup or the product's unattended shell policy (LAB-2352)."
+      }
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },
     {
