@@ -22,7 +22,6 @@ exports.default = Plugin.define({
   setup(ctx) {
     for (const [id, group, order, title] of [
       ["fixture-instructions", "work", 40, "Инструкции"],
-      ["fixture-loginom", "work", 10, "Loginom"],
       ["fixture-diagnostics", "application", 40, "Диагностика"],
     ]) {
       ctx.add(SettingsPage, { id, group, order, title, render() {

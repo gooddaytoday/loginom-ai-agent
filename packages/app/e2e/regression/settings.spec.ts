@@ -237,7 +237,13 @@ test("a settings page survives refresh", async ({ page }) => {
 })
 
 test("settings group GUI plugin pages in order on desktop and in the narrow menu", async ({ page }) => {
-  await mockWorkspace(page, { name: "Settings demo", directory, provider: NO_PROVIDER, sessions: [] })
+  await mockWorkspace(page, {
+    name: "Settings demo",
+    directory,
+    provider: NO_PROVIDER,
+    sessions: [],
+    seed: { locale: "ru" },
+  })
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(`/e2e/utils/settings-wsl.html?${new URLSearchParams({ server: SERVER, "grouped-settings": "1" })}`)
   const settings = page.getByTestId("settings-screen")
@@ -248,11 +254,11 @@ test("settings group GUI plugin pages in order on desktop and in the narrow menu
   await expect(settings.getByText("Работа", { exact: true })).toBeVisible()
   await expect(settings.getByText("Приложение", { exact: true })).toBeVisible()
   await expect(tabs).toHaveText([...work, ...application])
-  await settings.getByRole("tab", { name: "Loginom", exact: true }).click()
-  await expect(settings.getByRole("heading", { name: "Loginom", exact: true })).toBeVisible()
+  await settings.getByRole("tab", { name: "Инструкции", exact: true }).click()
+  await expect(settings.getByRole("heading", { name: "Инструкции", exact: true })).toBeVisible()
 
   await page.setViewportSize({ width: 390, height: 844 })
-  const picker = settings.getByRole("button", { name: "Loginom", exact: true })
+  const picker = settings.getByRole("button", { name: "Инструкции", exact: true })
   await picker.click()
   const menu = page.getByRole("menu")
   await expect(menu.getByRole("group", { name: "Работа", exact: true }).getByRole("menuitemradio")).toHaveText(work)

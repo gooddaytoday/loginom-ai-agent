@@ -33,6 +33,8 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
 
   ctx.add(SettingsPage, {
     id: "loginom",
+    group: "work",
+    order: 10,
     icon: "arrow-up-right",
     get title() {
       return ctx.t("title")
