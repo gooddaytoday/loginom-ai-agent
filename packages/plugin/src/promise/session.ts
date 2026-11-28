@@ -14,6 +14,7 @@ import type { ModelHooks } from "./registration.js"
 export interface SessionPrompt {
   readonly sessionID: Session.ID
   readonly messageID: SessionMessage.ID
+  readonly operation?: "submit" | "edit"
   prompt: Types.DeepMutable<PromptInput.Prompt>
   metadata?: Record<string, unknown>
   delivery: SessionInbox.Delivery

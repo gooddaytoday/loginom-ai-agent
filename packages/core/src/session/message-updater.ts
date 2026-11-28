@@ -67,15 +67,14 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
     )
   })
 
-  const idle = (outcome: SessionMessage.Idle["outcome"], error?: SessionMessage.Idle["error"]) =>
+  const idle = (input: Pick<SessionMessage.Idle, "outcome" | "error" | "interruption">) =>
     clearCurrentRetry.pipe(
       Effect.andThen(
         adapter.appendMessage(
           SessionMessage.Idle.make({
             id: SessionMessage.ID.fromEvent(event.id),
             type: "idle",
-            outcome,
-            error,
+            ...input,
             metadata: event.metadata,
             time: { created },
           }),
@@ -147,11 +146,13 @@ export function update(adapter: Adapter, event: SessionEvent.DurableEvent) {
       "session.inbox.edited": () => Effect.void,
       "session.inbox.delivery.changed": () => Effect.void,
       "session.execution.started": () => Effect.void,
-      "session.execution.succeeded": () => idle("succeeded"),
-      "session.execution.failed": (event) => idle("failed", event.data.error),
+      "session.execution.succeeded": () => idle({ outcome: "succeeded" }),
+      "session.execution.failed": (event) => idle({ outcome: "failed", error: event.data.error }),
       // Shutdown keeps the execution claim and the resumed drain continues the turn.
-      "session.execution.interrupted": (event) =>
-        event.data.reason === "shutdown" ? clearCurrentRetry : idle("interrupted"),
+      "session.execution.interrupted": ({ data }) =>
+        data.reason === "shutdown"
+          ? clearCurrentRetry
+          : idle({ outcome: "interrupted", interruption: { reason: data.reason, lastKnown: data.lastKnown } }),
       "session.instructions.updated": (event) => {
         if (event.data.text === undefined) return Effect.void
         return adapter.appendMessage(

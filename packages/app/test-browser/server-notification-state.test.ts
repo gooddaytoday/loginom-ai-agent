@@ -256,7 +256,7 @@ test.each(
 })
 
 test.each([
-  ["session.execution.succeeded", "notification.session.responseReady.title"],
+  ["session.status", "notification.session.responseReady.title"],
   ["session.execution.failed", "notification.session.error.title"],
 ] as const)("system alert for %s requires an open session tab", async (type, title) => {
   alerts.length = 0
@@ -265,8 +265,17 @@ test.each([
 
   const emit = (id: string) =>
     listeners.forEach((listener) =>
-      // SAFETY: the notification state reads only the type, id and session of execution events.
-      listener({ type, id, data: { sessionID: session.id, error: { type: "api", message: "failed" } } } as never),
+      listener(
+        type === "session.status"
+          ? { type, id, created: 1, data: { sessionID: session.id, status: { type: "idle" } } }
+          : {
+              type,
+              id,
+              created: 1,
+              durable: { aggregateID: session.id, seq: 1, version: 1 },
+              data: { sessionID: session.id, error: { type: "api", message: "failed" } },
+            },
+      ),
     )
 
   const dispose = createRoot((dispose) => {
@@ -294,6 +303,17 @@ test.each([
   expect(alerts).toEqual([])
 
   tabs.store = [{ type: "session", server, sessionId: session.id }]
+  if (type === "session.status") {
+    listeners.forEach((listener) =>
+      listener({
+        type: "session.execution.succeeded",
+        id: "intermediate-success",
+        created: 1,
+        durable: { aggregateID: session.id, seq: 1, version: 1 },
+        data: { sessionID: session.id },
+      }),
+    )
+  }
   emit("event-2")
   await new Promise((resolve) => setTimeout(resolve, 0))
   expect(alerts).toEqual([title])

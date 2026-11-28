@@ -14,7 +14,7 @@ export function transport(port: Port) {
     {
       resolve(value: unknown): void
       reject(error: Error): void
-      timer: ReturnType<typeof setTimeout>
+      cleanup(): void
       observe?(value: unknown): void
       progress?(value: unknown): void
     }
@@ -22,7 +22,7 @@ export function transport(port: Port) {
   function close() {
     state.closed = true
     pending.forEach((request) => {
-      clearTimeout(request.timer)
+      request.cleanup()
       request.reject(new Error("LOGINOM_HOST_CLOSED"))
     })
     pending.clear()
@@ -37,7 +37,7 @@ export function transport(port: Port) {
       return
     }
     pending.delete(data.id)
-    clearTimeout(request.timer)
+    request.cleanup()
     request.observe?.(data)
     if ("error" in data) {
       request.reject(hostException(data))
@@ -47,15 +47,37 @@ export function transport(port: Port) {
   })
   port.start()
   return {
-    request(method: string, input: unknown, timeout = 180_000, observe?: (value: unknown) => void, progress?: (value: unknown) => void) {
+    request(
+      method: string,
+      input: unknown,
+      timeout = 180_000,
+      observe?: (value: unknown) => void,
+      progress?: (value: unknown) => void,
+      signal?: AbortSignal,
+    ) {
       if (state.closed) return Promise.reject(new Error("LOGINOM_HOST_CLOSED"))
+      if (signal?.aborted) return Promise.reject(signal.reason)
       const id = randomUUID()
       return new Promise<unknown>((resolve, reject) => {
-        const timer = setTimeout(() => {
-          pending.delete(id)
-          reject(new Error("LOGINOM_HOST_TIMEOUT"))
-        }, timeout)
-        pending.set(id, { resolve, reject, timer, observe, progress })
+        const abort = () => cancel(signal?.reason)
+        const timer = setTimeout(() => cancel(new Error("LOGINOM_HOST_TIMEOUT")), timeout)
+        const cleanup = () => {
+          clearTimeout(timer)
+          signal?.removeEventListener("abort", abort)
+        }
+        function cancel(reason: unknown) {
+          if (!pending.delete(id)) return
+          cleanup()
+          reject(reason)
+          if (!signal) return
+          try {
+            port.postMessage({ cancel: id })
+          } catch {
+            close()
+          }
+        }
+        pending.set(id, { resolve, reject, cleanup, observe, progress })
+        signal?.addEventListener("abort", abort, { once: true })
         try {
           port.postMessage({ id, method, input })
         } catch {

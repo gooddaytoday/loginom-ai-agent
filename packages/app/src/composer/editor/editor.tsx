@@ -15,6 +15,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Portal } from "solid-js/web"
+import { makeEventListener } from "@solid-primitives/event-listener"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Key } from "@solid-primitives/keyed"
@@ -73,6 +74,7 @@ const MobilePanelDrawer = lazy(async () => {
 type ComposerMode = "normal" | "shell"
 
 const COMPOSER_SUGGESTION_MAX_HEIGHT = 320
+const COMPOSER_SUGGESTION_GAP = 8
 
 const COMPOSER_SUGGESTION_ROW_HEIGHT = 28
 
@@ -91,6 +93,9 @@ export type ComposerEditorProps = {
   borderUnderlay?: boolean
   class?: string
   modelControl?: JSX.Element
+  addMenu?: { render: () => JSX.Element }
+  placeholder?: { render: () => JSX.Element }
+  toolbar?: JSX.Element
   modelControlsVisible?: boolean
   attachKeybind?: string[]
   attachShortcut?: string
@@ -99,6 +104,7 @@ export type ComposerEditorProps = {
   queueFirstLabel?: string
   exitShellKeybind?: string[]
   suggestionBoundary?: () => HTMLElement | undefined
+  suggestionViewport?: () => HTMLElement | undefined
 }
 
 export function ComposerEditor(props: ComposerEditorProps) {
@@ -181,6 +187,8 @@ export function ComposerEditor(props: ComposerEditorProps) {
 
   const mode = createMemo(() => props.controller.mode())
 
+  const placeholder = () => (mode() === "normal" && !props.controller.value() ? props.placeholder : undefined)
+
   const buttons = createMemo(() => ({
     opacity: mode() === "normal" ? 1 : 0,
     "pointer-events": mode() === "normal" ? ("auto" as const) : ("none" as const),
@@ -236,6 +244,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
           emptyLabel={i18n.t("ui.promptInput.noMatchingItems")}
           items={props.controller.suggestions()}
           boundary={props.suggestionBoundary}
+          viewport={props.suggestionViewport}
           activeID={composerPopoverActiveID(state)}
           search={search()}
           history={state.popover.type === "history" ? mode() : undefined}
@@ -302,7 +311,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
             data-component="composer-scroll"
             data-scrollable
             class="relative overflow-y-auto"
-            classList={{ "max-h-[180px]": historyHeight() === undefined }}
+            classList={{
+              "max-h-[180px]": historyHeight() === undefined,
+              "grid grid-cols-[minmax(0,1fr)]": !!placeholder(),
+            }}
             onScroll={updateScroll}
             ref={viewport}
           >
@@ -325,7 +337,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
               // @ts-expect-error
               autocomplete="off"
               class="relative z-10 block w-full whitespace-pre-wrap bg-transparent ps-4 pe-[var(--composer-scroll-end)] pt-4 pb-2 text-[13px] font-[440] leading-5 text-v2-text-text-base focus:outline-none [&_[data-mention=file]]:text-syntax-property [&_[data-mention=agent]]:text-syntax-type [&_[data-mention=reference]]:text-v2-text-text-muted"
-              classList={{ "font-mono! tracking-[-0.04px]": mode() === "shell", "opacity-50": props.disabled }}
+              classList={{
+                "font-mono! tracking-[-0.04px]": mode() === "shell",
+                "opacity-50": props.disabled,
+                "col-start-1 row-start-1": !!placeholder(),
+              }}
               style={{
                 "unicode-bidi": mode() === "normal" ? "plaintext" : undefined,
                 "text-align": "start",
@@ -430,11 +446,16 @@ export function ComposerEditor(props: ComposerEditorProps) {
             <Show when={!props.controller.value()}>
               <div
                 dir={mode() === "normal" ? "auto" : "ltr"}
-                class="pointer-events-none absolute inset-x-0 top-0 ps-4 pe-[var(--composer-scroll-end)] pt-4 text-[13px] font-[440] leading-5 text-v2-text-text-faint"
-                classList={{ "font-mono! tracking-[-0.04px]": mode() === "shell" }}
+                class="pointer-events-none ps-4 pe-[var(--composer-scroll-end)] pt-4 text-[13px] font-[440] leading-5 text-v2-text-text-faint"
+                classList={{
+                  "font-mono! tracking-[-0.04px]": mode() === "shell",
+                  "absolute inset-x-0 top-0": !placeholder(),
+                  "col-start-1 row-start-1 pb-2": !!placeholder(),
+                }}
                 style={{ "unicode-bidi": mode() === "normal" ? "plaintext" : undefined, "text-align": "start" }}
               >
-                {view.placeholder?.() ??
+                {placeholder()?.render() ??
+                  view.placeholder?.() ??
                   (mode() === "shell"
                     ? i18n.t("ui.promptInput.placeholder.shell")
                     : i18n.t("ui.promptInput.placeholder.normal", { slash: "/", at: "@" }))}
@@ -444,7 +465,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
         </div>
 
         <div class="flex h-11 shrink-0 items-center px-2" classList={{ hidden: touch() && mode() === "shell" }}>
-          <Show when={!touch()}>
+          <Show when={!touch() || props.addMenu}>
             <div
               class="flex shrink-0 items-center"
               aria-hidden={mode() === "shell"}
@@ -464,6 +485,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                 onCommands={props.controller.openCommands}
                 onContext={props.controller.openContext}
                 onShell={props.controller.openShell}
+                extra={props.addMenu?.render}
               />
             </div>
           </Show>
@@ -482,6 +504,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
             style={buttons()}
           >
             <div ref={controlsContent} class="flex h-full w-max min-w-full items-center gap-0.5">
+              {props.toolbar}
               <Show when={view.agent} keyed>
                 {(control) => (
                   <ComposerEditorConfiguredSelect
@@ -978,6 +1001,7 @@ function ComposerAttachments(props: {
 
 function ComposerEditorAddMenu(props: {
   disabled?: boolean
+  extra?: () => JSX.Element
   title: string
   keybind?: string[]
   attachLabel: string
@@ -1033,6 +1057,7 @@ function ComposerEditorAddMenu(props: {
             <Menu.Item onSelect={props.onShell} shortcut="!">
               {props.shellLabel}
             </Menu.Item>
+            {props.extra?.()}
           </Menu.Content>
         </Menu.Portal>
       </Menu>
@@ -1256,6 +1281,7 @@ function ComposerEditorPopover(props: {
     onKeyDown: (event: KeyboardEvent) => void
   }
   boundary?: () => HTMLElement | undefined
+  viewport?: () => HTMLElement | undefined
   onActiveChange: (item: ComposerSuggestion) => void
   onSelect: (item: ComposerSuggestion) => void
 }) {
@@ -1263,7 +1289,12 @@ function ComposerEditorPopover(props: {
   const listID = props.id ?? createUniqueId()
   const active = createSelector(() => props.activeID)
   let container: HTMLDivElement | undefined
-  const [store, setStore] = createStore({ maxHeight: COMPOSER_SUGGESTION_MAX_HEIGHT })
+  const [store, setStore] = createStore({
+    maxHeight: COMPOSER_SUGGESTION_MAX_HEIGHT,
+    spaceAbove: COMPOSER_SUGGESTION_MAX_HEIGHT,
+    spaceBelow: 0,
+  })
+  const opensBelow = () => store.spaceAbove < store.maxHeight && store.spaceBelow > store.spaceAbove
 
   const resize = (height: number) =>
     setStore(
@@ -1308,13 +1339,43 @@ function ComposerEditorPopover(props: {
   createEffect(() => resize(boundary()?.clientHeight ?? COMPOSER_SUGGESTION_MAX_HEIGHT * 2))
   createResizeObserver(boundary, (rect) => resize(rect.height))
 
+  createEffect(() => {
+    const viewport = props.viewport?.()
+    const anchor = container?.offsetParent
+
+    if (!viewport || !(anchor instanceof HTMLElement)) {
+      setStore({ spaceAbove: COMPOSER_SUGGESTION_MAX_HEIGHT, spaceBelow: 0 })
+      return
+    }
+
+    const measure = () => {
+      const panel = viewport.getBoundingClientRect()
+      const composer = anchor.getBoundingClientRect()
+      setStore({
+        spaceAbove: Math.max(0, composer.top - panel.top - COMPOSER_SUGGESTION_GAP),
+        spaceBelow: Math.max(0, panel.bottom - composer.bottom - COMPOSER_SUGGESTION_GAP),
+      })
+    }
+
+    createResizeObserver([viewport, anchor], measure)
+    makeEventListener(viewport, "scroll", measure, { passive: true })
+    measure()
+  })
+
   return (
     <div
       ref={container}
       data-component="composer-suggestions"
-      class="absolute inset-x-0 -top-2 z-40 flex -translate-y-full scroll-pb-[18px] flex-col rounded-xl bg-v2-background-bg-base p-1.5 shadow-[var(--v2-elevation-raised)] no-scrollbar"
-      classList={{ "overflow-auto": !props.history, "overflow-hidden": !!props.history }}
-      style={{ "max-height": `${store.maxHeight}px` }}
+      class="absolute inset-x-0 -top-2 z-40 flex max-h-(--suggestions-height-above) -translate-y-full scroll-pb-[18px] flex-col rounded-xl bg-v2-background-bg-base p-1.5 shadow-[var(--v2-elevation-raised)] no-scrollbar"
+      classList={{
+        "@max-xl:top-full @max-xl:mt-2 @max-xl:max-h-(--suggestions-height-below) @max-xl:translate-y-0": opensBelow(),
+        "overflow-auto": !props.history,
+        "overflow-hidden": !!props.history,
+      }}
+      style={{
+        "--suggestions-height-above": `${Math.min(store.maxHeight, store.spaceAbove)}px`,
+        "--suggestions-height-below": `${Math.min(store.maxHeight, store.spaceBelow)}px`,
+      }}
       onMouseDown={(event) => event.preventDefault()}
     >
       <Show when={props.history}>

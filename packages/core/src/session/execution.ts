@@ -1,6 +1,7 @@
 export * as SessionExecution from "./execution.js"
 
 import { Cause, Context, Effect, Exit, Layer } from "effect"
+import { SessionStatusEvent } from "@opencode/schema/session-status-event"
 import { Bus } from "../bus.js"
 import { Database } from "../database/database.js"
 import { Job } from "../job.js"
@@ -8,6 +9,7 @@ import { Instance } from "../instance/service.js"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { SessionEvent } from "./event.js"
 import { SessionInbox } from "./inbox.js"
+import { SessionHistory } from "./history.js"
 import { SubagentReport } from "./execution/subagent-report.js"
 import { SessionRunCoordinator } from "./run-coordinator.js"
 import { SessionRunner } from "./runner/index.js"
@@ -25,7 +27,10 @@ export interface Interface {
     sessionID: SessionSchema.ID,
     options?: { readonly continuation?: boolean },
   ) => Effect.Effect<void, SessionRunner.RunError>
-  /** Registers newly recorded work. A queued prompt waits for an active execution to succeed. */
+  /**
+   * Registers new work. Queued prompts admitted before a stop wait for success.
+   * Those admitted after the stop was accepted can wake a new turn when cleanup finishes.
+   */
   readonly wake: (sessionID: SessionSchema.ID, scope?: "queue") => Effect.Effect<void>
   /**
    * Interrupt active work owned by this process. Idle interruption is a no-op. Resolves once
@@ -150,6 +155,9 @@ export const layer = Layer.effect(
         ),
       drain: (sessionID, force, promotable, continuation) =>
         drain(sessionID, force, continuation ? { step: 1 } : undefined, promotable),
+      hasSteeringWork: (sessionID) => SessionInbox.has(db, sessionID, "steer"),
+      succeededWhileIdle: (sessionID) =>
+        reportLifecycle(sessionID, bus.publish(SessionStatusEvent.Status, { sessionID, status: { type: "idle" } })),
       // One terminal observation per busy period, covering every coalesced drain.
       settled: (sessionID, exit, reason) =>
         reportLifecycle(
@@ -198,7 +206,12 @@ export const layer = Layer.effect(
             yield* coordinator.wake(sessionID, "steer")
           return interrupted
         }),
-      resume: coordinator.run,
+      resume: (sessionID, options) =>
+        options?.continuation
+          ? SessionHistory.hasExecutionProgress(db, sessionID).pipe(
+              Effect.flatMap((continuation) => coordinator.run(sessionID, { continuation })),
+            )
+          : coordinator.run(sessionID),
       wake: (sessionID, scope) =>
         Effect.gen(function* () {
           // Leave an orphaned claim to startup recovery even if new queue entries arrive first.

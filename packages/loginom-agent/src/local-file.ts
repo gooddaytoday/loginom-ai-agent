@@ -75,20 +75,30 @@ export async function localFiles(
   // taken when the prompt is admitted and kept with its message. The attachment then authorizes that file only while it
   // is unchanged, and is checked again before the file is admitted.
   await plugin.session.hook("prompt", async (event) => {
+    const queued = event.delivery === "queue" || event.operation === "edit"
+    const references = (event.prompt.files ?? []).flatMap((file) => {
+      const path = attachedPath(file.uri)
+      return path ? [{ file, path, text: referenceText(path) }] : []
+    })
     await Promise.all(
-      (event.prompt.files ?? []).map(async (file) => {
-        const path = attachedPath(file.uri)
-        const identity = path && (await inspectReferenceFile(path).catch(() => undefined))
-        if (identity) await plugin.storage.set(receiptKey(event.sessionID, event.messageID, file.uri), identity)
+      references.map(async ({ file, path }) => {
+        const key = receiptKey(event.sessionID, event.messageID, file.uri)
+        if (event.operation === "edit" && (await plugin.storage.get(key)) !== undefined) return
+        const identity = await inspectReferenceFile(path).catch(() => undefined)
+        if (identity) await plugin.storage.set(key, identity)
       }),
     )
+    if (queued) {
+      for (const { file, text } of references) {
+        if (text && !file.description?.endsWith(text))
+          file.description = [file.description, text].filter(Boolean).join("\n\n")
+      }
+      return
+    }
     // Core sends the model nothing of a data file it cannot read as text, so a synthetic message (0.4: a synthetic text
     // part) names the tool for it. Without a description the timeline does not show it, and the user's message keeps its
     // own text. It is admitted without a wake: the prompt that is being admitted starts the run.
-    const text = (event.prompt.files ?? [])
-      .map((file) => attachedPath(file.uri))
-      .flatMap((path) => (path ? [referenceText(path)] : []))
-      .join("\n\n")
+    const text = references.flatMap(({ text }) => (text ? [text] : [])).join("\n\n")
     if (text)
       await plugin.session.synthetic({
         sessionID: event.sessionID,

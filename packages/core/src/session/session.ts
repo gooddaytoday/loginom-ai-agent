@@ -150,6 +150,7 @@ export const make = Effect.fn("Session.make")(function* () {
     const item = yield* SessionPrompt.prepare({
       session,
       messageID: inboxID,
+      operation: "edit",
       input: { ...input, delivery: "queue" },
     }).pipe(
       instances.provide(session),
