@@ -69,7 +69,10 @@ export async function withGate(
         (target) => target.origin === url && !target.pathname.startsWith("/api/"),
         async (route) => {
           const target = new URL(route.request().url())
-          const response = await route.fetch({ url: new URL(target.pathname + target.search, renderer).href })
+          const response = await route.fetch({
+            url: new URL(target.pathname + target.search, renderer).href,
+            maxRetries: target.pathname.startsWith("/_assets/") ? 2 : 0,
+          })
           await route.fulfill({ response })
         },
       )
