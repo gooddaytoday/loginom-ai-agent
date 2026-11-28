@@ -1,8 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import { systemProxyPreference, updateProxy } from "./proxy"
+import { updateProxy } from "./proxy"
 
 test.each([
   [{}, "system"],
@@ -12,18 +9,9 @@ test.each([
   expect(updateProxy(environment).config.mode).toBe(mode)
 })
 
-test("updater inherits 0.4's preference without overriding HTTPS_PROXY", async () => {
-  const profile = await mkdtemp(join(tmpdir(), "updater-proxy-"))
-
-  try {
-    expect(updateProxy({}, await systemProxyPreference(profile)).config.mode).toBe("system")
-    await writeFile(join(profile, "loginom-ai-agent.settings"), JSON.stringify({ systemProxyEnabled: false }))
-    const enabled = await systemProxyPreference(profile)
-    expect(updateProxy({}, enabled).config.mode).toBe("direct")
-    expect(updateProxy({ HTTPS_PROXY: "http://explicit.example:8080" }, enabled).config.mode).toBe("fixed_servers")
-  } finally {
-    await rm(profile, { recursive: true, force: true })
-  }
+test("disabling system proxy for updater does not override HTTPS_PROXY", () => {
+  expect(updateProxy({}, false).config.mode).toBe("direct")
+  expect(updateProxy({ HTTPS_PROXY: "http://explicit.example:8080" }, false).config.mode).toBe("fixed_servers")
 })
 
 test("updater sends explicit credentials only to the matching proxy and protects loopback", () => {

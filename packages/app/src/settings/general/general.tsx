@@ -247,18 +247,6 @@ export const SettingsGeneral: Component = () => {
     write: (checked) => platform.setSpellcheckEnabled?.(checked),
   })
 
-  const systemProxy = createOptimisticSetting({
-    source: () => platform.getSystemProxySetting,
-    initial: true,
-    initialMeta: { unreachable: false, socksOnly: false },
-    load: async (read) => {
-      const { enabled, ...status } = await read()
-
-      return { value: enabled, meta: status }
-    },
-    write: (enabled) => platform.setSystemProxyEnabled?.(enabled),
-  })
-
   const GeneralSection = () => (
     <div class="settings-section">
       <h3 class="settings-section-title">{language.t("settings.general.section.general")}</h3>
@@ -299,23 +287,6 @@ export const SettingsGeneral: Component = () => {
             <div data-action="settings-spellcheck">
               <Switch checked={spellcheck.value()} onChange={spellcheck.select} />
             </div>
-          </SettingsRow>
-        </Show>
-
-        <Show when={platform.getSystemProxySetting}>
-          <SettingsRow
-            title={language.t("settings.general.row.systemProxy.title")}
-            description={[
-              language.t("settings.general.row.systemProxy.description"),
-              systemProxy.meta().unreachable && language.t("settings.general.row.systemProxy.unreachable"),
-              systemProxy.meta().socksOnly && language.t("settings.general.row.systemProxy.socksOnly"),
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <Switch checked={systemProxy.value()} onChange={systemProxy.select} hideLabel>
-              {language.t("settings.general.row.systemProxy.title")}
-            </Switch>
           </SettingsRow>
         </Show>
 

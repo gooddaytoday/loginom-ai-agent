@@ -6,7 +6,7 @@ import { Effect } from "effect"
 import { Product } from "@loginom-ai-agent/product"
 import { isProductBuild } from "./feed"
 import type { Platform } from "./machine"
-import { systemProxyPreference, updateProxy } from "./proxy"
+import { updateProxy } from "./proxy"
 
 const updateClient = pkg.autoUpdater
 
@@ -16,7 +16,7 @@ const restartTimeout = 10_000
 
 const unpackTimeout = 120_000
 
-export const make = Effect.fn("Updater.platform")(function* (channel: string, feed: string) {
+export const make = Effect.fn("Updater.platform")(function* (channel: string, feed: string, systemProxyEnabled: () => boolean) {
   const userAgent = `${Product.slug}/${channel === "prod" ? "latest" : channel}/${app.getVersion()}/desktop`
   const runFork = Effect.runForkWith(yield* Effect.context())
   let credentials: ReturnType<typeof updateProxy>["credentials"] | undefined
@@ -63,7 +63,7 @@ export const make = Effect.fn("Updater.platform")(function* (channel: string, fe
   return {
     checkForUpdate: Effect.tryPromise({
       try: async () => {
-        const proxy = updateProxy(process.env, await systemProxyPreference(app.getPath("userData")))
+        const proxy = updateProxy(process.env, systemProxyEnabled())
         credentials = proxy.credentials
         await updateClient.netSession.setProxy(proxy.config)
         await updateClient.netSession.closeAllConnections()

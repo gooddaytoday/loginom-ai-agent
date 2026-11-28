@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { createServer } from "node:http"
 import { runtimeEnvironment } from "../src/supervisor"
-import { desktopServiceProxy, onceDesktopServiceProxy } from "../src/system-proxy"
+import { desktopServiceProxy } from "../src/system-proxy"
 
 const inherited = { NO_PROXY: "private.example", no_proxy: "another.example" }
 const loopback = ["localhost", "127.0.0.1", "::1", "[::1]"]
@@ -67,22 +67,14 @@ test.each(["win32", "linux"] as const)("a terminal CLI preserves its new explici
   expect(runtime.https_proxy).toBeUndefined()
 })
 
-test("Desktop shares one detection across startup and reconnect and exposes unreachable without going direct", async () => {
-  let probes = 0
-  const detect = onceDesktopServiceProxy(() => ({
+test("Desktop exposes unreachable without going direct", async () => {
+  const proxy = await desktopServiceProxy({
     platform: "win32",
     windows,
-    probe: async () => {
-      probes++
-      return "closed"
-    },
-  }))
-  const [startup, reconnect] = await Promise.all([detect(), detect()])
-  expect(reconnect).toEqual(startup)
-  expect(await detect()).toEqual(startup)
-  expect(startup.notices).toContain("unreachable")
-  expect(startup.environment.HTTPS_PROXY).toBe("http://proxy.example:8080")
-  expect(probes).toBe(1)
+    probe: async () => "closed",
+  })
+  expect(proxy.notices).toContain("unreachable")
+  expect(proxy.environment.HTTPS_PROXY).toBe("http://proxy.example:8080")
 })
 
 test("Desktop does not resolve system routes when the imported preference is off", async () => {

@@ -6,6 +6,7 @@ import { MenubarItem, type Plugin } from "@opencode/plugin/gui/main"
 import { Updater } from "@opencode/plugin/gui/updater"
 import { logContext } from "./log"
 import { make } from "./machine"
+import { systemProxyPreference } from "./proxy-preference"
 
 const setup: Plugin.MainSetup = async (ctx) => {
   const builtin = builtinMainContext(ctx)
@@ -15,6 +16,7 @@ const setup: Plugin.MainSetup = async (ctx) => {
   // and requests nothing, as in 0.4.
   const feed = build.packaged ? Product.updateFeed : null
   const enabled = feed !== null
+  const proxy = systemProxyPreference(builtin.storage)
   // Holds no resources, so it needs no cleanup.
   const context = logContext(ctx.log.write)
   const runPromise = Effect.runPromiseWith(context)
@@ -34,7 +36,7 @@ const setup: Plugin.MainSetup = async (ctx) => {
   // electron-updater loads only in packaged builds, after the first window is up.
   const platform = enabled
     ? await import("./platform").then((module) =>
-        runPromise(module.make(build.channel, feed).pipe(Scope.provide(scope))),
+        runPromise(module.make(build.channel, feed, () => proxy.value).pipe(Scope.provide(scope))),
       )
     : undefined
 

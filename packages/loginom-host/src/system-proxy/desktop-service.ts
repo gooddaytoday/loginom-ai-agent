@@ -3,11 +3,6 @@ import { runtimeNoProxyKey } from "./environment"
 import { resolveSystemProxy, type ResolveSystemProxyInput } from "./resolve"
 import { failedResult } from "./types"
 
-export function onceDesktopServiceProxy(input: () => ResolveSystemProxyInput) {
-  let detection: ReturnType<typeof desktopServiceProxy> | undefined
-  return () => (detection ??= desktopServiceProxy(input()))
-}
-
 export async function desktopServiceProxy(input: ResolveSystemProxyInput, timeoutMs = 10_000) {
   const controller = new AbortController()
   const signal = input.signal ? AbortSignal.any([input.signal, controller.signal]) : controller.signal

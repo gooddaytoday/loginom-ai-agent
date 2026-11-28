@@ -1,18 +1,4 @@
-import { readFile } from "node:fs/promises"
-import { join } from "node:path"
 import type { ProxyConfig } from "electron"
-
-export async function systemProxyPreference(userData: string) {
-  try {
-    const settings: { systemProxyEnabled?: unknown } | null = JSON.parse(
-      await readFile(join(userData, "loginom-ai-agent.settings"), "utf8"),
-    )
-
-    return settings?.systemProxyEnabled !== false
-  } catch {
-    return true
-  }
-}
 
 export function updateProxy(environment: NodeJS.ProcessEnv, systemProxyEnabled = true) {
   const first = (...values: (string | undefined)[]) => values.find((value) => value?.trim())?.trim()

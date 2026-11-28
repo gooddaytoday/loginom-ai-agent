@@ -14,9 +14,10 @@ import wsl from "./wsl"
 import microsoftOffice from "./microsoft-office"
 import sources from "./sources"
 import goal from "./goal"
+import loginom, { loginomId } from "./loginom"
+import type { Plugin } from "@opencode/plugin/gui/main"
 
-/** Built-in plugins with their main entries, by id. Lists every built-in so their ids stay reserved. */
-export const builtins = compose({
+const entries = {
   context,
   btw,
   debug: { ...debug, mainEntry: () => import("./debug/main") },
@@ -32,4 +33,8 @@ export const builtins = compose({
   "microsoft-office": microsoftOffice,
   sources,
   goal,
-})
+}
+
+/** Built-in plugins with their main entries, by id. Lists every built-in so their ids stay reserved. */
+export const builtins = (loginomMain: Plugin.MainSetup) =>
+  compose({ ...entries, [loginomId]: { ...loginom, mainEntry: async () => ({ default: loginomMain }) } })
