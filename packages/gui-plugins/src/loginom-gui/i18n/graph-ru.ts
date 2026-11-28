@@ -23,4 +23,5 @@ export default {
   "graph.node.unnamed": "Узел без имени",
   "graph.saved.renamed": "Loginom переименовал узел «{{before}}» в «{{after}}»",
   "graph.saved.different": "В сохранённом пакете имя узла изменилось с «{{before}}» на «{{after}}»",
+  "graph.saved.repair": "Попросить исправить",
 } satisfies Record<keyof typeof en | "graph.edits.more.few" | "graph.edits.more.many", string>

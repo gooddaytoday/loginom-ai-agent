@@ -125,8 +125,12 @@ for (const mode of ["detailed", "compact"] as const) {
     const save = { action_key: "package.save_checkpoint" }
 
     let schemaReads = 0
+    let submitted = 0
     await setupTimeline(page, {
       locale: "ru",
+      onPrompt: () => {
+        submitted += 1
+      },
       rpc(params) {
         if (params.rpcID !== "loginom.package" || params.method !== "schema") return
 
@@ -182,28 +186,8 @@ for (const mode of ["detailed", "compact"] as const) {
               },
             },
           ),
-          toolPart(saveID, tool, "completed", save, {
-            metadata: {
-              loginom: {
-                ...facts,
-                status: "SUCCEEDED",
-                kind: "save",
-                package: { name: "Продажи.lgp", directory: "/user" },
-                saved_package_graph: {
-                  status: "compared",
-                  rename_attribution: "observed_during_save",
-                  changes: [
-                    {
-                      kind: "node_renamed",
-                      node_id: "merge-guid",
-                      before: "Слияние",
-                      observed_before_save: "Слияние",
-                      saved: "Левое",
-                    },
-                  ],
-                },
-              },
-            },
+          toolPart(saveID, "loginom_dock_action_run", "completed", save, {
+            metadata: { loginom: savedRenameReceipt },
           }),
           toolPart(
             emptyID,
@@ -233,7 +217,7 @@ for (const mode of ["detailed", "compact"] as const) {
     const notice = page.getByText(/^Учёл ваши правки/)
     await expect(notice).toHaveCount(1)
     await expect(edits).toContainText(/^Учёл ваши правки[\s\S]*Выполнил шаг в Loginom/)
-    await expect(saved).toContainText(/^Loginom переименовал узел[\s\S]*Сохранил «Продажи.lgp» в \/user/)
+    await expect(saved).toContainText(/^Loginom переименовал узел[\s\S]*Выполнил шаг в Loginom/)
 
     if (mode === "detailed") {
       await expect(edits.getByRole("listitem")).toHaveCount(5)
@@ -277,6 +261,16 @@ for (const mode of ["detailed", "compact"] as const) {
     const width = page.viewportSize()?.width
     await page.screenshot({ path: testInfo.outputPath(`manual-edits-${width}.png`), animations: "disabled" })
 
+    const composer = page.getByRole("textbox", { name: "Промпт", exact: true })
+    await composer.fill("Черновик пользователя")
+    await saved.getByRole("button", { name: "Попросить исправить", exact: true }).click()
+    await expect(composer).toBeFocused()
+    await expect(composer).toContainText("Черновик пользователя")
+    await expect(composer).toContainText(
+      'Проверьте, можно ли восстановить имя "Слияние" у узла 4527f5b0-c77f-4fcc-91be-fccae0406581, сейчас сохранённого как "Левое".',
+    )
+    expect(submitted).toBe(0)
+
     if (mode === "detailed") {
       await edits.getByRole("button", { name: "Фильтр", exact: true }).click()
       const diagram = page.getByRole("region", { name: "Схема пакета", exact: true })
@@ -294,4 +288,41 @@ for (const mode of ["detailed", "compact"] as const) {
       await expect(edits.getByRole("button", { name: "Фильтр", exact: true })).toHaveCount(0)
     }
   })
+}
+
+// Captured from #1477 (7050cd3d32) with compareSavedPackageGraph, loginomFeedMetadata and withLoginomMetadata.
+const savedRenameReceipt = {
+  v: 1,
+  operationId: "save-fixture",
+  state: "settled",
+  status: "SUCCEEDED",
+  savedPackageGraph: {
+    status: "compared",
+    saveOperationId: "save-fixture",
+    packagePath: "/user/Продажи.lgp",
+    scope: "active_workflow",
+    renameAttribution: "observed_during_save",
+    changes: [
+      {
+        kind: "node_renamed",
+        nodeId: "4527f5b0-c77f-4fcc-91be-fccae0406581",
+        before: "Слияние",
+        saved: "Левое",
+        observedBeforeSave: "Слияние",
+        repair: {
+          label: "Попросить исправить",
+          prompt:
+            'Проверьте, можно ли восстановить имя "Слияние" у узла 4527f5b0-c77f-4fcc-91be-fccae0406581, сейчас сохранённого как "Левое".',
+        },
+      },
+    ],
+    savedLabels: [
+      {
+        nodeId: "4527f5b0-c77f-4fcc-91be-fccae0406581",
+        label: "Левое",
+      },
+    ],
+    uncheckedSorting: [],
+    truncated: false,
+  },
 }

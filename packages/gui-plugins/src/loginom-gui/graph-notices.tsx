@@ -33,30 +33,42 @@ const Edit = Schema.Union([
   }),
 ])
 
-const Rename = Schema.Struct({
+const renameFields = {
   kind: Schema.Literal("node_renamed"),
-  node_id: Schema.NonEmptyString,
   before: Schema.String,
   saved: Schema.String,
-  observed_before_save: Schema.String,
-})
+  repair: Schema.optional(Schema.Struct({ prompt: Schema.NonEmptyString })),
+}
+
+const decodeRename = Schema.decodeUnknownOption(
+  Schema.Struct({ ...renameFields, nodeId: Schema.NonEmptyString, observedBeforeSave: Schema.String }),
+)
+
+const decodeLegacyRename = Schema.decodeUnknownOption(
+  Schema.Struct({ ...renameFields, node_id: Schema.NonEmptyString, observed_before_save: Schema.String }),
+)
+
+const comparedGraph = {
+  status: Schema.Literal("compared"),
+  changes: Schema.Array(Schema.Unknown),
+}
+
+const attribution = Schema.Literals(["observed_during_save", "unconfirmed"])
+
+const decodeSavedGraph = Schema.decodeUnknownOption(Schema.Struct({ ...comparedGraph, renameAttribution: attribution }))
+
+const decodeLegacySavedGraph = Schema.decodeUnknownOption(
+  Schema.Struct({ ...comparedGraph, rename_attribution: attribution }),
+)
 
 const decodeEdits = Schema.decodeUnknownOption(Schema.Array(Edit))
 
-const decodeSavedGraph = Schema.decodeUnknownOption(
-  Schema.Struct({
-    status: Schema.Literal("compared"),
-    rename_attribution: Schema.Literals(["observed_during_save", "unconfirmed"]),
-    changes: Schema.Array(Schema.Unknown),
-  }),
-)
-
-const decodeRename = Schema.decodeUnknownOption(Rename)
-
 const readGraphFields = Schema.decodeUnknownOption(
   Schema.Struct({
+    v: Schema.optional(Schema.Number),
     operationId: Schema.optional(Schema.NonEmptyString),
     manualEdits: Schema.optional(Schema.Unknown),
+    savedPackageGraph: Schema.optional(Schema.Unknown),
     saved_package_graph: Schema.optional(Schema.Unknown),
   }),
 )
@@ -73,19 +85,28 @@ export function GraphNotices(props: {
   const edits = createMemo(() => Option.getOrElse(decodeEdits(fields()?.manualEdits), () => []))
 
   const renames = createMemo(() => {
-    const graph = Option.getOrUndefined(decodeSavedGraph(fields()?.saved_package_graph))
+    const facts = fields()
+    const current = facts?.v === 1 ? Option.getOrUndefined(decodeSavedGraph(facts.savedPackageGraph)) : undefined
 
-    if (!graph) return []
+    // Older histories received the save report directly from the runtime.
+    const legacy =
+      facts?.savedPackageGraph === undefined
+        ? Option.getOrUndefined(decodeLegacySavedGraph(facts?.saved_package_graph))
+        : undefined
 
-    return graph.changes.flatMap((change) => {
-      const rename = Option.getOrUndefined(decodeRename(change))
+    const changes = current?.changes ?? legacy?.changes ?? []
+    const duringSave = (current?.renameAttribution ?? legacy?.rename_attribution) === "observed_during_save"
+
+    return changes.flatMap((change) => {
+      const rename = current
+        ? Option.getOrUndefined(decodeRename(change))
+        : Option.getOrUndefined(decodeLegacyRename(change))
 
       if (!rename) return []
 
-      return {
-        ...rename,
-        byLoginom: graph.rename_attribution === "observed_during_save" && rename.before === rename.observed_before_save,
-      }
+      const observed = "observedBeforeSave" in rename ? rename.observedBeforeSave : rename.observed_before_save
+
+      return { ...rename, byLoginom: duringSave && rename.before === observed }
     })
   })
 
@@ -177,12 +198,32 @@ export function GraphNotices(props: {
       </Show>
       <For each={renames()}>
         {(rename) => (
-          <p class={noticeClass}>
-            {t(rename.byLoginom ? "graph.saved.renamed" : "graph.saved.different", {
-              before: name(rename.before),
-              after: name(rename.saved),
-            })}
-          </p>
+          <div class={noticeClass}>
+            <p>
+              {t(rename.byLoginom ? "graph.saved.renamed" : "graph.saved.different", {
+                before: name(rename.before),
+                after: name(rename.saved),
+              })}
+            </p>
+            <Show when={props.ctx.screen.current() && rename.repair?.prompt}>
+              {(prompt) => (
+                <button
+                  type="button"
+                  class="mt-1 cursor-pointer text-v2-text-text-accent underline underline-offset-2"
+                  onClick={() => {
+                    const composer = props.ctx.screen.current()?.composer
+
+                    if (!composer) return
+
+                    composer.insert(composer.text() ? "\n\n" + prompt() + "\n\n" : prompt())
+                    composer.focus()
+                  }}
+                >
+                  {t("graph.saved.repair")}
+                </button>
+              )}
+            </Show>
+          </div>
         )}
       </For>
     </>

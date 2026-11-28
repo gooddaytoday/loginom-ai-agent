@@ -19,4 +19,5 @@ export default {
   "graph.node.unnamed": "Unnamed node",
   "graph.saved.renamed": "Loginom renamed node «{{before}}» to «{{after}}»",
   "graph.saved.different": "The saved package has node «{{after}}» in place of «{{before}}»",
+  "graph.saved.repair": "Ask to fix",
 }
