@@ -61,6 +61,21 @@ test("8 · Сбои", async ({ page, baseURL }, info) => {
         calls: ["dock_prepare", "dock_inspect", "dock_inspect", "dock_action_run", "dock_inspect"],
       })
     })
+    await test.step("Остановить третий одинаковый вызов до обращения в Loginom", async () => {
+      await gate.editor.fill(gatePrompts.repeat)
+      await gate.submit.click()
+      const question = page.locator('[data-component="dock-prompt"][data-kind="question"]')
+      await expect(
+        question.getByText("Агент снова делает одно и то же: применяет настройки узла Loginom", { exact: true }),
+      ).toBeVisible()
+      const applies = async () => (await gate.status()).calls.filter((call) => call === "dock_node_apply")
+      expect(await applies()).toHaveLength(2)
+      await gateScreenshot(page, info, "08-repeat-question")
+      await question.getByRole("radio", { name: /^Остановить/ }).click()
+      await question.getByRole("button", { name: "Submit", exact: true }).click()
+      await expect(page.getByText("Третий вызов остановлен по вашему выбору.", { exact: true })).toBeVisible()
+      expect(await applies()).toHaveLength(2)
+    })
     await test.step.skip(
       "LAB-2216, LAB-2234, LAB-2225 · таймеры долгого шага, подсказка задержки и «После хода»",
       async () => {},
@@ -71,7 +86,10 @@ test("8 · Сбои", async ({ page, baseURL }, info) => {
     )
     await test.step.skip("LAB-2208 · прерванный при закрытии ход и продолжение с подтверждённого шага", async () => {})
     await test.step.skip("LAB-2196 · пакет в другом разговоре, Studio или осиротевшей сессии", async () => {})
-    await test.step.skip("LAB-2143, LAB-2235 · одинаковые вызовы и решение пользователя", async () => {})
+    await test.step.skip(
+      "LAB-2235 · свернуть одинаковые вызовы в одну строку ленты и связать её с вопросом",
+      async () => {},
+    )
     await test.step.skip("LAB-2165, LAB-2200 · лимит модели и уведомления", async () => {})
   })
 })

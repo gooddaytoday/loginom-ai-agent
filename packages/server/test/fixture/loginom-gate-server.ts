@@ -167,17 +167,28 @@ await Effect.runPromise(
           )
           return TestLLM.toolCall(crypto.randomUUID(), step.tool, step.input)
         }
-        const results = answer.flatMap((message) => (message.role === "tool" ? message.content : []))
-        for (const call of turn.calls) {
+        const results = answer.flatMap((message) =>
+          message.role === "tool" ? message.content.filter((part) => part.name.startsWith("loginom_dock_")) : [],
+        )
+        const repeatStop = "repeatStop" in turn && turn.repeatStop
+        assert.equal(results.length, turn.calls.length + Number(repeatStop))
+        for (const [index, call] of turn.calls.entries()) {
           const name = `loginom_${call.name}`
-          const result = results.find((part) => part.name === name)?.result
+          const part = results[index]
+          assert.equal(part?.name, name)
+          const result = part.result
           const receipt = JSON.stringify(call.receipt)
           if (call.receipt.status === "FAILED" || call.receipt.status === "AMBIGUOUS") {
-            assert.equal(result?.type, "error", `${name} must report the failed receipt`)
+            assert.equal(result.type, "error", `${name} must report the failed receipt`)
             assert(JSON.stringify(result.value).includes(JSON.stringify(receipt).slice(1, -1)))
           } else {
             assert.deepEqual(result, { type: "text", value: receipt })
           }
+        }
+        if (repeatStop) {
+          const stopped = results.at(-1)?.result
+          assert(stopped?.type === "error")
+          assert(JSON.stringify(stopped.value).includes("Пользователь остановил повторный вызов."))
         }
         return TestLLM.text(turn.reply, crypto.randomUUID())
       })

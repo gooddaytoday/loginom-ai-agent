@@ -16,6 +16,7 @@ export function scriptedHost(
   options: {
     catalog?: (generation: number) => Tool[]
     call?: (request: Record<string, unknown>) => unknown
+    interrupt?: () => void
     acquire?: () => string | undefined
     tools?: () => string | undefined
     /** Runs start with a browser runtime, as after `dock_prepare`. */
@@ -43,6 +44,7 @@ export function scriptedHost(
     }
     const run = runs.get(input.run)
     if (!run) return fail("LOGINOM_RUN_INVALID")
+    if (request.method === "interrupt") options.interrupt?.()
     if (request.method === "release" || request.method === "interrupt") return reply(true)
     if (request.method === "scope") {
       const mode = input.mode
@@ -98,12 +100,9 @@ export function scriptedHost(
     }
     if (request.method === "call") {
       if (input.name === "dock_prepare") run.prepared = true
-      return Promise.resolve()
-        .then(() => options.call?.(input))
-        .then(
-          (result) => reply(result ?? { content: [{ type: "text", text: JSON.stringify({ called: input.name }) }] }),
-          (error: unknown) => fail(error instanceof Error ? error.message : String(error)),
-        )
+      return void Promise.resolve(
+        options.call?.(input) ?? { content: [{ type: "text", text: JSON.stringify({ called: input.name }) }] },
+      ).then(reply, (error: unknown) => fail(error instanceof Error ? error.message : String(error)))
     }
     return fail("LOGINOM_HOST_REQUEST_FAILED")
   }

@@ -22,6 +22,7 @@ export const gatePrompts = {
   reread: "Проверь ещё раз, доступен ли пакет Продажи.lgp.",
   write: "Сохрани новую версию пакета Продажи.lgp.",
   check: "Проверь, какая версия Продажи.lgp сохранилась.",
+  repeat: "Примени настройку фильтра в пакете Продажи.lgp.",
   closed: "Ответь, доступна ли модель организации.",
   import: "Импортируй учебную таблицу sales-demo.csv и запусти узел импорта.",
   filter: "Добавь фильтр за 2026 год и запусти его.",
@@ -48,6 +49,7 @@ type Turn = {
   reply: string
   automation?: boolean
   admitUpload?: boolean
+  repeatStop?: boolean
   calls: DockCall[]
 }
 
@@ -80,6 +82,12 @@ const output = (operation_id: string, node_id: string, row_count: number) => ({
   node: { document_id: doc, ...workflow, node_id },
   output: { ports: [{ port: "Output", port_guid: node_id + "-out", row_count }] },
 })
+
+const repeatedApply: DockCall = {
+  name: "dock_node_apply",
+  input: node("transform.filter_data", "gate-repeat", { year: 2026 }, []),
+  receipt: output("gate-repeat", "filter", 8),
+}
 
 export const gateScenarios = {
   "7": [],
@@ -126,6 +134,13 @@ export const gateScenarios = {
       automation: true,
       calls: [inspect({ state: "settled", status: "SUCCEEDED", package_ref: { path: packagePath }, revision: "v1" })],
       reply: "Проверка пакета подтвердила версию v1.",
+    },
+    {
+      prompt: gatePrompts.repeat,
+      automation: true,
+      repeatStop: true,
+      calls: [repeatedApply, repeatedApply],
+      reply: "Третий вызов остановлен по вашему выбору.",
     },
   ],
   "9": [
@@ -194,6 +209,7 @@ export type GateScenario = keyof typeof gateScenarios
 
 export function modelCalls(turn: Turn, uploadedPath: string | undefined) {
   const dock = turn.calls.map((call) => ({ tool: `loginom_${call.name}`, input: call.input }))
+  if (turn.repeatStop) dock.push({ tool: "loginom_dock_node_apply", input: repeatedApply.input })
   if (turn.admitUpload) dock.splice(1, 0, { tool: "loginom_file_admit", input: { path: uploadedPath } })
   return turn.automation ? [skill, ...dock] : dock
 }
