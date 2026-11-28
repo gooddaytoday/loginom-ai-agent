@@ -3,6 +3,38 @@
   "against": "a6b15d33daf6ab7d35569f6d711fdb630b9f04e7",
   "entries": [
     {
+      "id": "CAT-15",
+      "title": "Tool decision forms and timeline groups (C3 B6)",
+      "paths": [
+        "packages/core/src/plugin/host.ts",
+        "packages/core/test/lib/tool.ts",
+        "packages/core/test/plugin/host.ts",
+        "packages/core/test/plugin/plan.test.ts",
+        "packages/plugin/src/effect/tool.ts",
+        "packages/plugin/src/promise/adapter.ts",
+        "packages/plugin/src/promise/tool.ts",
+        "packages/plugin/src/gui/builtin.ts",
+        "packages/app/src/runtime/plugin/host.tsx",
+        "packages/app/src/session/requests/question-controller.ts",
+        "packages/app/src/session/requests/session-question-dock.tsx",
+        "packages/app/e2e/regression/loginom-repeat-question.spec.ts",
+        "packages/app/component-tests/plugin-host.spec.ts",
+        "packages/app/component-tests/plugin-host.fixture.tsx",
+        "packages/gui-plugins/AGENTS.md",
+        "packages/gui-plugins/README.md",
+        "packages/gui-plugins/src/loginom-gui/renderer.tsx",
+        "packages/gui-plugins/src/loginom-gui/repeat-dock.tsx",
+        "packages/server/test/loginom-access.test.ts",
+        "packages/tui/test/mini/blocker.responsive.test.tsx",
+        "packages/session-ui/src/components/tool-group-row.tsx",
+        "packages/session-ui/src/message/tool-group.ts",
+        "packages/session-ui/src/timeline/projection.ts",
+        "packages/session-ui/src/timeline-next/projection.ts",
+        "packages/session-ui/src/timeline-next/tools/tool-display.tsx",
+        "packages/session-ui/src/tools/tool-renderer.tsx"
+      ]
+    },
+    {
       "id": "CAT-01",
       "title": "Manifests and lockfile",
       "paths": ["bun.lock", "**/package.json"],
@@ -158,7 +190,15 @@
       "title": "Built-in plugin page navigation for dashboard links",
       "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
-    { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
+    { "id": "CAT-10", "title": "Web app, UI kit, session UI and Loginom localization", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
+    {
+      "id": "CAT-15",
+      "title": "Conversation search fields and sidebar shortcut (C1.5)",
+      "paths": [
+        "packages/schema/src/session.ts", "packages/core/src/session/store.ts", "packages/core/test/session-list.test.ts",
+        "packages/protocol/openapi.json", "packages/client/src/effect/api/api.ts", "packages/client/src/effect/generated/client.ts"
+      ]
+    },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
   ]
