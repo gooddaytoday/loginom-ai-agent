@@ -41,6 +41,17 @@ story.beforeEach(async ({ mount }) => {
   await mount("ui-line-comment--editor")
 })
 
+story("only a built-in plugin can add a form to the provider dialog", async ({ page }) => {
+  const [builtin, thirdParty] = await page.evaluate(async (fixture) => {
+    const { canAddProviderSetup } = await import(fixture)
+
+    return [await canAddProviderSetup(true), await canAddProviderSetup(false)]
+  }, fixture)
+
+  expect(builtin).toBe(1)
+  expect(thirdParty).toBe(0)
+})
+
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {
   const setups = await page.evaluate(async (fixture) => {
     const { mountPluginHost } = await import(fixture)

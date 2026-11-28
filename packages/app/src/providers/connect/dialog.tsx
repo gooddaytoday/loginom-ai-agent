@@ -97,9 +97,6 @@ export const DialogConnectProvider: Component<{
   const sdk = useServerSDK()
   const host = usePluginHost()
   const setups = () => host.list(BuiltinProviderSetup)
-  const [setupID, setSetupID] = createSignal(props.setup)
-  const setup = createMemo(() => setups().find((entry) => entry.id === setupID()))
-  const [setupCompleted, setSetupCompleted] = createSignal(false)
 
   const [welcome, setWelcome, , welcomeReady] = persisted(
     Persist.global("chatgpt-plan-welcome.v1"),
@@ -110,6 +107,7 @@ export const DialogConnectProvider: Component<{
   const controller = createProviderDialogController({
     // A sign-in belongs to the Location where it began, even if the route changes underneath it.
     directory: props.defaultLocation ? undefined : (props.directory ?? decode64(params.dir)),
+    setup: props.setup,
     standalone: !!props.standalone,
     selected: external.selected,
     onSelect: external.select,
@@ -118,6 +116,7 @@ export const DialogConnectProvider: Component<{
   })
 
   const view = controller.view
+  const setup = createMemo(() => setups().find((entry) => entry.id === controller.setup().id))
   const frame = () => (setup() ? "provider" : view().frame)
   const consoleSelected = () => view().provider === CONSOLE_INTEGRATION
   let focusHost: HTMLDivElement | undefined
@@ -149,7 +148,7 @@ export const DialogConnectProvider: Component<{
         FRAME_HEIGHT[frame()]
       }`}
       onCloseAutoFocus={(event) => {
-        if ((view().completed || setupCompleted()) && props.selection && props.onDone) {
+        if ((view().completed || controller.setup().completed) && props.selection && props.onDone) {
           event.preventDefault()
           props.onDone()
         }
@@ -179,7 +178,7 @@ export const DialogConnectProvider: Component<{
                     icon={<Icon name="arrow-left" size="small" />}
                     variant="ghost"
                     aria-label={language.t("common.goBack")}
-                    onClick={() => setSetupID(undefined)}
+                    onClick={() => controller.dispatchSetup({ type: "back" })}
                   />
                 </Show>
                 <DialogTitle>{entry().title}</DialogTitle>
@@ -264,7 +263,7 @@ export const DialogConnectProvider: Component<{
                     directory={props.directory}
                     setups={setups()}
                     onSelect={(id) => {
-                      if (setups().some((entry) => entry.id === id)) setSetupID(id)
+                      if (setups().some((entry) => entry.id === id)) controller.dispatchSetup({ type: "opened", id })
                       else controller.select(id)
                     }}
                     onPrepare={holdFocus}
@@ -278,13 +277,9 @@ export const DialogConnectProvider: Component<{
             {(entry) =>
               entry.render({
                 client: sdk.api,
+                location: controller.location,
                 onConnected: async (providerID, models, selected, signal) => {
-                  const completed = await controller.completeSetup(providerID, models, selected, signal)
-
-                  if (signal.aborted) return
-
-                  setSetupCompleted(completed)
-                  dialog.close()
+                  if (await controller.completeSetup(providerID, models, selected, signal)) dialog.close()
                 },
               })
             }

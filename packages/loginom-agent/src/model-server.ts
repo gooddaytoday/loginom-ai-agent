@@ -5,7 +5,6 @@ import type { ConfigProvider } from "@opencode/schema/config/provider"
 import { Model } from "@opencode/schema/model"
 import { Effect, Schema } from "effect"
 import { createHash } from "node:crypto"
-import { ServiceHost } from "./host"
 import { resolveModelServer } from "./model-server-network"
 
 const response = Schema.Struct({ data: Schema.Array(Schema.Struct({ id: Schema.String })) })
@@ -58,11 +57,7 @@ export function modelServerHandlers(options: {
         return yield* Effect.promise(async (signal) => {
           try {
             const deadline = AbortSignal.any([signal, AbortSignal.timeout(10_000)])
-            const target = await resolveModelServer(
-              `${baseURL}/models`,
-              ServiceHost.connectionSettings.deviceOnly(),
-              deadline,
-            )
+            const target = await resolveModelServer(`${baseURL}/models`, deadline)
             if (!target.ok) return target
             const reply = await target.request({
               signal: deadline,
@@ -87,19 +82,16 @@ export function modelServerHandlers(options: {
         if (!input.models.every((id) => usable(id, input.key))) return { ok: false, issue: "modelServerSaveFailed" }
         const verdict = yield* Effect.tryPromise({
           try: (signal) =>
-            resolveModelServer(
-              baseURL,
-              ServiceHost.connectionSettings.deviceOnly(),
-              AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
-            ),
+            resolveModelServer(baseURL, AbortSignal.any([signal, AbortSignal.timeout(10_000)])),
           catch: () => ({ ok: false, issue: "modelServerAddressInvalid" }) as const,
         }).pipe(Effect.catch(Effect.succeed))
         if (!verdict.ok) return verdict
+        const url = new URL(baseURL)
         return yield* options
           .save(
             providerIDFor(baseURL),
             {
-              name: new URL(baseURL).host,
+              name: `${url.host}${url.pathname === "/" ? "" : url.pathname}`,
               package: "@opencode/ai/providers/openai-compatible",
               settings: { baseURL },
               models: Object.fromEntries(

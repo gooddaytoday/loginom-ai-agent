@@ -5,6 +5,7 @@ export * as PluginProduct from "./product.js"
 import LoginomAgent, {
   Dashboard,
   isModelServerID,
+  modelServerFetch,
   modelServerHandlers,
   ModelServerRpc,
 } from "@loginom-ai-agent/loginom-agent"
@@ -15,11 +16,21 @@ import { Config } from "../config.js"
 import { Credential } from "../credential.js"
 import { Formatter } from "../formatter.js"
 import { ManagedPolicy } from "../managed-policy.js"
+import { ModelResolver } from "../model-resolver.js"
+import { Provider } from "../provider.js"
 import type { InternalPlugin } from "./internal.js"
 import { PluginPromise } from "./promise.js"
 
 const product = PluginPromise.fromPromise(LoginomAgent)
 const modelServerWrites = Semaphore.makeUnsafe(1)
+
+ModelResolver.registerTransportFetch((model) => {
+  if (
+    isModelServerID(model.providerID) &&
+    Provider.packageName(model.package) === "@opencode/ai/providers/openai-compatible"
+  )
+    return modelServerFetch
+})
 
 // No formatter runs in a dashboard's work folder, whatever the config says (B2.9d, guarantee G1): a formatter loads
 // its own config from the folder of the file it formats (Prettier runs `src/.prettierrc.cjs`), and there the model
@@ -94,9 +105,9 @@ export const plugins: readonly InternalPlugin[] = [
                   Effect.gen(function* () {
                     if (!config.update || !config.profile) return yield* Effect.fail("Config updates are unavailable")
                     const profile = yield* config.profile()
-                    if (profile?.providers?.[id]) yield* config.update({ providers: { [id]: undefined } })
                     const stored = yield* credential.list(Integration.ID.make(id))
                     yield* Effect.forEach(stored, (entry) => credential.remove(entry.id))
+                    if (profile?.providers?.[id]) yield* config.update({ providers: { [id]: undefined } })
                   }),
                 ),
             }),

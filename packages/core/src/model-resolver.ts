@@ -1,7 +1,6 @@
 export * as ModelResolver from "./model-resolver.js"
 
 import { makeLocationNode } from "@opencode/util/effect/app-node"
-import { isModelServerID, modelServerFetch } from "@loginom-ai-agent/loginom-agent"
 import {
   DecisionModel,
   DecisionModelCompatibility,
@@ -463,6 +462,13 @@ export const resolveModel = (
 
 export const hasPackage = (model: Info) => Boolean(model.package)
 
+type TransportFetch = (model: RuntimeInfo) => typeof fetch | undefined
+const transportFetches: TransportFetch[] = []
+
+export function registerTransportFetch(resolve: TransportFetch) {
+  transportFetches.push(resolve)
+}
+
 /** Resolves catalog selections into runtime models for the current Location. */
 export const layer = Layer.effect(
   Service,
@@ -500,17 +506,16 @@ export const layer = Layer.effect(
           ? LanguageModel.update(model, { route: model.route.with({ auth: Auth.none }) })
           : model
       const route = authenticated.route
-      const runtime =
-        isModelServerID(runtimeInfo.providerID) &&
-        Provider.packageName(runtimeInfo.package) === "@opencode/ai/providers/openai-compatible"
-          ? LanguageModel.update(authenticated, {
-              route: {
-                ...route,
-                prepareTransport: (body, request, options) =>
-                  route.prepareTransport(body, { ...request, fetch: modelServerFetch }, options),
-              },
-            })
-          : authenticated
+      const transportFetch = transportFetches.map((resolve) => resolve(runtimeInfo)).find((fetch) => fetch !== undefined)
+      const runtime = transportFetch
+        ? LanguageModel.update(authenticated, {
+            route: {
+              ...route,
+              prepareTransport: (body, request, options) =>
+                route.prepareTransport(body, { ...request, fetch: transportFetch }, options),
+            },
+          })
+        : authenticated
       return {
         model: runtime,
         ref: Ref.make({

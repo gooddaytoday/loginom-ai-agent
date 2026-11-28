@@ -10,7 +10,7 @@ import { showToast } from "@/shell/notifications/toast"
 import { popularProviders, useProviders } from "@/providers/catalog/providers"
 import { consoleProviderGroup } from "@/providers/catalog/console"
 import { useIntegrations } from "@/providers/catalog/integrations"
-import { createEffect, createMemo, createSignal, on, untrack, type Component, For, type JSX, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, on, onCleanup, untrack, type Component, For, type JSX, Show } from "solid-js"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePluginHost } from "@/runtime/plugin/host"
 import { useServerSDK } from "@/runtime/server/client"
@@ -31,6 +31,7 @@ import {
   type SettingsProvidersEffect,
   type SettingsProvidersEvent,
 } from "./machine"
+import { canRemove, transitionRemoval, type RemovalEvent, type RemovalState } from "./removal-machine"
 import "@/settings/settings.css"
 
 type ProviderSource = "env" | "api" | "account" | "config" | "custom"
@@ -65,7 +66,13 @@ export const SettingsProviders: Component<{
   const accountActions = useProviderAccountActions(() => props.directory)
 
   const [consoleExpanded, setConsoleExpanded] = createSignal(false)
-  const [removing, setRemoving] = createSignal(false)
+  const [removalState, setRemovalState] = createSignal<RemovalState>({ status: "idle" })
+  const dispatchRemoval = (event: RemovalEvent) => setRemovalState((state) => transitionRemoval(state, event))
+  const removalLifetime = new AbortController()
+  onCleanup(() => {
+    dispatchRemoval({ type: "disposed" })
+    removalLifetime.abort()
+  })
   const [pageState, setPageState] = createSignal(createSettingsProvidersState<ProviderItem>())
   const accountView = createMemo(() => providerAccountView(pageState()))
 
@@ -322,14 +329,18 @@ export const SettingsProviders: Component<{
   }
 
   const removeConfigured = async (item: ProviderItem, action: NonNullable<ProviderSetup["removal"]>) => {
-    setRemoving(true)
+    const attempt = Symbol()
+    const result = dispatchRemoval({ type: "requested", attempt })
+
+    if (result.status !== "removing" || result.attempt !== attempt) return
 
     try {
-      if (await action.run(serverSdk.api, item, props.directory)) await accountActions.refresh().catch(() => undefined)
+      if (await action.run(serverSdk.api, item, props.directory, removalLifetime.signal))
+        await accountActions.refresh().catch(() => undefined)
     } catch (error) {
       showToast({ title: language.t("common.requestFailed"), description: formatServerError(error, language.t) })
     } finally {
-      setRemoving(false)
+      dispatchRemoval({ type: "settled", attempt })
     }
   }
 
@@ -535,7 +546,7 @@ export const SettingsProviders: Component<{
                                   <Button
                                     size="normal"
                                     variant="ghost-muted"
-                                    disabled={removing()}
+                                    disabled={!canRemove(removalState())}
                                     onClick={() => void removeConfigured(item, action())}
                                   >
                                     {action().title}

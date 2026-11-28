@@ -46,5 +46,4 @@ export default {
   modelServerRemoveConfirm: "Удалить сервер «{{server}}», его модели из списка и сохранённый ключ?",
   modelServerRemoveFailed: "Не удалось удалить сервер моделей.",
   modelServerDenied: "Подключение своего сервера запрещено настройками организации.",
-  modelServerDeviceOnly: "В этом режиме можно подключить только сервер на этом компьютере.",
 }

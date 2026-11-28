@@ -47,5 +47,4 @@ export default {
   modelServerRemoveConfirm: "Remove {{server}}, its models from the list, and the saved key?",
   modelServerRemoveFailed: "Could not remove the model server.",
   modelServerDenied: "Your organization does not allow connecting a custom server.",
-  modelServerDeviceOnly: "In this mode, you can only connect to a server on this computer.",
 }

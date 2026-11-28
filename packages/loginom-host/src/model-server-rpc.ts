@@ -30,7 +30,6 @@ export const Issue = Schema.Literals([
   "modelServerNoModels",
   "modelServerSaveFailed",
   "modelServerDenied",
-  "modelServerDeviceOnly",
   "modelServerAddressBlocked",
   "modelServerRemoveFailed",
 ])

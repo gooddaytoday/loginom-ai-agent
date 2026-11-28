@@ -80,6 +80,12 @@ it.live(
       const location = { directory: path }
       const options = { location }
 
+      const legacyID = "loginom-model-server-01234567-0123-0123-0123-0123456789ab"
+      const removedLegacy = yield* Effect.promise(() =>
+        rpc.remove({ providerID: legacyID }, options).then(() => "accepted", () => "rejected"),
+      )
+      expect(removedLegacy).toBe("rejected")
+
       const invalid = yield* Effect.promise(() => rpc.discover({ address: "file:///tmp/models" }, options))
       expect(invalid).toEqual({ ok: false, issue: "modelServerAddressInvalid" })
       expect(first.requests).toEqual([])
@@ -140,6 +146,7 @@ it.live(
       ]) {
         expect(text).toContain(`"${id}": {`)
         expect(text).toContain(`"baseURL": "${address}"`)
+        expect(text).toContain(`"name": "${new URL(address).host}/v1"`)
       }
 
       const catalog = yield* Effect.promise(() => client.model.list({ location })).pipe(

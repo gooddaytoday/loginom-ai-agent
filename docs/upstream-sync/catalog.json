@@ -77,12 +77,20 @@
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     {
+      "id": "CAT-14",
+      "title": "Built-in GUI contributions",
+      "paths": [
+        "packages/plugin/src/gui/builtin.ts", "packages/app/src/runtime/plugin/host.tsx",
+        "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts",
+        "packages/gui-plugins/AGENTS.md", "packages/gui-plugins/README.md"
+      ]
+    },
+    {
       "id": "CAT-10",
       "title": "Web app, UI kit, session UI",
       "paths": [
         "packages/app/**", "packages/ui/**", "packages/session-ui/**",
-        "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**",
-        "packages/plugin/src/gui/builtin.ts"
+        "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
       ]
     },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },

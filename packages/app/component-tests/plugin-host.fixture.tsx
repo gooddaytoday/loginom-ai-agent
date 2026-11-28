@@ -19,7 +19,7 @@ import {
   type StoreOptions,
   type Workspaces,
 } from "@opencode/plugin/gui"
-import type { BuiltinLayout, BuiltinLocale } from "@opencode/plugin/gui/builtin"
+import { BuiltinProviderSetup, type BuiltinLayout, type BuiltinLocale } from "@opencode/plugin/gui/builtin"
 import {
   createComponent,
   createMemo,
@@ -164,7 +164,7 @@ export async function until(check: () => boolean) {
 }
 
 /** Mounts the real plugin host with one plugin whose every renderer load settles when the test says so. */
-export function mountPluginHost() {
+export function mountPluginHost(builtin = false) {
   const loads: PromiseWithResolvers<{ default: Plugin.Setup<Entry> }>[] = []
   const [disabled, setDisabled] = createSignal<ReadonlySet<string>>(new Set())
   const hosts: PluginHost[] = []
@@ -194,6 +194,7 @@ export function mountPluginHost() {
               },
             ]}
             disabled={disabled}
+            builtins={builtin ? new Set(["fixture"]) : undefined}
             apis={fakeApis(unused)}
             whenMounted={mounted}
           >
@@ -222,6 +223,26 @@ export function mountPluginHost() {
     status: () => hosts[0]?.status("fixture"),
     /** Contributions the host holds for a registry; readable after the host unmounts. */
     entries: (registry: string) => hosts[0]?.state.entries[registry]?.length ?? 0,
+  }
+}
+
+export async function canAddProviderSetup(builtin: boolean) {
+  const host = mountPluginHost(builtin)
+  const registered = Promise.withResolvers<void>()
+
+  try {
+    host.load((ctx) => {
+      try {
+        ctx.add({ ...BuiltinProviderSetup }, { id: "fixture-setup", title: "Fixture setup", render: () => null })
+      } finally {
+        registered.resolve()
+      }
+    })
+    await registered.promise
+
+    return host.entries(BuiltinProviderSetup.id)
+  } finally {
+    host.unmount()
   }
 }
 

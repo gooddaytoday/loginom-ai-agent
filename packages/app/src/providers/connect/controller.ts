@@ -28,10 +28,12 @@ import {
   type ProviderDialogEvent,
 } from "./dialog-machine"
 import { connectMethods, type ProviderConnectEffect, type ProviderConnectEvent } from "./machine"
+import { setupView, startSetup, transitionSetup, type SetupEvent } from "./setup-machine"
 
 export function createProviderDialogController(options: {
   /** The Location a sign-in belongs to, fixed when the dialog opens. */
   directory: string | undefined
+  setup?: string
   standalone: boolean
   /** The caller's selected provider; the dialog follows it and writes its own selection back. */
   selected: () => string | undefined
@@ -544,11 +546,13 @@ export function createProviderDialogController(options: {
       .catch(() => false)
   }
 
-  const [pendingSetup, setPendingSetup] = createSignal<ModelChoice>()
+  const [setupState, setSetupState] = createSignal(startSetup(options.setup))
+  const setup = createMemo(() => setupView(setupState()))
+  const dispatchSetup = (event: SetupEvent) => setSetupState((state) => transitionSetup(state, event))
 
   const setupSettler = createConsoleCatalogSettler({
     isLoaded: () => {
-      const pending = pendingSetup()
+      const pending = setup().selection
 
       return (
         !!pending &&
@@ -638,26 +642,48 @@ export function createProviderDialogController(options: {
     ),
   )
 
-  onCleanup(() => dispatch({ type: "disposed" }))
+  onCleanup(() => {
+    dispatchSetup({ type: "disposed" })
+    dispatch({ type: "disposed" })
+  })
 
   return {
     view,
+    location,
+    setup,
+    dispatchSetup,
     completeSetup: async (providerID: string, models: readonly string[], modelID: string, signal: AbortSignal) => {
+      if (signal.aborted) {
+        void sync()
+
+        return false
+      }
+
       const selection = { providerID, modelID }
-      setPendingSetup(selection)
+      const attempt = Symbol()
+      const waiting = dispatchSetup({ type: "saved", selection, attempt })
+
+      if (waiting.status !== "settling" || waiting.attempt !== attempt) return false
+
       signal.addEventListener("abort", setupSettler.cancel, { once: true })
       const outcome = await setupSettler.settle()
       signal.removeEventListener("abort", setupSettler.cancel)
+      const before = untrack(setupState)
+      const settled = dispatchSetup({ type: "settled", attempt, outcome: signal.aborted ? "cancelled" : outcome })
 
-      if (signal.aborted) return false
+      if (settled === before || settled.status !== "closing") {
+        void sync()
+
+        return false
+      }
 
       global.models.show(models.map((id) => ({ providerID, modelID: id })))
       options.onConnected?.(providerID)
 
-      if (outcome !== "loaded") {
+      if (!settled.completed) {
         showToast({ variant: "error", title: language.t("provider.connect.setup.modelUnavailable") })
 
-        return false
+        return true
       }
 
       applyModel(selection)

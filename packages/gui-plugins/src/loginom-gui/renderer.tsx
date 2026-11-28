@@ -17,7 +17,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       get title() {
         return ctx.t("modelServerRemove")
       },
-      async run(client, provider, directory) {
+      async run(client, provider, directory, signal) {
         const confirmed = await ctx.dialogs.confirm({
           title: ctx.t("modelServerRemove"),
           description: ctx.t("modelServerRemoveConfirm", { server: provider.name }),
@@ -25,19 +25,25 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
           danger: true,
         })
 
-        if (!confirmed) return false
+        if (!confirmed || signal.aborted) return false
 
         try {
           const { ModelServerRpc } = await import("@loginom-ai-agent/loginom-host/model-server-rpc")
 
           const result = await client
             .rpc(ModelServerRpc)
-            .remove({ providerID: provider.id }, { location: directory ? { directory } : undefined })
+            .remove(
+              { providerID: provider.id },
+              {
+                location: directory ? { directory } : undefined,
+                signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
+              },
+            )
 
           if (result.ok) return true
         } catch {}
 
-        ctx.toast.show({ variant: "error", title: ctx.t("modelServerRemoveFailed") })
+        if (!signal.aborted) ctx.toast.show({ variant: "error", title: ctx.t("modelServerRemoveFailed") })
 
         return false
       },

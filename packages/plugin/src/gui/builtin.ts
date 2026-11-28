@@ -2,7 +2,7 @@
 // out of `dist`, and `script/pack.ts` exports it as `null`. Public SDK modules never import it.
 
 import type { Schema } from "effect"
-import type { OpenCodeClient } from "@opencode/client/promise"
+import type { OpenCodeClient, RpcCallOptions } from "@opencode/client/promise"
 import type { Context } from "./context.js"
 import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclaration, type StoreFrom } from "./core.js"
 import type { Desktop, Layout, Locale, StorageScope, StoreOptions } from "./host-apis.js"
@@ -14,6 +14,8 @@ import { type JSX } from "solid-js"
 export interface ProviderSetupProps {
   /** Client for the server whose provider profile the form edits. */
   readonly client: OpenCodeClient
+  /** Location where the dialog was opened, or the server's default Location. */
+  readonly location: RpcCallOptions["location"]
   /** Refreshes the catalog and selects a model after the form saves a provider. */
   readonly onConnected: (
     providerID: string,
@@ -44,7 +46,8 @@ export interface ProviderSetup {
         /** Name shown in confirmation. */
         readonly name: string
       },
-      directory?: string,
+      directory: string | undefined,
+      signal: AbortSignal,
     ) => Promise<boolean>
   }
   /** Renders the form inside the host's provider dialog. */
