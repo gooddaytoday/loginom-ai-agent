@@ -120,7 +120,7 @@ function TouchComposer(props: { state: State }) {
     delivery: () => (props.state === "queue" ? ("queue" as const) : ("steer" as const)),
     alternate: () => (props.state === "queue" ? ("steer" as const) : ("queue" as const)),
     editing: () => (props.state === "editing" ? "inb_story_editing" : undefined),
-    confirmEdit: (delivery: "steer" | "queue") => record(`Edited queued prompt, ${delivery}`),
+    confirmEdit: () => record("Edited queued prompt"),
     cancelEdit: () => record("Cancelled the edit"),
     editFirst: () => false,
     first() {},

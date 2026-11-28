@@ -137,7 +137,7 @@ describe("an edit always returns the draft it replaced", () => {
   test("when the server delivers it while another row's edit is in flight", () => {
     const result = replay(createQueueState([one, two]), [
       { type: "edit.start", id: "inb_2", reverted: false, draft: draft("") },
-      { type: "edit.confirm", delivery: "queue", reverted: false, prompt: prompt("inb_2 edited") },
+      { type: "edit.confirm", reverted: false, prompt: prompt("inb_2 edited") },
       { type: "edit.start", id: "inb_1", reverted: false, draft: draft("my unsent draft") },
     ])
 
@@ -164,7 +164,7 @@ describe("an edit always returns the draft it replaced", () => {
   test("a failed edit that never reached the server returns to the composer", () => {
     const sent = replay(createQueueState([one, two]), [
       { type: "edit.start", id: "inb_1", reverted: false, draft: draft("") },
-      { type: "edit.confirm", delivery: "queue", reverted: false, prompt: prompt("inb_1 edited") },
+      { type: "edit.confirm", reverted: false, prompt: prompt("inb_1 edited") },
     ])
 
     const attempt = runs(sent.effects)[0].attempt
@@ -221,15 +221,16 @@ describe("queue changes run one at a time", () => {
     expect(runs(result.effects).map((operation) => operation.type)).toEqual(["steer"])
   })
 
-  test("confirming an unchanged edit as a steer waits behind the edit in flight", () => {
+  test("confirming an unchanged edit during another save leaves it in the queue", () => {
     const result = replay(createQueueState([one, two]), [
       { type: "edit.start", id: "inb_2", reverted: false, draft: draft("") },
-      { type: "edit.confirm", delivery: "queue", reverted: false, prompt: prompt("inb_2 edited") },
+      { type: "edit.confirm", reverted: false, prompt: prompt("inb_2 edited") },
       { type: "edit.start", id: "inb_1", reverted: false, draft: draft("my draft") },
-      { type: "edit.confirm", delivery: "steer", reverted: false, prompt: prompt("inb_1 text") },
+      { type: "edit.confirm", reverted: false, prompt: prompt("inb_1 text") },
     ])
 
-    expect(result.state).toMatchObject({ status: "mutating", pending: [{ type: "steer", id: "inb_1" }] })
+    expect(result.state).toMatchObject({ status: "mutating", pending: [] })
+    expect(rowIDs(result.state)).toEqual(["inb_1", "inb_2"])
     expect(runs(result.effects).map((operation) => operation.type)).toEqual(["edit"])
     expect(restores(result.effects).at(-1)).toEqual({ type: "draft.restore", stash: draft("my draft"), focus: true })
   })
@@ -268,7 +269,7 @@ describe("optimistic rows", () => {
   test("an edit in flight shows on its row as pending", () => {
     const result = replay(createQueueState([one, two]), [
       { type: "edit.start", id: "inb_1", reverted: false, draft: draft("") },
-      { type: "edit.confirm", delivery: "queue", reverted: false, prompt: prompt("inb_1 edited") },
+      { type: "edit.confirm", reverted: false, prompt: prompt("inb_1 edited") },
     ])
 
     expect(selectQueueRows(result.state)).toEqual([
@@ -333,7 +334,7 @@ describe("stale results", () => {
   test("an edit the server never admitted before dispose returns to the saved draft if it then fails", () => {
     const sent = replay(createQueueState([one]), [
       { type: "edit.start", id: "inb_1", reverted: false, draft: draft("") },
-      { type: "edit.confirm", delivery: "queue", reverted: false, prompt: prompt("inb_1 edited") },
+      { type: "edit.confirm", reverted: false, prompt: prompt("inb_1 edited") },
       { type: "dispose" },
     ])
 
@@ -386,10 +387,10 @@ describe("an operation past its bound", () => {
     expect(transitionQueue(timedOut.state, { type: "mutation.failed", attempt, hidden: [] }).state).toBe(timedOut.state)
   })
 
-  test("a steered edit whose admission is in flight keeps the edit until the server answers", () => {
+  test("an edit whose write outcome is unknown waits for the server", () => {
     const sent = replay(createQueueState([one, two]), [
       { type: "edit.start", id: "inb_1", reverted: false, draft: draft("") },
-      { type: "edit.confirm", delivery: "steer", reverted: false, prompt: prompt("inb_1 edited") },
+      { type: "edit.confirm", reverted: false, prompt: prompt("inb_1 edited") },
     ])
 
     const attempt = runs(sent.effects)[0].attempt
@@ -453,7 +454,7 @@ describe("an operation past its bound", () => {
   test("an edit the server holds whose queue re-read stalled counts as done", () => {
     const sent = replay(createQueueState([one]), [
       { type: "edit.start", id: "inb_1", reverted: false, draft: draft("") },
-      { type: "edit.confirm", delivery: "queue", reverted: false, prompt: prompt("inb_1 edited") },
+      { type: "edit.confirm", reverted: false, prompt: prompt("inb_1 edited") },
     ])
 
     const attempt = runs(sent.effects)[0].attempt

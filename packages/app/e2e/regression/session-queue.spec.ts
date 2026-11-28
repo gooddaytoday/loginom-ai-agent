@@ -960,8 +960,8 @@ test("a queued prompt the server delivers mid-edit returns the draft typed befor
   await expect(page.getByText("This message has already been sent or removed from the queue")).toBeVisible()
 })
 
-for (const delivery of ["queue", "steer"] as const) {
-  test(`editing a prompt the server delivered meanwhile keeps the edit draft (${delivery})`, async ({ page }) => {
+for (const key of ["Enter", "ControlOrMeta+Enter"] as const) {
+  test(`saving with ${key} keeps the draft when the prompt was delivered meanwhile`, async ({ page }) => {
     const mock = createQueueMock(["first queued prompt", "second queued prompt"])
     const view = await openQueue(page, mock, "queue")
     await view.rows.getByText("second queued prompt", { exact: true }).click()
@@ -971,7 +971,7 @@ for (const delivery of ["queue", "steer"] as const) {
     await view.input.pressSequentially(", edited")
     // The server delivers the original before the edit lands; this client has not heard yet.
     mock.rows.splice(1, 1)
-    await view.input.press(delivery === "queue" ? "Enter" : "ControlOrMeta+Enter")
+    await view.input.press(key)
 
     await expect(page.getByText("This message has already been sent or removed from the queue")).toBeVisible()
     await expect(view.input).toHaveText("second queued prompt, edited")
@@ -1011,8 +1011,8 @@ for (const change of ["reorder", "edit"] as const) {
   })
 }
 
-for (const delivery of ["steer", "queue"] as const) {
-  test(`an edit sent as a ${delivery} stays interactive while the server is slow to confirm it`, async ({ page }) => {
+for (const key of ["Enter", "ControlOrMeta+Enter"] as const) {
+  test(`saving with ${key} keeps the edit queued and stays interactive while the server answers`, async ({ page }) => {
     const mock = createQueueMock(["first queued prompt", "second queued prompt"])
     mock.rows[1].payload.files = [
       {
@@ -1034,9 +1034,10 @@ for (const delivery of ["steer", "queue"] as const) {
     await expect(view.input).toHaveText("second queued prompt")
     await expect(view.composer.getByRole("img", { name: "shot.png" })).toBeVisible()
     await expect(view.input).toBeFocused()
+    await expect(view.composer.getByRole("button", { name: "Save", exact: true })).toBeVisible()
     await view.input.press("End")
     await view.input.pressSequentially(", edited")
-    await view.input.press(delivery === "queue" ? "Enter" : "ControlOrMeta+Enter")
+    await view.input.press(key)
     await save.arrived
 
     // The composer is free at once and the strip shows the edit, pending, in the original's place.
@@ -1055,13 +1056,9 @@ for (const delivery of ["steer", "queue"] as const) {
     await view.input.pressSequentially(", edited too")
     await view.input.press("Enter")
     await expect(view.input).toHaveText("")
-    // Until the server answers, a steered edit also waits in the strip.
     await expect(texts).toHaveText(["first queued prompt, edited too", "second queued prompt, edited"])
 
-    const final =
-      delivery === "queue"
-        ? ["first queued prompt, edited too", "second queued prompt, edited"]
-        : ["first queued prompt, edited too"]
+    const final = ["first queued prompt, edited too", "second queued prompt, edited"]
 
     save.release()
 
@@ -1072,9 +1069,7 @@ for (const delivery of ["steer", "queue"] as const) {
     await expect
       .poll(() => mock.rows.filter((row) => row.delivery === "queue").map((row) => row.payload.text))
       .toEqual(final)
-    expect(mock.rows.filter((row) => row.delivery === "steer").map((row) => row.payload.text)).toEqual(
-      delivery === "steer" ? ["second queued prompt, edited"] : [],
-    )
+    expect(mock.changes).toEqual([])
     await expect(view.input).toHaveText("")
   })
 }

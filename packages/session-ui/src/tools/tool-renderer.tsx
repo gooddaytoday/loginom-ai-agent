@@ -1,3 +1,5 @@
+import { ToolGroupRow } from "../components/tool-group-row"
+import { toolGroupSummary } from "../message/tool-group"
 // Current Session tool presentation grouped by visual family.
 import {
   Component,
@@ -1416,6 +1418,9 @@ export function ToolDisplay(
     <Show when={!hideQuestion()}>
       <div data-component="tool-part-wrapper" data-timeline-part-id={props.id}>
         <Switch>
+          <Match when={toolGroupSummary(props.metadata)}>
+            {(summary) => <ToolGroupRow summary={summary()} detail={error() ?? props.output} />}
+          </Match>
           <Match when={stopped()}>
             {(stopped) => (
               <>

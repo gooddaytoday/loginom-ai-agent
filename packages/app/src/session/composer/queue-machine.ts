@@ -35,7 +35,6 @@ export type QueueRow = {
 export type EditOperation = {
   readonly type: "edit"
   readonly original: string
-  readonly delivery: ComposerDelivery
   readonly item: QueuedPrompt
   readonly prompt: Prompt
   readonly raw: string
@@ -129,7 +128,6 @@ export type QueueEvent =
   | { readonly type: "edit.cancel" }
   | {
       readonly type: "edit.confirm"
-      readonly delivery: ComposerDelivery
       readonly reverted: boolean
       readonly prompt: Prompt
     }
@@ -383,8 +381,8 @@ export function viewQueue(
     editing,
     busy: state.status === "mutating" || state.status === "editing-while-mutating",
     undoing: state.status === "mutating" && state.active.type === "undo",
-    delivery: context.working ? context.behavior : "steer",
-    alternate: editing ? "steer" : context.working ? (context.behavior === "queue" ? "steer" : "queue") : undefined,
+    delivery: editing ? "queue" : context.working ? context.behavior : "steer",
+    alternate: context.working && !editing ? (context.behavior === "queue" ? "steer" : "queue") : undefined,
     moved: selectQueueMoved(state),
   }
 }
@@ -501,19 +499,14 @@ function confirmEdit(state: LiveQueueState, event: Extract<QueueEvent, { type: "
 
   if (!raw.trim() && !attachments.length) return changed(closed, [restored])
   const item = state.items.find((entry) => entry.id === state.edit.id) ?? state.edit.item
-  const pristine = isPristine(item, event.prompt)
 
-  if (pristine && event.delivery === "queue") return changed(closed, [restored])
-
-  // An unchanged prompt steers in place instead of being replaced.
-  if (pristine) return enqueue(closed, { type: "steer", id: item.id }, [restored])
+  if (isPristine(item, event.prompt)) return changed(closed, [restored])
 
   return enqueue(
     closed,
     {
       type: "edit",
       original: item.id,
-      delivery: event.delivery,
       item,
       prompt: event.prompt,
       raw,
@@ -629,9 +622,7 @@ function settle(
           ? [active.item.id]
           : active.type === "reorder"
             ? Object.keys(active.moved)
-            : active.delivery === "steer"
-              ? [active.original]
-              : []
+            : []
 
     const hidden = hide(state, confirmed)
     const moved = active.type === "reorder" ? active.moved : NO_MOVES

@@ -400,6 +400,13 @@ export function ComposerEditor(props: ComposerEditorProps) {
                   event.preventDefault()
 
                   if (event.repeat) return
+
+                  if (view.submit.queue?.editing()) {
+                    props.controller.submit()
+
+                    return
+                  }
+
                   // On touch, Cmd+Return is the touch bar's primary action, since plain Return cannot send.
                   props.controller.submit(
                     !touch() && event.altKey && !mod
@@ -1648,9 +1655,11 @@ function composerSendLabel(
 ) {
   const queue = view.submit.queue
 
-  if (mode !== "normal" || !queue || !queue.alternate()) return translate("ui.promptInput.send")
+  if (mode !== "normal" || !queue) return translate("ui.promptInput.send")
 
   if (queue.editing()) return translate("ui.promptInput.saveQueued")
+
+  if (!queue.alternate()) return translate("ui.promptInput.send")
 
   return translate(queue.delivery() === "queue" ? "ui.promptInput.queue" : "ui.promptInput.steer")
 }

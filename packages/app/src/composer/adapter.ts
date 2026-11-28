@@ -47,7 +47,7 @@ export type ComposerQueue = {
   alternate: Accessor<ComposerDelivery | undefined>
   // Inbox ID of the queued prompt currently loaded in the composer for editing.
   editing: Accessor<string | undefined>
-  confirmEdit: (delivery: ComposerDelivery) => void
+  confirmEdit: () => void
   cancelEdit: () => void
   // Loads the first queued prompt into the composer. Returns false when the queue is empty.
   editFirst: () => boolean

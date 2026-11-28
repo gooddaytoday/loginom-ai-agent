@@ -14,6 +14,7 @@ import {
   type ReferenceSnapshot,
 } from "@loginom-ai-agent/loginom-host/file-reference"
 import type { Plugin } from "@opencode/plugin"
+import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Info, ToolContext } from "@opencode/plugin/promise/tool"
 import { Tool } from "@opencode/schema/tool"
 import { FSUtil } from "@opencode/util/fs-util"
@@ -47,6 +48,7 @@ const attachmentHint = ". Для CLI передайте файл через --fi
 // Metadata key of a rules-only check (0.4 `checkDeny`): this module's `permission.evaluate` hook settles it without
 // asking. A configured deny is decided before plugin hooks run, so it still fails the check.
 const check = "loginom.local-file.check"
+const queuedReference = "loginom_queued_file_reference"
 
 export type ReferenceHost = {
   reserveReference(userMessage: string, name: string, snapshot: ReferenceSnapshot): Promise<FileReference>
@@ -59,6 +61,23 @@ export type AdmitHost = ReferenceHost & {
 /** The Host run that serves a session's current task, and the task's user message (0.4 `turnLifecycle`; B2.3). */
 export type Lease = { host: AdmitHost & { readonly generation: number }; userMessage: string }
 type Authorized = { sourcePath: string; canonicalPath: string; verifyAttachment?: (bytes?: Buffer) => Promise<unknown> }
+
+function addQueuedReferences(
+  messages: SessionContext["messages"],
+  history: Awaited<ReturnType<Plugin.Context["session"]["context"]>>,
+) {
+  const positions = new Map(messages.map((message, index) => [message.id, index]))
+  let before = messages.length
+
+  for (const item of history.toReversed()) {
+    before = positions.get(item.id) ?? before
+    const text = item.type === "user" ? item.metadata?.[queuedReference] : undefined
+    const id = `${item.id}:loginom-file-reference`
+
+    if (typeof text === "string" && text && !positions.has(id))
+      messages.splice(before, 0, { id, role: "user", content: [{ type: "text", text }] })
+  }
+}
 
 const admittedReferences = new WeakMap<ReferenceHost, Map<string, { sourcePath: string; artifact: unknown }>>()
 
@@ -88,17 +107,15 @@ export async function localFiles(
         if (identity) await plugin.storage.set(key, identity)
       }),
     )
+    const text = references.flatMap(({ text }) => (text ? [text] : [])).join("\n\n")
+    if (event.metadata) delete event.metadata[queuedReference]
     if (queued) {
-      for (const { file, text } of references) {
-        if (text && !file.description?.endsWith(text))
-          file.description = [file.description, text].filter(Boolean).join("\n\n")
-      }
+      if (text) event.metadata = { ...event.metadata, [queuedReference]: text }
       return
     }
     // Core sends the model nothing of a data file it cannot read as text, so a synthetic message (0.4: a synthetic text
     // part) names the tool for it. Without a description the timeline does not show it, and the user's message keeps its
     // own text. It is admitted without a wake: the prompt that is being admitted starts the run.
-    const text = references.flatMap(({ text }) => (text ? [text] : [])).join("\n\n")
     if (text)
       await plugin.session.synthetic({
         sessionID: event.sessionID,
@@ -107,11 +124,15 @@ export async function localFiles(
         resume: false,
       })
   })
+  await plugin.session.hook("context", async (event) => {
+    addQueuedReferences(event.messages, await plugin.session.context({ sessionID: event.sessionID }))
+  })
   // A compaction keeps the attachments of the messages it summarizes, as 0.4 replayed their prompt (B2.5d). The hook runs
   // while the compaction is open, before its summary is written; once completed, its message heads the session's
   // context, and only then do the attachments it carried count. A failed or reverted compaction never heads it.
   await plugin.session.hook("compaction", async (event) => {
     const history = await plugin.session.context({ sessionID: event.sessionID })
+    addQueuedReferences(event.messages, history)
     const open = history.findLast((message) => message.type === "compaction" && message.status === "running")
     if (open)
       await plugin.storage.set(carriedKey(event.sessionID, open.id), await attachments(event.sessionID, history))

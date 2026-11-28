@@ -67,7 +67,6 @@ const attachmentContent = (file: FileAttachment): Array<TextPart | MediaPart> =>
     const location = attachmentLocation(file)
     return [...(location === undefined ? [] : [Message.text(`Attached file: ${location}`)]), media(file)]
   }
-  if (file.source.type === "uri" && file.description) return [Message.text(file.description)]
   return []
 }
 

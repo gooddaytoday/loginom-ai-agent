@@ -551,7 +551,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
           if (queue?.undoing()) return
 
           if (queue?.editing()) {
-            queue.confirmEdit(submitOptions?.alternate ? "steer" : "queue")
+            queue.confirmEdit()
 
             return
           }

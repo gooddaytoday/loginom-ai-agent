@@ -333,12 +333,6 @@ export function createSessionQueue(input: {
     const target = { sessionID: input.sessionID, inboxID: operation.original }
     await server.api.session.inbox.edit({ ...replacement, ...target }, { signal })
     dispatch({ type: "mutation.admitted", attempt: operation.attempt })
-
-    if (operation.delivery !== "steer") return
-
-    const background = input.background()
-    await server.api.session.inbox.update({ ...target, delivery: "steer" }, { signal })
-    void background?.move()
   }
 
   const rewrite = async (attempt: number, progress: MutationProgress, inboxIDs: string[]) => {
@@ -454,10 +448,9 @@ export function createSessionQueue(input: {
     delivery: () => view().delivery,
     alternate: () => view().alternate,
     editing: () => view().editing,
-    confirmEdit: (delivery: ComposerDelivery) =>
+    confirmEdit: () =>
       dispatch({
         type: "edit.confirm",
-        delivery,
         reverted: reverted(),
         prompt: clonePrompt(input.draft.current()),
       }),
