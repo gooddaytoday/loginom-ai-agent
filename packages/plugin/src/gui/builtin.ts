@@ -9,6 +9,44 @@ import type { MainContext } from "./main.js"
 import type { Command, IconName, Panel, PanelTab, SlotMap } from "./registries.js"
 import { type JSX } from "solid-js"
 
+type BuiltinDeepLink = { readonly channel: string; readonly data: typeof Schema.Json.Type }
+
+type DeepLinkListener = (data: BuiltinDeepLink["data"]) => void
+
+const deepLinkListeners = new Map<string, DeepLinkListener>()
+
+const pendingDeepLinks = new Map<string, BuiltinDeepLink["data"][]>()
+
+/**
+ * Delivers opaque data in this Desktop renderer, buffering it until the built-in subscribes.
+ * @param link - The destination channel and its JSON payload.
+ */
+export function deliverBuiltinDeepLink(link: BuiltinDeepLink) {
+  const listener = deepLinkListeners.get(link.channel)
+
+  if (listener) return listener(link.data)
+
+  pendingDeepLinks.set(link.channel, [...(pendingDeepLinks.get(link.channel) ?? []), link.data])
+}
+
+/**
+ * Consumes a built-in channel's buffered and live deep links.
+ * @param channel - The channel the built-in owns.
+ * @param listener - Decodes and handles each payload.
+ * @returns Stops listening; later arrivals are buffered again.
+ */
+export function subscribeBuiltinDeepLinks(channel: string, listener: DeepLinkListener) {
+  deepLinkListeners.set(channel, listener)
+  const pending = pendingDeepLinks.get(channel)
+
+  pendingDeepLinks.delete(channel)
+  pending?.forEach(listener)
+
+  return () => {
+    if (deepLinkListeners.get(channel) === listener) deepLinkListeners.delete(channel)
+  }
+}
+
 /**
  * Runs fn when the main thread is idle (a short timeout where requestIdleCallback is missing, e.g. Safari). Load lazy
  * chunks this way from setup, so they are compiled before a session first opens.
@@ -206,6 +244,31 @@ export interface BuiltinSlotMap extends SlotMap {
     /** The location icon: monitor for the local repository, worktree for a worktree. */
     readonly icon: IconName
   }
+  /** Replaces the wordmark above the draft composer. */
+  readonly "session.new.heading": Record<string, never>
+  /** Replaces the empty normal-mode draft hint. */
+  readonly "session.new.composer.placeholder": Record<string, never>
+  /** Replaces the project picker's label and moves the picker into the composer toolbar. */
+  readonly "session.new.composer.project": {
+    /** Display name of the selected project. */
+    readonly project: string
+  }
+  /** Items at the end of the draft composer's Add menu. Render rows with `Ui.MenuItem`. */
+  readonly "session.new.composer.add.menu": Record<string, never>
+  /** Content below the draft composer and its location controls. */
+  readonly "session.new.below": {
+    /**
+     * Prefills the draft and tags its origin without submitting it.
+     * @param text - The replacement text, leaving attachments in place.
+     * @param origin - A plugin-prefixed identifier for the source of the text.
+     */
+    insertPrompt(text: string, origin: string): void
+    /**
+     * Listen for successful promotion of this draft. Returns a function that unregisters the listener.
+     * @param listener - Receives the origin captured at submit time, if any.
+     */
+    onStarted(listener: (origin: string | undefined) => void): () => void
+  }
 }
 
 /** A `Slot` that may also fill the slots only built-ins use. */
@@ -391,6 +454,15 @@ export interface BuiltinContext extends Context {
   readonly locale: BuiltinLocale
   /** The session layout, with `command`. */
   readonly layout: BuiltinLayout
+  /** The app's route, with navigation to a built-in plugin's pages. */
+  readonly router: Context["router"] & {
+    /**
+     * Opens a top-level page contributed by the calling plugin. Waits for the app interface to mount.
+     *
+     * @param id - The page's id within the plugin, as registered with `Page`.
+     */
+    openPage(id: string): void
+  }
   /** Stores whose older homes may be parts of shared app keys. */
   readonly storage: BuiltinStorage
 }

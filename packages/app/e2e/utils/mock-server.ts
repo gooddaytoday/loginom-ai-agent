@@ -25,8 +25,6 @@ import { installSseTransport } from "./sse-transport"
 
 type Resolvable<T> = T | (() => T)
 
-const decodePackageSnapshot = Schema.decodeUnknownOption(Schema.Struct({ sessionID: Schema.String }))
-
 // A hook's replacement response.
 export type MockAnswer = { status: number; body: unknown }
 
@@ -103,6 +101,12 @@ export interface MockServerConfig {
   onMessage?: (input: { sessionID: string; messageID: string }) => void
   onRevertStage?: (input: { sessionID: string; messageID: string }) => void
   onSession?: (sessionID: string) => void
+  onRpc?: (request: {
+    rpcID: string
+    method: string
+    directory: string | null
+    body: unknown
+  }) => { output: unknown } | { unavailable: true } | undefined
   events?: () => OpenCodeEvent[]
   eventRetry?: number
   // Idle event streams send a comment every 15 s like the real server. Set false only to test the client's stall watchdog.
@@ -140,7 +144,6 @@ export interface MockServerConfig {
   // Runs on DELETE .../connect/oauth/:attemptID, which closes an OAuth attempt the dialog left.
   onIntegrationOAuthCancel?: (attemptID: string) => void
   plugins?: Resolvable<unknown[]>
-  loginomPackagePath?: (sessionID: string, directory: string | undefined) => string | null
   skills?: Resolvable<unknown[]>
   // Replaces the `/api/worktree` inventory, which defaults to the directory plus project sandboxes.
   worktrees?: Resolvable<unknown[]>
@@ -1225,20 +1228,17 @@ function mockHandlers(
         },
         // The goal plugin's pill reads each routed session's goal; no scenario sets one.
         rpcCall: (ctx) => {
+          const url = new URL(ctx.request.url, config.server ?? SERVER)
+          const response = config.onRpc?.({
+            ...ctx.params,
+            directory: url.searchParams.get("location[directory]"),
+            body: ctx.payload,
+          })
+          if (response && "unavailable" in response)
+            return Effect.fail(new MockServiceUnavailable({ message: "RPC unavailable" }))
+          if (response) return Effect.succeed(response)
           if (ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get")
             return Effect.succeed({ output: null })
-          const snapshot = Option.getOrUndefined(decodePackageSnapshot(ctx.payload.input))
-
-          if (
-            ctx.params.rpcID === "loginom.package-state" &&
-            ctx.params.method === "snapshot" &&
-            config.loginomPackagePath &&
-            snapshot
-          )
-            return Effect.succeed({
-              output: { path: config.loginomPackagePath(snapshot.sessionID, ctx.query["location[directory]"]) },
-            })
-
           return Effect.fail(
             new MockUnsupported({ message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC` }),
           )

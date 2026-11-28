@@ -974,9 +974,9 @@ export interface Layout {
    */
   project(server: string, title: string): void
   /**
-   * Opens a new draft session in a directory on a server with its prompt filled in, for the user to review and send.
-   * The draft opens in its own tab, as a new session from Home does. Does nothing when the app does not list the
-   * server.
+   * Opens a new draft with its prompt filled in for the user to review and send.
+   * Uses the selected Home project when the directory is omitted, or asks the user to choose a directory.
+   * Does nothing when the app does not list the requested server.
    *
    * @param input - Where the draft runs and what it asks.
    *
@@ -986,10 +986,10 @@ export interface Layout {
    * ```
    */
   draft(input: {
-    /** The server's `ServerRef.id`. */
-    readonly server: string
-    /** The directory the new session runs in. */
-    readonly directory: string
+    /** The server's `ServerRef.id`. Defaults to the server selected on Home. */
+    readonly server?: string
+    /** The directory the new session runs in. Defaults to the selected project on that server. */
+    readonly directory?: string
     /** The prompt the draft starts with. */
     readonly prompt: string
   }): void

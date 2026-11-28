@@ -367,10 +367,9 @@ const Group = HttpApiGroup.make("mock")
   .add(
     HttpApiEndpoint.post("rpcCall", "/api/rpc/:rpcID/:method", {
       params: { rpcID: Schema.String, method: Schema.String },
-      query: { "location[directory]": Schema.optionalKey(Schema.String) },
-      payload: Schema.Struct({ input: Schema.optionalKey(Schema.Json) }),
+      payload: JsonPayload,
       success: Json,
-      error: Unsupported,
+      error: [Unsupported, MockServiceUnavailable.pipe(HttpApiSchema.status(503))],
     }),
   )
   .add(

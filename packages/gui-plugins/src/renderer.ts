@@ -22,7 +22,9 @@ import microsoftOfficeRenderer from "./microsoft-office/renderer"
 import sources from "./sources"
 import sourcesRenderer from "./sources/renderer"
 import goal from "./goal"
+import loginom from "./loginom-gui"
 import goalRenderer from "./goal/renderer"
+import loginomRenderer from "./loginom-gui/renderer"
 import nodeContext from "./loginom-gui/node-context-entry"
 import nodeContextRenderer from "./loginom-gui/node-context-renderer"
 
@@ -48,5 +50,6 @@ export const builtins = compose({
   "microsoft-office": { ...microsoftOffice, windowEntry: eager(microsoftOfficeRenderer) },
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
   goal: { ...goal, windowEntry: eager(goalRenderer) },
+  "loginom-gui": { ...loginom, windowEntry: eager(loginomRenderer) },
   "loginom-node-context": { ...nodeContext, windowEntry: eager(nodeContextRenderer) },
 })

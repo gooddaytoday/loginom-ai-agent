@@ -12,7 +12,7 @@ for (const width of [1280, 390]) {
     const source = nodeFixture.source
     const other = { id: "ses_node_other", title: "Другой разговор" }
     const prompts: Parameters<NonNullable<MockServerConfig["onPrompt"]>>[0][] = []
-    const bindings: { sessionID: string; directory: string | undefined }[] = []
+    const bindings: { body: unknown; directory: string | null }[] = []
     let creates = 0
     let currentPath = nodeFixture.node.path
 
@@ -31,10 +31,11 @@ for (const width of [1280, 390]) {
         ],
       }),
       seed: { locale: "ru", storage: { "opencode.e2e.loginom-node": "1" } },
-      loginomPackagePath(sessionID, directory) {
-        bindings.push({ sessionID, directory })
+      onRpc(request) {
+        if (request.rpcID !== "loginom.package-state" || request.method !== "snapshot") return
+        bindings.push({ body: request.body, directory: request.directory })
 
-        return currentPath
+        return { output: { path: currentPath } }
       },
       onPrompt: (input) => void prompts.push(input),
       onSessionCreate: () => {
@@ -110,8 +111,8 @@ for (const width of [1280, 390]) {
         '\nThe user referenced Loginom node {"package":"Продажи.lgp","path":"/Команда/Продажи.lgp","guid":"{e9bd5bda-1245-43b0-acbe-d81c405077b1}","name":"Расчёт выручки","intent":"edit"}.',
     )
     expect(bindings).toEqual([
-      { sessionID: source.sessionID, directory: view.directory },
-      { sessionID: source.sessionID, directory: view.directory },
+      { body: { input: { sessionID: source.sessionID } }, directory: view.directory },
+      { body: { input: { sessionID: source.sessionID } }, directory: view.directory },
     ])
     expect(creates).toBe(0)
     await expect(chip).toHaveCount(0)

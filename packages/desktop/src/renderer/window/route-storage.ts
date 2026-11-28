@@ -26,6 +26,8 @@ export function acceptedLastActiveUrl(value: string | null | undefined) {
 
   if (/^\/server\/[^/]+\/session\/[^/]+$/.test(path ?? "")) return value ?? "/"
 
+  if (/^\/page\/[^/]+\/[^/]+$/.test(path ?? "")) return value ?? "/"
+
   return "/"
 }
 

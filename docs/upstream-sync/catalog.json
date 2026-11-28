@@ -2,7 +2,12 @@
   "comment": "Source of truth for which fork changes inside upstream files are described in catalog.md. First matching entry wins. An entry with `pending` names the stage B task or stage that brings its 0.4 change to OpenCode 2; until then it has no divergent files. Checked by scripts/upstream-sync/catalog-check.py.",
   "against": "a6b15d33daf6ab7d35569f6d711fdb630b9f04e7",
   "entries": [
-    { "id": "CAT-01", "title": "Manifests and lockfile", "paths": ["bun.lock", "**/package.json"] },
+    {
+      "id": "CAT-01",
+      "title": "Manifests and lockfile",
+      "paths": ["bun.lock", "**/package.json"],
+      "note": "Keep @types/mime-types in packages/util/package.json for filtered installs that typecheck util source."
+    },
     {
       "id": "CAT-02",
       "title": "CI, build, release and repository hygiene",
@@ -25,6 +30,7 @@
       "title": "Upstream endpoints: updates, installer, sharing",
       "paths": [
         "packages/gui-plugins/src/updater/main.ts", "packages/gui-plugins/src/updater/platform.ts",
+        "packages/gui-plugins/src/updater/signed-feed*.ts", "packages/desktop/src/main/plugin/storage.test.ts",
         "packages/gui-plugins/src/updater/whats-new.tsx", "packages/desktop/src/renderer/platform/notifications.ts",
         "packages/desktop/src/renderer/platform/notifications.test.ts", "packages/cli/src/services/updater.ts",
         "packages/cli/test/updater-install.test.ts"
@@ -50,7 +56,11 @@
         "packages/sdk/test/embedded.test.ts", "packages/core/src/schedule/check.ts",
         "packages/core/src/tool/plugin/shell.ts", "packages/core/src/tool.ts", "packages/core/src/formatter.ts",
         "packages/core/src/session/execution/restart.ts", "packages/core/test/session-execution.test.ts",
-        "packages/core/test/subagent-idle-e2e.test.ts"
+        "packages/core/test/subagent-idle-e2e.test.ts", "packages/core/src/plugin/product.ts",
+        "packages/core/src/session/history.ts", "packages/protocol/openapi.json",
+        "packages/core/src/session/message-updater.ts", "packages/schema/src/session-event.ts",
+        "packages/schema/src/session-message.ts", "packages/client/src/effect/api/api.ts",
+        "packages/app/src/runtime/server/data.test.ts"
       ]
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },
@@ -113,15 +123,37 @@
         "packages/ui/src/i18n/en.ts"
       ]
     },
-    { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
+    { "id": "CAT-09", "title": "Desktop main process, preload, renderer and window tests", "paths": ["packages/desktop/**"] },
     {
-      "id": "CAT-14",
+      "id": "CAT-21",
       "title": "Built-in plugin top-level pages",
       "paths": [
         "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
         "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
+        "packages/plugin/src/gui/host-apis.ts",
+        "packages/ui/src/context/dialog.tsx",
+        "packages/app/src/runtime/platform/pwa.ts", "packages/app/test-browser/pwa-route.test.ts",
+        "packages/app/src/runtime/plugin/pages.tsx",
         "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
       ]
+    },
+    {
+      "id": "CAT-16",
+      "title": "New-session GUI slot (C1.3)",
+      "paths": [
+        "packages/app/src/new-session/composer-adapter.ts", "packages/app/src/new-session/screen.tsx",
+        "packages/app/src/new-session/view.tsx", "packages/app/src/composer/composer.tsx",
+        "packages/app/src/composer/editor/editor.tsx",
+        "packages/app/src/shell/tabs/schema.ts", "packages/app/src/shell/tabs/tabs.test.ts",
+        "packages/app/e2e/regression/new-session.spec.ts",
+        "packages/app/e2e/utils/app-direction.html", "packages/app/e2e/utils/app-direction.fixture.tsx",
+        "packages/app/e2e/utils/direction.ts"
+      ]
+    },
+    {
+      "id": "CAT-17",
+      "title": "Built-in plugin page navigation for dashboard links",
+      "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
     { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },

@@ -16,6 +16,7 @@ const product = [
   "microsoft-office",
   "sources",
   "goal",
+  "loginom-gui",
   "loginom-node-context",
 ]
 
