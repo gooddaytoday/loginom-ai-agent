@@ -1,0 +1,15 @@
+.loginom-network-proxy {
+  max-width: min(20rem, 100%);
+  overflow-wrap: anywhere;
+}
+
+.loginom-network-port {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.loginom-network-port-field {
+  width: 6rem;
+}

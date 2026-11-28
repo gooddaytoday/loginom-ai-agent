@@ -2,6 +2,7 @@ export * as DesktopInitialization from "./desktop-initialization"
 
 import { app } from "electron"
 import { Context, Effect, Layer } from "effect"
+import { startSystemProxy } from "../loginom/system-proxy"
 import { DesktopLogging } from "../native/logging"
 import { marks } from "./marks"
 import {
@@ -28,6 +29,7 @@ export const layer = Layer.effect(
       prepareApplicationEnvironment.pipe(Effect.andThen(loadProxyEnvironment), Effect.andThen(logging.startNetwork)),
     )
     yield* Effect.promise(() => app.whenReady())
+    yield* startSystemProxy
     yield* prepareDesktop
     marks.init = Date.now()
 

@@ -52,6 +52,7 @@ export default defineConfig({
             input: [
               "index.html",
               "e2e/utils/settings-wsl.html",
+              "e2e/utils/settings-network.html",
               "e2e/utils/app-direction.html",
               "e2e/utils/windows-menu.html",
             ],

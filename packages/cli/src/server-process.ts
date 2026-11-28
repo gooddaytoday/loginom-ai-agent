@@ -2,6 +2,7 @@ export * as ServerProcess from "./server-process"
 
 import { NodeServices } from "@effect/platform-node"
 import { withBundledRipgrep } from "@loginom-ai-agent/loginom-host/bundled-ripgrep"
+import { serviceProxyStatus } from "@loginom-ai-agent/loginom-host/system-proxy"
 import { Service } from "@opencode/client/effect/service"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Global } from "@opencode/util/global"
@@ -13,6 +14,7 @@ import { PersistentPty } from "@opencode/schema/persistent-pty"
 import { HttpServer } from "effect/http"
 import { NetAddress } from "effect/net"
 import { Env } from "./env"
+import { networkSettings } from "./services/network-settings"
 import { PortOwner } from "./services/port-owner"
 import { ServiceConfig } from "./services/service-config"
 import { RetainedImage } from "./services/retained-image"
@@ -36,8 +38,8 @@ export type Options = {
 }
 
 // The process effect lives until server shutdown; tracing it would parent every request to one process-lifetime trace.
-export const run = Effect.fnUntraced(function* (options: Options) {
-  return yield* processEffect(options).pipe(
+export const run = Effect.fnUntraced(function* (options: Options, platform = process.platform) {
+  return yield* processEffect(options, platform).pipe(
     Effect.provide(
       LayerNode.compile(LayerNode.group([Global.node, AppProcess.node]), {
         replacements: [
@@ -51,7 +53,7 @@ export const run = Effect.fnUntraced(function* (options: Options) {
   )
 })
 
-const processEffect = Effect.fnUntraced(function* (options: Options) {
+const processEffect = Effect.fnUntraced(function* (options: Options, platform: NodeJS.Platform) {
   const inherited = process.env.LOGINOM_AI_AGENT_PTY_HANDOFF
   delete process.env.LOGINOM_AI_AGENT_PTY_HANDOFF
   const handoff =
@@ -76,12 +78,17 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       const serviceOptions = options.mode === "service" ? yield* ServiceConfig.options() : undefined
       const config = options.mode === "service" ? yield* ServiceConfig.read() : {}
       const hostname = options.hostname ?? config.hostname ?? "127.0.0.1"
-      const port = options.port ?? config.port ?? (options.mode === "service" ? ServiceConfig.defaultPort() : undefined)
-      const findIncumbent =
-        serviceOptions !== undefined && port !== undefined
-          ? Service.incumbent({ ...serviceOptions, url: serviceURL(hostname, port) })
-          : undefined
-      if (findIncumbent !== undefined && (yield* findIncumbent) !== undefined) return
+      const defaultPort = options.mode === "service" ? ServiceConfig.defaultPort(LOGINOM_AI_AGENT_CHANNEL, platform) : undefined
+      const port = options.port ?? config.port ?? defaultPort
+      const fallbackPort =
+        platform === "win32" && options.port === undefined && port !== defaultPort ? defaultPort : undefined
+      const findIncumbent = (candidate: number | undefined) =>
+        serviceOptions !== undefined && candidate !== undefined
+          ? Service.incumbent(
+              fallbackPort === undefined ? { ...serviceOptions, url: serviceURL(hostname, candidate) } : serviceOptions,
+            )
+          : Effect.succeed(undefined)
+      if ((yield* findIncumbent(port)) !== undefined) return
       // Loginom AI Agent (B2.7c): one server writes a CLI profile (`.writer`); a second one opens neither its database nor
       // its Host.
       const profile = CliProfile.current()
@@ -105,6 +112,12 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       const network = yield* Effect.promise(() =>
         NetworkMode.read(process.env.LOGINOM_AI_AGENT_CONFIG_DIR ?? global.config),
       )
+      const settings = yield* networkSettings({
+        editable: options.mode === "service" && options.port === undefined,
+        hostname,
+        maximum: ServiceConfig.maximumPort(platform),
+        proxy: serviceProxyStatus(process.env, config.env),
+      })
       if (network === "device") process.env.LOGINOM_AI_AGENT_DISABLE_FREE_MODELS = "1"
       // Loginom AI Agent (B2.3): the product's Loginom Host lives as long as this server. It recovers the leases a stopped
       // process left before any Location activates or a suspended session resumes.
@@ -112,7 +125,11 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       const host = yield* Effect.acquireRelease(
         Effect.promise(() =>
           // A CLI profile keeps its Host in `<root>/loginom`, next to the connection 0.4 saved there.
-          ServiceHost.start({ data: profile?.root ?? global.data, resources: process.env.LOGINOM_AI_AGENT_RESOURCES }),
+          ServiceHost.start({
+            data: profile?.root ?? global.data,
+            resources: process.env.LOGINOM_AI_AGENT_RESOURCES,
+            networkSettings: settings.handlers,
+          }),
         ),
         () => Effect.promise(() => ServiceHost.close().catch(() => undefined)),
       )
@@ -135,100 +152,116 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       const instanceID = randomUUID()
       const transform = yield* WebUi.handler()
       const remote = { urls: [] as ReadonlyArray<string> }
-      const launch = start(
-        {
-          app: {
-            name: process.env.LOGINOM_AI_AGENT_CLIENT ?? LOGINOM_AI_AGENT_ARTIFACT,
-            version: LOGINOM_AI_AGENT_VERSION,
-            channel: LOGINOM_AI_AGENT_CHANNEL,
-          },
-          hostname,
-          port,
-          cors: options.cors ?? config.cors,
-          password,
-          pty: { handoff },
-          simulation: truthy(process.env.LOGINOM_AI_AGENT_SIMULATE),
-          database: {
-            path: databasePath(global.data),
-          },
-          models: {
-            url: process.env.LOGINOM_AI_AGENT_MODELS_URL,
-            file: process.env.LOGINOM_AI_AGENT_MODELS_PATH,
-            fetch: network === "online" && !truthy(process.env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH),
-          },
-          config: {
-            directory: process.env.LOGINOM_AI_AGENT_CONFIG_DIR,
-            project: !truthy(
-              process.env.LOGINOM_AI_AGENT_CONFIG_PROJECT_DISABLE ?? process.env.LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG,
-            ),
-            // Loginom AI Agent (B2.8, U4): .claude is only read for skills, and the product never reads it, as if
-            // LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE were always set.
-            claude: false,
-            file: process.env.LOGINOM_AI_AGENT_CONFIG,
-            content: process.env.LOGINOM_AI_AGENT_CONFIG_CONTENT,
-          },
-          windows: {
-            gitbash: process.env.LOGINOM_AI_AGENT_GIT_BASH_PATH,
-          },
-          // Loginom AI Agent loads built-in server plugins only (В-80); there is no switch.
-          pluginPackages: false,
-          // Loginom AI Agent (В-100, В-104): as in 0.4, nothing calls the model at start before the user: a turn or a
-          // subagent cut off by a crash or a stop is not continued, and recovered background commands only report.
-          resumeTurns: false,
-          fs: {
-            filewatcher: !truthy(process.env.LOGINOM_AI_AGENT_FILEWATCHER_DISABLE ?? process.env.LOGINOM_AI_AGENT_DISABLE_FILEWATCHER),
-            fff:
-              process.env.LOGINOM_AI_AGENT_DISABLE_FFF === undefined
-                ? process.platform !== "win32"
-                : !truthy(process.env.LOGINOM_AI_AGENT_DISABLE_FFF),
-          },
-        },
-        serviceOptions === undefined
-          ? undefined
-          : {
-              onListen: (address, shutdown) =>
-                Effect.gen(function* () {
-                  if (!config.password) yield* ServiceConfig.password(password)
-                  // Loginom AI Agent (B4.16, В-97 п. 3): Desktop's service stops when its window is gone.
-                  yield* ServiceOwner.watch(shutdown)
-                  return yield* ServiceRegistration.register({
-                    address,
-                    password,
-                    id: instanceID,
-                    file: serviceOptions.file,
-                    shutdown,
-                  })
-                }),
+      const launch = (port: number | undefined, fallback?: number) =>
+        start(
+          {
+            app: {
+              name: process.env.LOGINOM_AI_AGENT_CLIENT ?? LOGINOM_AI_AGENT_ARTIFACT,
+              version: LOGINOM_AI_AGENT_VERSION,
+              channel: LOGINOM_AI_AGENT_CHANNEL,
             },
-        transform,
-        () => remote.urls,
-      )
-      const server = yield* launch.pipe(
-        Effect.catch((error) => {
-          if (findIncumbent === undefined || !addressInUse(error)) return Effect.fail(error)
-          return Effect.gen(function* () {
-            const deadline = Date.now() + 15_000
-            while (Date.now() < deadline) {
-              const found = yield* findIncumbent.pipe(Effect.timeoutOption(deadline - Date.now()))
-              if (Option.isSome(found) && found.value !== undefined) return
-              yield* Effect.sleep("100 millis")
-              if (Date.now() >= deadline) break
-              // Failed binds close their scope; a successful bind may take longer than this window to boot.
-              const server = yield* launch.pipe(Effect.catchIf(addressInUse, () => Effect.void))
-              if (server !== undefined) return server
-            }
-            const owner = port === undefined ? undefined : yield* PortOwner.describe(port, hostname)
-            return yield* Effect.fail(
-              new Error(
-                `Managed service port ${port} on ${hostname} is already in use by ${owner ?? "another process"}. ` +
-                  "Configure another port with `loginom-ai-agent-cli service set port <port>` and start the service again.",
-                { cause: error },
+            hostname,
+            port,
+            cors: options.cors ?? config.cors,
+            password,
+            pty: { handoff },
+            simulation: truthy(process.env.LOGINOM_AI_AGENT_SIMULATE),
+            database: {
+              path: databasePath(global.data),
+            },
+            models: {
+              url: process.env.LOGINOM_AI_AGENT_MODELS_URL,
+              file: process.env.LOGINOM_AI_AGENT_MODELS_PATH,
+              fetch: network === "online" && !truthy(process.env.LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH),
+            },
+            config: {
+              directory: process.env.LOGINOM_AI_AGENT_CONFIG_DIR,
+              project: !truthy(
+                process.env.LOGINOM_AI_AGENT_CONFIG_PROJECT_DISABLE ?? process.env.LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG,
               ),
-            )
+              // Loginom AI Agent (B2.8, U4): .claude is only read for skills, and the product never reads it, as if
+              // LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE were always set.
+              claude: false,
+              file: process.env.LOGINOM_AI_AGENT_CONFIG,
+              content: process.env.LOGINOM_AI_AGENT_CONFIG_CONTENT,
+            },
+            windows: {
+              gitbash: process.env.LOGINOM_AI_AGENT_GIT_BASH_PATH,
+            },
+            // Loginom AI Agent loads built-in server plugins only (В-80); there is no switch.
+            pluginPackages: false,
+            // Loginom AI Agent (В-100, В-104): as in 0.4, nothing calls the model at start before the user: a turn or a
+            // subagent cut off by a crash or a stop is not continued, and recovered background commands only report.
+            resumeTurns: false,
+            fs: {
+              filewatcher: !truthy(process.env.LOGINOM_AI_AGENT_FILEWATCHER_DISABLE ?? process.env.LOGINOM_AI_AGENT_DISABLE_FILEWATCHER),
+              fff:
+                process.env.LOGINOM_AI_AGENT_DISABLE_FFF === undefined
+                  ? process.platform !== "win32"
+                  : !truthy(process.env.LOGINOM_AI_AGENT_DISABLE_FFF),
+            },
+          },
+          serviceOptions === undefined
+            ? undefined
+            : {
+                onListen: (address, shutdown) =>
+                  Effect.gen(function* () {
+                    if (NetAddress.isInetAddress(address)) settings.listening(address.port, fallback)
+                    if (!config.password) yield* ServiceConfig.password(password)
+                    // Loginom AI Agent (B4.16, В-97 п. 3): Desktop's service stops when its window is gone.
+                    yield* ServiceOwner.watch(shutdown)
+                    return yield* ServiceRegistration.register({
+                      address,
+                      password,
+                      id: instanceID,
+                      file: serviceOptions.file,
+                      shutdown,
+                    })
+                  }),
+              },
+          transform,
+          () => remote.urls,
+        )
+      const launchManaged = (candidate: number | undefined, fallback?: number) =>
+        launch(candidate, fallback).pipe(
+          Effect.catch((error) => {
+            if (serviceOptions === undefined || !addressInUse(error)) return Effect.fail(error)
+            return Effect.gen(function* () {
+              const deadline = Date.now() + 15_000
+              while (Date.now() < deadline) {
+                const found = yield* findIncumbent(candidate).pipe(Effect.timeoutOption(deadline - Date.now()))
+                if (Option.isSome(found) && found.value !== undefined) return
+                yield* Effect.sleep("100 millis")
+                if (Date.now() >= deadline) break
+                // Failed binds close their scope; a successful bind may take longer than this window to boot.
+                const server = yield* launch(candidate, fallback).pipe(Effect.catchIf(addressInUse, () => Effect.void))
+                if (server !== undefined) return server
+              }
+              const owner = candidate === undefined ? undefined : yield* PortOwner.describe(candidate, hostname)
+              return yield* Effect.fail(
+                new Error(
+                  `Managed service port ${candidate} on ${hostname} is already in use by ${owner ?? "another process"}. ` +
+                    "Configure another port with `loginom-ai-agent-cli service set port <port>` and start the service again.",
+                  { cause: error },
+                ),
+              )
+            })
+          }),
+        )
+      const server = yield* (fallbackPort !== undefined && port !== undefined
+        ? Effect.gen(function* () {
+            const fallback = Effect.gen(function* () {
+              if ((yield* findIncumbent(port)) !== undefined) return
+              yield* Effect.logWarning(`Saved service port ${port} is unavailable. Using default port ${fallbackPort}.`)
+              return yield* launchManaged(fallbackPort, port)
+            })
+            if (port > ServiceConfig.maximumPort(platform)) return yield* fallback
+            // Give a competing launch time to register before switching to a second listener.
+            return yield* launchManaged(port).pipe(Effect.catchIf(portUnavailable, () => fallback))
           })
-        }),
-      )
+        : launchManaged(port))
       if (server === undefined) return
+      if (serviceOptions === undefined && NetAddress.isInetAddress(server.address)) settings.listening(server.address.port)
       if (serviceOptions !== undefined && config.remote !== undefined && NetAddress.isInetAddress(server.address)) {
         const bound = NetAddress.formatIp(server.address.address)
         // A wildcard bind also listens on loopback, which is all the tunnel needs to reach.
@@ -268,9 +301,17 @@ function truthy(value?: string) {
 }
 
 function addressInUse(error: unknown): boolean {
+  return bindError(error, "EADDRINUSE")
+}
+
+function portUnavailable(error: unknown): boolean {
+  return addressInUse(error) || bindError(error, "EACCES")
+}
+
+function bindError(error: unknown, code: string): boolean {
   if (typeof error !== "object" || error === null) return false
-  if ("code" in error && error.code === "EADDRINUSE") return true
-  return "cause" in error && addressInUse(error.cause)
+  if ("code" in error && error.code === code) return true
+  return "cause" in error && bindError(error.cause, code)
 }
 
 function waitForStdinClose() {

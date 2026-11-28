@@ -10,6 +10,7 @@ import { setNativeTranslations } from "../native/translations"
 import { IpcPortHandoff } from "../ipc-transport"
 import { ApplicationLifecycle } from "../lifecycle"
 import { finishFirstLaunchOnboarding, isFirstLaunchOnboardingPending } from "../lifecycle/onboarding"
+import { setSystemProxyEnabled, systemProxySetting } from "../loginom/system-proxy"
 import { BackgroundService } from "../service/background-service"
 import { SidecarCredentials } from "../service/sidecar-credentials"
 import { getWindowID, setBackgroundColor } from "../windows"
@@ -44,6 +45,8 @@ export const appHandlers = AppRpcs.toLayer(
       AppSetBackgroundColor: ({ color }) => Effect.sync(() => setBackgroundColor(color)),
       AppGetSpellcheckEnabled: () => Effect.sync(getSpellcheckEnabled),
       AppSetSpellcheckEnabled: ({ enabled }) => Effect.sync(() => setSpellcheckEnabled(enabled)),
+      AppGetSystemProxySetting: () => Effect.promise(systemProxySetting),
+      AppSetSystemProxyEnabled: ({ enabled }) => Effect.sync(() => setSystemProxyEnabled(enabled)),
       AppExportDebugLogs: () => logging.exportDebug,
       AppSetForceFocus: ({ enabled }, context) => promise(() => setForceFocus(sender(handoff, context), enabled)),
       AppRecordFatalRendererError: ({ error }) =>

@@ -1,5 +1,6 @@
 export { parseProxyAddress, proxyHostPort } from "./address"
 export { translateBypass } from "./bypass"
+export { desktopServiceProxy, onceDesktopServiceProxy } from "./desktop-service"
 export { explicitProxy } from "./environment"
 export { parseGnomeSettings } from "./gnome"
 export { parseKdeSettings } from "./kde"
@@ -23,3 +24,4 @@ export type {
   SystemProxyState,
   SystemProxySummary,
 } from "./types"
+export { serviceProxyStatus } from "./service-status"

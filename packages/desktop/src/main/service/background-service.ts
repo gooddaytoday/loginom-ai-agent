@@ -5,6 +5,7 @@ import { SidecarChanged } from "../../shared/ipc-rpc/events"
 import { CHANNEL } from "../constants"
 import { emitIpcEvent } from "../ipc-events"
 import { LoginomResources } from "../loginom/resources"
+import { backgroundServiceEnvironment } from "../loginom/system-proxy"
 import { getMainWindows } from "../windows"
 import { BackgroundServiceMachine } from "./background-service-machine"
 import { cleanStages } from "./cli-stages"
@@ -72,12 +73,13 @@ const probe = Effect.fn("BackgroundService.probe")(function* () {
 const ensure = Effect.fn("BackgroundService.ensure")(function* (mode: BackgroundServiceMachine.ConnectMode) {
   const runFork = Effect.runForkWith(yield* Effect.context<FileSystem.FileSystem | Path.Path>())
   const setup = yield* prepare(mode)
+  const env = yield* backgroundServiceEnvironment(setup.env)
 
   const run = (version = setup.version) =>
     setup.client.Service.ensure({
       file: setup.file,
       version,
-      env: setup.env,
+      env,
       // A fixed port makes a second contender fail to bind and back off; port 0 never collides, so two
       // services could boot against the same database.
       command: withoutWindowDescriptors([

@@ -3,7 +3,10 @@ import fs from "node:fs/promises"
 import net from "node:net"
 import os from "node:os"
 import path from "node:path"
+import { Definition } from "@loginom-ai-agent/loginom-host/network-settings-rpc"
+import { OpenCode } from "@opencode/client/promise"
 import { NetworkMode } from "../src/network-mode"
+import { ServiceConfig } from "../src/services/service-config"
 import { isolatedEnv } from "./fixture/environment"
 import { scriptedModel } from "./fixture/product-run"
 
@@ -39,6 +42,132 @@ describe("network mode in the global config", () => {
     expect(await NetworkMode.read(config)).toBe("device")
   })
 })
+
+test("settings RPC strips proxy credentials and keeps the active port until restart", async () => {
+  const root = await temporary("cli-network-settings-")
+  const [occupied, starting, next] = await Promise.all([listen(), listen(), listen()])
+  const current = boundPort(starting)
+  const saved = boundPort(next)
+  await close(starting)
+  await close(next)
+  await Bun.write(path.join(root, "config", "service-local.json"), JSON.stringify({ port: current }))
+  const env = {
+    LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "true",
+    HTTPS_PROXY: "http://sample-user:sample-pass@127.0.0.1:1",
+    https_proxy: "http://sample-user:sample-pass@127.0.0.1:1",
+    HTTP_PROXY: undefined,
+    http_proxy: undefined,
+    ALL_PROXY: undefined,
+    all_proxy: undefined,
+  }
+  const location = { location: { directory: root } }
+  const maximum = ServiceConfig.maximumPort()
+  try {
+    const result = await serve(
+      root,
+      async (call, client) => {
+        await active(call, root)
+        const settings = client.rpc(Definition)
+        expect(await settings.status({}, location)).toEqual({
+          proxy: { source: "environment", hosts: ["127.0.0.1:1"] },
+          port: { current, saved: current, editable: true, maximum },
+        })
+        if (process.platform === "win32") expect(await settings.savePort({ port: 0x8000 }, location)).toBe("invalid")
+        expect(await settings.savePort({ port: boundPort(occupied) }, location)).toBe("occupied")
+        expect((await settings.status({}, location)).port?.saved).toBe(current)
+        expect(await settings.savePort({ port: saved }, location)).toBe("saved")
+        expect((await settings.status({}, location)).port).toEqual({ current, saved, editable: true, maximum })
+      },
+      env,
+      ["--service"],
+    )
+    expect(result.requests).toEqual([])
+    await serve(
+      root,
+      async (call, client) => {
+        await active(call, root)
+        expect((await client.rpc(Definition).status({}, location)).port).toEqual({
+          current: saved,
+          saved,
+          editable: true,
+          maximum,
+        })
+      },
+      env,
+      ["--service"],
+    )
+  } finally {
+    await close(occupied)
+  }
+}, 60_000)
+
+test("Windows accepts configured ports only below 0x8000", () => {
+  expect(ServiceConfig.maximumPort("win32")).toBe(0x7fff)
+  expect(ServiceConfig.maximumPort("linux")).toBe(65_535)
+})
+
+test.each(["EADDRINUSE", "EACCES"] as const)("a saved Windows port with %s falls back to the Desktop default", async (code) => {
+  const root = await temporary("cli-network-fallback-")
+  const maximum = ServiceConfig.maximumPort("win32")
+  const [candidate, fallbackListener] = await Promise.all([listen(maximum), listen(maximum)])
+  const saved = boundPort(candidate)
+  const fallback = boundPort(fallbackListener)
+  await close(fallbackListener)
+  if (code === "EACCES") await close(candidate)
+  const name = "network-test"
+  await Bun.write(path.join(root, "config", `service-${name}.json`), JSON.stringify({ port: saved }))
+  try {
+    const result = await serve(
+      root,
+      async (call, client) => {
+        await active(call, root)
+        const settings = client.rpc(Definition)
+        const location = { location: { directory: root } }
+        expect((await settings.status({}, location)).port).toEqual({
+          current: fallback,
+          saved,
+          fallback: saved,
+          editable: true,
+          maximum,
+        })
+        expect(await settings.savePort({ port: 0x8000 }, location)).toBe("invalid")
+      },
+      {
+        LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "true",
+        LOGINOM_AI_AGENT_SERVICE_IDENTITY: name,
+        LOGINOM_AI_AGENT_SERVICE_PORT: String(fallback),
+      },
+      ["--service"],
+      { accessDeniedPort: code === "EACCES" ? saved : undefined },
+    )
+    expect(result.requests).toEqual([])
+  } finally {
+    if (candidate.listening) await close(candidate)
+  }
+}, 60_000)
+
+async function listen(maximum = ServiceConfig.maximumPort()) {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const server = net.createServer()
+    const port = maximum < 65_535 ? 20_000 + Math.floor(Math.random() * 12_000) : 0
+    const success = await new Promise<boolean>((resolve) => {
+      server.once("error", () => resolve(false))
+      server.listen(port, "127.0.0.1", () => resolve(true))
+    })
+    if (success) return server
+  }
+  throw new Error("No test port available")
+}
+
+function boundPort(server: net.Server) {
+  const address = server.address()
+  if (!address || typeof address === "string") throw new Error("No test port bound")
+  return address.port
+}
+
+function close(server: net.Server) {
+  return new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+}
 
 describe("product defaults of the server", () => {
   test("«Только этот компьютер» repeats S6 without a request off loopback", async () => {
@@ -253,9 +382,10 @@ type Call = ReturnType<typeof api>
 // `serve --port 0` (or `args`) in an isolated home with a recording proxy stub; `run` drives it, then the server stops.
 async function serve<A>(
   root: string,
-  run: (call: Call) => Promise<A>,
+  run: (call: Call, client: ReturnType<typeof OpenCode.make>) => Promise<A>,
   overrides: Record<string, string | undefined> = {},
   args = ["--port", "0"],
+  windows?: { accessDeniedPort?: number },
 ) {
   const requests: string[] = []
   const proxy = net.createServer((socket) =>
@@ -266,7 +396,10 @@ async function serve<A>(
   )
   await new Promise<void>((resolve) => proxy.listen(0, "127.0.0.1", resolve))
   const address = `http://127.0.0.1:${(proxy.address() as net.AddressInfo).port}`
-  const child = Bun.spawn([process.execPath, path.join(cli, "src/index.ts"), "serve", ...args], {
+  const command = windows
+    ? [path.join(import.meta.dir, "fixture/network-fallback.ts"), String(windows.accessDeniedPort ?? "")]
+    : [path.join(cli, "src/index.ts"), "serve", ...args]
+  const child = Bun.spawn([process.execPath, ...command], {
     // The CLI entry needs the preload from this package's bunfig.toml.
     cwd: cli,
     env: isolatedEnv(root, {
@@ -280,6 +413,7 @@ async function serve<A>(
       LOGINOM_AI_AGENT_PASSWORD: password,
       LOGINOM_AI_AGENT_SERVICE_IDENTITY: undefined,
       LOGINOM_AI_AGENT_SERVICE_PORT: undefined,
+      LOGINOM_AI_AGENT_RUNTIME_PROXY_SOURCE: undefined,
       OPENCODE_API_KEY: undefined,
       HTTPS_PROXY: address,
       HTTP_PROXY: address,
@@ -298,9 +432,17 @@ async function serve<A>(
     const url = await listening(child)
     // A service keeps its password in its config file, written before it listens.
     const secret = args.includes("--service")
-      ? (await Bun.file(path.join(root, "config", "service-local.json")).json()).password
+      ? (
+          await Bun.file(
+            path.join(root, "config", ServiceConfig.filename("local", ServiceConfig.identity(overrides))),
+          ).json()
+        ).password
       : password
-    const value = await run(api(url, secret))
+    const client = OpenCode.make({
+      baseUrl: url,
+      headers: { authorization: `Basic ${btoa(`loginom-ai-agent:${secret}`)}` },
+    })
+    const value = await run(api(url, secret), client)
     return { value, requests }
   } finally {
     child.kill("SIGTERM")

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
-import { app, autoUpdater, net, shell } from "electron"
+import { app, autoUpdater, net, shell, type AuthInfo } from "electron"
 import pkg from "electron-updater"
 import { Effect } from "effect"
 import { Product } from "@loginom-ai-agent/product"
@@ -18,6 +18,7 @@ import {
   type UpdateSource,
 } from "./signed-feed"
 import type { Platform } from "./machine"
+import { systemProxyPreference, updateProxy } from "./proxy"
 
 const updateClient = pkg.autoUpdater
 
@@ -34,6 +35,26 @@ export const make = Effect.fn("Updater.platform")(function* (sources: readonly U
   const file =
     process.platform === "darwin" ? "latest-mac.yml" : process.platform === "linux" ? "latest-linux.yml" : "latest.yml"
   const runFork = Effect.runForkWith(yield* Effect.context())
+  let credentials: ReturnType<typeof updateProxy>["credentials"] | undefined
+
+  const login = (auth: AuthInfo, callback: (username: string, password: string) => void) => {
+    const selected = credentials?.(auth)
+
+    if (selected) return callback(selected.username, selected.password)
+
+    // SAFETY: Electron's ClientRequest login callback accepts zero arguments to cancel authentication.
+    const cancel = callback as () => void
+    cancel()
+  }
+
+  yield* Effect.acquireRelease(
+    Effect.sync(() => updateClient.on("login", login)),
+    () =>
+      Effect.sync(() => {
+        updateClient.off("login", login)
+      }),
+  )
+
   const safe = (values: unknown[]) => values.map((value) => redactUpdateMessage(String(value)))
   updateClient.logger = {
     info: (...args) => runFork(Effect.logInfo(...safe(args))),
@@ -53,6 +74,7 @@ export const make = Effect.fn("Updater.platform")(function* (sources: readonly U
       url,
       (url) => {
         const request = net.request({ url, session: updateClient.netSession, redirect: "manual" })
+        request.on("login", login)
         let redirects = 0
         request.on("redirect", (_status, _method, location) => {
           if (++redirects > 5 || !URL.canParse(location) || new URL(location).protocol !== "https:") {
@@ -74,6 +96,11 @@ export const make = Effect.fn("Updater.platform")(function* (sources: readonly U
       try: async (signal) => {
         approved = undefined
         notification = undefined
+        const proxy = updateProxy(process.env, await systemProxyPreference(app.getPath("userData")))
+        credentials = proxy.credentials
+        await updateClient.netSession.setProxy(proxy.config)
+        await updateClient.netSession.closeAllConnections()
+        signal.throwIfAborted()
         const selected = await loadSignedUpdate({ sources, file, currentVersion, read })
         signal.throwIfAborted()
         if (

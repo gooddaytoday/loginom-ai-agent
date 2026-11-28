@@ -1,4 +1,4 @@
-import { SettingsPage, type Plugin } from "@opencode/plugin/gui"
+import { SettingsPage, Style, type Plugin } from "@opencode/plugin/gui"
 import { builtinContext, Page, subscribeBuiltinDeepLinks } from "@opencode/plugin/gui/builtin"
 import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
 import { Option, Schema } from "effect"
@@ -7,6 +7,7 @@ import { unwrap } from "solid-js/store"
 import { DashboardLink } from "./contract"
 import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
+import networkCss from "./network.css?inline"
 import { registerStartScreen } from "./start-screen"
 
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
@@ -39,6 +40,29 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     render: () => (
       <Suspense>
         <Settings />
+      </Suspense>
+    ),
+  })
+
+  const Network = lazy(() => import("./network"))
+
+  ctx.add(Style, networkCss)
+
+  ctx.add(SettingsPage, {
+    id: "network",
+    icon: "globe",
+    get title() {
+      return ctx.t("network.title")
+    },
+    get entries() {
+      return [
+        { id: "network-proxy", title: ctx.t("network.proxy") },
+        { id: "network-port", title: ctx.t("network.port") },
+      ]
+    },
+    render: () => (
+      <Suspense>
+        <Network />
       </Suspense>
     ),
   })

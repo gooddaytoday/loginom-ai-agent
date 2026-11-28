@@ -48,13 +48,15 @@ const setup: Plugin.MainSetup = async (ctx) => {
       : undefined
 
   if (ctx.signal.aborted) return
+  const scope = Scope.makeUnsafe()
+  ctx.onCleanup(() => runPromise(Scope.close(scope, Exit.void)))
+
+  // electron-updater loads only in packaged builds, after the first window is up.
   const platform = settings?.enabled
-    ? await import("./platform").then((module) => runPromise(module.make(settings.sources)))
+    ? await import("./platform").then((module) => runPromise(module.make(settings.sources).pipe(Scope.provide(scope))))
     : undefined
 
   if (ctx.signal.aborted) return
-  const scope = Scope.makeUnsafe()
-  ctx.onCleanup(() => runPromise(Scope.close(scope, Exit.void)))
   const publish = { changed: () => {} }
 
   const updater = await runPromise(
