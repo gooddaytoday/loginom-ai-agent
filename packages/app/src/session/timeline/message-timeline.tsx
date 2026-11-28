@@ -549,6 +549,24 @@ function MessageTimelineView(
 
   return (
     <VirtualizedTimeline
+      bottomContent={
+        <div class={`w-full min-w-0 ${turnPadding()}`} classList={{ "md:max-w-session md:mx-auto": props.centered }}>
+          <PluginSlot
+            at="session.timeline.end"
+            input={{
+              get session() {
+                return props.view
+              },
+              get active() {
+                return props.active !== false
+              },
+              get busy() {
+                return sessionStatus().type === "busy"
+              },
+            }}
+          />
+        </div>
+      }
       bottomSpacer={activity(() => !activityRow())}
       deferred={(row) => {
         if (!Predicate.isTagged(row, "AssistantPart") || row.group.type !== "part") return false

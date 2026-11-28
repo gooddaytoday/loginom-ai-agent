@@ -9,6 +9,7 @@ import { Loader } from "@opencode/ui/loader"
 import { Menu } from "@opencode/ui/menu"
 import { TextInput } from "@opencode/ui/text-input"
 import { useLanguage } from "@/runtime/i18n/language"
+import { PluginSlot } from "@/runtime/plugin/render"
 import { ServerConnection } from "@/runtime/server/registry"
 import { useGlobal } from "@/runtime/server/runtime"
 import { useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
@@ -156,6 +157,20 @@ export function ProjectSessionRow(props: {
         <span class="min-w-0 flex-1 truncate" dir="auto">
           {sessionLabel(props.session)}
         </span>
+        <PluginSlot
+          at="session.sidebar.status"
+          input={{
+            get server() {
+              return props.server
+            },
+            get sessionID() {
+              return props.session.id
+            },
+            get busy() {
+              return status.loading()
+            },
+          }}
+        />
         <Show when={props.label}>
           {(label) => (
             <span class="max-w-[40%] shrink-0 truncate text-[11px] leading-[var(--line-height-compact)] text-v2-text-text-faint [font-weight:400]">

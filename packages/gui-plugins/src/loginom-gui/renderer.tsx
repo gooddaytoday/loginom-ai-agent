@@ -7,12 +7,14 @@ import { unwrap } from "solid-js/store"
 import { DashboardLink } from "./contract"
 import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
+import { registerStepFailure } from "./step-failure/register"
 import { registerStartScreen } from "./start-screen"
 
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   registerStartScreen(ctx)
+  registerStepFailure(ctx)
   const Catalog = lazy(() => import("./catalog-page"))
 
   ctx.add(Page, {

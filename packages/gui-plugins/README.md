@@ -275,6 +275,8 @@ SDK icon fields take an `IconName` from `@opencode/plugin/gui`: the names of the
 | [`Theme`](../plugin/src/gui/registries.ts)           | window  | A color theme in the app's theme file format, listed in Settings › Appearance › Theme                                                                                                                                                |
 | [`MenubarItem`](../plugin/src/gui/main.ts)           | main    | An item of the native app menu                                                                                                                                                                                                       |
 
+Only built-ins can add `session.timeline.end` (after the last timeline row) or `session.sidebar.status` (a passive mark beside a conversation in the sidebar or tab strip). Neither slot replaces the timeline or its tool rows.
+
 `BuiltinSlot` has separate draft-screen slots: `session.new.heading`, `session.new.composer.placeholder`,
 `session.new.composer.project`, `session.new.composer.add.menu` and `session.new.below`. Render Add-menu rows with
 `ctx.ui.MenuItem`. In `session.new.below`, `insertPrompt(text, origin)` replaces the draft text without submitting it;

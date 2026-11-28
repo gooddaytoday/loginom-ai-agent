@@ -1,6 +1,17 @@
 import { expect, test } from "@playwright/test"
+import type { JsonValue, SessionMessageInfo } from "@opencode/client/promise"
+import { Schema } from "effect"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
-import { assistantMessage, partUpdated, setupTimeline, textPart, toolPart, userMessage } from "../utils/timeline"
+import {
+  assistantMessage,
+  partUpdated,
+  sessionID,
+  setupTimeline,
+  status,
+  textPart,
+  toolPart,
+  userMessage,
+} from "../utils/timeline"
 
 test("keeps shell and question failures in their Used group", async ({ page }) => {
   const shellID = "prt_transition_error_shell"
@@ -92,3 +103,300 @@ test("keeps rendering when a plugin tool reports progress metadata that is not a
 function questionInput() {
   return { questions: [{ header: "Stability", question: "Keep it stable?", options: [] }] }
 }
+
+const readTool = "loginom_dock_workspace_observe"
+
+const writeTool = "loginom_dock_node_apply"
+
+const decodeRetry = Schema.decodeUnknownSync(
+  Schema.Struct({
+    id: Schema.String,
+    text: Schema.String,
+    metadata: Schema.Struct({
+      displayText: Schema.String,
+      loginomRetry: Schema.String,
+      comments: Schema.mutable(Schema.Array(Schema.String)),
+      attachments: Schema.mutable(Schema.Array(Schema.String)),
+    }),
+  }),
+)
+
+const connection = (ready: boolean) => ({
+  ok: true,
+  value: {
+    revision: 1,
+    generation: ready ? 2 : 1,
+    state: ready ? "ready" : "starting",
+    failed: false,
+    url: "https://loginom.test/",
+    username: "operator",
+    folder: "/user",
+    hasPassword: true,
+  },
+})
+
+test("Loginom: a retry request stays pending until a matching read succeeds", async ({ page, context }) => {
+  const secret = "Bearer must-not-copy /private/example.lgp password=do-not-copy"
+
+  const history: SessionMessageInfo[] = [
+    userMessage(),
+    assistantMessage([
+      toolPart("prt_loginom_read_first", readTool, "error", {}, { error: secret }),
+      toolPart("prt_loginom_read_second", readTool, "error", {}, { error: secret }),
+    ]),
+  ]
+
+  let retries = 0
+  let retryID: string | undefined
+  await context.grantPermissions(["clipboard-read", "clipboard-write"])
+  await setupTimeline(page, {
+    locale: "ru",
+    viewport: { width: 1280, height: 860 },
+    tabs: [sessionID],
+    pageMessages: () => ({ items: history }),
+    onRpc: ({ rpcID, method }) =>
+      rpcID === "loginom.connection" && method === "status" ? { output: connection(true) } : undefined,
+    onPrompt({ body }) {
+      retries++
+      const prompt = decodeRetry(body)
+      retryID = prompt.id
+      expect(prompt.text).toContain(readTool)
+      expect(prompt.metadata.displayText).toBe("Запрос на повтор отправлен")
+      expect(prompt.metadata.loginomRetry).toBe("prt_loginom_read_second")
+      const retryMessage = userMessage([], { id: prompt.id, created: 1700000004000 })
+      retryMessage.text = prompt.text
+      retryMessage.metadata = prompt.metadata
+      history.push(retryMessage)
+    },
+  })
+
+  const block = page.locator("section").filter({ has: page.getByRole("heading", { name: "Шаг не выполнен" }) })
+  const retry = block.getByRole("button", { name: "Повторить шаг" })
+  await expect(retry).toBeEnabled()
+  await expect(retry).toBeInViewport()
+  const attention = page
+    .locator("[data-titlebar-tab]:visible")
+    .getByRole("img", { name: "Шаг Loginom требует внимания" })
+  await expect(attention).toBeVisible()
+  await block.getByRole("button", { name: "Скопировать текст ошибки" }).click()
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("LOGINOM_READ_FAILED: Loginom не завершил чтение после двух попыток.")
+  await page.screenshot({ path: test.info().outputPath("step-failed-1280.png"), animations: "disabled" })
+
+  const response = page.waitForResponse(
+    (candidate) => new URL(candidate.url()).pathname === `/api/session/${sessionID}/prompt`,
+  )
+
+  await retry.click()
+  expect((await response).ok()).toBe(true)
+  expect(retries).toBe(1)
+  const pending = page.getByText("Ждём результат повтора…", { exact: true })
+  const succeeded = page.getByText("Вы повторили шаг", { exact: true })
+  await expect(pending).toBeVisible()
+  await expect(succeeded).toHaveCount(0)
+  await expect(attention).toBeVisible()
+  await page.reload()
+  await expect(page.getByText("Запрос на повтор отправлен", { exact: true })).toBeVisible()
+  await expect(pending).toBeVisible()
+  await expect(attention).toBeVisible()
+
+  const result = (input: Record<string, JsonValue>) =>
+    assistantMessage(
+      [toolPart("prt_loginom_read_success", readTool, "completed", input, { output: "Read succeeded" })],
+      { id: "msg_loginom_retried", parentID: retryID, created: 1700000005000 },
+    )
+  history.push(result({ package: "different" }))
+  await page.reload()
+  await expect(page.getByText("После повтора выполнение шага не подтверждено.")).toBeVisible()
+  await expect(succeeded).toHaveCount(0)
+  await expect(attention).toBeVisible()
+
+  history[history.length - 1] = result({})
+  await page.reload()
+  await expect(succeeded).toBeVisible()
+  await expect(block).toHaveCount(0)
+  await expect(attention).toHaveCount(0)
+})
+
+test("Loginom: a checked write still waits for the operation's retry permission", async ({ page }) => {
+  await setupTimeline(page, {
+    locale: "ru",
+    messages: [
+      userMessage(),
+      assistantMessage([
+        toolPart(
+          "prt_loginom_operation",
+          writeTool,
+          "error",
+          {},
+          {
+            metadata: {
+              loginom: {
+                v: 1,
+                operationId: "operation-1",
+                state: "settled",
+                step: {
+                  outcome: "check_required",
+                  retryAvailable: false,
+                  persistence: "unknown",
+                  save: null,
+                },
+              },
+            },
+          },
+        ),
+      ]),
+    ],
+    onRpc({ rpcID, method, body }) {
+      if (rpcID === "loginom.connection" && method === "status") return { output: connection(true) }
+      if (rpcID !== "loginom.write-outcome" || method !== "check") return
+      expect(body).toMatchObject({ input: { sessionID, operationId: "operation-1" } })
+
+      return {
+        output: {
+          status: "not_applied",
+          operationId: "operation-1",
+          step: { outcome: "not_applied", retryAvailable: false, persistence: "step_unsaved", save: null },
+        },
+      }
+    },
+  })
+  await page.getByRole("button", { name: "Проверить состояние", exact: true }).click()
+  await expect(page.getByText("Изменения шага не сохранены.")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Повторить шаг" })).toBeDisabled()
+})
+
+for (const outcome of ["applied", "not_applied", "unknown", "different-operation"] as const) {
+  test(`Loginom: reconnect does not clear an uncertain write (${outcome})`, async ({ page }) => {
+    let ready = false
+    let checks = 0
+    let prompts = 0
+    await setupTimeline(page, {
+      locale: "ru",
+      viewport: { width: 390, height: 844 },
+      messages: [
+        userMessage(),
+        assistantMessage([
+          toolPart(
+            "prt_loginom_uncertain",
+            writeTool,
+            "error",
+            {},
+            {
+              error: "LOGINOM_CALL_UNCERTAIN",
+              metadata: {
+                loginom: {
+                  v: 1,
+                  operationId: "write-2",
+                  state: "settled",
+                  status: "AMBIGUOUS",
+                },
+              },
+            },
+          ),
+        ]),
+      ],
+      onRpc({ rpcID, method, body }) {
+        if (rpcID === "loginom.connection" && method === "status") return { output: connection(ready) }
+        if (rpcID !== "loginom.write-outcome" || method !== "check") return
+        checks++
+        expect(body).toMatchObject({ input: { sessionID, operationId: "write-2" } })
+
+        const negative = outcome === "not_applied" || outcome === "different-operation"
+        return {
+          output: {
+            status: negative ? "not_applied" : outcome,
+            operationId: outcome === "different-operation" ? "another-operation" : "write-2",
+            readback: outcome === "unknown" ? "changed" : "observed",
+            step: negative
+              ? { outcome: "not_applied", retryAvailable: true, persistence: "step_unsaved", save: null }
+              : undefined,
+          },
+        }
+      },
+      onPrompt: () => void prompts++,
+    })
+
+    const heading = page.getByRole("heading", { name: "Нужно проверить состояние" })
+    const check = page.getByRole("button", { name: "Проверить состояние", exact: true })
+    const retry = page.getByRole("button", { name: "Повторить шаг", exact: true })
+    await expect(heading).toBeVisible()
+    await expect(page.getByText("Loginom пока не готов.")).toBeVisible()
+    await expect(check).toBeEnabled()
+    await expect(retry).toBeDisabled()
+    await expect(page.getByText("Сохранение этого шага не подтверждено.")).toBeVisible()
+    expect(checks).toBe(0)
+
+    if (outcome === "unknown") {
+      await expect(check).toBeInViewport()
+      await page.screenshot({ path: test.info().outputPath("step-check-required-390.png"), animations: "disabled" })
+    }
+
+    await check.click()
+    ready = true
+
+    if (outcome === "applied") {
+      await expect(page.getByRole("heading", { name: "Шаг применён" })).toBeVisible()
+      await expect(retry).toHaveCount(0)
+    } else if (outcome === "not_applied") {
+      await expect(page.getByText("Проверка показала: шаг не применён.")).toBeVisible()
+      await expect(retry).toBeEnabled()
+    } else {
+      await expect(page.getByText("Проверка не подтвердила исход. Пока не повторяйте шаг.")).toBeVisible()
+      await expect(retry).toBeDisabled()
+    }
+
+    expect(checks).toBe(1)
+    expect(prompts).toBe(0)
+  })
+}
+
+test("Loginom: refreshed history updates the save on the mounted failure", async ({ page }) => {
+  const toolID = "prt_loginom_save_refresh"
+  const failed = (saved: boolean) =>
+    toolPart(
+      toolID,
+      writeTool,
+      "error",
+      {},
+      {
+        metadata: {
+          loginom: {
+            v: 1,
+            operationId: "write-3",
+            state: "settled",
+            status: "AMBIGUOUS",
+            step: {
+              outcome: "check_required",
+              retryAvailable: false,
+              persistence: saved ? "saved_through" : "unknown",
+              save: saved
+                ? {
+                    operationId: "save-1",
+                    path: "/user/copy.lgp",
+                    throughStep: { operationId: "read-1", label: "Импорт данных" },
+                  }
+                : null,
+            },
+          },
+        },
+      },
+    )
+  const history: SessionMessageInfo[] = [
+    userMessage(),
+    assistantMessage([failed(false), toolPart("prt_follow_up", "shell", "running", { command: "pwd" })]),
+  ]
+  const timeline = await setupTimeline(page, { locale: "ru", pageMessages: () => ({ items: history }) })
+  const unconfirmed = page.getByText("Сохранение этого шага не подтверждено.")
+  await expect(unconfirmed).toBeVisible()
+  const heading = page.getByRole("heading", { name: "Нужно проверить состояние" })
+  const original = await heading.elementHandle()
+
+  history[1] = assistantMessage([failed(true)])
+  await timeline.send(status("idle"))
+
+  await expect(page.getByText("Сохранено до шага «Импорт данных».")).toBeVisible()
+  await expect(unconfirmed).toHaveCount(0)
+  expect(await original?.evaluate((element) => element.isConnected)).toBe(true)
+})

@@ -1711,6 +1711,45 @@ story("declared global stores load before setup, so setup reads the stored value
   expect(result).toEqual({ held: { status: "loading", seen: [] }, seen: [true] })
 })
 
+story("only built-ins can contribute timeline and conversation status UI", async ({ page }) => {
+  const result = await page.evaluate(async (fixture) => {
+    const { BuiltinSlot, mountPlugins, until } = await import(fixture)
+    const points = ["session.timeline.end", "session.sidebar.status"] as const
+    const host = mountPlugins({
+      builtins: new Set(["builtin"]),
+      definitions: [
+        ...points.map((at) => ({
+          id: at,
+          windowEntry: async () => ({
+            default: (ctx: Context) => {
+              ctx.add(BuiltinSlot, { at, render: () => null })
+            },
+          }),
+        })),
+        {
+          id: "builtin",
+          windowEntry: async () => ({
+            default: (ctx: Context) => {
+              for (const at of points) ctx.add(BuiltinSlot, { at, render: () => null })
+            },
+          }),
+        },
+      ],
+    })
+    await until(() => host.ready())
+    const result = {
+      admitted: host.entries(BuiltinSlot.id),
+      failures: points.map((at) => host.failure(at)?.error),
+    }
+    host.unmount()
+
+    return result
+  }, fixture)
+
+  const rejection = expect.stringContaining("Only built-in plugins can add timeline and conversation status slots")
+  expect(result).toEqual({ admitted: 2, failures: [rejection, rejection] })
+})
+
 story("startup enable state does not wait for the manager, and live updates beat older replies", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
     const { Contract, mountPlugins, until } = await import(fixture)
