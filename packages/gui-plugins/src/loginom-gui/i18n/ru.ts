@@ -1,0 +1,18 @@
+export default {
+  "windows.menu": "Loginom",
+  "windows.heading": "Открытые окна Loginom",
+  "windows.empty": "Открытых окон Loginom нет",
+  "windows.show": "Показать окно",
+  "windows.focusUnconfirmed": "Выберите окно Loginom на панели задач",
+  "windows.noWindow": "Это окно Loginom уже закрыто",
+  "windows.showFailed": "Не удалось показать окно Loginom",
+  "windows.minimized": "свёрнуто",
+  "package.working": "Рабочий пакет",
+  "package.untitled": "Пакет без имени",
+  "package.unsaved": "не сохранено",
+  "package.saved": "сохранено",
+  "package.unknown": "состояние сохранения неизвестно",
+  "package.closed": "окно Loginom закрыто",
+  "package.readOnly": "только чтение",
+  "package.busy": "Агент работает в окне",
+}

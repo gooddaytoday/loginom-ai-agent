@@ -171,6 +171,10 @@ export const Page = Registry.define<Page>("page")
 
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
+  /** Content immediately below the conversation title bar. */
+  readonly "session.header.below": Omit<SlotMap["session.header"], "compact">
+  /** Compact actions in the narrow conversation's location bar. */
+  readonly "session.header.mobile": BuiltinSlotMap["session.header.below"]
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
   readonly "session.location.branch.menu": SlotMap["session.location.menu"]
   /** Items after the host's copy and reveal actions in the session directory's path submenu. Requires an owning screen. */

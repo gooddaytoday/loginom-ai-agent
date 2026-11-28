@@ -23,7 +23,7 @@ import type { SessionModel } from "@/session/model"
 import { SESSION_PANEL_WIDTH_MIN } from "@/session/session-panel-width"
 import { useLayout } from "@/shell/state/layout"
 import { SessionPanelFrame } from "@/session/session-frame"
-import { PluginLinks } from "@/runtime/plugin/render"
+import { PluginLinks, PluginSlot } from "@/runtime/plugin/render"
 import { createPanelSidebar, createRegion, MobilePanel } from "@/runtime/plugin/panels"
 import { createMobileViews, MobileViewTabs } from "@/runtime/plugin/mobile"
 import { usePluginAttachment } from "@/runtime/plugin/host-apis"
@@ -343,6 +343,14 @@ function SessionScreenContent(props: {
     </Show>
   )
 
+  const mobileHeader = {
+    get session() {
+      return props.view()
+    },
+    screen: props.screen,
+    active: true,
+  }
+
   const sessionPanelContent = () => (
     <>
       <ComposerDropzone
@@ -369,7 +377,11 @@ function SessionScreenContent(props: {
               screen: props.screen,
             }}
           />
+          <div class="ms-auto flex items-center gap-2">
+            <PluginSlot at="session.header.mobile" input={mobileHeader} />
+          </div>
         </div>
+        <PluginSlot at="session.header.below" input={mobileHeader} />
       </Show>
       {/* Surface query errors without suspending session metadata while messages load. */}
       <Show when={timeline.resource.error}>

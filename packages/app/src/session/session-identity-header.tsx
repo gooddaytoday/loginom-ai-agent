@@ -47,7 +47,7 @@ import "./session-identity-header.css"
 
 const SessionHeaderCollapse = createContext<() => number>(() => 0)
 
-export function SessionTitleHeader(props: ParentProps) {
+export function SessionTitleHeader(props: ParentProps<{ extra?: JSX.Element; extraHeight?: number }>) {
   return (
     <>
       {/* The bottom inset reserves room for the fade without covering rows stuck below the bar. */}
@@ -56,11 +56,13 @@ export function SessionTitleHeader(props: ParentProps) {
           <CollapsedSidebarToggleSpace />
           <div class="min-w-0 flex-1">{props.children}</div>
         </div>
+        {props.extra}
       </div>
       {/* Stuck timeline headers stack above this fade, so it only fades content scrolling under the bar. */}
       <div
         aria-hidden="true"
         class="session-header-fade pointer-events-none sticky z-[5] -mt-4 h-4 w-full bg-[linear-gradient(to_bottom,var(--v2-background-bg-base),transparent)]"
+        style={{ top: props.extraHeight ? `${48 + props.extraHeight}px` : undefined }}
       />
     </>
   )

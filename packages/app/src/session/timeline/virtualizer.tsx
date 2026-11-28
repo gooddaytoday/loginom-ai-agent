@@ -104,6 +104,7 @@ type Input = {
   keepsDisclosure?: boolean
   projection: Projection
   showHeader: Accessor<boolean>
+  extraHeaderHeight?: Accessor<number>
   /** Whether the timeline follows the newest content. Drives every anchoring decision. */
   follow: TimelineFollow
   scroll: Accessor<{ overflow: boolean; jump: boolean }>
@@ -145,7 +146,8 @@ export function createTimelineVirtualizer(input: Input) {
   const language = useLanguage()
   const active = () => input.active?.() !== false
   const isDesktop = createMediaQuery("(min-width: 768px)")
-  const topOffset = () => (input.showHeader() ? 64 : isDesktop() ? 0 : 16)
+  const extraHeaderHeight = input.extraHeaderHeight ?? (() => 0)
+  const topOffset = () => (input.showHeader() ? 64 + extraHeaderHeight() : isDesktop() ? 0 : 16)
   // Reserved below the last row: a 36px lane for the live status row and its background hint, a 14px gap, then the
   // activity pill and its 10px composer gap. Without hover the pill grows from 32px to its 44px touch size
   // (composer-lane.css), and the tail grows with it. Both come and go inside it, so neither moves the rows above.
@@ -398,7 +400,7 @@ export function createTimelineVirtualizer(input: Input) {
     },
     // Revealed prompts sit below the solid header and its 16px fade.
     get scrollPaddingStart() {
-      return input.showHeader() ? headerHeight() + 16 : 0
+      return input.showHeader() ? headerHeight() + extraHeaderHeight() + 16 : 0
     },
     get rangeExtractor() {
       return rangeExtractor()
@@ -1175,7 +1177,11 @@ export function createTimelineVirtualizer(input: Input) {
             if (window.getSelection()?.toString()) input.follow.dispatch({ type: "detach" })
           }}
           class="relative min-w-0 w-full h-full"
-          style={{ "--sticky-accordion-top": input.showHeader() ? "var(--session-header-height, 48px)" : "0px" }}
+          style={{
+            "--sticky-accordion-top": input.showHeader()
+              ? `calc(var(--session-header-height, 48px) + ${extraHeaderHeight()}px)`
+              : "0px",
+          }}
         >
           <Show when={input.showHeader()} fallback={<div aria-hidden="true" class="h-4 md:hidden" />}>
             {props.header}

@@ -102,6 +102,7 @@ export interface MockServerConfig {
   onRevertStage?: (input: { sessionID: string; messageID: string }) => void
   onSession?: (sessionID: string) => void
   events?: () => OpenCodeEvent[]
+  onRpc?: (call: { id: string; method: string; input: unknown }) => Schema.Json | undefined
   eventRetry?: number
   // Idle event streams send a comment every 15 s like the real server. Set false only to test the client's stall watchdog.
   keepalive?: boolean
@@ -1221,14 +1222,16 @@ function mockHandlers(
           })
         },
         // The goal plugin's pill reads each routed session's goal; no scenario sets one.
-        rpcCall: (ctx) =>
-          ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get"
-            ? Effect.succeed({ output: null })
-            : Effect.fail(
-                new MockUnsupported({
-                  message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
-                }),
-              ),
+        rpcCall: (ctx) => {
+          const { rpcID: id, method } = ctx.params
+          const output = config.onRpc?.({ id, method, input: ctx.payload.input })
+
+          if (output !== undefined) return Effect.succeed({ output })
+
+          if (id === "opencode.goal" && method === "get") return Effect.succeed({ output: null })
+
+          return Effect.fail(new MockUnsupported({ message: `The mock server has no ${id}.${method} RPC` }))
+        },
         sessionActive: () => {
           const status = resolve(config.sessionStatus ?? {})
 

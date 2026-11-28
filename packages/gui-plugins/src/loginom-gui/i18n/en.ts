@@ -1,0 +1,18 @@
+export default {
+  "windows.menu": "Loginom",
+  "windows.heading": "Open Loginom windows",
+  "windows.empty": "No Loginom windows are open",
+  "windows.show": "Show window",
+  "windows.focusUnconfirmed": "Select the Loginom window on the taskbar",
+  "windows.noWindow": "This Loginom window is no longer open",
+  "windows.showFailed": "Couldn't show the Loginom window",
+  "windows.minimized": "minimized",
+  "package.working": "Working package",
+  "package.untitled": "Untitled package",
+  "package.unsaved": "unsaved",
+  "package.saved": "saved",
+  "package.unknown": "save status unknown",
+  "package.closed": "Loginom window closed",
+  "package.readOnly": "read-only",
+  "package.busy": "Agent is working in the window",
+} as const
