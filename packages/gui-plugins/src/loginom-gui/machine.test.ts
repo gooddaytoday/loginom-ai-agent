@@ -88,7 +88,7 @@ test("Save checks first and reports pending activation until the service applies
 })
 
 test.each([
-  { outcome: { pendingCleanupFailed: true }, message: "pendingCleanupFailed" },
+  { outcome: { pendingOutcome: "pendingCleanupFailed" }, message: "pendingCleanupFailed" },
   { outcome: { pendingOutcome: "pendingResumeFailed" }, message: "pendingResumeFailed" },
   { outcome: { pendingOutcome: "pendingNotApplied" }, message: "pendingNotApplied" },
   { outcome: {}, message: "activationFailed" },
@@ -103,6 +103,30 @@ test.each([
     })
   },
 )
+
+test("a saved warning stays visible while polling for the original connection and can be acknowledged when ready", () => {
+  const warning = { ...fresh, revision: 2, generation: 1, failed: true, pendingOutcome: "pendingNotApplied", pendingNotice: "notice" } as const
+  const starting = form({ ...warning, state: "starting" })
+  expect(view(starting)).toMatchObject({ message: "pendingNotApplied", busy: true })
+  const stillStarting = transition(starting, {
+    type: "status", attempt: starting.attempt, now: 20_000,
+    result: { ok: true, value: { ...warning, state: "starting" } },
+  })
+  expect(stillStarting.effects).toMatchObject([{ type: "status" }])
+  const ready = transition(stillStarting.state, {
+    type: "status", attempt: stillStarting.state.attempt, now: 21_000,
+    result: { ok: true, value: { ...warning, state: "ready" } },
+  }).state
+  expect(view(ready)).toMatchObject({ connected: { generation: 1 }, message: "pendingNotApplied", canAcknowledge: true })
+  expect(transition(ready, { type: "acknowledge" }).effects).toMatchObject([{ type: "acknowledge", id: "notice" }])
+})
+
+test("the form shows primary write and secondary cleanup failures together", () => {
+  expect(view(form({
+    ...fresh, state: "ready", generation: 1, failed: true,
+    pendingOutcome: "pendingWriteFailed", pendingCleanupFailed: true,
+  }))).toMatchObject({ message: "pendingWriteFailed", pendingCleanupFailed: true, connected: { generation: 1 } })
+})
 
 test("unavailable, changed targets and disposal ignore late completions", () => {
   const checking = check().state

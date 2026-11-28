@@ -193,7 +193,7 @@
       "title": "Web app, UI kit, session UI and Loginom localization",
       "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],
       "notes": {
-        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events."
+        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events. C5 (CON-08): Keep polling for readiness with a saved failure notice, and acknowledge it from the settings form."
       }
     },
     {

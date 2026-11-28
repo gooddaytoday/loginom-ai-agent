@@ -5,6 +5,7 @@ import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { cliCredentials } from "@loginom-ai-agent/loginom-host/connection/cli-credentials"
+import { connectionStore } from "@loginom-ai-agent/loginom-host/connection/connection-store"
 import { recoveryStore } from "@loginom-ai-agent/loginom-host/connection/recovery-store"
 import { copyProductSkillsFixture } from "../../loginom-host/test/fixtures/product-skills"
 import { writeHelp } from "../../loginom-runtime/client/test/support/help-fixture.mjs"
@@ -149,6 +150,13 @@ test("status prints the saved connection and recovery work instead of a new Host
   expect(statusText(statusView({ ...starting, failure: "LOGINOM_PENDING_CLEAR_FAILED" }))).toBe(
     identity + "\nНе удалось удалить отложенные настройки. Служба повторит очистку при следующем запуске.",
   )
+  expect(statusText(statusView({
+    ...starting, failure: "LOGINOM_STORE_WRITE_FAILED", cleanupFailure: "LOGINOM_PENDING_CLEAR_FAILED",
+  })).split("\n")).toEqual([
+    identity,
+    expect.stringContaining("Не удалось завершить запись новых параметров"),
+    expect.stringContaining("Не удалось удалить отложенные настройки"),
+  ])
   const pending = statusView({ ...base, revision: 2, state: "pending" })
   expect(pending.state).toBe("pending")
   expect(statusText(pending)).toBe(
@@ -212,6 +220,34 @@ describe.skipIf(process.platform !== "linux")("loginom commands with the real No
       error: "",
     })
   }, 60_000)
+
+  test.each(["text", "json"])("status reports a failed change while the old Help is starting and acknowledges it in %s", async (format) => {
+    const fixture = await setupFixture()
+    expect(await loginom(fixture, ["status", "--format", "json"])).toMatchObject({ code: 0, json: { generation: 0 } })
+    const root = path.join(fixture.profile, "loginom")
+    const store = connectionStore(path.join(root, "connection"), cliCredentials("linux", { root, resources: fixture.resources }))
+    const active = { ...login, generation: 1, revision: 1, apiKey: "" }
+    const pending = { ...active, generation: 2, revision: 2, username: "replacement" }
+    await store.stage(active)
+    await store.activate(1)
+    await store.savePending(pending)
+    await store.deferPending(pending)
+    await fs.writeFile(path.join(fixture.root, "hold-help"), "")
+    await fs.writeFile(path.join(fixture.root, "fail-generation-2"), "")
+
+    const args = format === "json" ? ["status", "--format", "json"] : ["status"]
+    const failed = await loginom(fixture, args)
+    expect(failed).toMatchObject({ code: 1, stderr: "" })
+    if (format === "json")
+      expect(failed.json).toMatchObject({ state: "configured", generation: 1, failure: "LOGINOM_RUNTIME_START_FAILED" })
+    else {
+      expect(failed.stdout).toContain(login.username)
+      expect(failed.stdout).toContain("Не удалось запустить новое подключение. Новые параметры не применены.")
+    }
+    const after = await loginom(fixture, ["status", "--format", "json"])
+    expect(after).toMatchObject({ code: 0, stderr: "", json: { state: "configured", generation: 1 } })
+    expect(after.json).not.toHaveProperty("failure")
+  }, 30_000)
 
   test("status starts the Host from the resources and leaves nothing behind", async () => {
     const fixture = await setupFixture()
@@ -915,6 +951,10 @@ async function setupFixture(browser?: "LOGINOM_LOGIN_UNAVAILABLE", skills = fals
     process.on("message", m => {
       if (m.operation === "start") {
         appendFileSync(${JSON.stringify(starts)}, JSON.stringify({ generation: m.input.generation, pid: process.pid }) + "\\n");
+        if (m.input.generation === 2 && existsSync(${JSON.stringify(path.join(root, "fail-generation-2"))})) {
+          process.send({ id: m.id, error: "LOGINOM_RUNTIME_START_FAILED" });
+          return;
+        }
         process.send({ id: m.id, result: { protocol: 1, generation: m.input.generation, started: true } });
       }
       // While the test holds Help, its catalog stays pending: the Host reports the connection as starting. A failed Help

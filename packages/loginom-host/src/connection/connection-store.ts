@@ -28,6 +28,9 @@ const decode = Schema.decodeUnknownOption(Schema.fromJsonString(RecordSchema))
 const decodeMigration = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ state: Schema.Literals(["resetting", "complete"]) })),
 )
+const decodeDiscard = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ activeGeneration: Schema.Number, id: Schema.optionalKey(Schema.String) })),
+)
 
 // Only the owning host accesses this directory; it is outside renderer stores.
 export function connectionStore(directory: string, codec: CredentialCodec = credentials(process.platform)) {
@@ -50,7 +53,7 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
   }
   async function write(
     file: string,
-    record: ConnectionRecord | { state: "resetting" | "complete" } | { activeGeneration: number },
+    record: ConnectionRecord | { state: "resetting" | "complete" } | { activeGeneration: number; id: string },
     replace: boolean,
   ) {
     await protectDirectory()
@@ -177,6 +180,17 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
       ...(await codec.decode(record.secrets)),
     }
   }
+  async function removeRecords(...paths: string[]) {
+    await protectDirectory()
+    for (const path of paths) await rm(path, { force: true })
+    if (process.platform === "win32") return
+    const handle = await open(directory, constants.O_RDONLY)
+    try {
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
+  }
   return {
     initialize,
     async pending(): Promise<ActiveConnection | undefined> {
@@ -192,11 +206,18 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
       await write(pendingPath, { ...record, activationStarted: true }, true)
       return candidate
     },
-    async recordPendingDiscard(activeGeneration: number) {
-      await write(discardPath, { activeGeneration }, true)
+    recordPendingDiscard(notice: { activeGeneration: number; id: string }) {
+      return write(discardPath, notice, true)
     },
     async pendingDiscarded(activeGeneration: number) {
-      return (await readText(discardPath)) === JSON.stringify({ activeGeneration })
+      const text = await readText(discardPath)
+      if (text === undefined) return
+      const record = Option.getOrUndefined(decodeDiscard(text))
+      if (!record) throw Error("LOGINOM_STORE_INVALID")
+      if (record.activeGeneration === activeGeneration) return record.id ?? `legacy-${activeGeneration}`
+    },
+    clearPendingDiscard() {
+      return removeRecords(discardPath)
     },
     async deferPending(candidate: Pick<ActiveConnection, "generation" | "revision">) {
       const record = await read(pendingPath)
@@ -221,18 +242,9 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
         true,
       )
     },
-    async clearPending(options?: { forgetDiscard: true }) {
-      await protectDirectory()
+    clearPending(options?: { forgetDiscard: true }) {
       // Cancelling a new save must not bring back an older failure for the same active generation.
-      if (options?.forgetDiscard) await rm(discardPath, { force: true })
-      await rm(pendingPath, { force: true })
-      if (process.platform === "win32") return
-      const handle = await open(directory, constants.O_RDONLY)
-      try {
-        await handle.sync()
-      } finally {
-        await handle.close()
-      }
+      return options?.forgetDiscard ? removeRecords(discardPath, pendingPath) : removeRecords(pendingPath)
     },
     async staged(generation: number) {
       const record = await read(generationPath(generation))

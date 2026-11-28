@@ -51,6 +51,8 @@ export const View = Schema.Struct({
   application: Schema.optionalKey(Application),
   browser: optional(BrowserStatus),
   failure: Schema.optionalKey(Schema.String),
+  cleanupFailure: Schema.optionalKey(Schema.Literal("LOGINOM_PENDING_CLEAR_FAILED")),
+  pendingNotice: Schema.optionalKey(Schema.String),
   recoveries: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 export type View = typeof View.Type
@@ -61,6 +63,7 @@ export const Validation = Schema.Struct({
 })
 export const Save = Schema.Struct({ validationId: Schema.String, revision: NonNegativeInt })
 export const Cancel = Schema.Struct({ revision: NonNegativeInt })
+export const AcknowledgePendingNotice = Schema.Struct({ id: Schema.String })
 export const AcknowledgeRecovery = Schema.Struct({ revision: NonNegativeInt, ids: Schema.Array(Schema.String) })
 
 export type API = {
@@ -69,5 +72,6 @@ export type API = {
   check(candidate: Candidate, settings?: boolean, signal?: AbortSignal): Promise<typeof Validation.Type>
   save(input: typeof Save.Type, settings?: boolean): Promise<View>
   cancelPending(input: typeof Cancel.Type): Promise<View>
+  acknowledgePendingNotice(input: typeof AcknowledgePendingNotice.Type): Promise<View>
   acknowledgeRecovery(input: typeof AcknowledgeRecovery.Type): Promise<View>
 }

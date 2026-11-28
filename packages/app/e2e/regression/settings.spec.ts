@@ -304,6 +304,53 @@ async function loginomApplication(page: Page, outcome: "applied" | "failed") {
   }
 }
 
+for (const width of [1280, 390]) {
+  test(`Loginom keeps polling with a saved warning and acknowledges it at width ${width}`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 800 })
+    let reads = 0
+    let acknowledged = false
+    const current = {
+      revision: 1,
+      generation: 1,
+      url: loginomAddress,
+      username: "analyst",
+      folder: "/analyst",
+      hasPassword: true,
+    }
+    const form = await openLoginomSettings(page, ({ rpcID, method, body }) => {
+      if (rpcID !== "loginom.connection") return
+      if (method === "acknowledgePendingNotice") {
+        expect(body).toMatchObject({ input: { id: "notice" } })
+        acknowledged = true
+      }
+      if (method !== "status" && method !== "acknowledgePendingNotice") return
+      return {
+        output: {
+          ok: true,
+          value: {
+            ...current,
+            state: reads++ === 0 ? "starting" : "ready",
+            failed: !acknowledged,
+            ...(acknowledged ? {} : { pendingOutcome: "pendingNotApplied", pendingNotice: "notice" }),
+          },
+        },
+      }
+    })
+    const warning = form.getByText("The new settings were not applied. Save them again.")
+    const connected = form.getByRole("status").getByText(/Connected as analyst/)
+    await expect(warning).toBeVisible()
+    await expect(connected).toBeVisible()
+    await expect(warning).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath("connection-warning.png"), animations: "disabled" })
+    await form.getByRole("button", { name: "Got it" }).click()
+    await expect(warning).toHaveCount(0)
+    await expect(connected).toBeVisible()
+    await page.reload()
+    await expect(connected).toBeVisible()
+    await expect(warning).toHaveCount(0)
+  })
+}
+
 test("settings has its own route and returns through app history", async ({ page }) => {
   const { settings } = await open(page)
   const home = page.getByRole("button", { name: "Home", exact: true })

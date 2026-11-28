@@ -30,7 +30,8 @@ const validation = Schema.decodeUnknownOption(Loginom.Validation)
 /**
  * Runs `loginom <command>` from the arguments of the product CLI in its profile and returns the exit code of 0.4: 0, 1,
  * 2 (arguments, setup input, configuration), 3 (busy profile, conflict), 4 (recovery) or 130 (cancelled). With
- * `--format json` stdout holds one JSON document: the result, or `{ ok: false, code }`; stderr gets the code.
+ * `--format json` stdout holds one JSON document. Status returns the snapshot even on failure. Other failed commands
+ * return `{ ok: false, code }` and write diagnostics to stderr.
  */
 export async function command(args: string[]) {
   const parsed = parse(args)
@@ -91,21 +92,31 @@ async function manage(parsed: NonNullable<ReturnType<typeof parse>>, root: strin
   })
   if (host instanceof NodeHostStartupError) return failure(host, format)
   const action = parsed.positionals[1]!
-  const code = await loginomManagement(host, action, {
-    stdinJSON: parsed.values["stdin-json"],
-    acknowledge: parsed.values.acknowledge,
-    ids: parsed.positionals.slice(2),
-  }).then(
-    (result) => {
-      process.stdout.write(
-        (action === "status" && format !== "json"
-          ? statusText(result as ReturnType<typeof statusView>)
-          : JSON.stringify(result, null, format === "json" ? undefined : 2)) + "\n",
-      )
-      return 0
-    },
-    (error: unknown) => failure(error, format),
-  )
+  const code = await (async () => {
+    if (action === "status") {
+      const snapshot = statusView(await readConnection(host))
+      const { pendingNotice, ...result } = snapshot
+      const text = format === "json" ? JSON.stringify(result) : statusText(snapshot)
+      await new Promise<void>((resolve, reject) => {
+        process.stdout.write(text + "\n", (error) => {
+          if (error) reject(error)
+          else resolve()
+        })
+      })
+      if (pendingNotice)
+        await host.request("connection.acknowledge-pending-notice", { id: pendingNotice }).catch((error: unknown) => {
+          process.stderr.write(hostError(error) + "\n")
+        })
+      return result.failure ? 1 : 0
+    }
+    const result = await loginomManagement(host, action, {
+      stdinJSON: parsed.values["stdin-json"],
+      acknowledge: parsed.values.acknowledge,
+      ids: parsed.positionals.slice(2),
+    })
+    process.stdout.write(JSON.stringify(result, null, format === "json" ? undefined : 2) + "\n")
+    return 0
+  })().catch((error: unknown) => failure(error, format))
   await host.close()
   return code
 }
@@ -150,8 +161,10 @@ function failure(value: unknown, format: string) {
     "LOGINOM_BUNDLE_INCOMPLETE",
   ]
   const code = typeof message === "string" && local.includes(message) ? message : hostError(value)
-  if (format === "json") process.stdout.write(JSON.stringify({ ok: false, code }) + "\n")
+  const cleanupFailure = value instanceof Error && value.cause === "LOGINOM_PENDING_CLEAR_FAILED" ? value.cause : undefined
+  if (format === "json") process.stdout.write(JSON.stringify({ ok: false, code, cleanupFailure }) + "\n")
   process.stderr.write(code + "\n")
+  if (cleanupFailure) process.stderr.write(cleanupFailure + "\n")
   if (code === "CLI_CANCELLED") return 130
   if (["LOGINOM_RECOVERY_REQUIRED", "LOGINOM_CALL_UNCERTAIN", "LOGINOM_RECOVERY_CONFIRMATION_REQUIRED"].includes(code))
     return 4
@@ -223,16 +236,14 @@ export function statusView(current: Loginom.View) {
   return { ...current, state: current.generation ? ("configured" as const) : ("unconfigured" as const) }
 }
 
+const pendingCleanupMessage = "Не удалось удалить отложенные настройки. Служба повторит очистку при следующем запуске."
 const pendingFailureMessages = new Map([
   [
     "LOGINOM_PENDING_RESUME_FAILED",
     "Не удалось применить отложенные настройки при запуске. Проверьте права на запись профиля.",
   ],
   ["LOGINOM_PENDING_NOT_APPLIED", "Новые параметры не применены. Сохраните их снова через `loginom setup`."],
-  [
-    "LOGINOM_PENDING_CLEAR_FAILED",
-    "Не удалось удалить отложенные настройки. Служба повторит очистку при следующем запуске.",
-  ],
+  ["LOGINOM_PENDING_CLEAR_FAILED", pendingCleanupMessage],
   [
     "LOGINOM_RUNTIME_TIMEOUT",
     "Истекло время ожидания готовности нового подключения. Новые параметры не применены. Сохраните их снова через `loginom setup`.",
@@ -246,10 +257,13 @@ const pendingFailureMessages = new Map([
 export function statusText(current: ReturnType<typeof statusView>) {
   const count = current.recoveries?.length ?? 0
   const pendingFailure =
-    current.state === "ready" && current.failure === "LOGINOM_RUNTIME_START_FAILED"
+    current.failure === "LOGINOM_RUNTIME_START_FAILED" &&
+    ((current.generation > 0 && ["ready", "starting", "configured"].includes(current.state)) ||
+      current.pendingNotice ||
+      current.cleanupFailure)
       ? "Не удалось запустить новое подключение. Новые параметры не применены. Сохраните их снова через `loginom setup`."
       : current.failure && pendingFailureMessages.get(current.failure)
-  const clean = current.state !== "recoverable-error" && !count && !pendingFailure
+  const clean = current.state !== "recoverable-error" && !count && !current.failure
   const lines = [
     current.generation
       ? `Подключение настроено: ${current.url}, пользователь ${current.username}.` +
@@ -259,6 +273,7 @@ export function statusText(current: ReturnType<typeof statusView>) {
   if (current.state === "pending")
     lines.push("Сохранённое изменение подключения ещё не применено; отменить его — `loginom cancel-pending`.")
   if (pendingFailure) lines.push(pendingFailure)
+  if (current.cleanupFailure) lines.push(pendingCleanupMessage)
   if (count) {
     const word =
       count % 10 === 1 && count % 100 !== 11
@@ -269,12 +284,18 @@ export function statusText(current: ReturnType<typeof statusView>) {
     lines.push(
       `Требуется восстановление: ${count} ${word} — проверьте сценарий в Loginom и выполните \`loginom recover\`.`,
     )
-  } else if (current.state === "recoverable-error" && !pendingFailure)
+  } else if ((current.state === "recoverable-error" || current.failure) && !pendingFailure)
     lines.push(
       `Ошибка подключения${current.failure ? `: ${current.failure}` : ""}. ` +
         "Проверить соединение — `loginom check`, настроить заново — `loginom setup`.",
     )
   return lines.join("\n")
+}
+
+async function readConnection(host: Pick<Awaited<ReturnType<typeof launchNodeHost>>, "request">) {
+  const decoded = view(await host.request("connection.status", {}))
+  if (Option.isNone(decoded)) throw new Error("LOGINOM_REPLY_INVALID")
+  return decoded.value
 }
 
 export async function loginomManagement(
@@ -286,9 +307,7 @@ export async function loginomManagement(
     ids?: string[]
   },
 ) {
-  const decoded = view(await host.request("connection.status", {}))
-  if (Option.isNone(decoded)) throw new Error("LOGINOM_REPLY_INVALID")
-  const current = decoded.value
+  const current = await readConnection(host)
   if (command === "status") return statusView(current)
   if (command === "cancel-pending") return host.request("connection.cancel-pending", { revision: current.revision })
   if (command === "recover") {
@@ -328,7 +347,7 @@ export async function loginomManagement(
     await host.request("connection.save", { revision: current.revision, validationId: checked.value.validationId }),
   )
   if (Option.isNone(saved)) throw new Error("LOGINOM_REPLY_INVALID")
-  if (saved.value.failure) throw new Error(saved.value.failure)
+  if (saved.value.failure) throw new Error(saved.value.failure, { cause: saved.value.cleanupFailure })
   if (saved.value.state === "recoverable-error") throw new Error("LOGINOM_RECOVERY_REQUIRED")
   return saved.value
 }

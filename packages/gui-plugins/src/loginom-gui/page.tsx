@@ -53,8 +53,12 @@ export default function Page() {
       const rpc = server?.client.rpc(ConnectionSettingsRpc)
       const options = directory ? { location: { directory }, signal } : undefined
       switch (effect.type) {
-        case "status": {
-          const result = options && (await rpc?.status({}, options).catch(() => undefined))
+        case "status":
+        case "acknowledge": {
+          const response = options && (effect.type === "status"
+            ? rpc?.status({}, options)
+            : rpc?.acknowledgePendingNotice({ id: effect.id }, options))
+          const result = await response?.catch(() => undefined)
           dispatch({
             type: "status",
             attempt: effect.attempt,
@@ -172,6 +176,9 @@ export default function Page() {
             >
               {(tasks) => <span>{ctx.plural("waitingTasks", tasks())}</span>}
             </Show>
+            <Show when={page().pendingCleanupFailed}>
+              <span>{ctx.t("pendingCleanupFailed")}</span>
+            </Show>
           </div>
           <Show when={page().issue}>
             {(issue) => (
@@ -195,6 +202,11 @@ export default function Page() {
               </Show>
               <Show when={page().retry}>
                 <ui.Button onClick={() => dispatch({ type: "refresh" })}>{ctx.t("retry")}</ui.Button>
+              </Show>
+              <Show when={page().canAcknowledge}>
+                <ui.Button type="button" onClick={() => dispatch({ type: "acknowledge" })}>
+                  {ctx.t("acknowledgePendingNotice")}
+                </ui.Button>
               </Show>
             </div>
           </Show>

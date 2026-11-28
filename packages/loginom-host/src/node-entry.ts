@@ -172,6 +172,11 @@ async function dispatch(message: unknown) {
 
 async function management(method: string, input: unknown, host: Awaited<ReturnType<typeof createLoginomHost>>) {
   if (method === "connection.status" || method === "connection.read") return host.api.status()
+  if (method === "connection.acknowledge-pending-notice") {
+    const notice = Schema.decodeUnknownOption(Loginom.AcknowledgePendingNotice)(input)
+    if (Option.isNone(notice)) throw Error("LOGINOM_INPUT_INVALID")
+    return host.api.acknowledgePendingNotice(notice.value)
+  }
   if (method === "connection.ready") {
     const before = await host.api.status()
     if (!before.generation) throw new Error("LOGINOM_CONFIG_REQUIRED")

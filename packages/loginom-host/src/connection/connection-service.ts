@@ -42,6 +42,8 @@ export async function connectionService(
     loading?: Promise<void>
     applying?: Promise<void>
     failure?: string
+    cleanupFailure?: Loginom.View["cleanupFailure"]
+    pendingNotice?: string
     writing?: boolean
     closing?: boolean
     recovering?: Promise<void>
@@ -64,7 +66,13 @@ export async function connectionService(
   const switching = new AbortController()
   function loadProfile() {
     if (state.loading) return state.loading
-    state.loading = (async () => {
+    state.loading = (async (): Promise<{
+      active?: ActiveConnection
+      pending?: ActiveConnection
+      latest: number
+      failure?: string
+      pendingNotice?: string
+    }> => {
       const active = await store.read()
       const latest = await store.latestGeneration()
       const activeGeneration = active?.generation ?? 0
@@ -72,20 +80,30 @@ export async function connectionService(
       if (saved === "unavailable") return { active, latest, failure: "LOGINOM_PENDING_RESUME_FAILED" }
       if (saved && "interruptedGeneration" in saved) {
         const notApplied = saved.interruptedGeneration > activeGeneration
-        const failure = await discardPending(notApplied ? activeGeneration : undefined)
-        return { active, latest, failure: failure ?? (notApplied ? "LOGINOM_PENDING_NOT_APPLIED" : undefined) }
+        const { pendingNotice, cleanupFailure } = await discardPending(notApplied ? activeGeneration : undefined)
+        return {
+          active,
+          latest,
+          pendingNotice,
+          failure: cleanupFailure ?? (notApplied ? "LOGINOM_PENDING_NOT_APPLIED" : undefined),
+        }
       }
       if (saved) return { active, latest, pending: saved }
-      const failure = await store.pendingDiscarded(activeGeneration).then(
-        (discarded) => (discarded ? "LOGINOM_PENDING_NOT_APPLIED" : undefined),
-        () => "LOGINOM_PENDING_RESUME_FAILED",
+      return store.pendingDiscarded(activeGeneration).then(
+        (pendingNotice) => ({
+          active,
+          latest,
+          pendingNotice,
+          failure: pendingNotice ? "LOGINOM_PENDING_NOT_APPLIED" : undefined,
+        }),
+        () => ({ active, latest, failure: "LOGINOM_PENDING_RESUME_FAILED" }),
       )
-      return { active, latest, failure }
     })()
       .then(
-        ({ active, pending, latest, failure }) => {
+        ({ active, pending, latest, failure, pendingNotice }) => {
           if (state.closing) return
           state.failure = failure
+          state.pendingNotice = pendingNotice
           state.active = active
           state.setupRequired = active ? undefined : true
           state.pending = pending
@@ -188,19 +206,26 @@ export async function connectionService(
       ...(application ? { application } : {}),
       ...(recovery?.pending().length ? { recoveries: recovery.pending() } : {}),
       ...(state.failure ? { failure: state.failure } : {}),
+      ...(state.cleanupFailure ? { cleanupFailure: state.cleanupFailure } : {}),
+      ...(state.pendingNotice ? { pendingNotice: state.pendingNotice } : {}),
     }
   }
   async function discardPending(rememberFor?: number) {
+    const notice = rememberFor === undefined ? undefined : { activeGeneration: rememberFor, id: randomUUID() }
     try {
       // Leave the guarded request on disk until its outcome survives another restart.
-      if (rememberFor !== undefined) await store.recordPendingDiscard(rememberFor)
+      if (notice) await store.recordPendingDiscard(notice)
       await store.clearPending()
+      return { pendingNotice: notice?.id }
     } catch {
-      return "LOGINOM_PENDING_CLEAR_FAILED" as const
+      return { pendingNotice: notice?.id, cleanupFailure: "LOGINOM_PENDING_CLEAR_FAILED" as const }
     }
   }
   async function failPending(candidate: ActiveConnection, failure: string) {
-    state.failure = (await discardPending(state.active?.generation ?? 0)) ?? failure
+    const { pendingNotice, cleanupFailure } = await discardPending(state.active?.generation ?? 0)
+    state.failure = failure
+    state.cleanupFailure = cleanupFailure
+    state.pendingNotice = pendingNotice
     state.pending = undefined
     state.pendingBrowser = undefined
     state.phase = state.handle ? state.readiness : "recoverable-error"
@@ -297,6 +322,7 @@ export async function connectionService(
       state.pending = undefined
       // Finish the store writes before a window can observe successful activation.
       await store.clearPending().catch(() => {
+        state.cleanupFailure = "LOGINOM_PENDING_CLEAR_FAILED"
         durable = false
       })
       state.failure = durable ? undefined : "LOGINOM_STORE_WRITE_FAILED"
@@ -346,6 +372,26 @@ export async function connectionService(
       return view()
     },
     async status() {
+      return view()
+    },
+    async acknowledgePendingNotice({ id }) {
+      requireProfile()
+      if (state.pendingNotice !== id) return view()
+      if (state.writing) throw Error("LOGINOM_APPLICATION_PENDING")
+      state.writing = true
+      try {
+        // A guarded request left on disk would regenerate the notice at the next start.
+        if (state.cleanupFailure || state.failure === "LOGINOM_PENDING_CLEAR_FAILED") await store.clearPending()
+        await store.clearPendingDiscard()
+        state.pendingNotice = undefined
+        state.cleanupFailure = undefined
+        state.failure = state.readiness === "recoverable-error" ? "LOGINOM_RUNTIME_START_FAILED" : undefined
+        if (!state.active) state.phase = "unconfigured"
+      } catch (cause) {
+        throw Error("LOGINOM_STORE_WRITE_FAILED", { cause })
+      } finally {
+        state.writing = false
+      }
       return view()
     },
     async check(input, settings = false, signal) {
@@ -449,6 +495,8 @@ export async function connectionService(
         state.writing = false
       }
       state.failure = undefined
+      state.cleanupFailure = undefined
+      state.pendingNotice = undefined
       state.applied = undefined
       state.generation = candidate.generation
       state.revision = candidate.revision

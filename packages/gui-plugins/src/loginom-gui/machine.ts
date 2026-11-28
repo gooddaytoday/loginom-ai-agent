@@ -25,6 +25,7 @@ type Event =
   | { type: "target"; available: boolean }
   | { type: "disposed" }
   | { type: "refresh" }
+  | { type: "acknowledge" }
   | { type: "application"; revision: number; generation: number }
   | { type: "edit"; patch: Partial<Draft> }
   | { type: "submit"; submit: "check" | "save"; now: number }
@@ -34,6 +35,7 @@ type Event =
 type Effect =
   | { type: "cancel" }
   | { type: "status"; attempt: number; delay?: number; timeout?: number }
+  | { type: "acknowledge"; attempt: number; id: string }
   | { type: "check"; attempt: number; input: Candidate }
   | { type: "save"; attempt: number; input: { revision: number; validationId: string } }
 
@@ -61,7 +63,7 @@ function preservesPassword({ status, draft }: Form) {
 }
 
 function waiting(status: Status) {
-  return !status.failed && (status.state === "pending" || status.state === "starting")
+  return status.state === "starting" || (status.state === "pending" && !status.failed)
 }
 
 function draftCandidate(current: Form): Candidate | { issue: Issue } {
@@ -100,6 +102,12 @@ export function transition(state: State, event: Event): Transition {
       if (state.type === "unavailable") return transition(state, { type: "target", available: true })
       if (state.type !== "editing") return keep
       return refresh(state, attempt)
+    case "acknowledge":
+      if (state.type !== "editing" || !state.status.pendingNotice) return keep
+      return {
+        state: { ...state, type: "refreshing", attempt, edited: false },
+        effects: [{ type: "acknowledge", attempt, id: state.status.pendingNotice }],
+      }
     case "application":
       if (state.type !== "applying" && state.type !== "editing") return keep
 
@@ -190,6 +198,8 @@ export function transition(state: State, event: Event): Transition {
 
 function pollApplication(state: Extract<State, { type: "applying" }>, now: number, issue?: Issue): Transition {
   const { attempt, status, draft, until } = state
+  if (status.state === "starting" && status.failed && !issue)
+    return { state, effects: [{ type: "status", attempt, delay: applicationPollDelay }] }
   const timeout = until - now - applicationPollDelay
   if (timeout <= 0) return { state: { type: "editing", attempt, status, draft, issue }, effects: [] }
   return { state, effects: [{ type: "status", attempt, delay: applicationPollDelay, timeout }] }
@@ -219,7 +229,6 @@ function message(state: State) {
   if (state.type === "unavailable") return "serviceUnavailable"
   if (state.type === "verified") return "verified"
   if (!("status" in state)) return
-  if (state.status.pendingCleanupFailed) return "pendingCleanupFailed"
   if (state.status.pendingOutcome) return state.status.pendingOutcome
   if (state.status.failed) return "activationFailed"
 
@@ -239,6 +248,8 @@ export function view(state: State) {
     draft: form?.draft,
     connected: form?.status.state === "ready" ? form.status : undefined,
     message: message(state),
+    pendingCleanupFailed: form?.status.pendingCleanupFailed,
+    canAcknowledge: state.type === "editing" && !!state.status.pendingNotice,
     waitingTasks: state.type === "applying" ? waitingTasks(state.status) : 0,
     fieldErrors: {
       url: issue === "invalidAddress" || issue === "loginUnavailable" ? issue : undefined,
@@ -250,6 +261,7 @@ export function view(state: State) {
       issue === "changed" ||
       issue === "expired" ||
       issue === "saveFailed" ||
+      issue === "acknowledgeFailed" ||
       issue === "knowledgeAuthFailed" ||
       issue === "checkFailed" ||
       issue === "logoutUnconfirmed"

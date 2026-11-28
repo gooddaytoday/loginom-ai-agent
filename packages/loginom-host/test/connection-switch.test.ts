@@ -4,9 +4,11 @@ import { createReadStream } from "node:fs"
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { Schema } from "effect"
 import { cliCredentials } from "../src/connection/cli-credentials"
 import { connectionStore } from "../src/connection/connection-store"
 import { hostError } from "../src/errors"
+import { Loginom } from "../src/loginom"
 import { launchNodeHost } from "../src/node-client"
 import { transport } from "../src/transport"
 import { stageHeldKnowledge } from "./fixtures/knowledge"
@@ -204,7 +206,8 @@ test.each([
 
       await owner.close()
       owner = await f.launch()
-      expect(await owner.request("connection.ready", {})).toMatchObject({
+      const reopened = Schema.decodeUnknownSync(Loginom.View)(await owner.request("connection.ready", {}))
+      expect(reopened).toMatchObject({
         state: "ready",
         generation: 1,
         revision: 1,
@@ -215,6 +218,15 @@ test.each([
       expect(await openRun(owner, "after-restart")).toEqual({ generation: 1 })
       await readHelp(owner, "after-restart", 1)
       await owner.request("release", { run: "after-restart" })
+
+      const id = reopened.pendingNotice
+      if (!id) throw Error("Missing pending notice")
+      const acknowledge = (id: string) => owner.request("connection.acknowledge-pending-notice", { id })
+      expect(await acknowledge("stale-notice")).toMatchObject({ pendingNotice: id, failure: "LOGINOM_PENDING_NOT_APPLIED" })
+      expect(await acknowledge(id)).not.toHaveProperty("failure")
+      await owner.close()
+      owner = await f.launch()
+      expect(await owner.request("connection.ready", {})).not.toHaveProperty("failure")
 
       const generation = fault === "before-activate" ? 3 : 2
       const retry = await validate(owner, 1)

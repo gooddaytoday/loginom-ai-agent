@@ -274,9 +274,14 @@ for (const [name, codec] of [
           await chmod(generations, 0o500)
           run.release()
           await first.settled()
-          expect(await first.api.status()).toMatchObject({
-            generation: 1, state: "ready", failure: "LOGINOM_PENDING_CLEAR_FAILED",
+          const failed = await first.api.status()
+          expect(failed).toMatchObject({
+            generation: 1, state: "ready", failure: "LOGINOM_STORE_WRITE_FAILED",
+            cleanupFailure: "LOGINOM_PENDING_CLEAR_FAILED",
           })
+          if (!failed.pendingNotice) throw Error("Missing pending notice")
+          await expect(first.api.acknowledgePendingNotice({ id: failed.pendingNotice })).rejects.toThrow("LOGINOM_STORE_WRITE_FAILED")
+          expect(await first.api.status()).toEqual(failed)
           expect(await f.store.read()).toEqual(original)
           expect(await f.store.pending()).toMatchObject({ url: replacementUrl })
           expect(first.acquire("after-failure")?.generation).toBe(1)
@@ -494,7 +499,8 @@ for (const [name, codec] of [
       await first.api.save({ revision: 1, validationId: validation.validationId })
       await first.settled()
       expect(await first.api.status()).toMatchObject({
-        generation: 1, state: "ready", failure: "LOGINOM_PENDING_CLEAR_FAILED",
+        generation: 1, state: "ready", failure: "LOGINOM_RUNTIME_TIMEOUT",
+        cleanupFailure: "LOGINOM_PENDING_CLEAR_FAILED",
       })
       expect(await f.store.pending()).toMatchObject({ url: replacementUrl })
       expect(first.acquire("on-original")?.generation).toBe(1)
