@@ -17,7 +17,7 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
-import { windowPackageSchema } from "./package-schema"
+import { maxPackageBytes, PackageWorkflow, savedPackageSchema, windowPackageSchema } from "./package-schema"
 
 export function runtimeChat(sessionID: string) {
   return createHash("sha256").update(sessionID).digest("hex")
@@ -829,18 +829,26 @@ export async function createLoginomHost(options: {
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
     },
-    async packageSchema(sessionID: string) {
+    async packageSchema(sessionID: string, target?: typeof PackageWorkflow.Type) {
       const chat = runtimeChat(sessionID)
       const before = await service.api.status()
       const generation = generations.get(before.generation)
       const child = generation?.children.get(chat)
       if (!child || stale.has(chat) || journal.pending().length || recoveries.has(chat)) return null
-      const result = await (await child).request("packageSchema", undefined, 12_000)
+      const result = await (await child).request("packageSchema", target, target ? 19_000 : 12_000)
       const after = await service.api.status()
       if (
         before.generation !== after.generation || generation?.children.get(chat) !== child ||
         stale.has(chat) || journal.pending().length || recoveries.has(chat)
       ) return null
+      if (target && result && typeof result === "object" && "source" in result && result.source === "saved" &&
+        "name" in result && typeof result.name === "string" && "base64" in result && typeof result.base64 === "string" &&
+        result.base64.length <= Math.ceil(maxPackageBytes / 3) * 4) {
+        const snapshot = await savedPackageSchema(result.name, Buffer.from(result.base64, "base64"))
+        if ((await service.api.status()).generation !== before.generation || generation?.children.get(chat) !== child ||
+          stale.has(chat) || journal.pending().length || recoveries.has(chat)) return null
+        return { ...snapshot, target }
+      }
       const snapshot = windowPackageSchema(result)
       return snapshot ? { ...snapshot, generation: before.generation } : null
     },

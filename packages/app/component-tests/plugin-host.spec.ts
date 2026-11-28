@@ -7,6 +7,7 @@ import type {
   DialogHandle,
   Dialogs,
   Live,
+  Registry as RegistryToken,
   SessionRef,
   SessionScreen,
 } from "@opencode/plugin/gui"
@@ -49,6 +50,7 @@ story(
 
       return mountPluginPages()
     }, fixture)
+
     const nav = page.getByRole("navigation", { name: "Plugin pages" })
     const entry = nav.getByRole("button", { name: "Example plugin page", exact: true })
 
@@ -65,6 +67,34 @@ story(
     await host.evaluate((host) => host.unmount())
   },
 )
+
+story("the host reserves mobile header contributions and timeline navigation APIs for built-ins", async ({ page }) => {
+  const results = await page.evaluate(async (fixture) => {
+    const { mountPluginHost, Registry, Slot, until } = await import(fixture)
+    const mobile: RegistryToken<{ at: string; render: () => null }> = Registry.define(Slot.id)
+    const checks: { api?: { openPage: boolean; timeline: boolean }; slots: number }[] = []
+
+    for (const builtin of [false, true]) {
+      const host = mountPluginHost({ builtins: new Set(builtin ? ["fixture"] : []) })
+      await until(() => host.count() === 1)
+      let api: { openPage: boolean; timeline: boolean } | undefined
+      host.load((ctx) => {
+        api = { openPage: "openPage" in ctx.layout, timeline: "timeline" in ctx }
+        ctx.add(mobile, { at: "session.header.mobile", render: () => null })
+      })
+      await until(() => host.status() === "active" || host.status() === "failed")
+      checks.push({ api, slots: host.entries(Slot.id) })
+      host.unmount()
+    }
+
+    return checks
+  }, fixture)
+
+  expect(results).toEqual([
+    { api: { openPage: false, timeline: false }, slots: 0 },
+    { api: { openPage: true, timeline: true }, slots: 1 },
+  ])
+})
 
 story("a plugin page that fails to render shows a way back to Home", async ({ page }) => {
   const host = await page.evaluateHandle(async (fixture) => {

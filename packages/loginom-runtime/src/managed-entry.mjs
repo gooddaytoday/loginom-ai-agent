@@ -342,7 +342,7 @@ async function handle(message) {
       const controller = new AbortController()
       state.controller = controller
       try {
-        state.schemaRead = state.bridge.graphSnapshot(controller.signal,{details:true}).catch(() => null)
+        state.schemaRead = state.bridge.packageSchema(state.browser, message.input, controller.signal).catch(() => null)
         const result = await state.schemaRead
         send({ id: message.id, result: controller.signal.aborted ? null : result })
       } finally {

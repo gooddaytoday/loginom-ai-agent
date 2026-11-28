@@ -211,7 +211,8 @@ partial input. Set `handlesFailure: true` to draw failures. The timeline shows a
 and retries rendering at the next call status.
 
 `builtinContext(ctx).timeline` reads and sets the app's saved Compact and Detailed presets. A built-in can use
-`session.header.mobile` to put a control beside the session location on narrow screens.
+`BuiltinSlot` at `session.header.mobile` to put a control beside the session location on narrow screens.
+`builtinContext(ctx).layout.openPage(id)` opens a page registered by that same built-in.
 
 [Lifetimes](#lifetimes) shows `createKeyed` in files.
 
@@ -350,7 +351,7 @@ to the displayed repository or worktree instead of adding a second menu item.
 | `builtinMainContext(ctx)`, `MainStoreFrom`, `Lifecycle` | Main stores imported from settings files or other namespaces, and `lifecycle.restart(handoff)` |
 | `builtinCatalog(catalog)`, `BuiltinCatalog`             | Locales other than English as loaders, loaded when the user picks the locale                   |
 
-Registry tokens that extend a public registry share its id, so the host reads every item through it. The host accepts `Page` registrations only from built-in plugins. The host builds every context with the built-in members; `builtinContext` and `builtinMainContext` only type them. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
+Registry tokens that extend a public registry share its id, so the host reads every item through it. The window host reserves `Page`, `ToolRenderer` and the `session.header.mobile` slot for built-in plugins. It exposes the timeline presets and `layout.openPage` on built-in window contexts. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
 
 ```ts
 i18n: builtinCatalog({ en, de: () => import("./i18n/de") }),

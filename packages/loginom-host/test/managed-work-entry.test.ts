@@ -106,10 +106,12 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
-        graphSnapshot: async (signal, options) => {
-          if (!options?.details) return work().graph ?? null;
+        graphSnapshot: async () => work().graph ?? null,
+        packageSchema: async (_context, target, signal) => {
           if (work().holdSchema) await new Promise((resolve, reject) =>
             signal.addEventListener('abort', () => reject(Error('aborted')), { once: true }));
+          if (target?.workflow_id === 'saved-workflow' && target.document_id === work().schema?.document)
+            return work().savedSchema;
           return work().schema;
         },
         prepareLocalPackage: async (args, pair, { signal }) => {
@@ -315,11 +317,18 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       Schema.decodeUnknownSync(HostTaskScope.Info)({ taskMessageID: "msg_original", profile: "loginom-automation" }),
     )
     await run.call("dock_prepare", {}, "msg_original")
+    const archive = await readFile(join(import.meta.dir, "fixtures/package-docs/deep.lgp"))
     await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, prepared: true,
-      schema: { ...snapshot, name: "Fixture", navigation_path: [] } }))
+      schema: { ...snapshot, name: "Fixture", navigation_path: [] },
+      savedSchema: { source: "saved", name: "deep.lgp", base64: archive.toString("base64") } }))
     expect(await host.packageSchema("other-conversation")).toBeNull()
     expect(await host.packageSchema("file-errors")).toMatchObject({
       source: "window", generation: 1, workflow: { document_id: snapshot.document, workflow_id: snapshot.workflow },
+    })
+    const target = { document_id: snapshot.document, workflow_id: "saved-workflow" }
+    expect(await host.packageSchema("other-conversation", target)).toBeNull()
+    expect(await host.packageSchema("file-errors", target)).toMatchObject({
+      source: "saved", target, workflows: [{ submodels: [{ submodels: [expect.anything()] }] }],
     })
     await run.tools()
     const sessionID = Session.ID.make("ses_file_errors")

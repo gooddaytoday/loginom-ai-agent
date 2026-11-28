@@ -169,7 +169,7 @@ export function openLoginomSchemaConversation(page: Page, source: "saved" | "win
 
 export type NodeLinksFixture = {
   packageState: "saved" | "draft" | "dirty" | "resaved"
-  graph?: "submodel" | "removed" | "other"
+  graph?: "submodel" | "parent" | "removed" | "other"
   newTimeline?: boolean
 }
 
@@ -183,6 +183,7 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
   const selectedNode = { ...node, position: point(405, 100) }
   const sameName = { ...node, guid: id(9), position: point(25, 30) }
   const foreign = options.graph === "other"
+  const parent = options.graph === "parent"
 
   const snapshot = {
     ...windowSnapshot,
@@ -192,9 +193,9 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
     workflow: {
       ...windowSnapshot.workflow,
       document_id: target.document_id,
-      workflow_id: foreign ? "other-workflow" : target.workflow_id,
-      navigation_path: branch,
-      nodes: options.graph === "removed" ? [sameName] : [sameName, selectedNode],
+      workflow_id: foreign ? "other-workflow" : parent ? "parent" : target.workflow_id,
+      navigation_path: parent ? branch.slice(0, 1) : branch,
+      nodes: parent ? [sameName] : options.graph === "removed" ? [sameName] : [sameName, selectedNode],
     },
   }
 
@@ -235,11 +236,22 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
     seed: { locale: "ru", settings: { newTimeline: options.newTimeline ?? true } },
     pageMessages: pageMessagesFrom({ [sessionID]: messages }),
     onRpc: ({ rpcID, method, body }) => {
-      if (JSON.stringify(body) !== JSON.stringify({ input: { sessionID } })) return
+      const current = JSON.stringify(body) === JSON.stringify({ input: { sessionID } })
 
-      if (rpcID === "loginom.package" && method === "schema") return { output: { snapshot } }
+      if (rpcID === "loginom.package" && method === "schema") {
+        const binding = { document_id: target.document_id, workflow_id: target.workflow_id }
+        const step = JSON.stringify(body) === JSON.stringify({ input: { sessionID, target: binding } })
 
-      if (rpcID === "loginom.package-state" && method === "snapshot") {
+        if (step && parent) {
+          const workflow = { ...root, nodes: [...root.nodes, sameName] }
+
+          return { output: { snapshot: { ...saved, workflows: [workflow], target: binding } } }
+        }
+
+        if (current || step) return { output: { snapshot } }
+      }
+
+      if (current && rpcID === "loginom.package-state" && method === "snapshot") {
         const dirty = packageState === "dirty"
         const draft = packageState === "draft"
         const path = draft ? null : `/analyst/Пакеты/${packageName()}`
@@ -250,7 +262,7 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
             path,
             modified: dirty || draft,
             modifiedDetectedAt: dirty || draft ? T0 : null,
-            lastSave: path ? { path, confirmedAt: T0 - 10_000 } : null,
+            lastSave: path ? { path: "/analyst/Пакеты/Продажи.lgp", confirmedAt: T0 - 10_000 } : null,
             copy: path
               ? {
                   document_id: target.document_id,

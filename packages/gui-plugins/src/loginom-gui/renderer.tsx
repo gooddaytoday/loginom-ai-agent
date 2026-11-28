@@ -56,7 +56,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
   const load = (request: Request) => {
     controller?.abort()
     controller = new AbortController()
-    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)])
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(request.node ? 24_000 : 15_000)])
     dispatch({ type: "open", request })
     void Promise.try(() => {
       const server = ctx.servers.get(request.serverID)
@@ -65,7 +65,9 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
 
       const input = request.finding
         ? { sessionID: request.sessionID, source: "saved" as const }
-        : { sessionID: request.sessionID }
+        : request.node
+          ? { sessionID: request.sessionID, target: { document_id: request.node.document_id, workflow_id: request.node.workflow_id } }
+          : { sessionID: request.sessionID }
 
       return server.client.rpc(PackageSchema).schema(input, { location: { directory: request.directory }, signal })
     }).then(
@@ -131,7 +133,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       }
 
       return (
-        <Suspense fallback={<p role="status">{ctx.t("loading")}</p>}>
+        <Suspense fallback={<p role="status">{ctx.t("schemaLoading")}</p>}>
           <SchemaPage
             state={state}
             t={ctx.t}

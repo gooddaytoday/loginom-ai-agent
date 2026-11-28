@@ -41,6 +41,22 @@ for (const width of [1280, 390]) {
   })
 }
 
+test("opens the saved submodel from a step after returning to the parent workflow", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await openLoginomNodeConversation(page, { packageState: "saved", graph: "parent" })
+  const graph = page.getByRole("region", { name: "Схема пакета", exact: true })
+  const node = graph.getByRole("button", { name: "Внутренняя проверка", exact: true })
+  await page.getByRole("button", { name: "Схема пакета", exact: true }).click()
+  await expect(node).toHaveAttribute("aria-pressed", "false")
+  await page.getByRole("button", { name: "Вернуться к разговору" }).click()
+
+  await page.getByRole("button", { name: "Показать на схеме" }).click()
+  await expect(page.getByText("Сохранённый файл", { exact: true })).toBeVisible()
+  await expect(page.getByText("Продажи.lgp › Контроль качества", { exact: true })).toBeVisible()
+  await expect(node).toHaveAttribute("aria-pressed", "true")
+  await expect(node).toBeFocused()
+})
+
 test("offers no path for an unsaved draft", async ({ page }) => {
   await openLoginomNodeConversation(page, { packageState: "draft" })
   await page.evaluate(() => navigator.clipboard.writeText("нет пути"))
@@ -54,7 +70,7 @@ test("offers no path for an unsaved draft", async ({ page }) => {
 })
 
 for (const packageState of ["dirty", "resaved"] as const) {
-  test(`copies the confirmed path for a ${packageState} package`, async ({ page }) => {
+  test(packageState === "resaved" ? "copies the latest window path after manual Save As" : "marks the last saved path for a dirty package", async ({ page }) => {
     const conversation = await openLoginomNodeConversation(page, {
       packageState: packageState === "resaved" ? "saved" : "dirty",
     })

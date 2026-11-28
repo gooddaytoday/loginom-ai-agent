@@ -192,14 +192,14 @@ function failed(state: Form & { attempt: number }, issue: Issue): Transition {
 
 function message(state: State) {
   if (state.type === "disposed") return
-  if (state.type === "loading" || state.type === "refreshing") return "connectionLoading"
+  if (state.type === "loading" || state.type === "refreshing") return "loading"
   if (state.type === "unavailable") return "serviceUnavailable"
   if (state.type === "applying") return state.status.state === "pending" ? "pending" : "starting"
   if (state.type === "verified") return "verified"
   if (!("status" in state)) return
   if (state.status.failed) return "activationFailed"
   if (waiting(state.status)) return "applicationPaused"
-  if (state.status.state !== "ready") return "connectionDisconnected"
+  if (state.status.state !== "ready") return "disconnected"
 }
 
 export function view(state: State) {

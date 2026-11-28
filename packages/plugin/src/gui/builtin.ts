@@ -423,8 +423,7 @@ export interface BuiltinContext extends Context {
  * ```
  */
 export function builtinContext(ctx: Context): BuiltinContext {
-  // SAFETY: the app's window host builds every context as a `BuiltinContext` (its HostApi factories are typed by it),
-  // and built-ins run only in that host.
+  // SAFETY: the app's window host provides the full context for built-in instances, and only they import this module.
   return ctx as BuiltinContext
 }
 

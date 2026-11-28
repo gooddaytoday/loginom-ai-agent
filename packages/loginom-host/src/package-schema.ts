@@ -40,7 +40,11 @@ const WindowGraph = Schema.Struct({
   links: Schema.Array(WindowLink),
 })
 
-export const PackageSchemaSession = Schema.Struct({ sessionID: Schema.NonEmptyString })
+export const PackageWorkflow = Schema.Struct({ document_id: Schema.NonEmptyString, workflow_id: Schema.NonEmptyString })
+export const PackageSchemaSession = Schema.Struct({
+  sessionID: Schema.NonEmptyString,
+  target: Schema.optionalKey(PackageWorkflow),
+})
 export const maxPackageBytes = 16 * 1024 * 1024
 const maxSchemaBytes = 512 * 1024
 

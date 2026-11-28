@@ -45,7 +45,7 @@ function fixture() {
   const page = { url: () => origin, evaluate: (read, input) => runInNewContext(`(${read})(input)`, { ...globals, input, setTimeout, clearTimeout }) };
   const read = createPackageStateReader(metadata, origin, () => data.time);
   const snapshot = (save, opened) => read({ pages: () => [page] }, save && { ...save, document_id: 'doc' }, false, opened);
-  return { snapshot, data, owned, packages, connection };
+  return { snapshot, data, owned, packages, connection, receipt, metadata };
 }
 
 test('reads the conversation draft even when another package is active', async () => {
@@ -112,5 +112,34 @@ test('copy uses an opened file or a confirmed Save, ignoring a draft filename', 
   data.modified = false;
   assert.deepEqual((await snapshot({ path: '/user/revised.lgp', confirmedAt: 200 })).copy, {
     document_id: 'doc', workflow_id: 'workflow', path: '/user/revised.lgp', lastSave: false,
+  });
+});
+
+
+test('copies the current owned filename after manual Save As with an older agent receipt', async () => {
+  const { snapshot, data, owned, connection, receipt, packages } = fixture();
+  // A verified navigation receipt binds the native session through stepSession.
+  receipt.openConnection = undefined;
+  receipt.openServerSession = undefined;
+  receipt.stepSession = { connection, nativeSession: connection.Session };
+  const lastSave = { path: '/analyst/Sales.lgp', confirmedAt: 90 };
+  owned.PackageFileName = 'analyst/Sales-v2.lgp';
+  const copy = { document_id: 'doc', workflow_id: 'workflow', path: '/analyst/Sales-v2.lgp', lastSave: false };
+  assert.deepEqual(await snapshot(lastSave), {
+    open: true, path: copy.path, modified: false, modifiedDetectedAt: null, lastSave, copy,
+  });
+  data.modified = true;
+  assert.deepEqual((await snapshot(lastSave)).copy, { ...copy, lastSave: true });
+  packages.shift();
+  assert.deepEqual((await snapshot(lastSave)).copy, { ...copy, path: lastSave.path, lastSave: true });
+});
+
+test('recognizes the first manual save of an owned draft', async () => {
+  const { snapshot, owned, metadata } = fixture();
+  metadata.workspacePreparation.state.package_ref = { path: null, persisted: false };
+  assert.equal((await snapshot()).copy, undefined);
+  owned.PackageFileName = 'analyst/Sales.lgp';
+  assert.deepEqual((await snapshot()).copy, {
+    document_id: 'doc', workflow_id: 'workflow', path: '/analyst/Sales.lgp', lastSave: false,
   });
 });

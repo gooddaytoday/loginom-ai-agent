@@ -76,6 +76,8 @@ const saved: Schema.Codec<Workflow> = Schema.Struct({
   submodels: Schema.Array(Schema.suspend((): Schema.Codec<Workflow> => saved)),
 })
 
+const WorkflowTarget = Schema.Struct({ document_id: Schema.NonEmptyString, workflow_id: Schema.NonEmptyString })
+
 const snapshot = Schema.Union([
   Schema.Struct({
     source: Schema.Literal("saved"),
@@ -84,6 +86,7 @@ const snapshot = Schema.Union([
     observed_at: Schema.String,
     package: Schema.Struct({ name: Schema.String, guid: Schema.NullOr(Schema.String) }),
     workflows: Schema.Array(saved),
+    target: Schema.optionalKey(WorkflowTarget),
   }),
   Schema.Struct({
     source: Schema.Literal("window"),
@@ -104,8 +107,7 @@ const snapshot = Schema.Union([
 export type Snapshot = typeof snapshot.Type
 
 const StepNode = Schema.Struct({
-  document_id: Schema.NonEmptyString,
-  workflow_id: Schema.NonEmptyString,
+  ...WorkflowTarget.fields,
   node_id: Schema.NonEmptyString,
   label: Schema.optionalKey(Schema.NonEmptyString),
 })
@@ -121,6 +123,7 @@ export const PackageSchema = Rpc.define({
       input: Schema.toStandardSchemaV1(
         Schema.Struct({
           sessionID: Schema.NonEmptyString,
+          target: Schema.optionalKey(WorkflowTarget),
           source: Schema.optionalKey(Schema.Literals(["saved", "window"])),
         }),
       ),

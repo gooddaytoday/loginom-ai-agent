@@ -10,6 +10,7 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
+import type { PackageWorkflow } from "@loginom-ai-agent/loginom-host/package-schema"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { Option, Schema } from "effect"
@@ -91,10 +92,10 @@ export async function start(input: {
 }
 
 /** Read the conversation's existing runtime without taking a run lease. */
-export async function packageSchema(sessionID: string) {
+export async function packageSchema(sessionID: string, target?: typeof PackageWorkflow.Type, signal?: AbortSignal) {
   if (!connected()) return null
   const connection = await state.current?.ready
-  return connection?.request?.("package.schema", { sessionID }, 14_000) ?? null
+  return connection?.request?.("package.schema", target ? { sessionID, target } : { sessionID }, target ? 21_000 : 14_000, signal) ?? null
 }
 
 /** Whether the Host finished its handshake: before that, `acquire` waits for it (up to the handshake's 180 s). */

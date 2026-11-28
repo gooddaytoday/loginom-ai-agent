@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 import { basename } from "node:path"
-import { maxPackageBytes, savedPackageSchema } from "@loginom-ai-agent/loginom-host/package-schema"
+import { maxPackageBytes, PackageWorkflow, savedPackageSchema } from "@loginom-ai-agent/loginom-host/package-schema"
 import type { Plugin } from "@opencode/plugin"
 import { Schema } from "effect"
 import { fileSnapshot } from "./file-snapshot"
@@ -16,6 +16,12 @@ const rpc = {
         properties: {
           sessionID: { type: "string", minLength: 1 },
           source: { type: "string", enum: ["window", "saved"] },
+          target: {
+            type: "object",
+            properties: { document_id: { type: "string", minLength: 1 }, workflow_id: { type: "string", minLength: 1 } },
+            required: ["document_id", "workflow_id"],
+            additionalProperties: false,
+          },
         },
         required: ["sessionID"],
         additionalProperties: false,
@@ -33,6 +39,7 @@ const rpc = {
 
 const Request = Schema.Struct({
   sessionID: Schema.NonEmptyString,
+  target: Schema.optionalKey(PackageWorkflow),
   source: Schema.optionalKey(Schema.Literals(["window", "saved"])),
 })
 const SavedRef = Schema.Struct({ path: Schema.NonEmptyString, sha256: Schema.NonEmptyString })
@@ -66,10 +73,10 @@ export async function registerPackageSchema(
       signal.throwIfAborted()
 
       const window =
-        input.source === "saved" ? null : await ServiceHost.packageSchema(input.sessionID).catch(() => null)
+        input.source === "saved" ? null : await ServiceHost.packageSchema(input.sessionID, input.target, signal).catch(() => null)
       const snapshot =
         window ??
-        (input.source === "window"
+        (input.source === "window" || input.target
           ? null
           : await (async () => {
               const stored = await ctx.storage.get(storageKey(input.sessionID))

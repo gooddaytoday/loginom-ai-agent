@@ -22,12 +22,19 @@ export type Event =
   | { type: "enter"; workflow: Workflow }
   | { type: "leave" }
 
-function findPath(workflows: readonly Workflow[], guid: string): readonly Workflow[] | undefined {
+function* findNodes(
+  workflows: readonly Workflow[],
+  guid: string,
+  parents: readonly Workflow[] = [],
+): Generator<{ path: readonly Workflow[]; selected: number }> {
   for (const workflow of workflows) {
-    if (workflow.nodes.some((node) => node.guid === guid)) return [workflow]
-    const nested = findPath(workflow.submodels, guid)
+    const path = [...parents, workflow]
 
-    if (nested) return [workflow, ...nested]
+    for (const [selected, node] of workflow.nodes.entries()) {
+      if (node.guid === guid) yield { path, selected }
+    }
+
+    yield* findNodes(workflow.submodels, guid, path)
   }
 }
 
@@ -48,8 +55,18 @@ export function transition(state: State, event: Event): State {
       if (node) {
         if (!snapshot) return { status: "missing", request, reason: "unavailable" }
 
+        if (snapshot.source === "saved") {
+          if (snapshot.target?.document_id !== node.document_id || snapshot.target.workflow_id !== node.workflow_id)
+            return { status: "missing", request, reason: "otherSnapshot" }
+
+          const [match, duplicate] = findNodes(snapshot.workflows, node.node_id)
+
+          if (!match || duplicate) return { status: "missing", request, reason: "unavailable" }
+
+          return { status: "ready", request, snapshot, ...match }
+        }
+
         if (
-          snapshot.source !== "window" ||
           snapshot.workflow.document_id !== node.document_id ||
           snapshot.workflow.workflow_id !== node.workflow_id
         ) {
@@ -72,12 +89,9 @@ export function transition(state: State, event: Event): State {
 
       if (snapshot.source === "saved" && finding) {
         for (const guid of finding.nodeGuids) {
-          const path = findPath(snapshot.workflows, guid)
+          const [match] = findNodes(snapshot.workflows, guid)
 
-          if (!path) continue
-          const selected = path.at(-1)?.nodes.findIndex((node) => node.guid === guid)
-
-          return { status: "ready", request: state.request, snapshot, path, selected }
+          if (match) return { status: "ready", request, snapshot, ...match }
         }
 
         return { ...state, status: "empty" }

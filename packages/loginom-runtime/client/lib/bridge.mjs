@@ -1024,6 +1024,38 @@ export async function createBridge(config, session, { browserTransport: managedB
         const snapshot=parseCapabilityResult(response,{redactor}).output?.snapshot;
         return snapshot?redactor.redact(snapshot):null;
       },
+      async packageSchema(context, target, signal) {
+        const window = await this.graphSnapshot(signal, {details:true}).catch(() => null);
+        if (!target || window?.document === target.document_id && window.workflow === target.workflow_id) return window;
+        const preparation = session.metadata.workspacePreparation;
+        const prepared = preparation?.state;
+        if (!userProfile || !config.storageDirectories || !session.metadata.workspaceReady || prepared?.status !== 'READY'
+          || prepared.document_id !== target.document_id || nativeStepDocument !== prepared.document_id
+          || actionRuntime?.hasUnsettledWork() || actionRuntime?.hasActiveWork() || recovery.unsettled()
+          || clipboardUncertain || heldLeases.size > 0) return window;
+        try {
+          const current = await this.packageState(context, false);
+          const path = current.copy?.path;
+          if (!path || current.open !== true || current.path !== path || session.metadata.workspacePreparation !== preparation)
+            return window;
+          signal.throwIfAborted();
+          requireStorageDestination(path, config.storageDirectories, 'packages');
+          const code = makeSavedPackageGraphCode({
+            origin: new URL(config.loginomUrl).origin, build: session.metadata.targetIdentity.loginom_build,
+            path, tabTid: prepared.workflow_ref.tab_tid, documentId: prepared.document_id,
+            sessionId: session.metadata.sessionId, account: prepared.loginom_account,
+            target: {preparationId: preparation.operation_id, workflowId: target.workflow_id},
+          });
+          const response = await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:10000});
+          signal.throwIfAborted();
+          const bytes = parseSavedPackageBytes(response);
+          return session.metadata.workspacePreparation === preparation
+            ? {source:'saved', name:path.split('/').at(-1), base64:bytes.toString('base64')}
+            : null;
+        } catch {
+          return window;
+        }
+      },
       packageState(context, busy) {
         const save = lastSavedPackage?.sequence >= packageSaveFloor ? lastSavedPackage : null;
         return readPackageState(context, save, busy, openedPackage);

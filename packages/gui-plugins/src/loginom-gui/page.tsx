@@ -179,7 +179,7 @@ export default function Page() {
                 </ui.Button>
               </Show>
               <Show when={page().retry}>
-                <ui.Button onClick={() => dispatch({ type: "refresh" })}>{ctx.t("connectionRetry")}</ui.Button>
+                <ui.Button onClick={() => dispatch({ type: "refresh" })}>{ctx.t("retry")}</ui.Button>
               </Show>
             </div>
           </Show>

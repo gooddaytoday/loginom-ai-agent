@@ -8,12 +8,14 @@ export async function readPackageState({ origin, build, documentId, operationId,
     const connection = map?.FServerConnection;
     const preparation = globalThis.__loginomDockPreparationV1;
     const receipt = preparation?.receipts?.get(operationId);
+    const boundConnection = receipt?.stepSession?.connection ?? receipt?.openConnection;
+    const boundSession = receipt?.stepSession?.nativeSession ?? receipt?.openServerSession;
     if (location.origin !== origin || app?.Version !== build || form?.FReconnecting === true
       || preparation?.document !== document || preparation?.id !== documentId
       || !['verified', 'superseded'].includes(receipt?.phase)
       || JSON.parse(receipt.request).session !== sessionId
       || connection?.Connected !== true || connection.UserName !== account
-      || !connection.Session || receipt.openConnection !== connection || receipt.openServerSession !== connection.Session
+      || !connection.Session || boundConnection !== connection || boundSession !== connection.Session
       || !receipt.packageNode || !Number.isSafeInteger(map.PackageNodes?.Count) || map.PackageNodes.Count < 0) return null;
     const node = receipt.packageNode;
     const open = Array.from({ length: map.PackageNodes.Count }, (_, i) => map.PackageNodes.Items(i)).includes(node);
@@ -76,12 +78,18 @@ export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
     const savedPath = lastSavedPackage?.document_id === prepared?.document_id ? lastSavedPackage?.path : undefined;
     const openedPath = openedPackage?.documentID === prepared?.document_id ? openedPackage?.path : undefined;
     const knownPath = savedPath ?? openedPath;
-    const copy = current && typeof knownPath === 'string' && knownPath.startsWith('/') && /\.lgp$/i.test(knownPath)
+    const isPackagePath = path => typeof path === 'string' && path.startsWith('/') && /\.lgp$/i.test(path);
+    const preparedPath = prepared?.package_ref;
+    // PackageFileName belongs to the same native package in both window reads.
+    // A prepared draft has no filename until Loginom assigns a saved path.
+    const path = (isPackagePath(knownPath) || preparedPath?.path === null || preparedPath?.persisted === true)
+      && isPackagePath(observation?.path) ? observation.path : knownPath;
+    const copy = current && isPackagePath(path)
       ? {
           document_id: prepared.document_id,
           workflow_id: prepared.workflow_ref.workflow_id,
-          path: knownPath,
-          lastSave: observation?.path !== knownPath || observation?.modified !== false,
+          path,
+          lastSave: observation?.path !== path || observation?.modified !== false,
         }
       : null;
     return {

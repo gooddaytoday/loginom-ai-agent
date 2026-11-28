@@ -139,8 +139,8 @@ async function dispatch(message: unknown) {
       return
     }
     if (message.method === "package.schema") {
-      const { sessionID } = Schema.decodeUnknownSync(PackageSchemaSession)(input)
-      reply({ id: message.id, result: await state.host.packageSchema(sessionID) })
+      const { sessionID, target } = Schema.decodeUnknownSync(PackageSchemaSession)(input)
+      reply({ id: message.id, result: await state.host.packageSchema(sessionID, target) })
       return
     }
     if (message.method === "package.state") {

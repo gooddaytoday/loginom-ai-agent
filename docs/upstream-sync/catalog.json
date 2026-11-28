@@ -110,6 +110,8 @@
         "packages/app/src/session/timeline/tool-renderers.tsx",
         "packages/app/component-tests/tool-renderer.fixture.tsx",
         "packages/app/e2e/regression/timeline-stream.spec.ts",
+        "packages/app/e2e/regression/loginom-node-links.spec.ts",
+        "packages/app/e2e/utils/loginom-schema.ts",
         "packages/app/test-browser/builtin-plugins.test.ts",
         "packages/gui-plugins/src/main.ts",
         "packages/gui-plugins/src/renderer.ts"

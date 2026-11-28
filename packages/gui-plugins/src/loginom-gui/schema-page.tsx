@@ -144,7 +144,7 @@ function NodeDetails(props: { diagram: Diagram; index: number; t: Translate }) {
                       {props.t(item.port.direction)} «{portLabel(current.node, item.port, props.t)}»
                     </dt>
                     <dd>
-                      {connected.length ? `${output ? "→" : "←"} ${connected.join(", ")}` : props.t("disconnected")}
+                      {connected.length ? `${output ? "→" : "←"} ${connected.join(", ")}` : props.t("portDisconnected")}
                     </dd>
                   </div>
                 )
@@ -386,7 +386,7 @@ function WorkflowView(props: {
                                 classList={{ "is-connected": connected }}
                                 title={
                                   portLabel(item.node, port.port, props.t) +
-                                  (connected ? "" : ` — ${props.t("disconnected")}`)
+                                  (connected ? "" : ` — ${props.t("portDisconnected")}`)
                                 }
                                 style={{ left: `${port.x - item.x}px`, top: `${port.y - item.y}px` }}
                               />
@@ -524,7 +524,7 @@ export default function SchemaPage(props: {
           </Show>
           <Show when={!ready()}>
             <div class="loginom-schema-section" role="status">
-              <Show when={props.state().status === "loading"}>{props.t("loading")}</Show>
+              <Show when={props.state().status === "loading"}>{props.t("schemaLoading")}</Show>
               <Show when={props.state().status === "empty" || props.state().status === "closed"}>
                 {props.t("empty")}
               </Show>
@@ -532,7 +532,7 @@ export default function SchemaPage(props: {
               <Show when={props.state().status === "failed"}>
                 <p>{props.t("failed")}</p>
                 <Button type="button" variant="neutral" onClick={props.retry}>
-                  {props.t("retry")}
+                  {props.t("schemaRetry")}
                 </Button>
               </Show>
             </div>
