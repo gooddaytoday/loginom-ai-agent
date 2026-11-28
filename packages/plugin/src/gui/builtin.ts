@@ -238,13 +238,21 @@ export interface ComposerSlotInput {
     /** The attachment path on the server that runs the draft. */
     readonly path: string
   }[]
-  /** Opens the composer's standard attachment picker. */
-  attach(): void
+  /**
+   * Opens the composer's standard attachment picker or attaches a file already selected by the user.
+   * @param file - A local file selected in another picker, if any.
+   */
+  attach(file?: File): void
   /**
    * Removes a file from the current draft without touching the file itself.
    * @param id - The attachment's identity in the draft.
    */
   removeFile(id: string): void
+  /**
+   * Checks the current location's loaded skill list.
+   * @param id - The skill's stable id.
+   */
+  hasSkill(id: string): boolean
   /**
    * Adds a request with a skill mention to the current draft without submitting it.
    * @param skill - The skill's stable id.
@@ -266,10 +274,59 @@ export interface ComposerSlotInput {
   openPage(plugin: string, page: string, query?: URLSearchParams): void
 }
 
+/** The current composer and navigation available to an attachment menu entry. */
+export interface ComposerAddInput extends Pick<ComposerSlotInput, "draftKey" | "isNewSession" | "attach"> {
+  /** Opaque identity of this composer draft, stable across editor remounts and suitable as a WeakMap key. */
+  readonly draft: object
+  /**
+   * Opens a registered page of the same plugin.
+   *
+   * @param id - ID of the contributed page.
+   */
+  openPage(id: string): void
+}
+
+/** An entry supplied by a built-in plugin to the composer attachment menu. */
+export interface ComposerAddItem {
+  /** Label shown in the menu. */
+  readonly title: string
+  /** Optional icon shown beside the label. */
+  readonly icon?: IconName
+  /** Optional displayed keyboard shortcut. */
+  readonly keys?: readonly string[]
+  /** This item uses the host's attachment picker in place of the default attachment row. */
+  readonly replacesAttachment?: boolean
+  /**
+   * Limits the item to composers where it is applicable. Items are shown by default.
+   * @param input - The current draft and its actions.
+   */
+  when?(input: ComposerAddInput): boolean
+  /**
+   * Runs when the user picks the entry.
+   *
+   * @param input - The draft and its page navigation.
+   */
+  run(input: ComposerAddInput): void
+  /**
+   * Renders draft-specific content above the composer.
+   *
+   * @param input - The same draft and navigation passed to the menu action.
+   */
+  renderSelection?(input: ComposerAddInput): JSX.Element
+}
+
+/**
+ * The registry of additional composer attachment menu entries for built-in plugins.
+ *
+ * @example
+ * ```ts
+ * ctx.add(ComposerAddItem, { title: "Open assets", run: ({ openPage }) => openPage("assets") })
+ * ```
+ */
+export const ComposerAddItem = Registry.define<ComposerAddItem>("composer-add-item")
+
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
-  /** Rows in the composer's Add menu in place of the standard attachment row. Render with `Ui.MenuItem`. */
-  readonly "composer.add-menu": ComposerSlotInput
   /** Content immediately above the editable prompt in normal mode. */
   readonly "composer.above": ComposerSlotInput
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */

@@ -42,7 +42,7 @@ test("Loginom composer offers the package menu and shows an .lgp above the edito
   await expect(menu.getByRole("menuitem", { name: /Файл с компьютера/ })).toBeVisible()
   await expect(menu.getByRole("menuitem", { name: "Каталог…", exact: true })).toBeVisible()
   await menu.getByRole("menuitem", { name: "Пакет из Loginom…", exact: true }).click()
-  await expect(page.getByRole("dialog", { name: "Пакет из Loginom…" })).toBeVisible()
+  await expect(page.getByRole("dialog", { name: "Из Loginom" })).toBeVisible()
   await page.keyboard.press("Escape")
   await expect(page.getByRole("dialog")).toHaveCount(0)
 
@@ -52,7 +52,7 @@ test("Loginom composer offers the package menu and shows an .lgp above the edito
   await (await chooser).setFiles(packageFixture)
   const remove = page.getByRole("button", { name: `Убрать пакет ${packageFixture.name}` })
   await expect(remove).toBeVisible()
-  await expect(page.getByRole("button", { name: "Схема", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: /^Схема/ })).toHaveCount(0)
   await expect(actions.getByRole("button")).toHaveText(["Документировать", "Проверить", "Улучшить", "Сравнить", "Ещё"])
   await expect(actions.getByRole("button", { name: "Улучшить" })).toHaveAttribute("title", "Добавить из каталога")
   await expect(page.locator('[data-component="composer-attachments"]')).toHaveCount(0)
@@ -86,6 +86,7 @@ for (const action of [
     const view = await openDraft(page, {
       name: "LoginomPackageAction",
       provider: loginomModel,
+      skills: [{ id: action.skill, name: action.skill, path: `skill://${action.skill}/SKILL.md`, content: "fixture" }],
       onFileWrite: () => {},
       onPrompt: ({ body }) => void prompts.push(body),
     })
@@ -108,6 +109,29 @@ for (const action of [
     ])
   })
 }
+
+test("Loginom disables a package action when its skill is missing", async ({ page }) => {
+  const view = await openDraft(page, {
+    name: "LoginomUnavailablePackageSkill",
+    provider: loginomModel,
+    skills: [{ id: "package-docs", name: "package-docs", path: "skill://package-docs/SKILL.md", content: "fixture" }],
+    onFileWrite: () => {},
+  })
+
+  await page.locator('input[type="file"]').setInputFiles(packageFixture)
+  await view.editor.fill("Keep my notes")
+  await expect(page.getByRole("button", { name: "Document", exact: true })).toBeEnabled()
+
+  const check = page.getByRole("button", { name: "Check", exact: true })
+  const hint = "The package-linter skill is not available in this workspace."
+  await expect(check).toBeDisabled()
+  await expect(check).toHaveAccessibleDescription(hint)
+  const trigger = page.locator('[data-component="tooltip-v2-trigger"]').filter({ has: check })
+  await trigger.hover()
+  await expect(page.getByRole("tooltip")).toHaveText(hint)
+  await trigger.press("Enter")
+  await expect(view.editor).toHaveText("Keep my notes")
+})
 
 test("without Loginom the composer keeps the native menu and .lgp attachment", async ({ page }) => {
   await openDraft(page, {

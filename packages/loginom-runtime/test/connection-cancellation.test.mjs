@@ -9,6 +9,42 @@ import {loginBrowser} from '../src/connection-check.mjs';
 // Windows Chromium graceful exit after abort: median 393 ms, outlier 5967 ms (LAB-1790, run 43997383101 job 133752781207).
 const LAUNCHED_CANCEL_MS = 10000;
 
+for (const mode of ['validationLogout', 'reportSessionLimit']) {
+  test(`${mode} refuses a redirected login form on another origin before filling it`, {
+    skip: !process.env.LOGINOM_DOCK_TEST_BROWSER && 'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',
+    timeout: 30000,
+  }, async t => {
+    const directory = await mkdtemp(join(tmpdir(), 'login-redirect-'));
+    let forms = 0, submissions = 0;
+    const other = createServer((request, response) => {
+      if (request.url === '/submitted') { submissions++; response.end(); return; }
+      if (request.url !== '/app/') { response.writeHead(404).end(); return; }
+      forms++;
+      response.setHeader('Content-Type', 'text/html');
+      response.end(`<label data-tid="LoginForm;Login;edtUsername"><input oninput="fetch('/submitted')"></label>`);
+    });
+    const original = createServer((request, response) => {
+      response.writeHead(302, { Location: `http://127.0.0.1:${other.address().port}/app/` }).end();
+    });
+    for (const server of [original, other]) {
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+      t.after(() => new Promise(resolve => server.close(resolve)));
+    }
+    t.after(() => rm(directory, { recursive: true, force: true }));
+    const phases = [];
+    await assert.rejects(loginBrowser({
+      browserPath: process.env.LOGINOM_DOCK_TEST_BROWSER, profile: join(directory, 'browser'),
+      candidate: { url: `http://127.0.0.1:${original.address().port}/app/`, username: 'fixture-user', password: '' },
+      headless: true, signal: t.signal, [mode]: true, onPhase: event => phases.push(event),
+      keepOpen: mode === 'reportSessionLimit',
+    }), { message: 'LOGINOM_LOGIN_UNAVAILABLE' });
+    assert.ok(forms > 0);
+    assert.equal(submissions, 0);
+    assert.ok(phases.some(event => event.phase === 'login.form' && event.status === 'ready'));
+    assert.ok(!phases.some(event => event.phase === 'login.username'));
+  });
+}
+
 for (const phase of ['before-launch', 'navigation', 'login-form']) {
   test('private browser cancellation closes its context: ' + phase, {
     skip: !process.env.LOGINOM_DOCK_TEST_BROWSER && 'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',

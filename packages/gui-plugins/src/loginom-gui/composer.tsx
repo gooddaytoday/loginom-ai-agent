@@ -1,9 +1,11 @@
-import { BuiltinSlot, ComposerFileType, type ComposerSlotInput } from "@opencode/plugin/gui/builtin"
+import { BuiltinSlot, ComposerAddItem, ComposerFileType, type ComposerSlotInput } from "@opencode/plugin/gui/builtin"
 import type { Plugin } from "@opencode/plugin/gui"
 import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
+import { Tooltip } from "@opencode/ui/tooltip"
 import { For, Show } from "solid-js"
+import type { PackageSelection } from "./contract"
 import type definition from "./index"
 
 const packageFile = {
@@ -11,19 +13,14 @@ const packageFile = {
   matches: (filename: string) => filename.toLowerCase().endsWith(".lgp"),
 } satisfies ComposerFileType
 
-type LoginomPackage = { readonly name: string; readonly path: string }
-
-type PackagePicker = () => Promise<LoginomPackage | undefined>
-
-export const registerComposer: Plugin.Setup<typeof definition> = (ctx) => {
-  const ui = ctx.ui
+export function registerComposer(
+  ctx: Parameters<Plugin.Setup<typeof definition>>[0],
+  packages: {
+    pick(select: (selection: PackageSelection) => void, showPage: () => void): void
+    showDiagram(selection: PackageSelection): void
+  },
+) {
   const selections = ctx.stores.composerPackages
-
-  const pick: PackagePicker = async () => {
-    await ctx.dialogs.alert({ title: ctx.t("composerLoginom"), description: ctx.t("composerPickerUnavailable") })
-
-    return undefined
-  }
 
   const catalog = (input: ComposerSlotInput) => input.openPage("loginom-gui", "catalog")
 
@@ -37,8 +34,8 @@ export const registerComposer: Plugin.Setup<typeof definition> = (ctx) => {
   function PackageCard(props: {
     input: ComposerSlotInput
     name: string
-    path: string
     source: "file" | "loginom"
+    diagram?(): void
     remove(): void
   }) {
     return (
@@ -53,20 +50,14 @@ export const registerComposer: Plugin.Setup<typeof definition> = (ctx) => {
               {ctx.t(props.source === "file" ? "composerFile" : "title")}
             </div>
           </div>
-          <Show when={props.input.hasPage("loginom-gui", "packages")}>
+          <Show when={props.diagram && props.input.hasPage("loginom-gui", "packages")}>
             <Button
               type="button"
               variant="ghost-muted"
               size="small"
-              onClick={() =>
-                props.input.openPage(
-                  "loginom-gui",
-                  "packages",
-                  new URLSearchParams({ source: props.source, path: props.path }),
-                )
-              }
+              onClick={props.diagram}
             >
-              {ctx.t("composerScheme")}
+              {ctx.t("packages.diagram")}
             </Button>
           </Show>
           <IconButton
@@ -80,16 +71,25 @@ export const registerComposer: Plugin.Setup<typeof definition> = (ctx) => {
         <div role="group" aria-label={ctx.t("composerActions")} class="flex flex-wrap items-center gap-1">
           <span class="text-xs text-v2-text-text-muted">{ctx.t("composerActions")}:</span>
           <For each={builtInActions}>
-            {(action) => (
-              <Button
-                type="button"
-                variant="ghost-muted"
-                size="small"
-                onClick={() => props.input.appendSkillPrompt(action.skill, ctx.t(action.prompt, { name: props.name }))}
-              >
-                {ctx.t(action.label)}
-              </Button>
-            )}
+            {(action) => {
+              const available = () => props.input.hasSkill(action.skill)
+              const hint = () => ctx.t("composerSkillUnavailable", { skill: action.skill })
+
+              return (
+                <Tooltip value={hint()} inactive={available()} triggerTabIndex={0}>
+                  <Button
+                    type="button"
+                    variant="ghost-muted"
+                    size="small"
+                    disabled={!available()}
+                    aria-description={available() ? undefined : hint()}
+                    onClick={() => props.input.appendSkillPrompt(action.skill, ctx.t(action.prompt, { name: props.name }))}
+                  >
+                    {ctx.t(action.label)}
+                  </Button>
+                </Tooltip>
+              )
+            }}
           </For>
           <For each={catalogActions}>
             {(action) => (
@@ -114,32 +114,37 @@ export const registerComposer: Plugin.Setup<typeof definition> = (ctx) => {
   }
 
   ctx.add(ComposerFileType, packageFile)
-  ctx.add(BuiltinSlot, {
-    at: "composer.add-menu",
-    render: (input) => (
-      <>
-        <ui.MenuItem
-          label={ctx.t("composerLoginom")}
-          icon="folder"
-          onSelect={() => {
-            const key = input.draftKey
-            void pick().then((selected) => {
-              if (!selected) return
-              selections.update((draft) => {
-                draft[key] = selected
-              })
-            })
-          }}
-        />
-        <ui.MenuItem
-          label={ctx.t("composerFile")}
-          icon="file-document"
-          keys={ctx.keybinds.keybind("file.attach")}
-          onSelect={input.attach}
-        />
-        <ui.MenuItem label={ctx.t("composerCatalog")} onSelect={() => catalog(input)} />
-      </>
-    ),
+  ctx.add(ComposerAddItem, {
+    get title() {
+      return ctx.t("composerLoginom")
+    },
+    icon: "folder",
+    run(input) {
+      packages.pick((selection) => {
+        if (selection.kind === "file") return input.attach(selection.file)
+
+        selections.update((draft) => {
+          draft[input.draftKey] = selection
+        })
+      }, () => input.openPage("packages"))
+    },
+  })
+  ctx.add(ComposerAddItem, {
+    get title() {
+      return ctx.t("composerFile")
+    },
+    icon: "file-document",
+    get keys() {
+      return ctx.keybinds.keybind("file.attach")
+    },
+    replacesAttachment: true,
+    run: (input) => input.attach(),
+  })
+  ctx.add(ComposerAddItem, {
+    get title() {
+      return ctx.t("composerCatalog")
+    },
+    run: (input) => input.openPage("catalog"),
   })
   ctx.add(BuiltinSlot, {
     at: "composer.above",
@@ -149,9 +154,12 @@ export const registerComposer: Plugin.Setup<typeof definition> = (ctx) => {
           {(item) => (
             <PackageCard
               input={input}
-              name={item().name}
-              path={item().path}
+              name={item().package.name}
               source="loginom"
+              diagram={() => {
+                packages.showDiagram(item())
+                input.openPage("loginom-gui", "packages")
+              }}
               remove={() =>
                 selections.update((draft) => {
                   delete draft[input.draftKey]
@@ -165,7 +173,6 @@ export const registerComposer: Plugin.Setup<typeof definition> = (ctx) => {
             <PackageCard
               input={input}
               name={file.filename}
-              path={file.path}
               source="file"
               remove={() => input.removeFile(file.id)}
             />

@@ -74,6 +74,7 @@ const MobilePanelDrawer = lazy(async () => {
 type ComposerMode = "normal" | "shell"
 
 const COMPOSER_SUGGESTION_MAX_HEIGHT = 320
+
 const COMPOSER_SUGGESTION_GAP = 8
 
 const COMPOSER_SUGGESTION_ROW_HEIGHT = 28
@@ -94,7 +95,7 @@ export type ComposerEditorProps = {
   class?: string
   modelControl?: JSX.Element
   customFile?: (file: ComposerAttachment) => boolean
-  pluginAddMenu?: () => JSX.Element
+  addItems?: ComposerAddItems
   placeholder?: { render: () => JSX.Element }
   toolbar?: JSX.Element
   modelControlsVisible?: boolean
@@ -488,7 +489,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                 onCommands={props.controller.openCommands}
                 onContext={props.controller.openContext}
                 onShell={props.controller.openShell}
-                pluginItems={props.pluginAddMenu}
+                addItems={props.addItems}
               />
             </div>
           </Show>
@@ -581,11 +582,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
       <Show when={touch()}>
         <Show
           when={dock()}
-          fallback={<ComposerEditorTouchBar controller={props.controller} pluginAddMenu={props.pluginAddMenu} />}
+          fallback={<ComposerEditorTouchBar controller={props.controller} addItems={props.addItems} />}
         >
           {(mount) => (
             <Portal mount={mount()}>
-              <ComposerEditorTouchBar controller={props.controller} pluginAddMenu={props.pluginAddMenu} docked />
+              <ComposerEditorTouchBar controller={props.controller} addItems={props.addItems} docked />
             </Portal>
           )}
         </Show>
@@ -1000,6 +1001,8 @@ function ComposerAttachments(props: {
   )
 }
 
+type ComposerAddItems = { render(): JSX.Element; replacesAttachment: boolean }
+
 function ComposerEditorAddMenu(props: {
   disabled?: boolean
   title: string
@@ -1013,7 +1016,7 @@ function ComposerEditorAddMenu(props: {
   onCommands: () => void
   onContext: () => void
   onShell: () => void
-  pluginItems?: () => JSX.Element
+  addItems?: ComposerAddItems
 }) {
   const focus = pointerFocusReturn()
 
@@ -1045,16 +1048,12 @@ function ComposerEditorAddMenu(props: {
             class="[&_[data-slot=menu-v2-item-shortcut]]:w-5 [&_[data-slot=menu-v2-item-shortcut]]:justify-center"
             style={{ "min-width": "180px" }}
           >
-            <Show
-              when={props.pluginItems}
-              fallback={
-                <Menu.Item onSelect={props.onAttach} shortcut={props.attachShortcut}>
-                  {props.attachLabel}
-                </Menu.Item>
-              }
-            >
-              {(items) => items()()}
+            <Show when={!props.addItems?.replacesAttachment}>
+              <Menu.Item onSelect={props.onAttach} shortcut={props.attachShortcut}>
+                {props.attachLabel}
+              </Menu.Item>
             </Show>
+            {props.addItems?.render()}
             <Menu.Separator />
             <Menu.Item onSelect={props.onCommands} shortcut="/">
               {props.commandsLabel}
@@ -1302,6 +1301,7 @@ function ComposerEditorPopover(props: {
     spaceAbove: COMPOSER_SUGGESTION_MAX_HEIGHT,
     spaceBelow: 0,
   })
+
   const opensBelow = () => store.spaceAbove < store.maxHeight && store.spaceBelow > store.spaceAbove
 
   const resize = (height: number) =>
@@ -1644,7 +1644,7 @@ function ComposerEditorSubmitButton(props: {
 function ComposerEditorTouchBar(props: {
   controller: ComposerEditorModel
   docked?: boolean
-  pluginAddMenu?: () => JSX.Element
+  addItems?: ComposerAddItems
 }) {
   const i18n = useI18n()
   const view = props.controller.view
@@ -1714,7 +1714,7 @@ function ComposerEditorTouchBar(props: {
         }
       >
         <Show
-          when={props.pluginAddMenu}
+          when={props.addItems}
           fallback={
             <IconButton
               data-action="composer-attach-file"
@@ -1742,7 +1742,12 @@ function ComposerEditorTouchBar(props: {
                 onMouseDown={keep}
               />
               <Menu.Portal>
-                <Menu.Content>{items()()}</Menu.Content>
+                <Menu.Content>
+                  <Show when={!items().replacesAttachment}>
+                    <Menu.Item onSelect={props.controller.attach}>{i18n.t("ui.promptInput.attachments")}</Menu.Item>
+                  </Show>
+                  {items().render()}
+                </Menu.Content>
               </Menu.Portal>
             </Menu>
           )}

@@ -8,9 +8,48 @@ import {
   type Validation,
 } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Schema } from "effect"
+import type { Package } from "./package-model"
+
+export type UploadFailure = "invalidFile" | "fileTooLarge" | "nameTaken" | "sessionLimit" | "uploadFailed"
+
+export type UploadState =
+  | { kind: "idle"; file?: File; failure?: UploadFailure }
+  | { kind: "uploading"; file: File; attempt: AbortController }
+  | { kind: "uploaded"; file: File; entry: Package }
+
+type UploadEvent =
+  | { type: "choose"; file: File }
+  | { type: "reject"; failure: UploadFailure }
+  | { type: "start"; attempt: AbortController }
+  | { type: "failed"; attempt: AbortController; failure: UploadFailure }
+  | { type: "saved"; attempt: AbortController; entry: Package }
+
+export function transitionUpload(state: UploadState, event: UploadEvent): UploadState {
+  if (state.kind === "uploaded") return state
+
+  if (state.kind === "uploading") {
+    if (event.type === "saved" && state.attempt === event.attempt)
+      return { kind: "uploaded", file: state.file, entry: event.entry }
+
+    if (event.type === "failed" && state.attempt === event.attempt)
+      return { kind: "idle", file: state.file, failure: event.failure }
+
+    return state
+  }
+
+  if (event.type === "choose") return { kind: "idle", file: event.file }
+
+  if (event.type === "reject") return { kind: "idle", failure: event.failure }
+
+  if (event.type === "start" && state.file) return { kind: "uploading", file: state.file, attempt: event.attempt }
+
+  return state
+}
 
 type Draft = { url: string; username: string; password: string; noPassword: boolean }
+
 type Form = { status: Status; draft: Draft }
+
 type State = { attempt: number } & (
   | { type: "unavailable" | "loading" | "disposed" }
   | (Form & { type: "editing"; issue?: Issue })
@@ -66,18 +105,25 @@ function draftCandidate(current: Form): Candidate | { issue: Issue } {
   const { status, draft } = current
   const url = draft.url.trim()
   const username = draft.username.trim()
+
   if (!Schema.is(Address)(url)) return { issue: "invalidAddress" }
+
   if (!username) return { issue: "invalidUsername" }
   const identity = { revision: status.revision, url, username }
+
   if (draft.noPassword) return { ...identity, password: { operation: "empty" } }
+
   if (draft.password) return { ...identity, password: { operation: "replace", value: draft.password } }
+
   if (preservesPassword(current)) return { ...identity, password: { operation: "preserve" } }
+
   return { issue: "passwordRequired" }
 }
 
 export function transition(state: State, event: Event): Transition {
   const attempt = state.attempt + 1
   const keep = { state, effects: [] }
+
   if (state.type === "disposed") return keep
 
   function save(current: Form, validationId: string) {
@@ -96,45 +142,62 @@ export function transition(state: State, event: Event): Transition {
         : { state: { type: "unavailable", attempt }, effects: [{ type: "cancel" }] }
     case "refresh":
       if (state.type === "unavailable") return transition(state, { type: "target", available: true })
+
       if (state.type !== "editing") return keep
+
       return refresh(state, attempt)
     case "edit": {
       if (!("draft" in state) || state.type === "saving") return keep
       const draft = { ...state.draft, ...event.patch }
+
       if (draft.noPassword) draft.password = ""
+
       if (state.type === "applying") return { state: { ...state, draft, edited: true }, effects: [] }
+
       if (state.type === "refreshing") return { state: { ...state, draft, edited: true }, effects: [] }
+
       return {
         state: { type: "editing", attempt, draft, status: state.status },
         effects: state.type === "checking" ? [{ type: "cancel" }] : [],
       }
     }
+
     case "submit": {
       if (state.type !== "editing" && state.type !== "verified") return keep
+
       if (event.submit === "save" && state.type === "verified" && event.now < state.validation.expiresAt)
         return save(state, state.validation.validationId)
       const candidate = draftCandidate(state)
+
       if ("issue" in candidate) return failed(state, candidate.issue)
+
       return {
         state: { type: "checking", attempt, draft: state.draft, status: state.status, submit: event.submit },
         effects: [{ type: "check", attempt, input: candidate }],
       }
     }
+
     case "checked":
       if (state.type !== "checking" || event.attempt !== state.attempt) return keep
+
       if (event.result.ok) {
         const validation = event.result.value
+
         if (state.submit === "save") return save(state, validation.validationId)
+
         return {
           state: { type: "verified", attempt, draft: state.draft, status: state.status, validation },
           effects: [],
         }
       }
+
       return failed(state, event.result.issue)
     case "saved":
     case "status": {
       if (event.attempt !== state.attempt) return keep
+
       if (event.type === "saved" && state.type !== "saving") return keep
+
       if (
         event.type === "status" &&
         state.type !== "loading" &&
@@ -142,35 +205,50 @@ export function transition(state: State, event: Event): Transition {
         state.type !== "refreshing"
       )
         return keep
+
       if (!event.result.ok) {
         if (state.type === "saving" && event.result.issue === "saveFailed") return refresh(state, attempt, "saveFailed")
+
         if (state.type === "loading") return { state: { type: "unavailable", attempt }, effects: [] }
+
         if (state.type === "applying" && event.now >= state.until)
           return { state: { type: "editing", attempt, status: state.status, draft: state.draft }, effects: [] }
+
         if ("draft" in state)
           return failed(state, state.type === "refreshing" ? (state.issue ?? event.result.issue) : event.result.issue)
+
         return keep
       }
+
       const status = event.result.value
+
       const recovered =
         state.type === "refreshing" && state.issue === "saveFailed" && state.status.revision !== status.revision
+
       const edited =
         (state.type === "applying" && state.edited) || (state.type === "refreshing" && (state.edited || !recovered))
+
       const draft = "draft" in state && edited ? state.draft : form(status).draft
+
       if (waiting(status)) {
         const pendingDraft =
           state.type === "saving" || (recovered && !edited) ? { ...state.draft, password: "" } : draft
+
         const until = state.type === "applying" ? state.until : event.now + applicationWait
         const remaining = until - event.now
+
         if (remaining > 1000) {
           return {
             state: { type: "applying", attempt, status, draft: pendingDraft, until, edited },
             effects: [{ type: "status", attempt, delay: 1000, timeout: remaining - 1000 }],
           }
         }
+
         return { state: { type: "editing", attempt, status, draft: pendingDraft }, effects: [] }
       }
+
       const issue = state.type === "refreshing" && !recovered ? state.issue : undefined
+
       return { state: { type: "editing", attempt, status, draft, issue }, effects: [] }
     }
   }
@@ -192,19 +270,28 @@ function failed(state: Form & { attempt: number }, issue: Issue): Transition {
 
 function message(state: State) {
   if (state.type === "disposed") return
+
   if (state.type === "loading" || state.type === "refreshing") return "loading"
+
   if (state.type === "unavailable") return "serviceUnavailable"
+
   if (state.type === "applying") return state.status.state === "pending" ? "pending" : "starting"
+
   if (state.type === "verified") return "verified"
+
   if (!("status" in state)) return
+
   if (state.status.failed) return "activationFailed"
+
   if (waiting(state.status)) return "applicationPaused"
+
   if (state.status.state !== "ready") return "disconnected"
 }
 
 export function view(state: State) {
   const form = "draft" in state ? state : undefined
   const issue = state.type === "editing" ? state.issue : undefined
+
   return {
     draft: form?.draft,
     connected: form?.status.state === "ready" && !form.status.failed ? form.status : undefined,

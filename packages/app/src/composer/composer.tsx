@@ -1,10 +1,12 @@
-import { Show, createEffect, createMemo, createSignal, onCleanup, untrack, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, untrack, type JSX } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
+import { ComposerAddItem, type ComposerAddInput } from "@opencode/plugin/gui/builtin"
 import { Button } from "@opencode/ui/button"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { Icon } from "@opencode/ui/icon"
 import { Keybind } from "@opencode/ui/keybind"
+import { Menu } from "@opencode/ui/menu"
 import { Slash } from "@opencode/ui/slash"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { ComposerEditor } from "./editor/editor"
@@ -12,7 +14,8 @@ import { DialogSelectModel, ModelSelectorDrawer } from "@/providers/models/selec
 import { DialogSelectModelUnpaid } from "@/providers/models/unpaid"
 import { formatKeybind, useCommand } from "@/shell/commands/command"
 import { useLanguage } from "@/runtime/i18n/language"
-import { PluginSlot } from "@/runtime/plugin/render"
+import { useOptionalPluginHost } from "@/runtime/plugin/host"
+import { Contribution, PluginSlot } from "@/runtime/plugin/render"
 import type { ComposerModel } from "./model"
 import type { ComposerModelLabel } from "./model-label"
 import {
@@ -35,6 +38,40 @@ export function Composer(props: {
   const dialog = useDialog()
   const command = useCommand()
   const language = useLanguage()
+  const host = useOptionalPluginHost()
+
+  const addItems = createMemo(() => {
+    const model = props.model
+    const input = model.extension?.input
+
+    if (props.readOnly || model.mode() !== "normal" || !input) return []
+
+    return (host?.items(ComposerAddItem) ?? []).flatMap((entry) => {
+      const actions: ComposerAddInput = {
+        draft: model.draft,
+        draftKey: input.draftKey,
+        isNewSession: input.isNewSession,
+        attach: input.attach,
+        openPage: (id) => input.openPage(entry.plugin, id),
+      }
+
+      return (entry.value.when?.(actions) ?? true) ? [{ entry, actions }] : []
+    })
+  })
+
+  const renderAddItems = () => (
+    <For each={addItems()}>
+      {({ entry, actions }) => (
+        <Menu.Item
+          shortcut={entry.value.keys?.length ? <Keybind keys={[...entry.value.keys]} variant="neutral" /> : undefined}
+          onSelect={() => entry.value.run(actions)}
+        >
+          <Show when={entry.value.icon}>{(icon) => <Icon name={icon()} class="text-v2-icon-icon-muted" />}</Show>
+          <span class="min-w-0 truncate">{entry.value.title}</span>
+        </Menu.Item>
+      )}
+    </For>
+  )
 
   const modelName = () => {
     const preview = props.model.model.preview
@@ -62,19 +99,20 @@ export function Composer(props: {
 
   return (
     <div class="flex flex-col gap-3">
+      <For each={addItems().filter(({ entry }) => entry.value.renderSelection)}>
+        {({ entry, actions }) => (
+          <Contribution plugin={entry.plugin}>{() => entry.value.renderSelection?.(actions)}</Contribution>
+        )}
+      </For>
       <Show when={!props.readOnly && props.model.mode() === "normal" && props.model.extension}>
         {(extension) => <PluginSlot at="composer.above" input={extension().input} />}
       </Show>
       <ComposerEditor
         controller={props.model}
         customFile={props.readOnly ? undefined : props.model.extension?.customFile}
-        pluginAddMenu={
-          props.model.extension?.hasMenu()
-            ? () => (
-                <Show when={props.model.extension}>
-                  {(extension) => <PluginSlot at="composer.add-menu" input={extension().input} />}
-                </Show>
-              )
+        addItems={
+          addItems().length
+            ? { render: renderAddItems, replacesAttachment: addItems().some(({ entry }) => entry.value.replacesAttachment) }
             : undefined
         }
         borderUnderlay={props.borderUnderlay}

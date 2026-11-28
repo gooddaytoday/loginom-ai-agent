@@ -276,8 +276,8 @@ SDK icon fields take an `IconName` from `@opencode/plugin/gui`: the names of the
 | [`MenubarItem`](../plugin/src/gui/main.ts)           | main    | An item of the native app menu                                                                                                                                                                                                       |
 
 `BuiltinSlot` has separate draft-screen slots: `session.new.heading`, `session.new.composer.placeholder`,
-`session.new.composer.project` and `session.new.below`. Render Add-menu rows with `ctx.ui.MenuItem` in the shared
-`composer.add-menu` slot; check `input.isNewSession` for draft-only rows. In `session.new.below`,
+`session.new.composer.project` and `session.new.below`. Register Add-menu rows in `ComposerAddItem`;
+check `input.isNewSession` in `when` for draft-only rows. In `session.new.below`,
 `insertPrompt(text, origin)` replaces the draft text without submitting it;
 `onStarted` reports the captured origin once the draft becomes a session. Use a plugin-prefixed origin and dispose
 the listener with the contribution.
@@ -347,6 +347,8 @@ to the displayed repository or worktree instead of adding a second menu item.
 | `BuiltinPanel`, `BuiltinPanelTab`                       | `legacy` stored keys of a panel; `first` and stable `dom` ids of a tab                         |
 | `Page`                                                  | Top-level plugin pages with optional navigation entries                                        |
 | `BuiltinCommand`                                        | `follows`: share another command's shortcut inside `scope`                                     |
+| `ComposerAddItem`                                       | A menu item under the composer `+`, optionally with content above the current draft           |
+| `ComposerFileType`                                      | A file type the composer attaches by path                                                     |
 | `BuiltinStore`, `BuiltinStoreFrom`                      | Window stores imported from parts of the app's own keys                                        |
 | `builtinContext(ctx)`                                   | `ctx.desktop.forceFocus`, `ctx.locale.setDirection`                                            |
 | `builtinMainContext(ctx)`, `MainStoreFrom`, `Lifecycle` | Main stores imported from settings files or other namespaces, and `lifecycle.restart(handoff)` |
@@ -357,6 +359,17 @@ Registry tokens that extend a public registry share its id, so the host reads ev
 ```ts
 i18n: builtinCatalog({ en, de: () => import("./i18n/de") }),
 ```
+
+For example, open a contributed page from the composer menu:
+
+```ts
+ctx.add(ComposerAddItem, { title: "Open assets", run: ({ openPage }) => openPage("assets") })
+```
+
+Only built-in plugins can register `ComposerAddItem`, `ComposerFileType`, or fill `composer.above`.
+Use the shared menu for adding items and the slot above the editor for package cards. The stable `draftKey`
+scopes package selection in the plugin's own store. The Loginom GUI provides one `PackagePicker` contract
+for opening the package dialog.
 
 ## Ipc: main ↔ window
 

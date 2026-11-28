@@ -5,6 +5,7 @@ import { TextField } from "@opencode/ui/text-field"
 import { createMemo, createSignal, onCleanup, Show, untrack } from "solid-js"
 import type definition from "./index"
 import { initial, transition, view } from "./machine"
+import { loginomLocation, loginomServer } from "./server"
 
 export default function Page() {
   const ctx = usePlugin<typeof definition>()
@@ -14,20 +15,13 @@ export default function Page() {
 
   const errorText = (issue: Issue | undefined) => (issue ? ctx.t(issue) : undefined)
 
-  const service = createMemo(() => {
-    const servers = ctx.servers.list().flatMap((id) => ctx.servers.get(id) ?? [])
-    // Desktop owns the sidecar. Web uses the serving origin, or the single local service in development.
-    if (ctx.desktop) return servers.find((server) => server.builtin)
-    const serving = ctx.servers.get(location.origin)
-    if (serving) return serving
-    const local = servers.filter((server) => server.local)
-    if (local.length === 1) return local.at(0)
-  })
+  const service = createMemo(() => loginomServer(ctx))
 
   const client = () => service()?.client
 
   let controller: AbortController | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
+
   const dispatch = (event: Parameters<typeof transition>[1]) => {
     const next = transition(untrack(state), event)
     setState(next.state)
@@ -38,8 +32,10 @@ export default function Page() {
     if (effect.type === "cancel") {
       clearTimeout(timer)
       controller?.abort()
+
       return
     }
+
     const request = async () => {
       controller = new AbortController()
       const timeout = effect.type === "check" ? 245_000 : 12_000
@@ -47,11 +43,10 @@ export default function Page() {
       const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(deadline)])
       const server = untrack(service)
       // Connection settings are service-wide. Use the selected service's default Location.
-      const directory =
-        server?.data.location.default().directory ||
-        (await server?.client.location.get({}, { signal }).catch(() => undefined))?.directory
+      const location = server && (await loginomLocation(server, signal).catch(() => undefined))
       const rpc = server?.client.rpc(ConnectionSettingsRpc)
-      const options = directory ? { location: { directory }, signal } : undefined
+      const options = location ? { location, signal } : undefined
+
       switch (effect.type) {
         case "status": {
           const result = options && (await rpc?.status({}, options).catch(() => undefined))
@@ -63,11 +58,13 @@ export default function Page() {
           })
           break
         }
+
         case "check": {
           const result = options && (await rpc?.check(effect.input, options).catch(() => undefined))
           dispatch({ type: "checked", attempt: effect.attempt, result: result ?? { ok: false, issue: "unavailable" } })
           break
         }
+
         case "save": {
           const result = options && (await rpc?.save(effect.input, options).catch(() => undefined))
           dispatch({
@@ -80,10 +77,13 @@ export default function Page() {
         }
       }
     }
+
     if (effect.type === "status" && effect.delay) {
       timer = setTimeout(() => void request(), effect.delay)
+
       return
     }
+
     void request()
   }
 

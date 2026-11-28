@@ -2,7 +2,7 @@ import { ImagePreview } from "@opencode/ui/image-preview"
 import { useDialog } from "@opencode/ui/context/dialog"
 import type { ReferenceInfo } from "@opencode/client/promise"
 import type { Links, MountedSession } from "@opencode/plugin/gui"
-import { BuiltinSlot, ComposerFileType, type ComposerSlotInput } from "@opencode/plugin/gui/builtin"
+import { ComposerFileType, type ComposerSlotInput } from "@opencode/plugin/gui/builtin"
 import { createComponent, createEffect, createMemo, on, onCleanup } from "solid-js"
 import { Predicate } from "effect"
 import type { ComposerSuggestion } from "./types"
@@ -39,10 +39,10 @@ import { useAttachmentDestination } from "./attachments/destination"
 import { parseClientSlashCommand } from "./client-slash-command"
 
 export type ComposerModel = ComposerEditorModel & {
+  readonly draft: object
   readonly model: ComposerControls["model"]
   readonly extension?: {
     readonly input: ComposerSlotInput
-    hasMenu(): boolean
     customFile(file: { filename: string; mime: string }): boolean
   }
 }
@@ -588,10 +588,10 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     },
   })
 
-  Object.defineProperty(controller, "model", { get: () => adapter.controls().model })
+  const model = Object.assign(controller, { draft: prompt.identity })
+  Object.defineProperty(model, "model", { get: () => adapter.controls().model })
 
   const extension: NonNullable<ComposerModel["extension"]> = {
-    hasMenu: () => host.items(BuiltinSlot).some(({ value }) => value.at === "composer.add-menu"),
     customFile: (file) => referenceMime(file.filename) === file.mime,
     input: {
       get draftKey() {
@@ -605,19 +605,23 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
       get files() {
         return controller.attachments().filter((part) => part.type === "path")
       },
-      attach: controller.attach,
+      attach: (file) => (file ? controller.addAttachments([file]) : controller.attach()),
       removeFile: controller.removeAttachment,
+      hasSkill: (id) => skills().some((entry) => entry.id === id),
       ...pages,
       appendSkillPrompt(skill, text) {
+        const entry = skills().find((item) => item.id === skill)
+
+        if (!entry) return
+
         const current = prompt.current()
         const content = `@${skill}`
-        const name = skills().find((entry) => entry.id === skill)?.name ?? skill
 
         const request: Prompt = [
           {
             type: "skill",
-            id: Skill.ID.make(skill),
-            name: Skill.Name.make(name),
+            id: Skill.ID.make(entry.id),
+            name: Skill.Name.make(entry.name),
             content,
             start: 0,
             end: content.length,
@@ -666,7 +670,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   ])
 
   // SAFETY: the `model` getter defined on the controller above completes `ComposerModel`.
-  return Object.assign(controller, { extension }) as ComposerModel
+  return Object.assign(model, { extension }) as ComposerModel
 }
 
 function composerErrorMessage(language: ReturnType<typeof useLanguage>, cause: unknown) {
