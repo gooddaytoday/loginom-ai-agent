@@ -249,6 +249,31 @@ describe.skipIf(process.platform !== "linux")("loginom commands with the real No
     expect(after.json).not.toHaveProperty("failure")
   }, 30_000)
 
+  test("status reports an active generation's startup failure after acknowledging the rejected change", async () => {
+    const fixture = await setupFixture()
+    expect(await loginom(fixture, ["status", "--format", "json"])).toMatchObject({ code: 0, json: { generation: 0 } })
+    const root = path.join(fixture.profile, "loginom")
+    const store = connectionStore(path.join(root, "connection"), cliCredentials("linux", { root, resources: fixture.resources }))
+    await store.stage({ ...login, generation: 1, revision: 1, apiKey: "" })
+    await store.activate(1)
+    await store.recordPendingDiscard({ activeGeneration: 1, id: "notice" })
+    await fs.writeFile(path.join(fixture.root, "fail-generation-1"), "")
+
+    const reported = await loginom(fixture, ["status"])
+    expect(reported).toMatchObject({ code: 1, stderr: "" })
+    expect(reported.stdout).toContain("Новые параметры не применены.")
+    expect(reported.stdout).toContain("Ошибка подключения: LOGINOM_RUNTIME_START_FAILED.")
+    const after = await loginom(fixture, ["status", "--format", "json"])
+    expect(after).toMatchObject({
+      code: 1,
+      json: {
+        state: "recoverable-error", generation: 1,
+        failure: "LOGINOM_RUNTIME_START_FAILED", runtimeFailure: "LOGINOM_RUNTIME_START_FAILED",
+      },
+    })
+    expect(after.stdout).not.toContain("LOGINOM_PENDING_NOT_APPLIED")
+  }, 30_000)
+
   test("status starts the Host from the resources and leaves nothing behind", async () => {
     const fixture = await setupFixture()
     expect(await loginom(fixture, ["status", "--format", "json"])).toMatchObject({
@@ -420,7 +445,7 @@ describe.skipIf(process.platform !== "linux")("loginom commands with the real No
     const id = await journal.begin("a".repeat(64), 2)
     await journal.settle(id, false)
     expect(await loginom(fixture, ["status"], "", strict)).toMatchObject({
-      code: 0,
+      code: 1,
       stdout: expect.stringContaining(
         "Требуется восстановление: 1 операция — проверьте сценарий в Loginom и выполните `loginom recover`.",
       ),
@@ -951,7 +976,7 @@ async function setupFixture(browser?: "LOGINOM_LOGIN_UNAVAILABLE", skills = fals
     process.on("message", m => {
       if (m.operation === "start") {
         appendFileSync(${JSON.stringify(starts)}, JSON.stringify({ generation: m.input.generation, pid: process.pid }) + "\\n");
-        if (m.input.generation === 2 && existsSync(${JSON.stringify(path.join(root, "fail-generation-2"))})) {
+        if (existsSync(${JSON.stringify(path.join(root, "fail-generation-"))} + m.input.generation)) {
           process.send({ id: m.id, error: "LOGINOM_RUNTIME_START_FAILED" });
           return;
         }

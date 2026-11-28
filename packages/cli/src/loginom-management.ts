@@ -107,7 +107,7 @@ async function manage(parsed: NonNullable<ReturnType<typeof parse>>, root: strin
         await host.request("connection.acknowledge-pending-notice", { id: pendingNotice }).catch((error: unknown) => {
           process.stderr.write(hostError(error) + "\n")
         })
-      return result.failure ? 1 : 0
+      return result.state === "recoverable-error" || result.failure ? 1 : 0
     }
     const result = await loginomManagement(host, action, {
       stdinJSON: parsed.values["stdin-json"],
@@ -256,13 +256,15 @@ const pendingFailureMessages = new Map([
 
 export function statusText(current: ReturnType<typeof statusView>) {
   const count = current.recoveries?.length ?? 0
+  const requestFailure =
+    current.failure === current.runtimeFailure && !current.pendingNotice ? undefined : current.failure
   const pendingFailure =
-    current.failure === "LOGINOM_RUNTIME_START_FAILED" &&
-    ((current.generation > 0 && ["ready", "starting", "configured"].includes(current.state)) ||
+    requestFailure === "LOGINOM_RUNTIME_START_FAILED" &&
+    ((!current.runtimeFailure && current.generation > 0 && ["ready", "starting", "configured"].includes(current.state)) ||
       current.pendingNotice ||
       current.cleanupFailure)
       ? "Не удалось запустить новое подключение. Новые параметры не применены. Сохраните их снова через `loginom setup`."
-      : current.failure && pendingFailureMessages.get(current.failure)
+      : requestFailure && pendingFailureMessages.get(requestFailure)
   const clean = current.state !== "recoverable-error" && !count && !current.failure
   const lines = [
     current.generation
@@ -284,9 +286,11 @@ export function statusText(current: ReturnType<typeof statusView>) {
     lines.push(
       `Требуется восстановление: ${count} ${word} — проверьте сценарий в Loginom и выполните \`loginom recover\`.`,
     )
-  } else if ((current.state === "recoverable-error" || current.failure) && !pendingFailure)
+  }
+  const connectionFailure = current.runtimeFailure ?? (pendingFailure ? undefined : current.failure)
+  if (connectionFailure || (current.state === "recoverable-error" && !count && !pendingFailure))
     lines.push(
-      `Ошибка подключения${current.failure ? `: ${current.failure}` : ""}. ` +
+      `Ошибка подключения${connectionFailure ? `: ${connectionFailure}` : ""}. ` +
         "Проверить соединение — `loginom check`, настроить заново — `loginom setup`.",
     )
   return lines.join("\n")

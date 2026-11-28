@@ -26,7 +26,7 @@ type Event =
   | { type: "disposed" }
   | { type: "refresh" }
   | { type: "acknowledge" }
-  | { type: "application"; revision: number; generation: number }
+  | { type: "application"; revision: number; generation: number; now: number }
   | { type: "edit"; patch: Partial<Draft> }
   | { type: "submit"; submit: "check" | "save"; now: number }
   | { type: "status" | "saved"; attempt: number; result: StatusResult; now: number }
@@ -114,11 +114,12 @@ export function transition(state: State, event: Event): Transition {
       if (!waiting(state.status) || event.revision < state.status.revision || event.generation < state.status.generation)
         return keep
 
-      if (state.type === "editing") return refresh(state, attempt)
-
       return {
-        state: { ...state, attempt },
-        effects: [{ type: "cancel" }, { type: "status", attempt }],
+        state: {
+          type: "applying", attempt, status: state.status, draft: state.draft,
+          until: event.now + applicationWait, edited: state.type === "editing" || state.edited,
+        },
+        effects: [{ type: "cancel" }, { type: "status", attempt, timeout: applicationWait }],
       }
     case "edit": {
       if (!("draft" in state) || state.type === "saving") return keep
@@ -183,9 +184,10 @@ export function transition(state: State, event: Event): Transition {
         const pendingDraft =
           state.type === "saving" || (recovered && !edited) ? { ...state.draft, password: "" } : draft
 
-        // Drains can last as long as the tasks. Bound the wait for startup once the tasks finish.
+        // Drains and startup of the retained connection can keep polling while the service responds.
+        const restored = status.state === "starting" && status.failed
         const until =
-          state.type === "applying" && !waitingTasks(state.status) && !waitingTasks(status)
+          state.type === "applying" && !restored && !waitingTasks(state.status) && !waitingTasks(status)
             ? state.until
             : event.now + applicationWait
         return pollApplication({ type: "applying", attempt, status, draft: pendingDraft, until, edited }, event.now)
@@ -198,8 +200,6 @@ export function transition(state: State, event: Event): Transition {
 
 function pollApplication(state: Extract<State, { type: "applying" }>, now: number, issue?: Issue): Transition {
   const { attempt, status, draft, until } = state
-  if (status.state === "starting" && status.failed && !issue)
-    return { state, effects: [{ type: "status", attempt, delay: applicationPollDelay }] }
   const timeout = until - now - applicationPollDelay
   if (timeout <= 0) return { state: { type: "editing", attempt, status, draft, issue }, effects: [] }
   return { state, effects: [{ type: "status", attempt, delay: applicationPollDelay, timeout }] }

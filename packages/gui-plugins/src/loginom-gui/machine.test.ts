@@ -113,8 +113,22 @@ test("a saved warning stays visible while polling for the original connection an
     result: { ok: true, value: { ...warning, state: "starting" } },
   })
   expect(stillStarting.effects).toMatchObject([{ type: "status" }])
-  const ready = transition(stillStarting.state, {
+  const failure = { ok: false, issue: "unavailable" } as const
+  const interrupted = transition(stillStarting.state, {
     type: "status", attempt: stillStarting.state.attempt, now: 21_000,
+    result: failure,
+  })
+  expect(interrupted.effects).toMatchObject([{ type: "status", delay: 1000 }])
+  expect(view(interrupted.state)).toMatchObject({ message: "pendingNotApplied", busy: true })
+  const expired = transition(interrupted.state, {
+    type: "status", attempt: interrupted.state.attempt, now: 35_000,
+    result: failure,
+  })
+  expect(expired.effects).toEqual([])
+  const refreshed = transition(expired.state, { type: "application", revision: 2, generation: 1, now: 36_000 })
+  expect(refreshed.effects).toMatchObject([{ type: "cancel" }, { type: "status" }])
+  const ready = transition(refreshed.state, {
+    type: "status", attempt: refreshed.state.attempt, now: 36_000,
     result: { ok: true, value: { ...warning, state: "ready" } },
   }).state
   expect(view(ready)).toMatchObject({ connected: { generation: 1 }, message: "pendingNotApplied", canAcknowledge: true })

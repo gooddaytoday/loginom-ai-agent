@@ -75,7 +75,7 @@ export const ConnectionSettingsRpc = Rpc.define({
       output: result(Status),
     },
   },
-  events: { applied: applicationEvent, failed: applicationEvent },
+  events: { applied: applicationEvent, failed: applicationEvent, ready: applicationEvent },
 })
 
 export type StatusResult = typeof ConnectionSettingsRpc.methods.status.output.Type

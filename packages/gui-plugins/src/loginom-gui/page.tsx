@@ -96,8 +96,8 @@ export default function Page() {
     client,
     (target) => {
       const events = target.rpc(ConnectionSettingsRpc).events
-      for (const outcome of ["applied", "failed"] as const) {
-        onCleanup(events.on(outcome, ({ data }) => dispatch({ type: "application", ...data })))
+      for (const outcome of ["applied", "failed", "ready"] as const) {
+        onCleanup(events.on(outcome, ({ data }) => dispatch({ type: "application", ...data, now: Date.now() })))
       }
       reload()
     },

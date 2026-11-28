@@ -91,11 +91,13 @@ export async function launchNodeHost(
       typeof data === "object" &&
       "event" in data &&
       "data" in data &&
-      (data.event === "connection.applied" || data.event === "connection.failed")
+      (data.event === "connection.applied" || data.event === "connection.failed" || data.event === "connection.ready")
     ) {
       const event = decodeApplication(data.data)
-      if (Option.isSome(event))
-        input.onConnectionApplication?.(data.event === "connection.applied" ? "applied" : "failed", event.value)
+      if (Option.isSome(event)) {
+        const outcome = data.event === "connection.applied" ? "applied" : data.event === "connection.failed" ? "failed" : "ready"
+        input.onConnectionApplication?.(outcome, event.value)
+      }
       return
     }
     events.emit("message", { data })

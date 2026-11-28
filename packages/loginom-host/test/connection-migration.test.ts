@@ -364,7 +364,8 @@ for (const [name, codec] of [
           await first.close()
           const readOnly = await f.start()
           expect(await readOnly.api.status()).toMatchObject({
-            generation: 1, state: "ready", failure: "LOGINOM_PENDING_CLEAR_FAILED",
+            generation: 1, state: "ready", failure: "LOGINOM_PENDING_NOT_APPLIED",
+            cleanupFailure: "LOGINOM_PENDING_CLEAR_FAILED",
           })
           expect(await f.store.pending()).toMatchObject({ url: replacementUrl })
           await readOnly.close()
@@ -509,7 +510,8 @@ for (const [name, codec] of [
       f.runtime.prepare = prepare
       const retriedWithFailure = await f.start(blockedStore())
       expect(await retriedWithFailure.api.status()).toMatchObject({
-        generation: 1, state: "ready", failure: "LOGINOM_PENDING_CLEAR_FAILED",
+        generation: 1, state: "ready", failure: "LOGINOM_PENDING_NOT_APPLIED",
+        cleanupFailure: "LOGINOM_PENDING_CLEAR_FAILED",
       })
       expect(await f.store.pending()).toMatchObject({ url: replacementUrl })
       await retriedWithFailure.close()
@@ -527,6 +529,62 @@ for (const [name, codec] of [
       await restarted.settled()
       expect(await f.store.read()).toMatchObject({ generation: 2, url: replacementUrl })
     } finally { await f.close() }
+  })
+
+  test(`${name}: acknowledging a rejected change leaves the active generation's startup error visible`, async () => {
+    const f = await fixture(codec)
+    try {
+      await f.store.stage(original)
+      await f.store.activate(1)
+      await f.store.recordPendingDiscard({ activeGeneration: 1, id: "notice" })
+      f.runtime.prepare = async () => { throw Error("LOGINOM_RUNTIME_TIMEOUT") }
+
+      const service = await f.start()
+      const failed = { generation: 1, state: "recoverable-error", runtimeFailure: "LOGINOM_RUNTIME_TIMEOUT" }
+      expect(await service.api.status()).toMatchObject({
+        ...failed, failure: "LOGINOM_PENDING_NOT_APPLIED", pendingNotice: "notice",
+      })
+      expect(await service.api.acknowledgePendingNotice({ id: "notice" })).toMatchObject({
+        ...failed, failure: "LOGINOM_RUNTIME_TIMEOUT",
+      })
+      expect(await service.api.status()).not.toHaveProperty("pendingNotice")
+      expect(service.acquire("failed-generation")).toBeUndefined()
+    } finally { await f.close() }
+  })
+
+  test(`${name}: tasks can enter the ready generation while a notice acknowledgment writes the profile`, async () => {
+    const f = await fixture(codec)
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    try {
+      await f.store.stage(original)
+      await f.store.activate(1)
+      await f.store.recordPendingDiscard({ activeGeneration: 1, id: "notice" })
+      const service = await f.start({
+        ...f.store,
+        async clearPendingDiscard() {
+          entered.resolve()
+          await release.promise
+          await f.store.clearPendingDiscard()
+        },
+      })
+      const acknowledgement = service.api.acknowledgePendingNotice({ id: "notice" })
+      await entered.promise
+      const lease = service.acquire("during-acknowledgment")
+      expect(lease?.generation).toBe(1)
+      lease?.release()
+      const validation = await service.api.check({
+        revision: 1, url: original.url, username: original.username, password: { operation: "preserve" },
+      })
+      const change = { revision: 1, validationId: validation.validationId }
+      await expect(service.api.save(change)).rejects.toThrow("LOGINOM_APPLICATION_PENDING")
+      release.resolve()
+      expect(await acknowledgement).not.toHaveProperty("pendingNotice")
+      expect(await service.api.save(change)).toMatchObject({ revision: 2 })
+    } finally {
+      release.resolve()
+      await f.close()
+    }
   })
 
   test(`${name}: preserves current-version stand URLs and secrets across restarts`, async () => {

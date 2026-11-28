@@ -307,7 +307,9 @@ async function loginomApplication(page: Page, outcome: "applied" | "failed") {
 for (const width of [1280, 390]) {
   test(`Loginom keeps polling with a saved warning and acknowledges it at width ${width}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 800 })
+    const directory = "/test/loginom"
     let reads = 0
+    let ready = false
     let acknowledged = false
     const current = {
       revision: 1,
@@ -317,28 +319,47 @@ for (const width of [1280, 390]) {
       folder: "/analyst",
       hasPassword: true,
     }
-    const form = await openLoginomSettings(page, ({ rpcID, method, body }) => {
-      if (rpcID !== "loginom.connection") return
-      if (method === "acknowledgePendingNotice") {
-        expect(body).toMatchObject({ input: { id: "notice" } })
-        acknowledged = true
-      }
-      if (method !== "status" && method !== "acknowledgePendingNotice") return
-      return {
-        output: {
-          ok: true,
-          value: {
-            ...current,
-            state: reads++ === 0 ? "starting" : "ready",
-            failed: !acknowledged,
-            ...(acknowledged ? {} : { pendingOutcome: "pendingNotApplied", pendingNotice: "notice" }),
+    const { push } = await mockWorkspace(page, {
+      directory, name: "Loginom demo", provider: NO_PROVIDER,
+      onRpc: ({ rpcID, method, body }) => {
+        if (rpcID !== "loginom.connection") return
+        if (method === "acknowledgePendingNotice") {
+          expect(body).toMatchObject({ input: { id: "notice" } })
+          acknowledged = true
+        }
+        if (method !== "status" && method !== "acknowledgePendingNotice") return
+        if (method === "status" && ++reads === 2) return { unavailable: true }
+        return {
+          output: {
+            ok: true,
+            value: {
+              ...current,
+              state: ready ? "ready" : "starting",
+              failed: !acknowledged,
+              ...(acknowledged ? {} : { pendingOutcome: "pendingNotApplied", pendingNotice: "notice" }),
+            },
           },
-        },
-      }
+        }
+      },
     })
+    const now = new Date()
+    await page.clock.install({ time: now })
+    await page.clock.pauseAt(now)
+    await page.goto("/settings?tab=loginom")
+    const form = page.getByRole("tabpanel", { name: "Loginom", exact: true }).locator("form")
     const warning = form.getByText("The new settings were not applied. Save them again.")
     const connected = form.getByRole("status").getByText(/Connected as analyst/)
     await expect(warning).toBeVisible()
+    await page.clock.fastForward(1_000)
+    await expect.poll(() => reads).toBe(2)
+    await page.clock.fastForward(1_000)
+    await expect.poll(() => reads).toBe(3)
+
+    ready = true
+    await push([{
+      id: "evt_loginom_connection_ready", created: 1, type: "rpc.loginom.connection.ready",
+      location: { directory }, data: { revision: current.revision, generation: current.generation },
+    }])
     await expect(connected).toBeVisible()
     await expect(warning).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath("connection-warning.png"), animations: "disabled" })

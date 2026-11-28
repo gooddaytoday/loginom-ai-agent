@@ -33,7 +33,7 @@ export const BrowserStatus = Schema.Union([
 export type BrowserStatus = typeof BrowserStatus.Type
 export const ConnectionApplication = Schema.Struct({ revision: NonNegativeInt, generation: NonNegativeInt })
 export type ConnectionApplication = typeof ConnectionApplication.Type
-export type ConnectionApplicationListener = (outcome: "applied" | "failed", event: ConnectionApplication) => void
+export type ConnectionApplicationListener = (outcome: "applied" | "failed" | "ready", event: ConnectionApplication) => void
 const Application = Schema.Union([
   Schema.Struct({ state: Schema.Literal("pending"), tasks: NonNegativeInt }),
   Schema.Struct({ state: Schema.Literal("applied") }),
@@ -51,6 +51,7 @@ export const View = Schema.Struct({
   application: Schema.optionalKey(Application),
   browser: optional(BrowserStatus),
   failure: Schema.optionalKey(Schema.String),
+  runtimeFailure: Schema.optionalKey(Schema.Literals(["LOGINOM_RUNTIME_START_FAILED", "LOGINOM_RUNTIME_TIMEOUT"])),
   cleanupFailure: Schema.optionalKey(Schema.Literal("LOGINOM_PENDING_CLEAR_FAILED")),
   pendingNotice: Schema.optionalKey(Schema.String),
   recoveries: Schema.optionalKey(Schema.Array(Schema.String)),

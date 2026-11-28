@@ -105,7 +105,7 @@ async function profile(mode: string, build: "production" | "fixture") {
   const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
   await store.stage(original)
   await store.activate(1)
-  const launch = () =>
+  const launch = (onConnectionApplication?: Loginom.ConnectionApplicationListener) =>
     launchNodeHost({
       node,
       entry: join(directory, build, "node-host.mjs"),
@@ -113,6 +113,7 @@ async function profile(mode: string, build: "production" | "fixture") {
       resources,
       headless: true,
       environment: { ...process.env, [flag]: "1" },
+      onConnectionApplication,
     })
   return { store, launch, fault: join(root, "con08-fault") }
 }
@@ -205,7 +206,20 @@ test.each([
       await owner.request("release", { run: "after-failure" })
 
       await owner.close()
-      owner = await f.launch()
+      const ready = Promise.withResolvers<Loginom.ConnectionApplication>()
+      await writeFile(gate, "")
+      try {
+        owner = await f.launch((outcome, event) => {
+          if (outcome === "ready") ready.resolve(event)
+        })
+        expect(await owner.request("connection.status", {})).toMatchObject({
+          state: "starting", generation: 1, failure: "LOGINOM_PENDING_NOT_APPLIED",
+        })
+        await catalog.entered()
+      } finally {
+        await catalog.release()
+      }
+      expect(await ready.promise).toEqual({ revision: 1, generation: 1 })
       const reopened = Schema.decodeUnknownSync(Loginom.View)(await owner.request("connection.ready", {}))
       expect(reopened).toMatchObject({
         state: "ready",
