@@ -11,7 +11,23 @@ import type definition from "./index"
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
+  const Catalog = lazy(() => import("./catalog-page"))
+
+  ctx.add(Page, {
+    id: "catalog",
+    nav: {},
+    get title() {
+      return ctx.t("catalog.title")
+    },
+    render: () => (
+      <Suspense>
+        <Catalog />
+      </Suspense>
+    ),
+  })
+
   const Settings = lazy(() => import("./page"))
+
   ctx.add(SettingsPage, {
     id: "loginom",
     icon: "arrow-up-right",

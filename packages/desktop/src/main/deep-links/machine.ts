@@ -1,17 +1,12 @@
-import { Predicate } from "effect"
-import { consoleReturnWindow } from "../lifecycle/deep-link"
 import type { DeepLinkPayload } from "../../shared/ipc-rpc/events"
 
 export type DeepLinkWindow = { readonly status: "loading" } | { readonly status: "ready"; readonly clientID: number }
 
-// `target` is the window a console return names; a link without one, or whose window is gone, opens in the
-// preferred window.
 export type DeepLink =
-  | { readonly status: "queued"; readonly url: DeepLinkPayload; readonly target: string | undefined }
+  | { readonly status: "queued"; readonly url: DeepLinkPayload }
   | {
       readonly status: "delivered"
       readonly url: DeepLinkPayload
-      readonly target: string | undefined
       readonly clientID: number
       readonly attempt: number
     }
@@ -56,13 +51,8 @@ export function transitionDeepLinks(state: DeepLinkState, event: DeepLinkEvent):
     case "links.received": {
       if (event.urls.length === 0) return unchanged(state)
 
-      const links = event.urls.map((url): DeepLink => ({
-        status: "queued",
-        url,
-        target: Predicate.isString(url) ? consoleReturnWindow(url) : undefined,
-      }))
-
-      const focus = links.find((link) => link.target && state.windows[link.target])?.target ?? preferredWindowID(state)
+      const links = event.urls.map((url): DeepLink => ({ status: "queued", url }))
+      const focus = preferredWindowID(state)
       const next = drain({ ...state, links: [...state.links, ...links] })
 
       return {
@@ -137,57 +127,32 @@ export function transitionDeepLinks(state: DeepLinkState, event: DeepLinkEvent):
   }
 }
 
-// The window an untargeted link opens in: the focused one, else the first open one.
+// The window a link opens in: the focused one, else the first open one.
 function preferredWindowID(state: DeepLinkState) {
   return state.focusedWindowID ?? Object.keys(state.windows)[0]
 }
 
-// The ready window and renderer a link goes to now, if any.
-function recipientOf(state: DeepLinkState, link: DeepLink) {
-  const windowID = link.target && state.windows[link.target] ? link.target : preferredWindowID(state)
+// Sends queued links to the preferred window as soon as it is ready.
+function drain(state: DeepLinkState): DeepLinkTransition {
+  const windowID = preferredWindowID(state)
   const window = windowID ? state.windows[windowID] : undefined
 
-  if (!windowID || window?.status !== "ready") return
+  if (!windowID || window?.status !== "ready") return unchanged(state)
 
-  return { windowID, clientID: window.clientID }
-}
+  const urls = state.links.flatMap((link) => (link.status === "queued" ? [link.url] : []))
 
-// Sends every queued link whose window is ready, one batch and attempt per window.
-function drain(state: DeepLinkState): DeepLinkTransition {
-  const routed = state.links.map((link) => ({
-    link,
-    recipient: link.status === "queued" ? recipientOf(state, link) : undefined,
-  }))
+  if (urls.length === 0) return unchanged(state)
 
-  const recipients = routed.flatMap((item) => (item.recipient ? [item.recipient] : []))
+  const attempt = state.nextAttempt
+  const clientID = window.clientID
 
-  const batches = recipients
-    .filter((recipient, index) => recipients.findIndex((other) => other.windowID === recipient.windowID) === index)
-    .map((recipient, index) => ({
-      ...recipient,
-      attempt: state.nextAttempt + index,
-      urls: routed.flatMap((item) => (item.recipient?.windowID === recipient.windowID ? [item.link.url] : [])),
-    }))
-
-  if (batches.length === 0) return { state, commands: [] }
-
-  const links = routed.map((item): DeepLink => {
-    const batch = batches.find((candidate) => candidate.windowID === item.recipient?.windowID)
-
-    if (!batch) return item.link
-
-    return {
-      status: "delivered",
-      url: item.link.url,
-      target: item.link.target,
-      clientID: batch.clientID,
-      attempt: batch.attempt,
-    }
-  })
+  const links = state.links.map(
+    (link): DeepLink => (link.status === "queued" ? { status: "delivered", url: link.url, clientID, attempt } : link),
+  )
 
   return {
-    state: { ...state, links, nextAttempt: state.nextAttempt + batches.length },
-    commands: batches.map((batch): DeepLinkCommand => ({ type: "links.deliver", ...batch })),
+    state: { ...state, links, nextAttempt: attempt + 1 },
+    commands: [{ type: "links.deliver", windowID, clientID, attempt, urls }],
   }
 }
 
@@ -195,9 +160,7 @@ function drain(state: DeepLinkState): DeepLinkTransition {
 function requeue(links: readonly DeepLink[], clientID: number) {
   return links.map(
     (link): DeepLink =>
-      link.status === "delivered" && link.clientID === clientID
-        ? { status: "queued", url: link.url, target: link.target }
-        : link,
+      link.status === "delivered" && link.clientID === clientID ? { status: "queued", url: link.url } : link,
   )
 }
 
