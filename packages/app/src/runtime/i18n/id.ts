@@ -143,7 +143,6 @@ export const dict = {
   "dialog.provider.tag.recommended": "Direkomendasikan",
   "dialog.provider.opencode.note": "Model pilihan, termasuk Claude, GPT, Gemini, dan lainnya",
   "dialog.provider.opencode.tagline": "Model andal yang dioptimalkan",
-  "dialog.provider.opencodeGo.tagline": "Langganan terjangkau untuk semua orang",
   "dialog.provider.anthropic.note": "Akses langsung ke model Claude melalui kunci API",
   "dialog.provider.copilot.note": "Model AI untuk bantuan pengodean melalui GitHub Copilot",
   "dialog.provider.openai.note": "Model GPT untuk tugas AI umum yang cepat dan mumpuni",
@@ -158,8 +157,6 @@ export const dict = {
   "dialog.model.manage.description": "Sesuaikan model mana yang muncul di pemilih model.",
 
   "dialog.model.unpaid.freeModels.title": "Model gratis disediakan oleh OpenCode",
-  "dialog.model.unpaid.addMore.title": "Tambahkan lebih banyak model dari penyedia populer",
-  "dialog.model.unpaid.viewMoreProviders": "Lihat 70+ penyedia lainnya",
 
   "dialog.provider.viewAll": "Tampilkan lebih banyak penyedia",
 
@@ -281,8 +278,6 @@ export const dict = {
   "dialog.project.edit.color.select": "Pilih warna {{color}}",
   "dialog.project.edit.worktree.startup": "Skrip awal ruang kerja",
   "dialog.project.edit.worktree.startup.placeholder": "mis. bun install",
-
-  "dialog.usageExceeded.dontShowAgain": "Jangan tampilkan lagi",
 
   "toast.permissions.autoaccept.on.title": "Menerima izin secara otomatis",
   "toast.permissions.autoaccept.on.description": "Permintaan izin akan disetujui secara otomatis",

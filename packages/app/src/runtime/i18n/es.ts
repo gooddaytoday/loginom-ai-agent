@@ -356,7 +356,6 @@ export const dict = {
   "dialog.provider.tag.recommended": "Recomendado",
   "dialog.provider.opencode.note": "Selección de modelos como Claude, GPT, Gemini y otros",
   "dialog.provider.opencode.tagline": "Modelos optimizados y fiables",
-  "dialog.provider.opencodeGo.tagline": "Suscripción económica para todos",
   "dialog.provider.copilot.note": "Modelos de IA para asistencia de codificación a través de GitHub Copilot",
   "dialog.provider.openai.note": "Modelos GPT para tareas de IA generales rápidas y capaces",
   "dialog.provider.google.note": "Modelos Gemini para respuestas rápidas y estructuradas",
@@ -370,8 +369,6 @@ export const dict = {
   "dialog.model.manage.description": "Personalizar qué modelos aparecen en el selector de modelos.",
 
   "dialog.model.unpaid.freeModels.title": "Modelos gratuitos proporcionados por OpenCode",
-  "dialog.model.unpaid.addMore.title": "Añadir más modelos de proveedores populares",
-  "dialog.model.unpaid.viewMoreProviders": "Ver más de 70 proveedores",
 
   "dialog.provider.viewAll": "Ver más proveedores",
 
@@ -484,8 +481,6 @@ export const dict = {
   "dialog.project.edit.color.select": "Seleccionar color {{color}}",
   "dialog.project.edit.worktree.startup": "Script de inicio del espacio de trabajo",
   "dialog.project.edit.worktree.startup.placeholder": "p. ej. bun install",
-
-  "dialog.usageExceeded.dontShowAgain": "No volver a mostrar",
 
   "toast.permissions.autoaccept.on.title": "Aceptando permisos automáticamente",
   "toast.permissions.autoaccept.on.description": "Las solicitudes de permisos se aprobarán automáticamente",

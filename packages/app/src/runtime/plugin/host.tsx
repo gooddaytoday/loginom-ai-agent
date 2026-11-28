@@ -23,7 +23,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry } from "@opencode/plugin/gui/host"
-import { ToolRenderer, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
+import { Page, ToolRenderer, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
 import { Predicate } from "effect"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { pluralCategory, resolveTemplate } from "@opencode/ui/context/i18n"
@@ -130,8 +130,8 @@ type HostState = {
   contracts: Record<string, number | undefined>
 }
 
-// How long a plugin may load its window entry and global stores before it fails.
-const activationTimeout = 30_000
+// Give Desktop's 30 s port handshake time to finish, with 15 s of headroom for store reads.
+const activationTimeout = 45_000
 
 type Stores = Record<string, Persisted<object> | ((session: SessionRef) => Persisted<object>)>
 
@@ -820,6 +820,9 @@ function createHost(input: HostInput) {
 
         if (toolRenderer && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add tool renderers")
+
+        if (registry.id === Page.id && !input.builtins?.has(plugin))
+          throw new Error("Only built-in plugins can add pages")
 
         let active = toolRenderer
         let claimed: string | undefined

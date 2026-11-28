@@ -98,8 +98,8 @@ export const dict = {
   "theme.scheme.dark": "Тёмная",
 
   "command.project.open": "Открыть проект",
-  "command.provider.connect": "Подключить провайдера",
-  "command.provider.connect.description": "Войдите в аккаунт OpenCode Go, OpenCode Console или другого провайдера",
+  "command.provider.connect": "Подключить модель…",
+  "command.provider.connect.description": "Подключите модель: по подписке, по ключу API или свой сервер.",
   "command.settings.open": "Открыть настройки",
 
   "command.config.reload": "Обновить конфигурацию",
@@ -188,14 +188,14 @@ export const dict = {
   "dialog.provider.tag.recommended": "Рекомендуемые",
   "dialog.provider.opencode.note": "Отобранные модели, включая Claude, GPT, Gemini и другие",
   "dialog.provider.opencode.tagline": "Надёжные оптимизированные модели",
-  "dialog.provider.opencodeGo.tagline": "Доступная подписка для всех",
   "dialog.provider.copilot.note": "ИИ-модели для помощи в кодировании через GitHub Copilot",
   "dialog.provider.openai.note": "Модели GPT для быстрых и мощных задач общего ИИ",
   "dialog.provider.google.note": "Модели Gemini для быстрых и структурированных ответов",
-  "dialog.provider.openrouter.note": "Доступ к моделям разных сервисов через OpenRouter",
+  "dialog.provider.openrouter.note": "Доступ к моделям разных провайдеров через OpenRouter",
   "dialog.provider.vercel.note": "Единый доступ к ИИ-моделям с умной маршрутизацией",
 
   "dialog.model.select.title": "Выбрать модель",
+  "dialog.model.connect": "Подключить модель",
   "dialog.model.search.placeholder": "Поиск моделей",
   "dialog.model.empty": "Модели не найдены",
   "dialog.model.unavailable": "{{model}} (недоступна)",
@@ -210,11 +210,14 @@ export const dict = {
   "dialog.model.hint.select": "Выбрать",
   "dialog.model.favorite": "Добавить в избранное",
   "dialog.model.unfavorite": "Убрать из избранного",
-  "dialog.model.unpaid.freeModels.title": "Бесплатные модели от OpenCode",
-  "dialog.model.unpaid.addMore.title": "Добавьте модели из других сервисов",
-  "dialog.model.unpaid.viewMoreProviders": "Посмотреть других провайдеров (более 70)",
+  "dialog.model.unpaid.freeModels.title": "Бесплатные модели OpenCode",
+  "dialog.model.unpaid.connect.title": "Добавьте больше моделей",
+  "dialog.model.unpaid.moreProviders": "Ещё провайдеры",
 
-  "dialog.provider.viewAll": "Показать больше сервисов",
+  "session.freeLimit.stopped": "Модель остановила ход",
+  "session.freeLimit.resetTime": "Бесплатные запросы снова доступны с {{time}}.",
+
+  "dialog.provider.viewAll": "Показать больше провайдеров",
 
   "dialog.provider.accounts.add": "Добавить аккаунт",
   "dialog.provider.accounts.connected": "Подключённые аккаунты",
@@ -254,7 +257,7 @@ export const dict = {
     "В Loginom AI Agent можно отправлять подходящие запросы по подписке ChatGPT.",
   "provider.connect.chatgptWelcome.usage": "Управление расходом в настройках ChatGPT",
   "provider.connect.chatgptWelcome.confirm": "Понятно",
-  "provider.connect.models.list": "Модели сервиса {{provider}}",
+  "provider.connect.models.list": "Модели провайдера {{provider}}",
   "provider.connect.chatgptUsageLimit.title": "Достигнут лимит ChatGPT",
   "provider.connect.chatgptUsageLimit.description": "Проверьте расход и лимиты в настройках ChatGPT.",
   "provider.connect.chatgptUsageLimit.manage": "Перейти в настройки расхода",
@@ -451,7 +454,6 @@ export const dict = {
 
   "dialog.project.edit.worktree.startup": "Скрипт запуска рабочего пространства",
   "dialog.project.edit.worktree.startup.placeholder": "например, bun install",
-  "dialog.usageExceeded.dontShowAgain": "Больше не показывать",
 
   "toast.permissions.autoaccept.on.title": "Разрешения принимаются автоматически",
   "toast.permissions.autoaccept.on.description": "Запросы на разрешения будут одобряться автоматически",
@@ -502,11 +504,11 @@ export const dict = {
   "error.chain.responseBody": "Тело ответа:\n{{body}}",
   "error.chain.didYouMean": "Возможно, вы имели в виду: {{suggestions}}",
   "error.chain.modelNotFound": "Модель не найдена: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "Проверьте названия сервиса и модели в файле настроек loginom-ai-agent.json",
+  "error.chain.checkConfig": "Проверьте названия провайдера и модели в файле настроек loginom-ai-agent.json",
   "error.chain.mcpFailed": "Не удалось подключиться к «{{name}}». Проверьте настройки подключения.",
-  "error.chain.providerAuthFailed": "Не удалось войти в сервис {{provider}}: {{message}}",
+  "error.chain.providerAuthFailed": "Не удалось войти в аккаунт у провайдера {{provider}}: {{message}}",
   "error.chain.providerInitFailed":
-    "Не удалось подключиться к сервису «{{provider}}». Проверьте данные для входа и настройки.",
+    "Не удалось подключиться к провайдеру «{{provider}}». Проверьте данные для входа и настройки.",
   "error.chain.configJsonInvalid": "Конфигурационный файл по адресу {{path}} содержит некорректный JSON(C)",
   "error.chain.configJsonInvalidWithMessage":
     "Конфигурационный файл по адресу {{path}} содержит некорректный JSON(C): {{message}}",
@@ -1050,12 +1052,6 @@ export const dict = {
     "Сервер {{server}} больше не принимает данные для входа. Войдите снова, чтобы продолжить.",
   "session.error.signedOut.signIn": "Войти снова",
   "session.background.moveInline": "Нажмите {{keybind}}, чтобы перенести текущую работу в фоновый режим",
-  "session.freeLimit.title": "Бесплатный лимит исчерпан",
-  "session.freeLimit.reset":
-    "Бесплатный лимит обновится в {{time}}. Чтобы продолжить, подключите провайдера или оформите подписку Go.",
-  "session.freeLimit.noReset": "Чтобы продолжить, подключите провайдера или оформите подписку Go.",
-  "session.freeLimit.connect": "Подключить провайдера",
-  "session.freeLimit.subscribe": "Подписаться на Go · $10 в месяц",
   "session.goLimit.title": "Лимит Go исчерпан.",
   "session.goLimit.titleNamed": "Лимит Go для {{name}} исчерпан.",
   "session.goLimit.reset": "Лимит обновится в {{time}}.",
