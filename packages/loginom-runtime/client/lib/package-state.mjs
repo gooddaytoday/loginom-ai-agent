@@ -59,23 +59,23 @@ export async function readPackageState({ origin, build, documentId, operationId,
 
 export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
   const origin = loginomUrl && new URL(loginomUrl).origin;
+  const browserPending = Symbol('browser read pending');
   let evaluation;
   let dirty;
   let lastConfirmed;
   return async (context, lastConfirmedSave, busy) => {
     const lastSave = lastConfirmedSave ? { path: lastConfirmedSave.path, confirmedAt: lastConfirmedSave.confirmedAt } : null;
+    const preparation = metadata.workspacePreparation;
+    const prepared = preparation?.state;
+    const stillPrepared = () => !!prepared && metadata.workspaceReady === true && metadata.workspacePreparation === preparation;
     const cachedSnapshot = () => ({
       ...lastConfirmed.snapshot,
       lastSave,
       staleForSeconds: Math.floor(Math.max(0, now() - lastConfirmed.at) / 1000),
     });
-    if (busy && lastConfirmed) return cachedSnapshot();
-
-    const preparation = metadata.workspacePreparation;
-    const prepared = preparation?.state;
-    let observation = null;
+    let observation = evaluation ? browserPending : null;
     if (!preparation && !busy) observation = { open: false, path: null, modified: null };
-    if (prepared && metadata.workspaceReady === true && origin && !busy && !evaluation) {
+    if (stillPrepared() && origin && !busy && !evaluation) {
       const pages = context.pages().filter(page => URL.canParse(page.url()) && new URL(page.url()).origin === origin);
       if (pages.length === 1) {
         let timer;
@@ -91,7 +91,7 @@ export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
           observation = await Promise.race([
             evaluation,
             // Bound the browser round trip, including time before page code can run.
-            new Promise(resolve => { timer = setTimeout(resolve, 4000, null); }),
+            new Promise(resolve => { timer = setTimeout(resolve, 4000, browserPending); }),
           ]);
         } catch {
           observation = null;
@@ -99,12 +99,23 @@ export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
           clearTimeout(timer);
         }
       }
-      if (metadata.workspacePreparation !== preparation || metadata.workspaceReady !== true) observation = null;
+      if (!stillPrepared()) observation = null;
     }
+
+    if (stillPrepared() && lastConfirmed?.preparation === preparation) {
+      if (busy || observation === browserPending) return cachedSnapshot();
+      // Without a valid binding, future requests need a fresh observation.
+      if (observation === null) lastConfirmed = undefined;
+    }
+    if (observation === browserPending) observation = null;
 
     const identity = JSON.stringify([prepared?.document_id, prepared?.loginom_account, observation?.packageId, observation?.path]);
     if (observation?.open && observation.modified === null && lastConfirmed?.identity === identity
-      && typeof lastConfirmed.snapshot.modified === 'boolean') return cachedSnapshot();
+      && typeof lastConfirmed.snapshot.modified === 'boolean') {
+      // The browser verified the same package under this preparation.
+      lastConfirmed.preparation = preparation;
+      return cachedSnapshot();
+    }
     if (observation?.open === false || observation?.modified === false) dirty = undefined;
     const at = now();
     if (observation?.modified === true && dirty?.identity !== identity) dirty = { identity, at };
@@ -116,7 +127,7 @@ export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
       lastSave,
       staleForSeconds: null,
     };
-    if (observation) lastConfirmed = { snapshot, at, identity };
+    if (observation) lastConfirmed = { snapshot, at, identity, preparation };
     return snapshot;
   };
 }
