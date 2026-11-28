@@ -46,6 +46,9 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       new URL("../../loginom-runtime/src/dashboard-storage.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/src/protected-operation.mjs": await readFile(
+      new URL("../../loginom-runtime/src/protected-operation.mjs", import.meta.url), "utf8",
+    ),
     "runtime/src/resources.mjs": `export async function verifyResources() {
       return { manifestHash: 'fixture', manifest: { actionManifestSha256: 'fixture' } };
     }`,
@@ -95,12 +98,21 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
        export const artifactFailure=artifacts.artifactFailure ?? (()=>null);`,
     "runtime/client/lib/bridge.mjs": `
       import { readFileSync } from 'node:fs';
+      import { loginomFeedMetadata } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/user-results.mjs", import.meta.url).href)};
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
-      export async function createBridge() { return {
+      export let protect;
+      export async function createBridge(_config, _session, {presentNodeReply, protectOperation}) {
+       protect = protectOperation;
+       return {
         server: { connect: async () => {} }, close: async () => ({
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
+        applyWithScanReceipt: async reply => {
+          const end = await protectOperation(reply.structuredContent.operation_id);
+          await end();
+          return presentNodeReply(reply, options => loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'}));
+        },
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -115,12 +127,16 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
           if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
           if (input.arguments.progressFixture) {
             const { stepPhase } = await import('../../../../lib/step-progress.mjs');
+            const { protect } = await import('../../../../lib/bridge.mjs');
+            const end = await protect('progress-operation');
+            try {
             stepPhase('configuring', 'transform.group_data', { kind: 'fields', index: 2, total: 3 });
             await new Promise(resolve => setTimeout(resolve, 1700));
             stepPhase('reading', 'transform.group_data');
             await new Promise(resolve => setTimeout(resolve, 1550));
             setTimeout(() => stepPhase('executing'), 50);
             return { content: [{ type: 'text', text: 'original model result' }] };
+            } finally { await end(); }
           }
           if (!input.arguments.hold) return { content: [] };
           await new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(Error('aborted')), { once: true }));
@@ -147,7 +163,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     stateDir: join(directory, "state"),
     generation: 1,
     chat: "chat",
-    connection: { url: "http://example.test", username: "user", apiKey: "fixture", password: "" },
+    connection: { url: "http://example.test", username: "test", apiKey: "fixture", password: "private-password" },
     environment: {},
   })
   try {
@@ -167,7 +183,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       { activeWork: false, unsettledWork: false },
     ]) {
       await Bun.write(work, JSON.stringify(state))
-      expect(await runtime.request("work")).toEqual({ ...state, dispatching: false })
+      expect(await runtime.request("work")).toEqual({ ...state, dispatching: false, busy: null })
     }
     const args = { intent: "open_package", operation_id: "local-package" }
     const packageArtifact = { artifactID: "artifact", uploadGrantID: "grant" }
@@ -176,13 +192,64 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       recoveryPending: false,
       activeWork: false,
     })
+    const receipt = {
+      result_version: "user-v1",
+      operation_id: "test-operation",
+      state: "settled",
+      status: "SUCCEEDED",
+      node: { node_id: "node-guid", label: "test node", type: "transform.filter_data" },
+      output: {
+        ports: [
+          {
+            port: 0,
+            port_guid: "port-guid",
+            fresh: true,
+            row_count: 3,
+            sample_complete: true,
+            schema: [{ index: 0, name: "test_name", type: "string" }],
+            sample: ["contest result", "fixture", "private-password"].map((value) => [{ type: "string", value }]),
+          },
+        ],
+      },
+    }
+    const content = [{ type: "text", text: JSON.stringify(receipt) }]
+    const updates: unknown[] = []
+    const busy = { version: 1, windowId: expect.any(String), operationId: "test-operation", active: false }
+    expect(
+      await runtime.request("call", {
+        name: "dock_node_apply",
+        arguments: { content, structuredContent: receipt },
+        scanReceipt: {},
+        stepProgress: true,
+      }, undefined, update => updates.push(update)),
+    ).toMatchObject({
+      result: {
+        content,
+        _meta: {
+          loginom: {
+            operationId: "test-operation",
+            busy,
+            node: { label: "test node" },
+            ports: [
+              {
+                preview: {
+                  schema: [{ name: "test_name" }],
+                  sample: [[{ value: "contest result" }], [{ value: "[redacted]" }], [{ value: "[redacted]" }]],
+                },
+              },
+            ],
+          },
+        },
+      },
+    })
+    expect(updates).toEqual([{ busy: { ...busy, active: true } }, { busy }])
     const call = runtime
       .request("call", { name: "fixture", arguments: { hold: true } })
       .catch((error: unknown) => error)
-    expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: true })
+    expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: true, busy })
     expect(await runtime.request("interrupt")).toEqual({ interrupted: true })
     expect(await call).toMatchObject({ message: "LOGINOM_RUNTIME_FAILED" })
-    expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: false })
+    expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: false, busy })
   } finally {
     await runtime.close()
     expect(await runtime.exited).toEqual({ code: 0, signal: null })
@@ -282,18 +349,28 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     const tool = tools.get("loginom_fixture")
     if (!tool) throw Error("Fixture tool not registered")
     const updates: unknown[] = []
-    const result = await tool.execute({ progressFixture: true }, {
+    const entered = Promise.withResolvers<void>()
+    const running = tool.execute({ progressFixture: true }, {
       sessionID, messageID, agent: Agent.ID.make("fixture"), id: Tool.CallID.make("fixture"),
       signal: new AbortController().signal,
-      progress: async (update) => { updates.push(update) },
+      progress: async (update) => { updates.push(update); entered.resolve() },
     })
+    await Promise.race([entered.promise, running])
+    const active = await run.busy()
+    if (!active) throw Error("Protected operation did not publish a live snapshot")
+    expect(active).toMatchObject({ version: 1, windowId: expect.any(String), operationId: "progress-operation", active: true })
+    const result = await running
+    const settled = { ...active, active: false }
+    expect(await run.busy()).toEqual(settled)
     expect(result).toEqual({ content: "original model result", metadata: { generation: 1 } })
     expect(updates).toEqual([
-      { loginomStep: { version: 1, phase: "configuring", nodeType: "transform.group_data", substep: { kind: "fields", index: 2, total: 3 }, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
-      { loginomStep: { version: 1, phase: "reading", nodeType: "transform.group_data", substep: null, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
+      { loginom: { busy: active } },
+      { loginom: { busy: active }, loginomStep: { version: 1, phase: "configuring", nodeType: "transform.group_data", substep: { kind: "fields", index: 2, total: 3 }, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
+      { loginom: { busy: active }, loginomStep: { version: 1, phase: "reading", nodeType: "transform.group_data", substep: null, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
+      { loginom: { busy: settled }, loginomStep: { version: 1, phase: "reading", nodeType: "transform.group_data", substep: null, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
     ])
     await Bun.sleep(1_600)
-    expect(updates).toHaveLength(2)
+    expect(updates).toHaveLength(4)
     for (const [name, code] of [
       ["missing", "LOGINOM_FILE_NOT_FOUND"],
       ["directory", "LOGINOM_FILE_NOT_REGULAR"],
@@ -315,7 +392,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       expect(error).toMatchObject({ message: code })
       if (name === "oversize")
         expect(error).toMatchObject({ details: { actual: 16 * 1024 * 1024 + 1, limit: 16 * 1024 * 1024 } })
-      const text = error instanceof Error ? error.message + JSON.stringify("details" in error ? error.details : undefined) : String(error)
+      const text =
+        error instanceof Error
+          ? error.message + JSON.stringify("details" in error ? error.details : undefined)
+          : String(error)
       expect(text).toContain(code)
       expect(text).not.toMatch(/secret|sourcePath|\/private|stack|AAAA/)
       expect(host.journal.pending()).toEqual([])
