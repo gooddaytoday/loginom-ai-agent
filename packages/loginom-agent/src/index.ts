@@ -2,8 +2,8 @@
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
-import { Definition as ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
