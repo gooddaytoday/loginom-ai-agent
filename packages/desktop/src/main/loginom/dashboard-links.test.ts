@@ -74,6 +74,22 @@ const unavailable = () => wire(400, '{"_tag":"RpcError","type":"rpc.unavailable"
 const failed = () => wire(500, '{"_tag":"RpcInternalError","type":"rpc.internal","message":"RPC call failed"}')
 
 describe("dashboard links (B4.15)", () => {
+  test("a second click on the same Studio link reports its spent snapshot", async () => {
+    const id = crypto.randomUUID()
+    const gone = { code: "DASHBOARD_SNAPSHOT_UNAVAILABLE", message: "DASHBOARD_SNAPSHOT_UNAVAILABLE" }
+    const target = service((attempt) => answer(attempt === 0 ? prepared : gone))
+    const seen = reports()
+    const queue = DashboardLinks.make(seen.report)
+    queue.connect(async () => target.data)
+    queue.receive([link(id, "create"), link(id, "create")])
+    await seen.until(2)
+    expect(target.requests.map((request) => request.body)).toEqual([asked(id), asked(id)])
+    expect(seen.list.map(([, result]) => result)).toEqual([
+      { status: "fulfilled", value: prepared },
+      { status: "fulfilled", value: gone },
+    ])
+  })
+
   test("prepares only the product's dashboard links, as 0.4's window read them, one at a time in order", async () => {
     const [first, second] = [crypto.randomUUID(), crypto.randomUUID()]
     const target = service(() => answer(prepared))

@@ -4,7 +4,7 @@ import { appendFile } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 import { createHook } from "node:async_hooks"
 import { browserEnvironment, browserLoggingArguments } from "./connection-check.mjs"
-import { browserLaunch } from "../client/lib/browser-launch.mjs"
+import { browserLaunch, prepareBrowserProfile } from "../client/lib/browser-launch.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 
 if (!process.send) throw Error("LOGINOM_PRIVATE_IPC_REQUIRED")
@@ -122,6 +122,7 @@ async function dispatch(message) {
         launch = browserLaunch(true)
       await phase({ phase: "browser.launch", status: "starting" })
       try {
+        await prepareBrowserProfile(profile)
         state.context = await chromium.launchPersistentContext(profile, {
           ...launch,
           executablePath: browserPath,
