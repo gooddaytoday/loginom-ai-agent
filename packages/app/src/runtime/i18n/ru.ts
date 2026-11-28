@@ -548,8 +548,7 @@ export const dict = {
   "home.sessions.group.today": "Сегодня",
   "home.sessions.group.yesterday": "Вчера",
   "home.sessions.group.older": "Ранее",
-  "home.providerTip":
-    "Подключите один из более чем 75 провайдеров, чтобы использовать Claude, GPT, Gemini и другие модели",
+  "home.providerTip": "Подключите модель",
 
   "session.tab.session": "Разговор",
   "session.tab.more": "Ещё…",
