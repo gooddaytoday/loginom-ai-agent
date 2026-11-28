@@ -145,7 +145,7 @@ function closedMode(state, s) {
 function loginomBlocked(state, s, url) {
   const mode = closedMode(state, s)
   if (mode === "device" && isWebUrl(url) && !isLocalUrl(url)) return "В режиме «" + deviceName + "» доступен только Loginom на этом компьютере, например http://127.0.0.1:8080."
-  if (mode !== "online" && url.replace(/\/$/, "") === publicStand) return "Учебный сервер Loginom работает в интернете. В закрытом контуре укажите адрес Loginom вашей организации."
+  if (mode !== "online" && url.replace(/\/$/, "") === publicStand) return "В закрытом контуре публичный стенд Loginom недоступен. Укажите адрес Loginom вашей организации."
   return ""
 }
 function lockReason(state) {
@@ -199,7 +199,7 @@ function policyBanner(state) {
 
 function loginomLine(state, s) {
   const reason = loginomBlocked(state, s, s.connection.url)
-  if (s.connection.url && reason) return status(closedMode(state, s) === "device" ? "Не на этом компьютере — не используется" : "Учебный сервер недоступен в закрытом контуре", "wait")
+  if (s.connection.url && reason) return status(closedMode(state, s) === "device" ? "Не на этом компьютере — не используется" : "Публичный стенд недоступен в закрытом контуре", "wait")
   return s.connection.connected ? status("Подключён как " + s.connection.username + " · папка /" + s.connection.username, "good") : status(s.test?.ok ? "Проверено, ещё не сохранено" : "Не подключён", "wait")
 }
 function loginomTab(state, s) {
@@ -208,7 +208,7 @@ function loginomTab(state, s) {
   const policy = state.policy === "set"
   const device = closedMode(state, s) === "device"
   const closedHint = policy ? "" : device && (!draft.url || !isLocalUrl(draft.url)) ? "В режиме «" + deviceName + "» нужен Loginom на этом компьютере, например http://127.0.0.1:8080."
-    : draft.url && state.contour === "closed" && draft.url.replace(/\/$/, "") === publicStand ? "Учебный сервер в закрытом контуре недоступен — укажите адрес Loginom вашей организации." : ""
+    : draft.url && state.contour === "closed" && draft.url.replace(/\/$/, "") === publicStand ? "Публичный стенд в закрытом контуре недоступен — укажите адрес Loginom вашей организации." : ""
   const feedback = result?.error ? notice("Не удалось подключиться", result.error, "error")
     : result?.ok ? notice("Проверка прошла", "Нажмите «Сохранить», чтобы агент работал с этим Loginom.", "good")
       : s.pendingConnection ? notice("Сохранено", "Новое подключение заработает, когда агент закончит текущий ход. Пока он работает с прежним.", "neutral") : ""
@@ -385,8 +385,8 @@ function contourTab(state, s) {
     ["Сайты", "Агент их не открывает.", locked("Запрещены")],
     ["Обновления", "Новые версии устанавливает администратор.", locked("Выключены")],
   ] : {
-    online: [["Свои навыки и действия", "Работают у вас; опубликовать для всех — после проверки Loginom."], ["Модели", "Бесплатные модели в Облаке OpenCode, провайдеры по подписке или ключу и свой сервер."], ["Loginom", "Любой адрес, в том числе учебный сервер."], ["Каталог", "Loginom Hub из интернета."], ["Сайты", "Агент открывает их, если разрешено в «Разрешениях»."], ["Обновления", "Приходят автоматически."]],
-    intranet: [["Свои навыки и действия", "Работают у вас; поделиться — файлом через администратора."], ["Модели", "Только свои: на этом компьютере и в сети организации."], ["Loginom", "Сервер в сети организации; учебный сервер недоступен."], ["Каталог", "Из файла: «Каталог» → «Импорт из файла»; навыки «Сообщество» — только если разрешил администратор."], ["Сайты", "Агент их не открывает."], ["Обновления", "Сами не приходят: новую версию установщика ставите вы или администратор."]],
+    online: [["Свои навыки и действия", "Работают у вас; опубликовать для всех — после проверки Loginom."], ["Модели", "Бесплатные модели в Облаке OpenCode, провайдеры по подписке или ключу и свой сервер."], ["Loginom", "Любой адрес, в том числе публичный стенд."], ["Каталог", "Loginom Hub из интернета."], ["Сайты", "Агент открывает их, если разрешено в «Разрешениях»."], ["Обновления", "Приходят автоматически."]],
+    intranet: [["Свои навыки и действия", "Работают у вас; поделиться — файлом через администратора."], ["Модели", "Только свои: на этом компьютере и в сети организации."], ["Loginom", "Сервер в сети организации; публичный стенд недоступен."], ["Каталог", "Из файла: «Каталог» → «Импорт из файла»; навыки «Сообщество» — только если разрешил администратор."], ["Сайты", "Агент их не открывает."], ["Обновления", "Сами не приходят: новую версию установщика ставите вы или администратор."]],
     device: [["Свои навыки и действия", "Работают у вас; поделиться — файлом через администратора."], ["Модели", "Только на этом компьютере."], ["Loginom", "Только на этом компьютере."], ["Каталог", "Из файла; навыки «Сообщество» — только если разрешил администратор."], ["Сайты", "Агент их не открывает."], ["Обновления", "Сами не приходят: новую версию установщика ставите вы или администратор."]],
   }[mode]
   return card("Сеть", "Куда приложению и агенту можно обращаться по сети.", choice) +
@@ -428,8 +428,8 @@ function helpTab(state, s) {
   return card("Справка", "Как пользоваться приложением. Документация самого Loginom встроена и доступна агенту.", '<div class="st-about brand"><picture><img class="brand-standard" src="assets/loginom-wordmark.svg" alt="Loginom"><img class="brand-inverse" src="assets/loginom-wordmark-light.png" alt="Loginom"></picture><span>AI Agent · версия 0.5.0 (прототип)</span></div><div class="st-help">' + [
     ["Подключить Loginom", policy ? "Адрес Loginom задал администратор. В «Loginom» введите пользователя и пароль, нажмите «Сохранить»."
       : device ? "Сейчас — только Loginom на этом компьютере. В «Loginom» укажите его адрес, например http://127.0.0.1:8080, пользователя и пароль."
-      : closed ? "В закрытом контуре учебный сервер недоступен. В «Loginom» укажите адрес сервера вашей организации, пользователя и пароль."
-        : "Адрес учебного сервера уже указан. Свой сервер — в «Loginom»: адрес, пользователь, пароль, «Проверить».", "tab:loginom", "Открыть «Loginom»"],
+      : closed ? "В закрытом контуре публичный стенд недоступен. В «Loginom» укажите адрес сервера вашей организации, пользователя и пароль."
+        : "Адрес публичного стенда уже указан. Свой сервер — в «Loginom»: адрес, пользователь, пароль, «Проверить».", "tab:loginom", "Открыть «Loginom»"],
     ["Выбрать модель", policy ? "Модели задал администратор; выберите одну из них в поле ввода."
       : closed ? "«Провайдеры» → «Свой сервер»: Ollama или LM Studio на этом компьютере" + (device ? "." : " или сервер вашей организации.") : "«Провайдеры»: подписка (например, ChatGPT), ключ API или свой сервер. Модель для разговора — в поле ввода.", "tab:providers", "Открыть «Провайдеры»"],
     ["Чтобы ничего не уходило в интернет", policy ? "Настройку сети задал администратор — раздел «Сеть» отмечен замком." : state.policy === "broken" ? "Пока файл политики с ошибкой, приложение и так работает без сети." : "«Сеть» → «Закрытый контур».", "tab:contour", "Открыть «Сеть»"],
@@ -475,7 +475,7 @@ export function renderSettings(state, narrow = false) {
   return '<div class="st-suite st-page"><header class="st-page-head"><div><h1>Настройки</h1><p>Loginom, модели, инструкции, разрешения и сеть.</p></div>' +
     '</header><div class="st-layout">' + menu + '<div class="st-content">' + (state.policy ? '<div class="st-policy">' + policyBanner(state) + "</div>" : "") + settingsBody(state, s) + "</div></div>" +
     (s.connect && state.policy !== "set" ? connectDialog(state, s) : "") +
-    (s.confirmClosed ? '<dialog class="st-dialog st-confirm-closed" aria-labelledby="st-closed-title"><h2 id="st-closed-title">Включить закрытый контур?</h2><p>Облачные модели, учебный сервер Loginom и сайты станут недоступны. Модели и Loginom вашей организации продолжат работать в её сети. Новое в Каталог добавляется из файла.</p><footer>' +
+    (s.confirmClosed ? '<dialog class="st-dialog st-confirm-closed" aria-labelledby="st-closed-title"><h2 id="st-closed-title">Включить закрытый контур?</h2><p>Облачные модели, публичный стенд Loginom и сайты станут недоступны. Модели и Loginom вашей организации продолжат работать в её сети. Новое в Каталог добавляется из файла.</p><footer>' +
       '<button class="btn quiet" data-st="cancel-closed" autofocus>Отмена</button>' +
       btn("Включить закрытый контур", "enable-closed", "primary") + "</footer></dialog>" : "") +
     (s.leaveTo ? '<dialog aria-labelledby="st-unsaved" class="st-dialog"><h2 id="st-unsaved">Подключение Loginom не сохранено</h2><p>Вернитесь и сохраните или уйдите без сохранения.</p><footer>' +
@@ -777,7 +777,7 @@ export function bindSettings(root, state, api) {
       api.setContour(action === "enable-closed" ? "closed" : value)
       ensureSettings(state)
       // The public stand is not used in a closed contour: say so, or the Loginom chip turns orange without a reason.
-      announceModel(api, before, s, s.connection.connected && loginomBlocked(state, s, s.connection.url) ? "Учебный сервер Loginom здесь недоступен — укажите сервер организации в «Loginom»." : "")
+      announceModel(api, before, s, s.connection.connected && loginomBlocked(state, s, s.connection.url) ? "Публичный стенд Loginom здесь недоступен — укажите сервер организации в «Loginom»." : "")
       api.render()
       return
     }
