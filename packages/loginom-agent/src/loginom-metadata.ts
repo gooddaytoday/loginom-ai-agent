@@ -1,3 +1,4 @@
+import { Step, StepOperationId, type StepMetadata } from "@loginom-ai-agent/loginom-host/step-state"
 import { SessionID } from "@opencode/schema/session-id"
 import { Option, Schema } from "effect"
 import {
@@ -9,31 +10,17 @@ import {
 
 const count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 const id = Schema.NonEmptyString
-const stepId = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_.:-]{1,128}$/))
 const busy = Schema.Struct({
   version: Schema.Literal(1),
   windowId: Schema.String.check(Schema.isUUID()),
-  operationId: stepId,
+  operationId: StepOperationId,
   active: Schema.Boolean,
-})
-const step = Schema.Struct({
-  outcome: Schema.Literals(["completed", "not_applied", "check_required"]),
-  retryAvailable: Schema.Boolean,
-  reason: Schema.optional(Schema.Literals(["unknown_write", "graph_conflict", "partial_effect"])),
-  persistence: Schema.Literals(["saved_through", "step_unsaved", "unknown"]),
-  save: Schema.NullOr(
-    Schema.Struct({
-      operationId: stepId,
-      path: Schema.String,
-      throughStep: Schema.Struct({ operationId: stepId, label: Schema.String.check(Schema.isMaxLength(240)) }),
-    }),
-  ),
 })
 
 const position = Schema.Struct({ x: Schema.Finite, y: Schema.Finite })
 const graphNode = Schema.Struct({ guid: id, label: Schema.String, type: id, position })
 const graphLink = Schema.Struct({ source: id, output: id, target: id, input: id })
-const manualEdits = Schema.Array(
+const edits = Schema.Array(
   Schema.Union([
     Schema.Struct({ kind: Schema.Literals(["node_added", "node_removed"]), node: graphNode }),
     Schema.Struct({ kind: Schema.Literal("node_renamed"), guid: id, from: Schema.String, to: Schema.String }),
@@ -46,6 +33,8 @@ const manualEdits = Schema.Array(
     }),
   ]),
 )
+
+const manualEdits = Schema.Struct({ edits, omitted: count })
 
 const savedPackageIdentity = { saveOperationId: id, packagePath: Schema.String }
 const savedChange = Schema.Union([
@@ -170,7 +159,7 @@ const identity = Schema.Struct({
 const extensionFields = {
   kind: Schema.Literals(["add", "configure", "execute", "export", "read", "save"]),
   busy,
-  step,
+  step: Step,
   manualEdits,
   verificationStale: Schema.Boolean,
   savedPackageGraph,
@@ -224,7 +213,7 @@ const fields = {
   files: Schema.Array(Schema.Struct({ artifactId: Schema.NonEmptyString, name: Schema.String, bytes: count })),
 }
 const diagnostics = {
-  dropped: Schema.Array(Schema.Literals(Object.keys(fields) as (keyof typeof fields)[])),
+  dropped: Schema.Array(id),
   omitted: Schema.Record(Schema.String.check(Schema.isMaxLength(64)), count),
 }
 const rawFields = { ...fields, ...diagnostics }
@@ -250,7 +239,7 @@ export const LoginomMetadata = Schema.Struct({ ...identity.fields, ...optional }
 export type LoginomMetadata = typeof LoginomMetadata.Type
 
 type Extension = keyof typeof extensionFields
-export type LoginomMetadataFields = Partial<Pick<LoginomMetadata, Extension>>
+export type LoginomMetadataFields = Partial<Pick<LoginomMetadata, Extension | "omitted">>
 export type LoginomMetadataInput = {
   toolCallId: string
   host?: unknown
@@ -265,14 +254,35 @@ const fieldDecoders = Object.entries(rawFields).map(([key, schema]) => ({
   limit: LOGINOM_METADATA_FIELD_MAX_BYTES[key as Extension],
 }))
 
-function readFields(value: object, extensionOnly = false) {
+const decodeEvidence = Schema.decodeUnknownOption(LoginomEvidence)
+const decodeOmitted = Schema.decodeUnknownOption(diagnostics.omitted)
+
+function readFields(value: Record<string, unknown>, extensionOnly = false) {
   const accepted: Record<string, unknown> = {}
-  const dropped: string[] = []
+  const dropped = Object.keys(value).filter(
+    (key) =>
+      !Object.hasOwn(identity.fields, key) &&
+      !Object.hasOwn(extensionOnly ? extensionFields : fields, key) &&
+      key !== "omitted" &&
+      key !== "dropped",
+  )
+  let omitted = Option.getOrUndefined(decodeOmitted(value.omitted))
   for (const { key, decode, limit } of fieldDecoders) {
-    if (extensionOnly && !Object.hasOwn(extensionFields, key)) continue
+    if (key === "omitted" || (extensionOnly && !Object.hasOwn(extensionFields, key))) continue
     if (!Object.hasOwn(value, key)) continue
-    const field = (value as Record<string, unknown>)[key]
+    const field = value[key]
     if (field === undefined) continue
+    if (key === "evidence" && Array.isArray(field)) {
+      const evidence = field.flatMap((fact: unknown) => {
+        const decoded = decodeEvidence(fact)
+        return Option.isSome(decoded) ? [decoded.value] : []
+      })
+      accepted.evidence = evidence
+      if (evidence.length < field.length) {
+        omitted = { ...omitted, evidence: (omitted?.evidence ?? 0) + field.length - evidence.length }
+      }
+      continue
+    }
     const decoded = decode(field)
     if (
       Option.isSome(decoded) &&
@@ -285,23 +295,37 @@ function readFields(value: object, extensionOnly = false) {
       dropped.push(key)
     }
   }
-  return { accepted, dropped }
+  return { accepted, dropped, omitted }
 }
 
-export function decodeLoginomMetadata(value: unknown, input?: LoginomMetadataInput): LoginomMetadata | undefined {
+export function decodeLoginomMetadata(
+  value: unknown,
+  input?: LoginomMetadataInput,
+  writeStep?: typeof StepMetadata.Type,
+): LoginomMetadata | undefined {
   const base = Option.getOrUndefined(decodeIdentity(value))
   let result: { _meta?: Record<string, unknown> } = {}
-  if (base && typeof value === "object" && value !== null) {
-    const { accepted, dropped } = readFields(value)
-    result = withLoginomMetadata(result, { receipt: { ...base, ...accepted }, dropped })
+  // A blocked write names the original operation, which can differ from the current call.
+  if (
+    base &&
+    (!writeStep || writeStep.operationId === base.operationId) &&
+    typeof value === "object" &&
+    value !== null
+  ) {
+    const { accepted, dropped, omitted } = readFields(value as Record<string, unknown>)
+    result = withLoginomMetadata(result, { receipt: { ...base, ...accepted, ...(omitted && { omitted }) }, dropped })
+  }
+  if (writeStep) {
+    result = withLoginomMetadata(result, { receipt: writeStep, step: writeStep.step })
   }
   for (const source of [input?.host, input?.agent]) {
     if (typeof source !== "object" || source === null) continue
-    const { accepted, dropped } = readFields(source, true)
+    const { accepted, dropped, omitted } = readFields(source as Record<string, unknown>, true)
     result = withLoginomMetadata(result, {
       ...accepted,
-      ...(base ? {} : { operationId: input?.toolCallId, state: "settled" }),
+      ...(base || writeStep ? {} : { operationId: input?.toolCallId, state: "settled" }),
       dropped,
+      omitted,
     })
   }
   return Option.getOrUndefined(decodeBlock(result._meta?.loginom))

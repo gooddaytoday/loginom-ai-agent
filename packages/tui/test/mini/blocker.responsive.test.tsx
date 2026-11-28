@@ -1,8 +1,15 @@
 /** @jsxImportSource @opentui/solid */
 import { expect, test } from "bun:test"
+import { OpenCode } from "@opencode/client/promise"
+import { Agent } from "@opencode/schema/agent"
+import type { Form } from "@opencode/schema/form"
+import { Session } from "@opencode/schema/session"
+import { SessionMessage } from "@opencode/schema/session-message"
+import { Tool } from "@opencode/schema/tool"
 import { BoxRenderable, RGBA, ScrollBoxRenderable, TextRenderable, type Renderable } from "@opentui/core"
 import { createTestRenderer } from "@opentui/core/testing"
 import { testRender } from "@opentui/solid"
+import { repeatGuard } from "../../../loginom-agent/src/repeat-guard"
 import { Keymap } from "../../src/context/keymap"
 import { RunFooter } from "../../src/mini/footer"
 import { RunFormBody } from "../../src/mini/footer.form"
@@ -54,19 +61,79 @@ async function renderForm(request: MiniFormRequest, width = 80, height = 20) {
   const replies: FormReply[] = []
   const app = await testRender(
     () => (
-      <RunFormBody
-        request={request}
-        theme={RUN_THEME_FALLBACK.footer}
-        onReply={(reply) => {
-          replies.push(reply)
-        }}
-        onCancel={() => {}}
-      />
+      <Keymap.Provider config={createTuiResolvedConfig()}>
+        <RunFormBody
+          request={request}
+          theme={RUN_THEME_FALLBACK.footer}
+          onReply={(reply) => {
+            replies.push(reply)
+          }}
+          onCancel={() => {}}
+        />
+      </Keymap.Provider>
     ),
     { width, height, kittyKeyboard: true },
   )
   return { ...app, replies }
 }
+
+test.each([
+  ["1", "continue", ""],
+  ["2", "stop", ""],
+  ["3", "hint", "Проверь заголовок"],
+])("Mini submits Loginom's repeat question with key %s", async (key, decision, hint) => {
+  const sessionID = Session.ID.create()
+  const requests: Form.Info[] = []
+  const guard = repeatGuard({
+    ask: async (form) => {
+      requests.push({ ...form, sessionID })
+      return { status: "answered", answer: { decision: "continue" } }
+    },
+    interrupt: async () => {},
+  })
+  const tool = guard.wrap({
+    name: "loginom_dock_node_apply",
+    description: "",
+    input: {},
+    execute: async () => ({ content: "Applied" }),
+  })
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await tool.execute({}, {
+      id: Tool.CallID.make(crypto.randomUUID()),
+      agent: Agent.ID.make("build"),
+      sessionID,
+      messageID: SessionMessage.ID.create(),
+      signal: new AbortController().signal,
+      progress: async () => {},
+    })
+  }
+  const client = OpenCode.make({
+    baseUrl: "http://opencode.local",
+    fetch: Object.assign(async () => Response.json({ data: requests }), { preconnect() {} }),
+  })
+  const [request] = await client.session.form.list({ sessionID })
+  if (!request) throw new Error("The third Loginom call did not open a question")
+
+  const app = await renderForm(request)
+  try {
+    await settle(app)
+    expect(app.captureCharFrame()).toContain("Повтор действия")
+    app.mockInput.pressKey(key)
+    await settle(app)
+    expect(app.captureCharFrame()).toContain("Подсказать агенту (необязательно)")
+    if (hint) await app.mockInput.typeText(hint)
+    app.mockInput.pressEnter()
+    await settle(app)
+    expect(app.captureCharFrame()).toContain("Review")
+    app.mockInput.pressEnter()
+    await settle(app)
+    expect(app.replies).toEqual([
+      { sessionID, formID: request.id, answer: hint ? { decision, hint } : { decision } },
+    ])
+  } finally {
+    app.renderer.destroy()
+  }
+})
 
 test("roomy question forms retain the established spacing and inline descriptions", async () => {
   const app = await renderForm({

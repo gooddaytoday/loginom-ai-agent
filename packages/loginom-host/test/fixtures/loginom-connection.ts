@@ -1,9 +1,9 @@
 import { once } from "node:events"
 import { constants } from "node:fs"
-import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { createServer, type ServerResponse } from "node:http"
 import { tmpdir } from "node:os"
-import { basename, dirname, join, resolve } from "node:path"
+import { basename, dirname, join, posix, resolve } from "node:path"
 import { text } from "node:stream/consumers"
 import release from "../../../product/loginom-release.json"
 import { writeHelp } from "../../../loginom-runtime/client/test/support/help-fixture.mjs"
@@ -14,7 +14,12 @@ const browser =
     join(process.env.PLAYWRIGHT_BROWSERS_PATH, `chromium-${release.chromiumRevision}`, "chrome-linux64", "chrome"))
 export const hasConnectionFixture = process.platform === "linux" && process.arch === "x64" && Boolean(browser)
 
-export async function loginomConnectionFixture() {
+export async function loginomConnectionFixture(
+  options: {
+    packages?: Readonly<Record<string, { file: string; name: string }>>
+    onOpen?: (path: string) => void
+  } = {},
+) {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node || !browser) throw Error("Set the pinned Loginom test Node and Chromium paths")
   const directory = await mkdtemp(join(tmpdir(), "con-gate-"))
@@ -35,7 +40,9 @@ export async function loginomConnectionFixture() {
     if (path === "/favicon.ico") return response.writeHead(204).end()
     requests.push({ method: request.method, path, cookie })
     if (request.method === "GET" && path === "/app/") {
-      return response.writeHead(200, { "Content-Type": "text/html" }).end(loginPage)
+      return response
+        .writeHead(200, { "Content-Type": "text/html" })
+        .end(loginPage.replace("/* package support */", options.packages ? packagesScript : ""))
     }
     if (request.method === "POST" && path === "/login") {
       void text(request).then(
@@ -72,7 +79,42 @@ export async function loginomConnectionFixture() {
     if (request.method === "POST" && path === "/logout") {
       return response.writeHead(204, { "Set-Cookie": "fixture-auth=; Path=/; Max-Age=0" }).end()
     }
-    // The fixture has working authentication and no available file service.
+    if (request.method === "GET" && path === "/package-list" && options.packages) {
+      const owner = logins.find((login) => login.cookie === cookie)?.username
+      if (!owner) return response.writeHead(403).end()
+      const folder = searchParams.get("folder") === "/user/" ? `/${owner}` : "/common"
+      const files = Object.entries(options.packages).filter(([file]) => posix.dirname(file) === folder)
+      void Promise.all(
+        files.map(async ([file, pkg]) => {
+          const { size } = await stat(pkg.file)
+          return { FileName: posix.basename(file), Size: size, Time: "2026-01-01T00:00:00.000Z" }
+        }),
+      ).then(
+        (rows) => response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(rows)),
+        () => response.writeHead(500).end(),
+      )
+      return
+    }
+    if (request.method === "GET" && path === "/package" && options.packages) {
+      const file = searchParams.get("path") ?? ""
+      const owner = logins.find((login) => login.cookie === cookie)?.username
+      const pkg = Object.hasOwn(options.packages, file) ? options.packages[file] : undefined
+      if (!owner || !file.startsWith(`/${owner}/`) || !pkg) return response.writeHead(404).end()
+      void readFile(pkg.file).then(
+        (contents) => {
+          if (searchParams.get("download") === "1") {
+            return response.writeHead(200, { "Content-Type": "application/octet-stream" }).end(contents)
+          }
+          options.onOpen?.(file)
+          return response
+            .writeHead(200, { "Content-Type": "application/json" })
+            .end(JSON.stringify({ path: file, name: pkg.name }))
+        },
+        () => response.writeHead(500).end(),
+      )
+      return
+    }
+    // The fixture has working authentication and no available file service by default.
     return response.writeHead(503).end()
   })
   async function close() {
@@ -161,8 +203,10 @@ const loginPage = `<!doctype html>
       } } } } } };
       login.hidden = true;
       workspace.hidden = false;
+      if (typeof addPackageControls === "function") addPackageControls();
     };
   };
+  /* package support */
   logoutButton.onclick = async () => {
     const response = await fetch("/logout", { method: "POST" });
     if (!response.ok) return;
@@ -172,3 +216,74 @@ const loginPage = `<!doctype html>
     login.hidden = false;
   };
 </script>`
+
+// A Loginom workspace and its native Open dialog. The browser sees the
+// package only after the authenticated server returns its metadata.
+const packagesScript = `
+  function addPackageControls() {
+    const control = (parent, tid, label, tag = "button") => {
+      const element = document.createElement(tag);
+      element.dataset.tid = tid;
+      element.textContent = label;
+      parent.append(element);
+      return element;
+    };
+    const prefix = "MF;TF";
+    const tab = control(workspace, "MF;cntMain;cntWorkspace;Workspace;t.br;tb", "Workspace");
+    tab.className = "x-tab-active";
+    const home = control(workspace, prefix + ";HomePage;btnCreateUnsavedPackage", "Create package");
+    const menu = control(workspace, "MF;cntMain;tlbMainToolbar;btnPackagesMenu", "Packages");
+    const open = control(workspace, "MF;MainMenuForm;btnOpenPackage", "Open package");
+    open.hidden = true;
+    menu.onclick = () => { open.hidden = false; };
+    const picker = control(workspace, "OpenDialogForm", "", "div");
+    const field = control(picker, "OpenDialogForm;edtFileName", "", "label");
+    const input = field.appendChild(document.createElement("input"));
+    const submit = control(picker, "OpenDialogForm;btnOpen", "Open");
+    picker.id = "package-picker";
+    picker.hidden = true;
+    const dialog = { $className: "bg.filedialog.view.OpenDialogForm", el: { dom: picker }, hidden: true };
+    window.Ext = { getCmp: (id) => id === picker.id ? dialog : undefined };
+    open.onclick = () => { picker.hidden = dialog.hidden = false; };
+    class PackageTreeNode {}
+    const active = { Controller: { Node: { data: {} } } };
+    const main = window.bg.app.Application.FInstance.FMainForm;
+    Object.assign(window.bg.app, { Version: "7.4.2", PackageTreeNode });
+    const fileInfoList = {
+      GetDirectoryItems: () => [],
+      async GetFileInfoItemsEx(folder) {
+        const response = await fetch("/package-list?" + new URLSearchParams({ folder }));
+        if (!response.ok) throw Error("Could not list packages");
+        return response.json();
+      },
+    };
+    Object.assign(window.bg, {
+      selectAllAsync: async (rows) => (receive) => receive(rows),
+      forEach: (rows, receive) => rows.forEach(receive),
+    });
+    window.ReleaseObject = () => {};
+    Object.assign(main.FMapTree.FServerConnection, {
+      Connected: true,
+      Session: { get_FileStorage: () => ({ FileInfoList: fileInfoList }) },
+      FSession: {},
+      FRemoteSession: {},
+    });
+    const nodes = [];
+    main.FMapTree.PackageNodes = { get Count() { return nodes.length; }, Items: (index) => nodes[index] };
+    main.FReconnecting = false;
+    main.Items = { Workspace: { getActiveTab: () => active } };
+    submit.onclick = async () => {
+      const response = await fetch("/package?" + new URLSearchParams({ path: input.value }));
+      if (!response.ok) return;
+      const pkg = await response.json();
+      picker.hidden = dialog.hidden = true;
+      home.hidden = open.hidden = true;
+      control(workspace, prefix + ";ModelForm;cmpDiagram", "Diagram", "div");
+      control(workspace, prefix + ";ModelForm;pnlWorkarea", "Work area", "div");
+      ["Packages", pkg.name, "Scenario"].forEach((label, i) => control(workspace, prefix + ";cnrNaviMode;b.s_" + i, label, "span"));
+      const node = Object.assign(new PackageTreeNode(), { PackageFileName: pkg.path, PackageName: pkg.name });
+      active.Controller.Node.data.node = node;
+      nodes.push(node);
+    };
+  }
+`

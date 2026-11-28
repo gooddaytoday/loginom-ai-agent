@@ -224,6 +224,8 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
     nextStep: typeof receipt.next_step?.instruction === 'string'
       ? {tool: text(receipt.next_step.tool, 128), instruction: text(receipt.next_step.instruction)} : undefined,
   };
+  const limitationsOmitted = (receipt.limitations?.length ?? 0) - (result.limitations?.length ?? 0);
+  if (limitationsOmitted) result.omitted = {limitations: limitationsOmitted};
   const error = receipt.error;
   const native = error?.native;
   const afterLaunch = native?.source === 'loginom_post_launch_error_toast' && native.attribution === 'own_action_wait';
@@ -270,11 +272,14 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
   let blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
   while (blockRemaining < 0 && result.limitations?.length) {
     result.limitations.pop();
+    result.omitted = {limitations: (result.omitted?.limitations ?? 0) + 1};
     blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
   }
-  for (const key of ['ports', 'files']) {
+  for (const key of ['files', 'ports']) {
     if (blockRemaining >= 0) break;
+    if (!result[key]) continue;
     delete result[key];
+    (result.dropped ??= []).push(key);
     blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
   }
   if (blockRemaining < 0) return;

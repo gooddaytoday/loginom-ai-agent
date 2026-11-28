@@ -18,6 +18,7 @@ type Update = Partial<Identity> &
   Partial<Record<keyof typeof LOGINOM_METADATA_FIELD_MAX_BYTES, unknown>> & {
     receipt?: Identity
     dropped?: readonly string[]
+    omitted?: Readonly<Record<string, number>>
   }
 
 export function loginomMetadataBytes(value: unknown): number

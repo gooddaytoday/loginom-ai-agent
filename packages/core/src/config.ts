@@ -8,6 +8,7 @@ import { Context, Effect, FiberMap, Layer, Option, PubSub, Ref, Schema, Semaphor
 import { Directory, Document, Info, type Patch, type Entry, Event } from "@opencode/schema/config"
 import { Credential } from "./credential.js"
 import { Bus } from "./bus.js"
+import { KeyedMutex } from "./effect/keyed-mutex.js"
 import { Watcher } from "./filesystem/watcher.js"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Global } from "@opencode/util/global"
@@ -30,6 +31,12 @@ export function latest<K extends keyof Info>(entries: readonly Entry[], key: K):
     ?.info[key]
 }
 
+type ProfilePatch = Partial<Patch> & {
+  readonly providers?: Readonly<Record<string, NonNullable<Info["providers"]>[string] | undefined>>
+}
+
+const profileWrites = KeyedMutex.makeUnsafe<string>()
+
 export interface Interface {
   /** Returns location config documents and discovery sources from lowest to highest priority. */
   readonly entries: () => Effect.Effect<Entry[]>
@@ -45,7 +52,9 @@ export interface Interface {
    */
   readonly changes: () => Stream.Stream<Watcher.Update>
   /** Updates supported global config fields while preserving unrelated JSONC content. */
-  readonly update?: (patch: Patch) => Effect.Effect<void, FSUtil.Error>
+  readonly update?: (patch: ProfilePatch) => Effect.Effect<void, FSUtil.Error>
+  /** Reads the profile document used by `update`, without project or managed overlays. */
+  readonly profile?: () => Effect.Effect<Info | undefined, FSUtil.Error>
   /**
    * Replaces, or clears with `undefined`, the document an integration connection contributes. It loads right after
    * managed policies: its settings layer below remote, user, and project config, while its policies outrank theirs.
@@ -132,7 +141,6 @@ export const layer = (options?: Options) =>
       // Integrations set their documents from outside this layer, so their reloads run with its services.
       const context = yield* Effect.context<FSUtil.Service | Global.Service | Location.Service>()
       const reloadLock = Semaphore.makeUnsafe(1)
-      const updateLock = Semaphore.makeUnsafe(1)
       const decodeOptions = { errors: "all", onExcessProperty: "ignore" } as const
       const decodeInfo = Schema.decodeUnknownOption(Info, decodeOptions)
       const parseInfo = Effect.fn("Config.parseInfo")(function* (text: string, source: string) {
@@ -466,28 +474,33 @@ export const layer = (options?: Options) =>
       )
       yield* reloadLock.withPermit(reconcile(initial))
 
-      const update = Effect.fn("Config.update")(
-        function* (patch: Patch) {
-          const directory = initial.global ?? AbsolutePath.make(globalService.config)
-          const candidates = ConfigDiscovery.names.map((name) => path.join(directory, name))
-          const filepath =
-            (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "loginom-ai-agent.jsonc")
+      const profilePath = Effect.fnUntraced(function* () {
+        const directory = initial.global ?? AbsolutePath.make(globalService.config)
+        const candidates = ConfigDiscovery.names.map((name) => path.join(directory, name))
+        return (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "loginom-ai-agent.jsonc")
+      })
+
+      const update = Effect.fn("Config.update")(function* (patch: ProfilePatch) {
+        const filepath = yield* profilePath()
+        const target = yield* fs.resolve(filepath)
+        yield* Effect.gen(function* () {
           const text = (yield* fs.readFileStringSafe(filepath)) ?? "{}\n"
           const updated = yield* Effect.try({
-            try: () =>
-              applyEdits(
-                text,
-                modify(text, ["shell"], patch.shell ?? undefined, {
-                  formattingOptions: { tabSize: 2, insertSpaces: true },
-                }),
-              ),
+            try: () => {
+              const formattingOptions = { tabSize: 2, insertSpaces: true }
+              let next = text
+              if ("shell" in patch)
+                next = applyEdits(next, modify(next, ["shell"], patch.shell ?? undefined, { formattingOptions }))
+              for (const [id, provider] of Object.entries(patch.providers ?? {}))
+                next = applyEdits(next, modify(next, ["providers", id], provider, { formattingOptions }))
+              return next
+            },
             catch: (cause) => new FSUtil.FileSystemError({ method: "config.update", cause }),
           })
           yield* fs.writeWithDirs(filepath, updated.endsWith("\n") ? updated : `${updated}\n`)
-          yield* requestReload
-        },
-        (effect) => updateLock.withPermit(effect),
-      )
+        }).pipe(profileWrites.withLock(target))
+        yield* requestReload
+      })
 
       return Service.of({
         entries: Effect.fnUntraced(function* () {
@@ -500,6 +513,12 @@ export const layer = (options?: Options) =>
           }),
         changes: () => Stream.fromPubSub(updates),
         update,
+        profile: () =>
+          profilePath().pipe(
+            Effect.flatMap(loadFile),
+            Effect.provide(context),
+            Effect.map((file) => file?.info),
+          ),
         integration: Effect.fn("Config.integration")(function* (integrationID, document) {
           if (isDeepStrictEqual(integrations.get(integrationID), document)) return
           integrations.delete(integrationID)

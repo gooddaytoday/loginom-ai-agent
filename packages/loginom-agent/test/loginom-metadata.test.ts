@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { withLoginomMetadata } from "../../loginom-runtime/client/lib/loginom-feed-metadata.mjs"
-import { dockToolResult } from "../src/dock"
+import { dockToolResult, prepareOperationId } from "../src/dock"
 import type { LoginomMetadataFields } from "../src/loginom-metadata"
 
 const receipt = { operation_id: "operation", state: "settled", status: "SUCCEEDED" }
@@ -64,7 +64,7 @@ test("Dock retains all scenario 10 fields written by independent feed producers"
     persistence: "saved_through",
     save: { operationId: "save", path: "/package.lgp", throughStep: { operationId: "operation", label: "Фильтр" } },
   }
-  const manualEdits = [
+  const edits = [
     { kind: "node_added", node: { ...node, position: { x: 0, y: 0 } } },
     { kind: "node_removed", node: { ...node, position: { x: 3, y: 8 } } },
     { kind: "node_renamed", guid: node.guid, from: node.label, to: "Новый фильтр" },
@@ -76,6 +76,7 @@ test("Dock retains all scenario 10 fields written by independent feed producers"
       targetLabel: node.label,
     },
   ]
+  const manualEdits = { edits, omitted: 2 }
   const savedPackageGraph = {
     saveOperationId: "save",
     packagePath: "/package.lgp",
@@ -234,4 +235,59 @@ test("Dock enforces the metadata byte budget for multibyte JSON", async () => {
     content: JSON.stringify(receipt),
     metadata: { generation: 4, loginom: { ...feed, limitations: [], omitted: { limitations: 1 } } },
   })
+})
+
+test("Dock preserves the verified-write step and independent metadata for the same operation", async () => {
+  const step = {
+    outcome: "check_required",
+    retryAvailable: false,
+    reason: "unknown_write",
+    persistence: "unknown",
+    save: null,
+  }
+  const value = reply(receipt, { ...feed, limitations: ["Available"] })
+  const result = await dockToolResult(
+    {
+      ...value,
+      _meta: { ...value._meta, loginomStep: { v: 1, operationId: feed.operationId, state: "settled", step } },
+    },
+    4,
+  )
+  expect(result).toEqual({
+    content: JSON.stringify(receipt),
+    metadata: { generation: 4, loginom: { ...feed, limitations: ["Available"], step } },
+  })
+})
+
+test("Dock keeps valid evidence and producer omissions and reports unknown metadata", async () => {
+  const saved = { kind: "saved", path: "/package.lgp" }
+  const executed = { kind: "executed", scope: "activeWorkflow", executionId: "exec" }
+  const value = reply(receipt, { ...feed, evidence: [saved, null], unknownReceiptField: true })
+  const result = await dockToolResult(value, 4, {
+    toolCallId: "call-1",
+    host: { evidence: [executed, { kind: "unsupportedEvidence" }], omitted: { evidence: 3, limitations: 999 } },
+    agent: { agentCopy: { originalPath: "/original.lgp", path: "/copy.lgp" }, omitted: { agentCopy: 2 } },
+  })
+  expect(result).toEqual({
+    content: JSON.stringify(receipt),
+    metadata: {
+      generation: 4,
+      loginom: {
+        ...feed,
+        evidence: [saved, executed],
+        agentCopy: { originalPath: "/original.lgp", path: "/copy.lgp" },
+        omitted: { evidence: 5, agentCopy: 2 },
+        dropped: ["unknownReceiptField"],
+      },
+    },
+  })
+})
+
+test("local package preparation derives a stable wire ID from arbitrary tool call IDs", () => {
+  expect(prepareOperationId("call:valid-1")).toBe("call:valid-1")
+  const raw = "неподходящий id/" + "x".repeat(150)
+  const first = prepareOperationId(raw)
+  expect(first).toMatch(/^[a-zA-Z0-9_.:-]{1,128}$/)
+  expect(prepareOperationId(raw)).toBe(first)
+  expect(prepareOperationId(raw + "1")).not.toBe(first)
 })

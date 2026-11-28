@@ -35,11 +35,11 @@ test('feed drops over-limit fields individually and preserves the other fields',
   const busy = {version:1, windowId:'32ef40ff-08d2-476a-ad73-1ef3feb17ce8', operationId:'operation', active:true};
   const step = {outcome:'completed', retryAvailable:false, persistence:'saved_through',
     save:{operationId:'save', path:'Ж'.repeat(1024), throughStep:{operationId:'operation', label:'Фильтр'}}};
-  const manualEdits = [{kind:'node_renamed', guid:'node', from:'Фильтр', to:'Ж'.repeat(2048)}];
+  const manualEdits = {edits:[{kind:'node_renamed', guid:'node', from:'Фильтр', to:'Ж'.repeat(2048)}], omitted:2};
   const savedPackageGraph = {saveOperationId:'save', packagePath:'Ж'.repeat(4096), status:'unavailable'};
   const result = withLoginomMetadata(reply, {...identity, busy, step, manualEdits, savedPackageGraph, verificationStale:true});
-  assert.deepEqual(result._meta.loginom, {v:1, ...identity, busy, verificationStale:true, manualEdits:[],
-    omitted:{manualEdits:1}, dropped:['step', 'savedPackageGraph']});
+  assert.deepEqual(result._meta.loginom, {v:1, ...identity, busy, verificationStale:true, manualEdits:{edits:[], omitted:3},
+    dropped:['step', 'savedPackageGraph']});
   const updated = withLoginomMetadata(result, {busy:{...busy, operationId:'a'.repeat(256)}, verificationStale:'invalid'});
   assert.deepEqual(updated._meta.loginom, {...result._meta.loginom,
     dropped:['step', 'savedPackageGraph', 'busy', 'verificationStale']});
@@ -52,7 +52,7 @@ test('feed reduces previews and limitations before dropping scenario facts', () 
   const reply = nodeResultReply(receipt({ports:[sample], warnings}), {userProfile:true, tool});
   const projection = loginomFeedMetadata(reply, {tool, facts});
   const base = withLoginomMetadata(reply, {receipt:projection});
-  const manualEdits = [{kind:'node_renamed', guid:'node', from:'Фильтр', to:'Ж'.repeat(1000)}];
+  const manualEdits = {edits:[{kind:'node_renamed', guid:'node', from:'Фильтр', to:'Ж'.repeat(1000)}], omitted:0};
   assert.ok(Buffer.byteLength(JSON.stringify({...projection, manualEdits})) > 16 * 1024);
   const result = withLoginomMetadata(base, {manualEdits});
   const metadata = result._meta.loginom;
@@ -77,14 +77,14 @@ test('a nearly full receipt keeps a prefix of manual edits and counts all omitte
   const limitations = Array.from({length:8}, (_, index) => index+'Ж'.repeat(910));
   const receipt = {operationId:'operation', state:'settled', limitations};
   const reply = withLoginomMetadata({content:[]}, {receipt});
-  const manualEdits = Array.from({length:12}, (_, index) => ({
+  const edits = Array.from({length:12}, (_, index) => ({
     kind:'node_renamed', guid:'node-'+index, from:'Фильтр', to:'Ж'.repeat(220),
   }));
-  const result = withLoginomMetadata(reply, {manualEdits, verificationStale:true})._meta.loginom;
+  const result = withLoginomMetadata(reply, {manualEdits:{edits, omitted:2}, verificationStale:true})._meta.loginom;
   assert.equal(result.verificationStale, true);
-  assert.ok(result.manualEdits.length > 0 && result.manualEdits.length < manualEdits.length);
-  assert.deepEqual(result.manualEdits, manualEdits.slice(0, result.manualEdits.length));
-  assert.equal(result.omitted.manualEdits, manualEdits.length - result.manualEdits.length);
+  assert.ok(result.manualEdits.edits.length > 0 && result.manualEdits.edits.length < edits.length);
+  assert.deepEqual(result.manualEdits.edits, edits.slice(0, result.manualEdits.edits.length));
+  assert.equal(result.manualEdits.omitted, 2 + edits.length - result.manualEdits.edits.length);
   assert.ok(result.omitted.limitations > 0);
   assert.equal(result.omitted.limitations, limitations.length - result.limitations.length);
   assert.equal(result.dropped, undefined);
@@ -230,12 +230,47 @@ test('the block budget reduces preview rows before dropping limitations', () => 
 
 test('the block budget also applies to results without previews', () => {
   const tool = 'dock_node_apply';
-  const warnings = Array.from({length:8}, (_, index) => index+'Ж'.repeat(800)+'😀'.repeat(199));
+  const warnings = Array.from({length:20}, (_, index) => index < 8 ? index+'Ж'.repeat(800)+'😀'.repeat(196) : 'Limitation '+index);
   const reply = nodeResultReply(receipt({warnings}), {userProfile:true, tool});
   const metadata = loginomFeedMetadata(reply, {tool, facts});
   assert.equal(metadata.operationId, 'operation');
   assert.equal(metadata.status, 'SUCCEEDED');
   assert.deepEqual(metadata.limitations, warnings.slice(0, metadata.limitations.length));
-  assert.ok(metadata.limitations.length > 0 && metadata.limitations.length < warnings.length);
+  assert.ok(metadata.limitations.length > 0 && metadata.limitations.length < 8);
+  assert.equal(metadata.omitted.limitations, warnings.length - metadata.limitations.length);
   assert.ok(Buffer.byteLength(JSON.stringify(metadata)) <= 16 * 1024);
+});
+
+
+test('feed reports a whole files field discarded by the runtime projection budget', () => {
+  const tool = 'dock_node_apply';
+  const large = 'x'.repeat(16 * 1024);
+  const reply = nodeResultReply(receipt({artifacts:[{artifact_id:large, bytes:42}]}), {userProfile:true, tool});
+  const metadata = loginomFeedMetadata(reply, {tool, facts, outputFiles:[{artifact_id:large, name:'report.csv'}]});
+  assert.deepEqual(metadata.dropped, ['files']);
+  assert.equal(metadata.files, undefined);
+  assert.ok(Buffer.byteLength(JSON.stringify(metadata)) <= 16 * 1024);
+});
+
+test('a full block makes room for a step by shortening its largest scenario list before the port or files', () => {
+  const identity = {operationId:'operation', state:'settled'};
+  const ports = [{index:0, guid:'port', rowCount:20, columnCount:1}];
+  const files = [{artifactId:'artifact', name:'', bytes:1}];
+  const definitions = Array.from({length:22}, (_, index) => ({name:'variable-'+index+'x'.repeat(250), type:'string'}));
+  const packageVariables = {source:'saved', definitionsCoverage:'complete', defaultsCoverage:'unavailable',
+    usagesCoverage:'partial', definitions, defaults:null, usages:[]};
+  const busy = {version:1, operationId:'operation', windowId:'32ef40ff-08d2-476a-ad73-1ef3feb17ce8', active:true};
+  const initial = {v:1, ...identity, ports, files, packageVariables, busy};
+  files[0].name = 'x'.repeat(16 * 1024 - Buffer.byteLength(JSON.stringify(initial)) - 64);
+  const step = {outcome:'completed', retryAvailable:false, persistence:'saved_through',
+    save:{operationId:'save', path:'/package.lgp', throughStep:{operationId:'operation', label:'Фильтр'}}};
+  const { _meta: {loginom} } = withLoginomMetadata({_meta:{loginom:initial}}, {step});
+  assert.deepEqual(loginom.step, step);
+  assert.deepEqual(loginom.busy, busy);
+  assert.deepEqual(loginom.ports, ports);
+  assert.deepEqual(loginom.files, files);
+  assert.ok(loginom.packageVariables.definitions.length < definitions.length);
+  assert.equal(loginom.omitted['packageVariables.definitions'], definitions.length - loginom.packageVariables.definitions.length);
+  assert.equal(loginom.packageVariables.definitionsCoverage, 'partial');
+  assert.ok(Buffer.byteLength(JSON.stringify(loginom)) <= 16 * 1024);
 });
