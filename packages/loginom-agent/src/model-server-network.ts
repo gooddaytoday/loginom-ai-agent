@@ -123,6 +123,7 @@ function redactBody(body: ReadableStream<Uint8Array>, key: string) {
         const bytes = pending.length ? Buffer.concat([pending, chunk]) : Buffer.from(chunk)
         let offset = 0
 
+        // Secret matches take precedence even when they overlap a protocol field name.
         while (offset < bytes.length) {
           let first = bytes.length
           let length = 0

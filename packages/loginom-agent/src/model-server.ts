@@ -1,4 +1,5 @@
 import { providerPrefix } from "@loginom-ai-agent/loginom-host/model-server-id"
+import { modelServerSecretMinLength } from "@loginom-ai-agent/loginom-host/model-server-key"
 import { ModelID, ModelServerRpc } from "@loginom-ai-agent/loginom-host/model-server-rpc"
 import type { RpcHandlers } from "@opencode/plugin/effect/rpc"
 import type { ConfigProvider } from "@opencode/schema/config/provider"
@@ -38,6 +39,11 @@ async function readModels(reply: Response) {
 const usable = Schema.is(ModelID)
 const providerIDFor = (address: string) => `${providerPrefix}${createHash("sha256").update(address).digest("hex")}`
 
+function withoutSecretIDs(ids: readonly string[], key?: string) {
+  const secret = key?.trim()
+  return secret && secret.length >= modelServerSecretMinLength ? ids.filter((id) => !id.includes(secret)) : ids
+}
+
 export function modelServerHandlers(options: {
   catalogAvailable: Effect.Effect<boolean>
   allowed: (id: string) => Effect.Effect<boolean>
@@ -65,7 +71,8 @@ export function modelServerHandlers(options: {
               headers: input.key ? { Authorization: `Bearer ${input.key}` } : undefined,
             })
             const entries = await readModels(reply)
-            const models = [...new Set(entries.map((entry) => entry.id).filter(usable))].slice(0, 4096)
+            const ids = entries.map((entry) => entry.id).filter(usable)
+            const models = [...new Set(withoutSecretIDs(ids, input.key))].slice(0, 4096)
             if (models.length === 0) return { ok: false, issue: "modelServerNoModels" } as const
             return { ok: true, value: models } as const
           } catch {
@@ -78,6 +85,8 @@ export function modelServerHandlers(options: {
         const baseURL = addressOf(input.address)
         if (!baseURL) return { ok: false, issue: "modelServerAddressInvalid" }
         if (!input.models.every(usable)) return { ok: false, issue: "modelServerSaveFailed" }
+        const models = withoutSecretIDs(input.models, input.key)
+        if (models.length === 0) return { ok: false, issue: "modelServerNoModels" }
         const verdict = yield* Effect.tryPromise({
           try: (signal) =>
             resolveModelServer(baseURL, AbortSignal.any([signal, AbortSignal.timeout(10_000)])),
@@ -93,7 +102,7 @@ export function modelServerHandlers(options: {
               package: "@opencode/ai/providers/openai-compatible",
               settings: { baseURL },
               models: Object.fromEntries(
-                input.models.map((id) => [id, { modelID: Model.ID.make(id), name: id, type: "chat" }]),
+                models.map((id) => [id, { modelID: Model.ID.make(id), name: id, type: "chat" }]),
               ),
             },
             input.key || undefined,

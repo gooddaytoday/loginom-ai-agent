@@ -95,7 +95,10 @@
         "packages/app/src/runtime/server/data.test.ts", "packages/core/src/config.ts",
         "packages/core/src/model-resolver.ts", "packages/core/src/models-dev.ts", "packages/core/test/models.test.ts",
         "packages/server/test/loginom-model-server.test.ts"
-      ]
+      ],
+      "notes": {
+        "packages/server/test/loginom-model-server.test.ts": "C2.6: verifies that model discovery and direct saves omit identifiers containing an echoed server secret."
+      }
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },
     {

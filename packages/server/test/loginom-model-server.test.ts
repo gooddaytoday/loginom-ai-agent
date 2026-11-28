@@ -10,7 +10,7 @@ import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { serveRoutes } from "./fixture/routes"
 
-const fixture = (ids: readonly string[]) =>
+const fixture = (ids: readonly string[], echo?: { key: string; id: string }) =>
   Effect.acquireRelease(
     Effect.sync(() => {
       const requests: { path: string; authorization: string | null }[] = []
@@ -19,10 +19,14 @@ const fixture = (ids: readonly string[]) =>
         port: 0,
         async fetch(request) {
           const path = new URL(request.url).pathname
-          requests.push({ path, authorization: request.headers.get("authorization") })
+          const authorization = request.headers.get("authorization")
+          requests.push({ path, authorization })
           if (path === "/redirect/models" || path === "/redirect/chat/completions")
             return Response.redirect(new URL(`/v1${path.slice("/redirect".length)}`, request.url), 307)
-          if (path === "/v1/models") return Response.json({ data: ids.map((id) => ({ id })) })
+          if (path === "/v1/models") {
+            const models = echo && authorization === `Bearer ${echo.key}` ? [...ids, echo.id] : ids
+            return Response.json({ data: models.map((id) => ({ id })) })
+          }
           if (path === "/v1/chat/completions") {
             const body = await request.json()
             const messages = JSON.stringify(body?.messages)
@@ -75,7 +79,11 @@ it.live(
         ),
       )
       const fixtureKey = "fixture-secret-not-an-api-key"
-      const first = yield* fixture(["alpha", "beta", "model", "alpha", "{env:HOME}", "__proto__"])
+      const echoedID = `model-${fixtureKey}-chat`
+      const first = yield* fixture(["alpha", "beta", "model", "alpha", "{env:HOME}", "__proto__"], {
+        key: fixtureKey,
+        id: echoedID,
+      })
       const second = yield* fixture(["alpha"])
       let failProfileWrite = false
       const filesystem = Layer.effect(
@@ -145,17 +153,27 @@ it.live(
       expect(redirect).toEqual({ ok: false, issue: "modelServerDiscoveryFailed" })
       expect(first.requests.map((request) => request.path)).toEqual(["/redirect/models"])
 
-      const add = (address: string, ids: readonly string[], key?: string) =>
+      const add = (address: string, ids: readonly string[], key?: string, extraModels: readonly string[] = []) =>
         Effect.gen(function* () {
           const found = yield* Effect.promise(() => rpc.discover({ address: `${address}/`, key }, options))
           expect(found).toEqual({ ok: true, value: ids })
           if (!found.ok) throw new Error("Local model discovery failed")
-          const saved = yield* Effect.promise(() => rpc.save({ address, key, models: found.value }, options))
+          const saved = yield* Effect.promise(() =>
+            rpc.save({ address, key, models: [...found.value, ...extraModels] }, options),
+          )
           expect(JSON.stringify(saved)).not.toContain(fixtureKey)
           if (!saved.ok) throw new Error(`Local model server save failed: ${saved.issue}`)
           return saved.value.providerID
         })
-      const firstID = yield* add(first.address, ["alpha", "beta", "model"], fixtureKey)
+      const firstID = yield* add(first.address, ["alpha", "beta", "model"], fixtureKey, [echoedID])
+      const safeProfile = yield* Effect.promise(() => Bun.file(config).text())
+      expect(safeProfile).toContain('"modelID": "alpha"')
+      expect(safeProfile).not.toContain(fixtureKey)
+      expect(
+        yield* Effect.promise(() => rpc.save({ address: first.address, key: fixtureKey, models: [echoedID] }, options)),
+      ).toEqual({ ok: false, issue: "modelServerNoModels" })
+      expect(yield* Effect.promise(() => Bun.file(config).text())).toBe(safeProfile)
+
       const secondID = yield* add(second.address, ["alpha"])
       expect(firstID).not.toBe(secondID)
       expect(first.requests.at(-1)).toEqual({ path: "/v1/models", authorization: `Bearer ${fixtureKey}` })
