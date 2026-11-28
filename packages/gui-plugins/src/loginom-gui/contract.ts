@@ -3,6 +3,10 @@ import type { Package } from "./package-model"
 
 export type PackageInput = { kind: "loginom"; package: Package } | { kind: "file"; file: File }
 
+export type PackageSelection =
+  | Extract<PackageInput, { kind: "file" }>
+  | (Extract<PackageInput, { kind: "loginom" }> & { connection: string })
+
 export type PackageAction = {
   readonly id: string
   readonly title: string

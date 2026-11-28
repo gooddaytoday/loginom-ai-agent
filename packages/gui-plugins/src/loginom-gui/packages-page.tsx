@@ -1,19 +1,19 @@
 import { usePlugin } from "@opencode/plugin/gui"
-import { For, Show } from "solid-js"
-import type { PackageAction } from "./contract"
+import { For, Match, Show, Switch } from "solid-js"
+import type { PackageAction, PackageSelection } from "./contract"
 import type definition from "./index"
-import type { Package } from "./package-model"
 
 export default function Packages(props: {
-  selected?: Package
-  file?: File
+  selected?: PackageSelection
   actions: readonly PackageAction[]
   choose: () => void
-  upload: () => void
-  run: (action: PackageAction, entry: Package) => void
+  upload: (file?: File) => void
+  run: (action: PackageAction, entry: Extract<PackageSelection, { kind: "loginom" }>) => void
 }) {
   const ctx = usePlugin<typeof definition>()
   const ui = ctx.ui
+  const local = () => props.selected?.kind === "file" ? props.selected.file : undefined
+  const remote = () => props.selected?.kind === "loginom" ? props.selected : undefined
 
   return (
     <main class="h-full min-h-0 w-full overflow-auto">
@@ -24,36 +24,38 @@ export default function Packages(props: {
             <ui.Button variant="contrast" onClick={props.choose}>
               {ctx.t("packages.fromLoginom")}
             </ui.Button>
-            <ui.Button onClick={props.upload}>{ctx.t("packages.fromComputer")}</ui.Button>
+            <ui.Button onClick={() => props.upload(local())}>{ctx.t("packages.fromComputer")}</ui.Button>
           </div>
         </header>
-        <Show when={props.file}>
-          {(file) => (
-            <div class="flex flex-wrap items-center gap-2 rounded-lg border border-border-weak-base p-3">
-              <span class="min-w-0 break-all">{file().name}</span>
-              <ui.Button onClick={props.upload}>{ctx.t("packages.copy")}</ui.Button>
-            </div>
-          )}
-        </Show>
-        <Show when={props.selected} fallback={<p class="text-text-weak">{ctx.t("packages.noSelection")}</p>}>
-          {(entry) => (
-            <section class="rounded-xl border border-border-weak-base p-4">
-              <div class="flex items-start gap-3">
-                <ui.Icon name="file-document" />
-                <div class="min-w-0 break-all">
-                  <h2 class="text-16-medium">{entry().name}</h2>
-                  <p class="text-12-regular text-text-weak">{entry().path}</p>
+        <Switch fallback={<p class="text-text-weak">{ctx.t("packages.noSelection")}</p>}>
+          <Match when={local()}>
+            {(file) => (
+              <div class="flex flex-wrap items-center gap-2 rounded-lg border border-border-weak-base p-3">
+                <h2 class="min-w-0 break-all">{file().name}</h2>
+                <ui.Button onClick={() => props.upload(file())}>{ctx.t("packages.copy")}</ui.Button>
+              </div>
+            )}
+          </Match>
+          <Match when={remote()}>
+            {(entry) => (
+              <section class="rounded-xl border border-border-weak-base p-4">
+                <div class="flex items-start gap-3">
+                  <ui.Icon name="file-document" />
+                  <div class="min-w-0 break-all">
+                    <h2 class="text-16-medium">{entry().package.name}</h2>
+                    <p class="text-12-regular text-text-weak">{entry().package.path}</p>
+                  </div>
                 </div>
-              </div>
-              <div class="mt-4 grid min-h-40 place-items-center rounded-lg border border-dashed border-border-weak-base p-3 text-text-weak">
-                {ctx.t("packages.diagram")}
-              </div>
-            </section>
-          )}
-        </Show>
+                <div class="mt-4 grid min-h-40 place-items-center rounded-lg border border-dashed border-border-weak-base p-3 text-text-weak">
+                  {ctx.t("packages.diagram")}
+                </div>
+              </section>
+            )}
+          </Match>
+        </Switch>
         <section class="flex flex-col gap-2">
           <h2 class="text-16-medium">{ctx.t("packages.actions")}</h2>
-          <Show when={props.selected}>
+          <Show when={remote()}>
             {(entry) => (
               <div class="grid gap-2 sm:grid-cols-2">
                 <For each={props.actions} fallback={<p class="text-text-weak">{ctx.t("packages.noActions")}</p>}>

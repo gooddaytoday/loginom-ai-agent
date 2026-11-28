@@ -157,68 +157,85 @@ export async function withPackageFolderSession({ login, folder, origin, username
 export async function withPackageUploadSession({ login, origin, username, signal, upload, temporary }) {
   return withPackageStorage({ login, origin, username }, async page => {
     signal?.throwIfAborted()
-    let cancellation
-    const cancel = () => {
-      cancellation = page.evaluate(token => { globalThis.loginomPackageUploadCancelled = token }, temporary)
-        .catch(() => undefined)
-    }
-    signal?.addEventListener("abort", cancel, { once: true })
-    try {
-      const saved = await bounded(() => page.evaluate(async ({ origin, username, name, content, temporary }) => {
-        const mapTree = () => globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree
-        const connection = mapTree()?.FServerConnection
-        const session = connection?.Session
-        const ownsSession = () => location.origin === origin && connection?.Connected === true
-          && connection.UserName === username && mapTree()?.FServerConnection === connection && connection.Session === session
-        const cancelled = () => globalThis.loginomPackageUploadCancelled === temporary
-        if (!session || !ownsSession() || cancelled()) return null
-        const storage = await session.get_FileStorage()
-        const bytes = Uint8Array.from(atob(content), character => character.charCodeAt(0))
-        if (!ownsSession() || cancelled()) return null
-        const path = `/user/${name}`
-        const staged = `/user/.loginom-agent-${temporary}.part`
-        let moved = false
-        const stream = await storage.CreateFile(staged)
+    let settled = false
+    const pending = page.evaluate(async ({ origin, username, name, content, temporary }) => {
+      const mapTree = () => globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree
+      const connection = mapTree()?.FServerConnection
+      const session = connection?.Session
+      const ownsSession = () => location.origin === origin && connection?.Connected === true
+        && connection.UserName === username && mapTree()?.FServerConnection === connection && connection.Session === session
+      if (!session || !ownsSession()) return null
+      let cancelled = false
+      let stop
+      const stopped = new Promise(resolve => { stop = resolve })
+      globalThis.loginomPackageUpload = { token: temporary, cancel: () => { cancelled = true; stop(false) } }
+      const storage = await session.get_FileStorage()
+      const bytes = Uint8Array.from(atob(content), character => character.charCodeAt(0))
+      if (!ownsSession() || cancelled) return null
+      const path = `/user/${name}`
+      const staged = `/user/.loginom-agent-${temporary}.part`
+      let moved = false
+      const stream = await storage.CreateFile(staged)
+      try {
         try {
-          try {
-            for (let offset = 0; offset < bytes.length; offset += 512 * 1024) {
-              if (cancelled()) return null
-              await stream.WriteBuffer(bytes.subarray(offset, offset + 512 * 1024))
-            }
-          } finally {
-            await ReleaseObject(stream, true)
-          }
-          if (!ownsSession() || cancelled()) return null
-          if (await storage.MoveFile(staged, path, false) !== true) {
-            const existing = await storage.GetFileInfo(path)
-            if (!existing) return null
-            await ReleaseObject(existing, true)
-            return "name_taken"
-          }
-          moved = true
-          const info = await storage.GetFileInfo(path)
-          if (!info) return null
-          try {
-            const sizeBytes = await info.Size
-            const time = await info.Time
-            return sizeBytes === bytes.length && ownsSession()
-              ? { kind: "package", name, path, modifiedAt: time instanceof Date ? time.toISOString() : time, sizeBytes }
-              : null
-          } finally {
-            await ReleaseObject(info, true)
+          for (let offset = 0; offset < bytes.length; offset += 512 * 1024) {
+            if (cancelled) return null
+            const write = Promise.resolve(stream.WriteBuffer(bytes.subarray(offset, offset + 512 * 1024)))
+            if (!await Promise.race([write.then(() => true), stopped])) return null
           }
         } finally {
-          if (!moved && ownsSession()) await storage.DeleteFile(staged)
+          await ReleaseObject(stream, true)
         }
-      }, { origin, username, name: upload.name, content: upload.content, temporary }), 60_000)
-      signal?.throwIfAborted()
-      if (saved === "name_taken") throw Error("LOGINOM_PACKAGE_UPLOAD_NAME_TAKEN")
-      if (!saved) throw Error("LOGINOM_PACKAGE_UPLOAD_UNCONFIRMED")
-      return saved
-    } finally {
-      signal?.removeEventListener("abort", cancel)
-      if (cancellation) await bounded(() => cancellation, 2_000).catch(() => undefined)
+        if (!ownsSession() || cancelled) return null
+        if (await storage.MoveFile(staged, path, false) !== true) {
+          const existing = await storage.GetFileInfo(path)
+          if (!existing) return null
+          await ReleaseObject(existing, true)
+          return "name_taken"
+        }
+        moved = true
+        const info = await storage.GetFileInfo(path)
+        if (!info) return null
+        try {
+          const sizeBytes = await info.Size
+          const time = await info.Time
+          return sizeBytes === bytes.length && ownsSession()
+            ? { kind: "package", name, path, modifiedAt: time instanceof Date ? time.toISOString() : time, sizeBytes }
+            : null
+        } finally {
+          await ReleaseObject(info, true)
+        }
+      } finally {
+        if (!moved) {
+          try {
+            if (!ownsSession() || await storage.DeleteFile(staged) === false) return "cleanup_failed"
+          } catch {
+            return "cleanup_failed"
+          }
+        }
+      }
+    }, { origin, username, name: upload.name, content: upload.content, temporary }).finally(() => { settled = true })
+    let saved
+    try {
+      saved = await bounded(() => pending, 60_000, signal)
+    } catch (error) {
+      const cleaned = settled
+        ? await pending.catch(() => undefined) !== "cleanup_failed"
+        : await bounded(async () => {
+          await page.evaluate(token => {
+            const current = globalThis.loginomPackageUpload
+            if (current?.token === token) current.cancel()
+          }, temporary)
+          return await pending !== "cleanup_failed"
+        }, 6_000).catch(() => false)
+      if (!cleaned) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      throw error
     }
+    if (saved === "cleanup_failed") throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+    signal?.throwIfAborted()
+    if (saved === "name_taken") throw Error("LOGINOM_PACKAGE_UPLOAD_NAME_TAKEN")
+    if (!saved) throw Error("LOGINOM_PACKAGE_UPLOAD_UNCONFIRMED")
+    return saved
   })
 }
 

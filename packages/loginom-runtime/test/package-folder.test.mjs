@@ -207,3 +207,28 @@ test("cancelling an active package write removes its temporary file and never mo
   assert.deepEqual([...staged], [])
   assert.deepEqual(f.events, [["logout"], ["close browser"]])
 })
+
+test("a timed-out WriteBuffer removes its staged file before logout even if the write never settles", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] })
+  const f = fixture()
+  const writing = Promise.withResolvers()
+  const staged = new Set()
+  Object.assign(f.storage, {
+    CreateFile(name) {
+      staged.add(name)
+      return { WriteBuffer() { writing.resolve(); return new Promise(() => {}) } }
+    },
+    MoveFile() { assert.fail("timed-out upload moved its staged file") },
+    DeleteFile(name) { assert.equal(staged.delete(name), true); f.events.push(["delete staged file"]) },
+  })
+  const pending = withPackageUploadSession({
+    login: f.login, origin, username, temporary: "timeout",
+    upload: { name: "Copy.lgp", content: Buffer.from("sample").toString("base64") },
+  })
+  await writing.promise
+  assert.equal(staged.size, 1)
+  t.mock.timers.tick(60_000)
+  await assert.rejects(pending, { message: "LOGINOM_PACKAGE_FOLDER_UNAVAILABLE" })
+  assert.equal(staged.size, 0)
+  assert.deepEqual(f.events, [["delete staged file"], ["logout"], ["close browser"]])
+})

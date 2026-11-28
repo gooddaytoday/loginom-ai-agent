@@ -12,17 +12,32 @@ function toPackage(item: typeof ServerPackage.Type, folder: string): Package {
 export async function packageConnection(server: LoginomServer, signal: AbortSignal) {
   const location = await loginomLocation(server, signal)
   const { client } = server
-  const result = await client.rpc(ConnectionSettingsRpc).status({}, { location, signal })
 
-  if (!result.ok || result.value.failed) throw Error("Loginom status unavailable")
+  const status = async (signal: AbortSignal) => {
+    const result = await client.rpc(ConnectionSettingsRpc).status({}, { location, signal })
 
-  if (result.value.state !== "ready") return
+    if (!result.ok || result.value.failed) throw Error("Loginom status unavailable")
+
+    return result.value
+  }
+
+  const connection = await status(signal)
+
+  if (connection.state !== "ready") return
+  const { generation } = connection
+  const accountKey = (value: typeof connection) => JSON.stringify([value.url, value.username])
+  const key = accountKey(connection)
   const rpc = client.rpc(Definition)
 
   return {
-    key: JSON.stringify([result.value.url, result.value.username]),
+    key,
+    verify: async (signal: AbortSignal) => {
+      const current = await status(signal)
+
+      return current.state === "ready" && current.generation === generation && accountKey(current) === key
+    },
     list: async (folder: string, signal: AbortSignal): Promise<Listing> => {
-      const result = await rpc.list({ folder }, { location, signal })
+      const result = await rpc.list({ folder, generation }, { location, signal })
 
       return {
         folders: result.entries.filter((item) => item.kind === "folder"),
@@ -33,7 +48,7 @@ export async function packageConnection(server: LoginomServer, signal: AbortSign
       }
     },
     search: async (folder: string, text: string, cursor: string | undefined, signal: AbortSignal) => {
-      const page = await rpc.search({ folder, text, recursive: true, cursor }, { location, signal })
+      const page = await rpc.search({ folder, text, recursive: true, cursor, generation }, { location, signal })
 
       return { cursor: page.cursor, packages: page.entries.map((item) => toPackage(item, page.folder)), slow: page.slow }
     },
@@ -42,7 +57,7 @@ export async function packageConnection(server: LoginomServer, signal: AbortSign
 
       const entry = await client
         .rpc(UploadRpc)
-        .upload({ name: file.name, content, generation: result.value.generation }, { location, signal })
+        .upload({ name: file.name, content, generation }, { location, signal })
 
       return toPackage(entry, "/user")
     },

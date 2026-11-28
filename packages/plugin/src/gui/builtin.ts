@@ -171,7 +171,7 @@ export const Page = Registry.define<Page>("page")
 
 /** The current composer and navigation available to an attachment menu entry. */
 export interface ComposerAddInput {
-  /** Identity of this composer draft, suitable as a WeakMap key. */
+  /** Opaque identity of this composer draft, stable across editor remounts and suitable as a WeakMap key. */
   readonly draft: object
   /**
    * Opens a registered page of the same plugin.

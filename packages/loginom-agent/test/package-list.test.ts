@@ -59,13 +59,13 @@ test("list reads only the requested folder", async () => {
   const f = fixture()
   const result = f.table.get("/user")
   if (!result) throw Error("Expected fixture folder")
-  expect(await f.rpc.list({ folder: "/user" }, call())).toEqual(result)
+  expect(await f.rpc.list({ folder: "/user", generation: 11 }, call())).toEqual(result)
   expect(f.requests).toEqual([{ folder: "/user", generation: 11 }])
 })
 
 test("search filters by name locally and only walks subfolders when requested", async () => {
   const f = fixture()
-  const input = { folder: "/user", text: " ПРОДАЖИ ", recursive: false }
+  const input = { folder: "/user", text: " ПРОДАЖИ ", recursive: false, generation: 11 }
   const expected = [pkg("Продажи.lgp", "/user/Продажи.lgp")]
   expect(await f.rpc.search(input, call())).toEqual({ folder: "/user", entries: expected, slow: false })
   expect(f.requests.map((x) => x.folder)).toEqual(["/user"])
@@ -87,7 +87,7 @@ test("search filters by name locally and only walks subfolders when requested", 
 
 test("canceling a recursive page aborts the current read and invalidates its continuation", async () => {
   const f = fixture()
-  const input = { folder: "/user", text: "", recursive: true }
+  const input = { folder: "/user", text: "", recursive: true, generation: 11 }
   const first = await f.rpc.search(input, call())
   if (!("cursor" in first) || !first.cursor) throw Error("Expected cursor")
   const active = Promise.withResolvers<void>()
@@ -114,8 +114,32 @@ test("a session limit produces the approved client message", async () => {
   f.host.read = async () => {
     throw Error("LOGINOM_SESSION_LIMIT")
   }
-  await expect(f.rpc.list({ folder: "/common" }, call())).rejects.toMatchObject({
+  await expect(f.rpc.list({ folder: "/common", generation: 11 }, call())).rejects.toMatchObject({
     type: "session_limit",
     message: "Сейчас заняты все сессии Loginom вашей организации",
   })
+})
+
+test("list and search reject a previous connection without reading the new account", async () => {
+  const f = fixture()
+  const input = { folder: "/user", generation: 11, text: "", recursive: true }
+  const first = await f.rpc.search(input, call())
+  if (!("cursor" in first) || !first.cursor) throw Error("Expected cursor")
+
+  f.host.generation = async () => 12
+  await expect(f.rpc.list(input, call())).rejects.toMatchObject({ type: "connection_changed" })
+  await expect(f.rpc.search(input, call())).rejects.toMatchObject({ type: "connection_changed" })
+  await expect(f.rpc.search({ ...input, cursor: first.cursor }, call())).rejects.toMatchObject({
+    type: "connection_changed",
+  })
+  expect(f.requests).toEqual([{ folder: "/user", generation: 11 }])
+
+  const ongoing = fixture()
+  const read = ongoing.host.read
+  ongoing.host.read = async (input, signal) => {
+    const result = await read(input, signal)
+    ongoing.host.generation = async () => 12
+    return result
+  }
+  await expect(ongoing.rpc.search(input, call())).rejects.toMatchObject({ type: "connection_changed" })
 })

@@ -358,7 +358,7 @@ For example, open a contributed page from the composer menu:
 ctx.add(ComposerAddItem, { title: "Open assets", run: ({ openPage }) => openPage("assets") })
 ```
 
-Use the `draft` identity passed to `run` and `renderSelection` to keep each composer's selection separate.
+Use `ComposerAddItem` to extend the `+` menu. The opaque `draft` identity passed to `run` and `renderSelection` survives editor remounts and can key a `WeakMap` for draft-specific selection. The Loginom GUI provides one `PackagePicker` contract for opening the package dialog.
 
 ## Ipc: main ↔ window
 

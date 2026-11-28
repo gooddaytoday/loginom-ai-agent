@@ -37,6 +37,7 @@ import { useAttachmentDestination } from "./attachments/destination"
 import { parseClientSlashCommand } from "./client-slash-command"
 
 export type ComposerModel = ComposerEditorModel & {
+  readonly draft: object
   readonly model: ComposerControls["model"]
 }
 
@@ -574,7 +575,8 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     },
   })
 
-  Object.defineProperty(controller, "model", { get: () => adapter.controls().model })
+  const model = Object.assign(controller, { draft: prompt.identity })
+  Object.defineProperty(model, "model", { get: () => adapter.controls().model })
 
   command.register("composer-editor", () => [
     {
@@ -610,7 +612,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   ])
 
   // SAFETY: the `model` getter defined on the controller above completes `ComposerModel`.
-  return controller as ComposerModel
+  return model as ComposerModel
 }
 
 function composerErrorMessage(language: ReturnType<typeof useLanguage>, cause: unknown) {

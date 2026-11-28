@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import type { ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
 import type { RpcHandlers } from "@opencode/plugin/promise/rpc"
 import { ServiceHost } from "./host"
 import type { Definition, Search } from "./package-list-contract"
@@ -19,18 +20,32 @@ const isCode = (error: unknown, code: string) => error instanceof Error && error
 export function packageListHandlers(host = ServiceHost.packageFolders): RpcHandlers<typeof Definition> {
   const continuations = new Map<string, Continuation>()
 
+  async function read(input: ReadFolder, signal: AbortSignal) {
+    signal.throwIfAborted()
+    if (await host.generation() !== input.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
+    const result = await host.read(input, signal)
+    if (await host.generation() !== input.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
+    signal.throwIfAborted()
+    return result
+  }
+
+  function readError(cause: unknown) {
+    if (isCode(cause, "LOGINOM_GENERATION_UNAVAILABLE")) return ["connection_changed", ru.connectionChanged] as const
+    if (isCode(cause, "LOGINOM_SESSION_LIMIT")) return ["session_limit", ru.sessionLimit] as const
+    return ["unavailable", ru.unavailable] as const
+  }
+
   return {
-    async list({ folder }, { signal, error }) {
+    async list(input, { signal, error }) {
       try {
-        return await host.read({ folder, generation: await host.generation() }, signal)
+        return await read(input, signal)
       } catch (cause) {
         signal.throwIfAborted()
-        return isCode(cause, "LOGINOM_SESSION_LIMIT")
-          ? error("session_limit", ru.sessionLimit)
-          : error("unavailable", ru.unavailable)
+        const [type, message] = readError(cause)
+        return error(type, message)
       }
     },
-    async search({ folder, text, recursive, cursor }: Search, { signal, error }) {
+    async search({ folder, text, recursive, generation, cursor }: Search, { signal, error }) {
       const query = normalize(text.trim())
       const continuation = cursor ? continuations.get(cursor) : undefined
       if (
@@ -39,6 +54,7 @@ export function packageListHandlers(host = ServiceHost.packageFolders): RpcHandl
           !continuation ||
           continuation.folder !== folder ||
           continuation.text !== query ||
+          continuation.generation !== generation ||
           continuation.expires <= Date.now() ||
           continuation.reading)
       )
@@ -46,11 +62,10 @@ export function packageListHandlers(host = ServiceHost.packageFolders): RpcHandl
       if (continuation) continuation.reading = true
       try {
         signal.throwIfAborted()
-        const generation = continuation?.generation ?? (await host.generation())
         const [current, ...remaining] = continuation?.pending ?? [folder]
         if (!current) return error("search_expired", ru.searchExpired)
 
-        const result = await host.read({ folder: current, generation }, signal)
+        const result = await read({ folder: current, generation }, signal)
         signal.throwIfAborted()
         const entries = result.entries
           .filter((entry) => entry.kind === "package")
@@ -78,13 +93,10 @@ export function packageListHandlers(host = ServiceHost.packageFolders): RpcHandl
         }
         return { folder: current, entries, slow: result.slow, cursor: next }
       } catch (cause) {
-        if (signal.aborted && cursor) continuations.delete(cursor)
+        if (cursor && (signal.aborted || isCode(cause, "LOGINOM_GENERATION_UNAVAILABLE"))) continuations.delete(cursor)
         signal.throwIfAborted()
-        if (continuation && isCode(cause, "LOGINOM_GENERATION_UNAVAILABLE"))
-          return error("search_expired", ru.searchExpired)
-        return isCode(cause, "LOGINOM_SESSION_LIMIT")
-          ? error("session_limit", ru.sessionLimit)
-          : error("unavailable", ru.unavailable)
+        const [type, message] = readError(cause)
+        return error(type, message)
       } finally {
         if (continuation) continuation.reading = false
       }

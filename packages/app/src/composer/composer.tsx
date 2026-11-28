@@ -41,7 +41,7 @@ export function Composer(props: {
   const addItems = createMemo(() => host?.items(ComposerAddItem) ?? [])
 
   const addInput = (plugin: string, draft: ComposerModel) => ({
-    draft,
+    draft: draft.draft,
     openPage: (id: string) => navigate?.(`/page/${encodeURIComponent(plugin)}/${encodeURIComponent(id)}`),
   })
 

@@ -57,6 +57,7 @@ for (const viewport of [
 
     const first = { ...sales, name: "Баланс.lgp", path: "/user/Баланс.lgp", modified: "2026-11-21T12:00:00Z" }
     const copy = { ...first, name: "Копия.lgp", path: "/user/Копия.lgp", size: 4 }
+    const replacement = { ...first, name: "Другой аккаунт.lgp", path: "/user/Другой аккаунт.lgp" }
 
     const entry = (item: typeof sales) => ({
       kind: "package",
@@ -68,11 +69,17 @@ for (const viewport of [
 
     const calls: Schema.Json[] = []
     let status: "ready" | "unconfigured" | "recoverable-error" | "error" = "ready"
+    let generation = 1
+    let holdStatus: Promise<void> | undefined
+
     const nextSearchPage = Promise.withResolvers<void>()
     const searchCursor = "380e21c6-581f-48d7-8dbd-978650e8c285"
     const directory = "C:/OpenCode/Packages"
     const payload = Schema.decodeUnknownSync(Schema.Struct({ input: Schema.Json }))
-    const filter = Schema.decodeUnknownSync(Schema.Struct({ folder: Schema.String, cursor: Schema.optionalKey(Schema.String) }))
+
+    const filter = Schema.decodeUnknownSync(
+      Schema.Struct({ folder: Schema.String, generation: Schema.Number, cursor: Schema.optionalKey(Schema.String) }),
+    )
 
     const workspace = await openSession(page, {
       name: "Packages",
@@ -98,16 +105,18 @@ for (const viewport of [
       const answer = (output: Schema.Json) => route.fulfill({ json: { output } })
 
       if (method === "status") {
+        await holdStatus
+
         if (status === "error")
           return route.fulfill({ status: 400, json: RpcError.make({ type: "unavailable", message: "Unavailable" }) })
 
         return answer({
           ok: true,
           value: {
-            revision: 1,
-            generation: 1,
+            revision: generation,
+            generation,
             url: "https://loginom.test/",
-            username: "analyst",
+            username: generation === 1 ? "analyst" : "another-user",
             folder: "/user",
             hasPassword: false,
             state: status,
@@ -120,7 +129,14 @@ for (const viewport of [
       calls.push(input)
 
       if (method === "upload") return answer(entry(copy))
-      const { folder, cursor } = filter(input)
+      const { folder, cursor, generation: openedGeneration } = filter(input)
+
+      if (openedGeneration !== generation) {
+        return route.fulfill({
+          status: 400,
+          json: RpcError.make({ type: "connection_changed", message: "Connection changed" }),
+        })
+      }
 
       if (method === "search") {
         if (cursor) {
@@ -135,6 +151,8 @@ for (const viewport of [
       if (method !== "list") return route.fallback()
 
       if (folder === "/common") return answer({ folder, entries: [], slow: false })
+
+      if (generation === 2) return answer({ folder, entries: [entry(replacement)], slow: false })
 
       return answer({
         folder: "/user",
@@ -171,6 +189,7 @@ for (const viewport of [
       text: "Архив",
       recursive: true,
       cursor: searchCursor,
+      generation: 1,
     })
     await picker.getByRole("button", { name: "Остановить" }).click()
     nextSearchPage.resolve()
@@ -184,12 +203,22 @@ for (const viewport of [
     await expect(page).toHaveURL(/\/page\/loginom-gui\/packages$/)
     await expect(page.getByRole("heading", { name: "Архив.lgp" })).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath("packages.png") })
+    await page.goBack()
+    await expect(page).toHaveURL(draftUrl)
+    await expect(page.getByText("Архив.lgp", { exact: true })).toBeVisible()
+    await page.getByRole("button", { name: "Схема пакета" }).click()
+    await expect(page.getByRole("heading", { name: "Архив.lgp" })).toBeVisible()
 
     await page.getByRole("button", { name: "Из Loginom" }).click()
     await expect(
       picker.getByRole("region", { name: "Недавние" }).getByRole("button", { name: /Архив\.lgp/ }),
     ).toBeVisible()
-    await picker.getByRole("button", { name: /Архив\.lgp/ }).click()
+    await picker
+      .locator('input[type="file"]')
+      .setInputFiles({ name: "Копия.lgp", mimeType: "application/octet-stream", buffer: Buffer.from("demo") })
+    await expect(page.getByRole("heading", { name: "Копия.lgp" })).toBeVisible()
+    await expect(page.getByRole("heading", { name: "Архив.lgp" })).toHaveCount(0)
+    await expect(page.getByText("Нет установленных действий с пакетом.")).toHaveCount(0)
     await page.getByRole("button", { name: "С компьютера" }).click()
     const upload = page.getByRole("dialog", { name: "С компьютера" })
     await upload
@@ -210,11 +239,25 @@ for (const viewport of [
     await uploadButton.click()
     await expect(page.getByRole("heading", { name: "Копия.lgp" })).toBeVisible()
     expect(calls).toContainEqual({ content: "ZGVtbw==", name: "Копия.lgp", generation: 1 })
+    const statusResponse = Promise.withResolvers<void>()
+    holdStatus = statusResponse.promise
     await page.reload()
     await page.getByRole("button", { name: "Из Loginom" }).click()
     const recents = picker.getByRole("region", { name: "Недавние" })
+    const recentCopy = recents.getByRole("button", { name: /Копия\.lgp/ })
     await expect(recents.getByRole("button")).toHaveText([/Копия\.lgp/, /Архив\.lgp/])
-    await page.keyboard.press("Escape")
+    await expect(recentCopy).toBeDisabled()
+    statusResponse.resolve()
+    await expect(recentCopy).toBeEnabled()
+    await expect(rows.first()).toBeVisible()
+    generation = 2
+    await picker.getByRole("button", { name: "Общие папки" }).click()
+    await expect(picker.getByRole("alert")).toHaveText("Подключение изменилось. Обновите его перед новой попыткой.")
+    await expect(recents).toHaveCount(0)
+    await picker.getByRole("button", { name: "Повторить" }).click()
+    await expect(rows).toHaveText([/Другой аккаунт\.lgp/])
+    await expect(recents).toHaveCount(0)
+    await picker.getByRole("button", { name: "Закрыть" }).click()
     await expect(picker).toBeHidden()
 
     status = "error"
