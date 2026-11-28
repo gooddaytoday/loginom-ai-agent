@@ -131,6 +131,7 @@
 
 - **Назначение (C1.0).** Встроенный плагин регистрирует страницу через `Page` в `@opencode/plugin/gui/builtin`. Оболочка открывает её по `/page/<plugin>/<id>`, кодирует оба сегмента и рендерит в `Contribution`. Меню заголовка, вертикальная панель и мобильное меню показывают активную страницу. Недоступная страница ведёт на Home. «Новая сессия» использует выбранный на Home проект.
 - **Файлы и конфликты.** Маршрут в `app/src/shell/routes/routes.tsx`, разбор в `app/src/shell/state/layout.tsx`, рендер и навигация в новом `app/src/runtime/plugin/pages.tsx`. `app/src/shell/titlebar/titlebar.tsx` остаётся у CAT-10, где учтён `Product.support`. При конфликте сохранить настройку поддержки, ветку `page` в `openDraft`, заголовок и пункты навигации плагинов. Английские строки и keeper `app/e2e/regression/tabs.spec.ts` также учтены в CAT-10. Реестр в `plugin/src/gui/builtin.ts` остаётся у CAT-12 вместе с именами продукта в примерах хранилища.
+- **Черновик из страницы (C4.2).** `app/src/runtime/plugin/host-apis.tsx` и `plugin/src/gui/host-apis.ts` разрешают открыть заполненный черновик без явной папки. Хост использует выбранный проект на Home или открывает штатный выбор папки. В `ui/src/context/dialog.tsx` новое окно наследует контекст только от открытого окна. Проверка — `app/e2e/regression/loginom-catalog.spec.ts`.
 - **Политика.** `merge`. После обновления прогнать `layout.test.ts`, компонентный `plugin-host.spec.ts` и keeper `tabs.spec.ts`. Тестовый плагин подключается через Vite при запуске e2e с фикстурами.
 
 ## CAT-10 Веб-приложение, UI-кит, UI сессии
