@@ -35,6 +35,7 @@ import {
 } from "../utils/timeline"
 
 const detailed = timelinePresets[2].value
+
 const saveEvidence = Schema.decodeUnknownSync(
   Schema.mutable(Schema.Array(Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number])))),
 )(receipts.save.evidence)
