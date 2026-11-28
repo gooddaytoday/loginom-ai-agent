@@ -9,6 +9,44 @@ import type { MainContext } from "./main.js"
 import type { Command, IconName, Panel, PanelTab, SlotMap } from "./registries.js"
 import { type JSX } from "solid-js"
 
+type BuiltinDeepLink = { readonly channel: string; readonly data: typeof Schema.Json.Type }
+
+type DeepLinkListener = (data: BuiltinDeepLink["data"]) => void
+
+const deepLinkListeners = new Map<string, DeepLinkListener>()
+
+const pendingDeepLinks = new Map<string, BuiltinDeepLink["data"][]>()
+
+/**
+ * Delivers opaque data in this Desktop renderer, buffering it until the built-in subscribes.
+ * @param link - The destination channel and its JSON payload.
+ */
+export function deliverBuiltinDeepLink(link: BuiltinDeepLink) {
+  const listener = deepLinkListeners.get(link.channel)
+
+  if (listener) return listener(link.data)
+
+  pendingDeepLinks.set(link.channel, [...(pendingDeepLinks.get(link.channel) ?? []), link.data])
+}
+
+/**
+ * Consumes a built-in channel's buffered and live deep links.
+ * @param channel - The channel the built-in owns.
+ * @param listener - Decodes and handles each payload.
+ * @returns Stops listening; later arrivals are buffered again.
+ */
+export function subscribeBuiltinDeepLinks(channel: string, listener: DeepLinkListener) {
+  deepLinkListeners.set(channel, listener)
+  const pending = pendingDeepLinks.get(channel)
+
+  pendingDeepLinks.delete(channel)
+  pending?.forEach(listener)
+
+  return () => {
+    if (deepLinkListeners.get(channel) === listener) deepLinkListeners.delete(channel)
+  }
+}
+
 /**
  * Runs fn when the main thread is idle (a short timeout where requestIdleCallback is missing, e.g. Safari). Load lazy
  * chunks this way from setup, so they are compiled before a session first opens.
@@ -370,6 +408,15 @@ export interface BuiltinContext extends Context {
   readonly locale: BuiltinLocale
   /** The session layout, with `command`. */
   readonly layout: BuiltinLayout
+  /** The app's route, with navigation to a built-in plugin's pages. */
+  readonly router: Context["router"] & {
+    /**
+     * Opens a top-level page contributed by the calling plugin. Waits for the app interface to mount.
+     *
+     * @param id - The page's id within the plugin, as registered with `Page`.
+     */
+    openPage(id: string): void
+  }
   /** Stores whose older homes may be parts of shared app keys. */
   readonly storage: BuiltinStorage
 }

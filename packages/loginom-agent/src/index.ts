@@ -533,6 +533,11 @@ export default Plugin.define({
     await ctx.rpc.register(DashboardTarget.rpc, {
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
+      preview: async (value, call) => {
+        if (!Dashboard.isWork(ctx.location.directory)) return {}
+        const url = await drafts.preview((value as { id: string }).id, call.signal)
+        return url ? { url } : {}
+      },
     })
     await ctx.rpc.register(Packages, packageListHandlers())
     await ctx.rpc.register(PackageReferences, packageReferencesHandlers((sessionID) =>
