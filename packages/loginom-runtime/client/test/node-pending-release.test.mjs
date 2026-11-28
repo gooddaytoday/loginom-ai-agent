@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {createActionRuntime,parseCapabilityResult,withBrowserReceipt} from '../lib/executor.mjs';
+import {nodeResultReply} from '../lib/node-result-reply.mjs';
+import {loginomFeedMetadata} from '../lib/user-results.mjs';
 import {createStorageBinding,withStorageIdentity} from '../lib/storage-policy.mjs';
 import {releasePendingNode,verifyRecoveredPendingNode,proveFinishLaunchRefused,NodeReleaseBlocked} from '../lib/node-pending-release.mjs';
 import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
@@ -399,10 +401,45 @@ function fixture({release:releaseDriver,type='imports.text',browserRecovery=fals
  const runtime=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,execute,browserRecovery,
   nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:new Map([[type,handler]]),nodeApplyDriverFactory:value=>{context=value;return drivers;},
   onRecord:async e=>{events.push(e);return e;}});
- return {runtime,calls,events,drivers,handler,context:()=>context};
+ return {runtime,calls,events,drivers,handler,adapter,context:()=>context};
 }
+for(const nativeStatus of ['NOT_APPLIED','AMBIGUOUS'])test('check releases a lost first graph gesture only with a no-write receipt: '+nativeStatus,async()=>{
+ const f=fixture();
+ const graph={...graphOf(),nodes:[],interaction_ready:true};
+ const adapter=f.adapter;
+ Object.assign(adapter,{
+  observe:async()=>structuredClone(graph),
+  mutate:async()=>{f.calls.push('dispatch');throw Error('Reply lost');},
+  reconcile:async()=>({completed:true,cleanup_complete:true,receipt:{status:nativeStatus,effect_possible:nativeStatus!=='NOT_APPLIED'}}),
+ });
+ f.runtime.startNodeApply(request());
+ const job=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+ assert.equal(job.outcome.status,'AMBIGUOUS');
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+ const released=await f.runtime.settleUnappliedStep('apply',graph,{deadline:Date.now()+1000});
+ assert.equal(released,nativeStatus==='NOT_APPLIED');
+ assert.equal(f.runtime.hasUnsettledWork(),!released);
+ assert.equal(f.calls.filter(call=>call==='dispatch').length,1);
+ assert.deepEqual(graph.nodes,[]);
+ if(released)assert.equal(f.runtime.nodeApplyStatus('apply').outcome.status,'NOT_APPLIED');
+});
 const proved=({wizard_closed=false,read_view_restored=false}={})=>()=>({verified:true,cleanup_complete:true,effect_possible:wizard_closed||read_view_restored,
  node_context:{...node,verified:true,surface:'graph',locked:false},graph:graphOf(),cleanup:{wizard_closed,read_view_restored,views_returned:false}});
+
+test('a settled runtime wait exposes the node observed by the target phase, not the request', async()=>{
+ const {runtime}=fixture();
+ const input=request();
+ input.finish='done';
+ runtime.startNodeApply(input);
+ const job=await runtime.waitNodeApply(input.operation_id,{timeoutMs:1000});
+ assert.equal(job.outcome.status,'SUCCEEDED');
+ const tool='dock_node_wait';
+ const reply=nodeResultReply(job,{userProfile:true,tool});
+ assert.deepEqual(reply.structuredContent.node,node);
+ const projection=loginomFeedMetadata(reply,{tool,facts:runtime.nodeFeedFacts(input.operation_id)});
+ assert.equal(projection.kind,'configure');
+ assert.deepEqual(projection.node,{guid:node.node_id,label:'Source',type:'imports.text'});
+});
 const stop=async(f,phase)=>{
  const key=phase==='read'?'readOutput':'finish',original=f.drivers[key];let first=true;
  f.drivers[key]=async(...args)=>{if(!first)return original(...args);first=false;f.calls.push(phase);throw Error('Local node cancellation requested');};

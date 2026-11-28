@@ -4,6 +4,7 @@ import type { InputFile } from "./inputs"
 import type { FileReference } from "./file-reference"
 import { hostException, hostFailure } from "./errors"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
+import { StepCheckRequest, StepCheckResult } from "./step-state"
 import { HostTaskScope } from "./task-scope"
 import { DashboardDelete, DashboardRead, DashboardPublish } from "./dashboard"
 import { Schema } from "effect"
@@ -189,6 +190,23 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     )
       return
     const input = "input" in data ? data.input : undefined
+    if (data.method === "checkStepState") {
+      try {
+        const check = Schema.decodeUnknownSync(StepCheckRequest)(input)
+        const chat = createHash("sha256").update(check.sessionID).digest("hex")
+        if ([...runs.values()].some((run) => run.chat === chat && run.dispatching)) {
+          reply({ id: data.id, result: { state: "busy", retryAvailable: false } })
+          return
+        }
+        const result = Schema.decodeUnknownSync(StepCheckResult)(
+          await service.checkStepState(chat, check.operationId),
+        )
+        reply({ id: data.id, result })
+      } catch (error) {
+        reply({ id: data.id, ...hostFailure(error) })
+      }
+      return
+    }
     if (!input || typeof input !== "object" || !("run" in input) || typeof input.run !== "string") {
       reply({ id: data.id, error: "LOGINOM_HOST_REQUEST_FAILED" })
       return
@@ -362,6 +380,12 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         return
       }
       if (run.scope?.profile === "loginom-dashboard" && data.method === "call") throw new Error("LOGINOM_SCOPE_DENIED")
+      if (data.method === "busy") {
+        const generation = run.lease?.generation ?? (await service.api.status()).generation
+        const state = await service.workState(generation, run.chat)
+        reply({ id: data.id, result: state.busy ?? null }, generation)
+        return
+      }
       const browserCall =
         data.method === "call" &&
         "name" in input &&

@@ -10,6 +10,7 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
+import { StepCheckRequest, StepCheckResult } from "@loginom-ai-agent/loginom-host/step-state"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { Option, Schema } from "effect"
@@ -138,6 +139,12 @@ export const dashboard = {
     if (Option.isNone(source)) throw new Error("LOGINOM_REPLY_INVALID")
     return source.value
   },
+}
+
+export async function checkStepState(input: typeof StepCheckRequest.Type): Promise<typeof StepCheckResult.Type> {
+  return request("checkStepState", input)
+    .then(Schema.decodeUnknownSync(StepCheckResult))
+    .catch(() => ({ state: "unavailable", retryAvailable: false }))
 }
 
 export const connectionSettings = {

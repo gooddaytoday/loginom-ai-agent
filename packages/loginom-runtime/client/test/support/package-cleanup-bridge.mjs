@@ -1,4 +1,5 @@
 import vm from 'node:vm';
+import {withLoginomMetadata} from '../../lib/loginom-feed-metadata.mjs';
 import {makePackageCleanupCode} from '../../lib/package-cleanup.mjs';
 import test, {mock} from 'node:test';
 import assert from 'node:assert/strict';
@@ -86,6 +87,10 @@ class ExternalClient {
       value={version:1,session_id:'own-session',document_id:'own-doc',account:'test-2',package_path:this.f.path,
         modified:this.f.scenario==='dirty-after-save'&&this.f.saves===1,observation:'after_confirmed_save',read_only:true,persisted_content_verified:false};
     }
+    else if(this.f.savedFixture && code.includes('function inSavedFileTab')){
+      this.f.events.push('saved-file');
+      value={base64:this.f.savedFixture.toString('base64')};
+    }
     else if(code.includes('async function closeOwnedPackage')){
       this.f.events.push('package-cleanup');
       if(this.f.page){
@@ -152,11 +157,15 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
     return f.runtime;
   }
   return {tools:f.storageReturn?[...executor.executorTools,...serverDownloadTools]:executor.executorTools,
+    saveNodeIntent:()=>({}),
+    savedGraphBefore:()=>f.savedFixture ? {
+      nodes:[{id:'770a65bc-5ea0-47f2-80f8-ab900e5e43c2',label:'Сортировка',sorting:true}],links:[],
+    } : undefined,
     serverDownload:async(_args,_name,{onWorkflowReturn})=>{onWorkflowReturn?.(f.storageReturn);return f.storageReceipt;},
     describe:()=>({available_node_types:[],actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
     requestFailure:error=>{
       f.failureMessages??=[];f.failureMessages.push(error.message);
-      return {status:'NOT_APPLIED',operation_id:'refused-save',effect_possible:false,cleanup_complete:true};
+      return {status:'NOT_APPLIED',operation_id:'refused-save',effect_possible:false,cleanup_complete:true,output:{}};
     },
     run:async(key,parameters,{operationId})=>{
       // Keep the real executor's explicit-null validation authoritative.
@@ -179,6 +188,7 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
         if(key==='package.save_checkpoint')result.output.workflow_continuations=continuations;
       }
       if(f.recovered){result.output.reopened=false;if(f.saves===1){result.status='AMBIGUOUS';result.output={};}}
+      if(f.savedFixture)result.cleanup_complete=true;
       f.receipts.set(operationId,result);return f.loseId===operationId?{...result,status:'AMBIGUOUS'}:result;
     },
     inspect:async({operationId})=>f.inspection??{status:'SUCCEEDED',action_key:'operation.inspect',operation_id:operationId,
@@ -489,16 +499,24 @@ test('unknown prepared workflow advises only the last confirmed Save of its own 
 });
 
 for(const action_key of ['package.save_checkpoint','package.save_as'])
- test('Save rejects explicit null but permits an omitted ID: '+action_key,async t=>{
+ test('Save rejects explicit null and compares persisted bytes after success: '+action_key,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-null-save-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
-  const f=current={scenario:'success',events:[],busy:false,saves:0,path,receipts:new Map(),catalog};
+  const savedFixture=await readFile(new URL('../../../../../evals/fixtures/calibration/sales-by-category/reference.lgp',import.meta.url));
+  const f=current={scenario:'success',events:[],busy:false,saves:0,path,receipts:new Map(),catalog,savedFixture};
   const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
    artifactStore:{list:()=>[],async releaseUploads(){}}};
   const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
-   mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
-   loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+   mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+   loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session,{
+   presentNodeReply:(reply, project) => {
+     const projection=project({});
+     if(!projection)return reply;
+     const {savedPackageGraph,...receipt}=projection;
+     return withLoginomMetadata(reply,{receipt,savedPackageGraph});
+   },
+  });
   const client=new AgentClient({name:'null-save',version:'1'});
   try{
    const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
@@ -513,6 +531,18 @@ for(const action_key of ['package.save_checkpoint','package.save_as'])
    const response=await client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'}}});
    const saved=JSON.parse(response.content[0].text);
    assert.equal(saved.status,'SUCCEEDED');assert.match(saved.operation_id,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+   const {operationId,savedPackageGraph:report}=response._meta.loginom;
+   assert.equal(report.status,'compared');
+   assert.equal(operationId,saved.operation_id);
+   assert.equal(report.saveOperationId,saved.operation_id);
+   assert.equal(report.packagePath,path);
+   assert.deepEqual(report.savedLabels,[{nodeId:'770a65bc-5ea0-47f2-80f8-ab900e5e43c2',label:'По убыванию выручки'}]);
+   assert.ok(response.content.some(block=>block.text.includes('«Сортировка» → «По убыванию выручки»')));
+   const replay=await client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'},operation_id:saved.operation_id}});
+   assert.deepEqual(replay._meta.loginom.savedPackageGraph,report);
+   const inspected=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:saved.operation_id}});
+   assert.deepEqual(inspected._meta.loginom.savedPackageGraph,report);
+   assert.equal(f.events.filter(event=>event==='saved-file').length,1);
    assert.equal(f.saves,1);
    assert.equal((await bridge.close()).browser_transport_closed,true);
    const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));

@@ -16,7 +16,7 @@ export async function readGraph(page, task) {
     .filter(r=>r.state==='completed'&&r.outcome?.status==='SUCCEEDED'&&r.outcome.action_key==='ui.act'&&r.outcome.cleanup_complete===true)
     .map(r=>({context:r.outcome.output?.prepared_node_context,trace:r.outcome.trace}));
   return page.evaluate(({ request, types, origin, build, read_bindings=false, window_blocker_selector,
-    track_link_guids=false, finishes, step_rebaseline=false, reopened }) => {
+    track_link_guids=false, finishes, step_rebaseline=false, read_only=false, reopened }) => {
     const fail = message => { throw new Error(message); };
     const preparation = globalThis.__loginomDockPreparationV1;
     if (location.origin !== origin || globalThis.bg?.app?.Version !== build || preparation?.document !== document
@@ -56,11 +56,17 @@ export async function readGraph(page, task) {
     // Older hosts without this native class still support the graph driver,
     // but cannot enter a bound composite node configuration.
     if (record.nodeTargetWorkflowNode && record.nodeTargetWorkflowNode !== workflowNode) fail('Prepared workflow object changed');
-    if (workflowNode) record.nodeTargetWorkflowNode=workflowNode;
-    const epochs=preparation.nodeTargetDomEpochs??={objects:new WeakMap(),next:0};
-    const epoch=e=>{if(!epochs.objects.has(e))epochs.objects.set(e,++epochs.next);return epochs.objects.get(e);};
+    if (workflowNode && !read_only) record.nodeTargetWorkflowNode=workflowNode;
+    const epochs=preparation.nodeTargetDomEpochs??{objects:new WeakMap(),next:0};
+    if(!read_only)preparation.nodeTargetDomEpochs=epochs;
+    const epoch=e=>{
+      if(read_only)return epochs.objects.get(e)??0;
+      if(!epochs.objects.has(e))epochs.objects.set(e,++epochs.next);
+      return epochs.objects.get(e);
+    };
     const domEpoch=epoch(containers[0]);
-    const portIdentities=record.nodeTargetPortIdentities??=new WeakMap();
+    const portIdentities=record.nodeTargetPortIdentities??new WeakMap();
+    if(!read_only)record.nodeTargetPortIdentities=portIdentities;
     const stepPorts=[];
     const collection = diagram.FNodes?.FCollection;
     if (!Array.isArray(collection) || collection.length > 200) fail('Graph node bound exceeded');
@@ -167,7 +173,10 @@ export async function readGraph(page, task) {
         if(renderedPort.getAttribute('data-tid')===ptid && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && (nativeRebound||[...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)){
           const identity={graph,node:n,cell:p.FCell,guid:p.FGuid,data:p.data,nodeTid:tid,type:p.FType,subtype:p.FSubType,tid:ptid};
-          if(step_rebaseline)stepPorts.push([p,identity]);else portIdentities.set(p,identity);
+          if(!read_only){
+            if(step_rebaseline)stepPorts.push([p,identity]);
+            else portIdentities.set(p,identity);
+          }
         }
         const suffix = ptid.slice(tid.length + 1), m = /^(Input|Output)_Data(Tree)?-(\d+)$/.exec(suffix);
         const variable=/^(Input|Output)_Var-(\d+)$/.exec(suffix),control=suffix==='Input_ControlVar';
@@ -259,6 +268,13 @@ export async function readGraph(page, task) {
 // Fixed UI gestures used only through the enclosing graph phase. The complete
 // pre-effect graph must still match immediately before the gesture.
 export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph, overflow, gap, addOnlyWindow) {
+  const guardGraph=(expected,observed,message,exact=false)=>{
+    if(exact?JSON.stringify(expected)===JSON.stringify(observed):sameGraph(expected,observed))return;
+    const error=Error(message);
+    if(expected.document_id===observed.document_id&&expected.workflow_ref?.workflow_id===observed.workflow_ref?.workflow_id
+      &&!sameGraph(expected,observed,true))error.code='NODE_GRAPH_CONFLICT';
+    throw error;
+  };
   let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false,moveGeometry,deletion;
   let gestureBefore=task.effect.before;
   let dropBinding,ownedWindowNodeId;
@@ -308,26 +324,27 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     try{remaining();await page.mouse.down();for(let step=1;step<=24;step++){remaining();await ensureContext();await page.mouse.move(from.x+(to.x-from.x)*step/24,from.y+(to.y-from.y)*step/24);}}finally{await page.mouse.up();held=false;}};
   try {
     const before=await read(page,task);
-    if(JSON.stringify(before)!==JSON.stringify(task.effect.before) || !before.interaction_ready)throw new Error('Graph changed before gesture');
+    guardGraph(before,task.effect.before,'Graph changed before gesture',true);
+    if(!before.interaction_ready)throw Error('Graph interaction is not ready');
     const p=task.effect.parameters,kind=task.effect.kind;
     if(kind==='rename'||kind==='move'||kind==='reveal_control'||kind==='delete_node'){
       const node=before.nodes.find(n=>n.ref.node_id===p.ref.node_id);
       if(!node||node.locked)throw Error('Exact unlocked target node required');
       const canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
       placementNavigation=await revealPosition({page,root:canvas,nodeId:p.ref.node_id,position:node.position,prefix:task.request.workflow_ref.prefix,scrollNode:true,
-        remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();if(!sameGraph(before,await read(page,task)))throw Error('Graph changed during target navigation');}});
+        remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();guardGraph(before,await read(page,task),'Graph changed during target navigation');}});
       if(!placementNavigation.fully_visible)throw Error('Target node and ports are not fully visible');
       gestureBefore=await read(page,task);
-      if(!sameGraph(before,gestureBefore))throw Error('Graph changed after target navigation');
+      guardGraph(before,gestureBefore,'Graph changed after target navigation');
     }
     if(kind==='create'){
       const title=task.types[p.type].title.replace(/\s/g,'_');
       const palette=task.request.workflow_ref.prefix+';ModelForm;colVendors_Компоненты>'+task.types[p.type].palette_group+'>'+title+';TreeText';
       const canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
       placementNavigation=await revealPosition({page,root:canvas,position:p.position,prefix:task.request.workflow_ref.prefix,scrollNode:true,
-        remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();if(!sameGraph(before,await read(page,task)))throw Error('Graph changed during placement navigation');}});
+        remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();guardGraph(before,await read(page,task),'Graph changed during placement navigation');}});
       gestureBefore=await read(page,task);
-      if(!sameGraph(before,gestureBefore))throw Error('Graph changed after placement navigation');
+      guardGraph(before,gestureBefore,'Graph changed after placement navigation');
       placementNavigation.rebound_node_epochs=gestureBefore.nodes.filter(n=>before.nodes.find(b=>b.ref.node_id===n.ref.node_id)?.dom_epoch!==n.dom_epoch).map(n=>({node_id:n.ref.node_id,dom_epoch:n.dom_epoch}));
       const origin=await canvas.boundingBox();
       const reachable=await canvas.evaluate((e,{point,scale,prefix})=>{
@@ -359,7 +376,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
             const hit=await canvas.evaluate((e,p)=>{const h=document.elementFromPoint(p.x,p.y);return !!h&&(h===e||e.contains(h))&&!h.closest('[role="dialog"],.x-window,.x-mask,.x-mask-msg');},candidate);
             if(!hit||JSON.stringify(await canvas.evaluate(readViewport))!==JSON.stringify(v))suggested=null;
           }
-          await ensureContext();if(!sameGraph(before,await read(page,task)))throw Error('Graph changed during placement suggestion');
+          await ensureContext();guardGraph(before,await read(page,task),'Graph changed during placement suggestion');
           if(suggested)placementRefusal.suggested_position=suggested;
         }
         throw new Error(outside
@@ -374,7 +391,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         try{
           const plan=await handle.evaluate(scrollExport,args);paletteScroll={before:plan,applied:false};
           if(!plan.visible){
-            remaining();await ensureContext();if(JSON.stringify(await read(page,task))!==JSON.stringify(gestureBefore))throw Error('Graph changed before palette scroll');
+            remaining();await ensureContext();guardGraph(await read(page,task),gestureBefore,'Graph changed before palette scroll',true);
             effectPossible=true;paletteScrollUncertain=true;
             const moved=await handle.evaluate(scrollExport,{...args,before:plan,apply:true});
             paletteScroll={before:plan,...moved};paletteScrollUncertain=false;
@@ -383,7 +400,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
           }
         }finally{await handle.dispose();}
         const revealedGraph=await read(page,task);
-        if(!sameGraph(gestureBefore,revealedGraph))throw Error('Graph changed after palette reveal');
+        guardGraph(gestureBefore,revealedGraph,'Graph changed after palette reveal');
         gestureBefore=revealedGraph;
         const currentView=await canvas.evaluate(readViewport);
         if(currentView.scale!==placementNavigation.view.scale
@@ -417,7 +434,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       effectPossible=true;await page.mouse.click(blank.x,blank.y);
       await wait('node_selection_controls_closed',()=>page.evaluate(()=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FmxGraph.getSelectionCells().length===0));
       const deselected=await read(page,task);
-      if(!sameGraph(gestureBefore,deselected))throw new Error('Graph changed while deselecting');
+      guardGraph(gestureBefore,deselected,'Graph changed while deselecting');
       // Selection can redraw SVG. Rebind only drawing epochs after the full
       // native graph comparison; drag rechecks it even if another repaint lands.
       gestureBefore=deselected;
@@ -459,7 +476,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         throw Error('Native control reveal body hit unavailable');
       },{task,mode});
       const tid=await targetTid(p.ref),label=find(tid+';Label;Label');await point(label);effectPossible=true;await label.click({timeout:remaining()});
-      if(!sameGraph(gestureBefore,await read(page,task)))throw Error('Graph changed before control reveal');
+      guardGraph(gestureBefore,await read(page,task),'Graph changed before control reveal');
       const body=await inspect('body');await ensureContext();await page.mouse.click(body.x,body.y,{button:'right'});transient=true;
       await find('mn;mniShowControlVariablesPort').waitFor({state:'visible',timeout:remaining()});
       const command=await inspect('menu');await ensureContext();await page.mouse.click(command.x,command.y);transient=false;
@@ -496,7 +513,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       // rendered as Input_Data-2; resolve both ends with the same native reader
       // used by link creation before selecting the exact owned edge.
       const {native_bindings:bindings,...boundGraph}=await read(page,{...task,read_bindings:true});
-      if(JSON.stringify(boundGraph)!==JSON.stringify(before))throw Error('Graph changed before owned link binding');
+      guardGraph(boundGraph,before,'Graph changed before owned link binding',true);
       const resolve=(id,direction,index)=>{
         const matches=bindings.filter(b=>b.node_id===id);
         if(p.edge.kind){
@@ -689,7 +706,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       }
       if(settleJavascript && pendingNode && node.ref.node_id!==pendingNode)throw Error('Created JavaScript rendering owner changed');
       const visibility=await revealPosition({page,root:canvas,nodeId:node.ref.node_id,position:node.position,prefix:task.request.workflow_ref.prefix,
-        remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();if(!sameGraph(baseline,await read(page,task)))throw Error('Graph changed while revealing created node');}});
+        remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();guardGraph(baseline,await read(page,task),'Graph changed while revealing created node');}});
       placementNavigation.node_visibility=visibility;
       if(!visibility.fully_visible)throw Error('Created node and ports are not fully visible');
       after=await read(page,task);
@@ -701,8 +718,11 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       try{dropLinkGuids=await handle.jsonValue();}finally{await handle.dispose();}
     }
     outcome={status:'SUCCEEDED',effect_possible:true,after,...(addOnly?{drop_link_guids:dropLinkGuids}:{})};
-  }catch(error){if(error.placement_navigation_unverified){effectPossible=true;placementNavigationUncertain=true;}outcome={...outcome,status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,error:String(error.message),...(placementRefusal?{placement_refusal:placementRefusal}:{})};}
-  finally{try{if(held){await page.mouse.up();held=false;}if(transient==='delete'){const cancel=find('msgbox;tlb;no');if(await cancel.isVisible())await cancel.click({timeout:3000});}else if(transient)await page.keyboard.press('Escape');transient=false;outcome.cleanup_complete=true;}catch(error){outcome={...outcome,status:'AMBIGUOUS',cleanup_complete:false,cleanup_error:String(error.message)};}}
+  }catch(error){if(error.placement_navigation_unverified){effectPossible=true;placementNavigationUncertain=true;}outcome={...outcome,status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,error:String(error.message),...(!effectPossible&&error.code==='NODE_GRAPH_CONFLICT'?{error_code:error.code}:{}),...(placementRefusal?{placement_refusal:placementRefusal}:{})};}
+  finally{try{if(held){await page.mouse.up();held=false;}if(transient==='delete'){const cancel=find('msgbox;tlb;no');if(await cancel.isVisible())await cancel.click({timeout:3000});}else if(transient){
+    if(outcome.error_code==='NODE_GRAPH_CONFLICT')throw Error('Transient UI ownership is unconfirmed after a graph conflict');
+    await page.keyboard.press('Escape');
+  }transient=false;outcome.cleanup_complete=true;}catch(error){outcome={...outcome,status:'AMBIGUOUS',cleanup_complete:false,cleanup_error:String(error.message)};}}
   if(dropBinding)await dropBinding.dispose().catch(()=>{});
   if(paletteScroll)outcome.palette_scroll=paletteScroll;
   if(placementNavigation)outcome.placement_navigation=placementNavigation;

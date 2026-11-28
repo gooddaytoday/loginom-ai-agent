@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {journalCopy} from './execution-journal.mjs';
 import { NODE_ADD_ONLY_MODE, NODE_TYPES, validateNodeTargetRequest } from './node-contracts.mjs';
+import {samePlacementGraph} from './node-placement.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
 import {variablesColumnUnionTargetRequest} from './variables-coluniondatavar-parameters.mjs';
 
@@ -11,7 +12,7 @@ const digest = value => createHash('sha256').update(JSON.stringify(canonical(val
 // The native output boundary follows the diagram's right extent on repaint.
 // Its horizontal layout is not a graph edit; GUID, role, ports and y remain bound.
 const domainNode=({dom_epoch,...value})=>value.type==='control.supernode_output'&&value.boundary_role==='output'&&Number.isFinite(value.position?.x)?{...value,position:{...value.position,x:0}}:value;
-const sameDomainGraph=(a,b)=>same({...a,nodes:a.nodes.map(domainNode)},{...b,nodes:b.nodes.map(domainNode)});
+export const sameDomainGraph=(a,b)=>same({...a,nodes:a.nodes.map(domainNode)},{...b,nodes:b.nodes.map(domainNode)});
 
 export function proveReloadedNode(operation, first, second, {readOnly=false}={}) {
   const state=operation.nodeApply, target=operation.targetPhase;
@@ -47,6 +48,9 @@ export function normalizeGraphRefusal(effect,receipt){
    return {...receipt,status:'NOT_APPLIED',native_status:'FAILED'};
  return receipt;
 }
+const keepBefore = (effect,request) => effect.kind==='move'||effect.kind==='connect'
+  &&(effect.parameters.edge.kind==='variables'||request.target.type==='transform.join_data'&&effect.parameters.edge.input===1);
+const conflict = message => Object.assign(Error(message), {code:'NODE_GRAPH_CONFLICT'});
 const edgeKey = e => [e.source, e.output, e.target, e.input,...(e.kind?[e.kind]:[])].join('|');
 const node = (graph, id) => {
   const matches = graph.nodes.filter(n => n.ref.node_id === id);
@@ -289,12 +293,33 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       &&graph.links.filter(e=>e.target===p.encoder.node_id&&e.input===0).length===1
       &&graph.links.some(e=>e.source===raw.source.node_id&&e.output===raw.output&&e.target===p.encoder.node_id&&e.input===0);
   };
+  const sameTarget = (before,after) => before.document_id===after.document_id
+    && before.workflow_ref.workflow_id===after.workflow_ref.workflow_id;
+  const graphRefusal = (before,after,message) => sameTarget(before,after)&&!samePlacementGraph(before,after,true)
+    ? conflict(message):Error(message);
+  const lateNativeCaption = (checkpoint,graph) => {
+    const prior=state.receipts.at(-1),edge=prior?.parameters?.edge;
+    if(prior?.kind!=='connect'||!prior.verified||edge?.target!==state.targetId||!prior.before||!graph.interaction_ready)return false;
+    if(edge.kind==='variables'){
+      const normalized=normalizeVariablesToTableLinkGraph(prior.before,graph,edge);
+      return normalized!==graph&&sameDomainGraph(checkpoint,normalized);
+    }
+    if(request.target.kind!=='new'||request.target.type!=='transform.join_data'||edge.kind||edge.input!==1
+      ||!prior.before.links.some(link=>link.target===edge.target&&link.input===0))return false;
+    const previous=node(checkpoint,edge.target),current=graph.nodes.find(n=>n.ref.node_id===edge.target);
+    return previous.label===joinDesignTitle&&current?.label==='Левое'
+      &&sameDomainGraph(checkpoint,{...graph,nodes:graph.nodes.map(n=>n===current?{...n,label:previous.label}:n)});
+  };
   const change = async (kind, parameters, verify = () => true) => {
     let original = await observe();
+    const checkpoint=state.last_graph??state.baseline;
+    if(checkpoint&&!sameDomainGraph(checkpoint,original)&&!lateNativeCaption(checkpoint,original))
+      throw graphRefusal(checkpoint,original,'Graph changed since the last verified target checkpoint');
     for(let refresh=0;refresh<3;refresh++){
       budget();
       const before=refresh===0?original:await observe();
-      if(!same(before,original))throw new Error('Graph target changed before local refresh');
+      if(!sameDomainGraph(before,original)&&!lateNativeCaption(original,before))
+        throw graphRefusal(original,before,'Graph target changed before local refresh');
       if(addOnly&&kind==='remove_link'&&![...before.links,...before.variable_links??[],...before.rest_connection_links??[]]
         .some(edge=>same(edge,parameters.edge)))throw Error('Owned add-only link identity changed before deletion');
       if(['remove_link','connect'].includes(kind)&&state.replacements?.some(r=>r.created.target===parameters.edge.target&&r.created.input===parameters.edge.input)){
@@ -321,11 +346,17 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         // Confirm the same live graph before accepting a pre-dispatch refusal.
         // An unrelated change or lost observation keeps this effect pending.
         const after=await observe();
-        if(!sameDomainGraph(before,after))throw new Error('Graph changed after refused gesture');
+        const provedEdit=(receipt.error_code??receipt.error?.code)==='NODE_GRAPH_CONFLICT';
+        const changed=!lateNativeCaption(before,after)&&(!sameDomainGraph(before,after)||provedEdit
+          ||['connect_graph_changed','connect_binding_graph_changed'].includes(receipt.reason));
+        const refusal=provedEdit?conflict('Graph changed before the refused gesture')
+          :graphRefusal(before,after,'Graph changed around the refused gesture');
+        if(changed&&!after.interaction_ready)throw refusal;
         await save('node_target_refusal_observed',{refusal:{effect,receipt:structuredClone(receipt),after_graph:after}});
         (state.refusals??=[]).push({id:effect.id,kind,receipt:structuredClone(receipt)});
         state.pending = null; state.last_graph=structuredClone(after);state.effect_possible=priorEffect;
         await commit();
+        if(changed)throw refusal;
         // New receipt ID, same graph identity and original deadline. No retry
         // is allowed unless this exact gesture was proved not dispatched.
         // A refused deletion is reported, never re-dispatched under a new receipt.
@@ -350,7 +381,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         }
         throw new Error(receipt?.create_mismatch?receipt.error:'Graph effect needs reconciliation');
       }
-      state.receipts.push({ id: effect.id, kind, parameters: effect.parameters, verified: true, receipt: structuredClone(receipt),...(kind==='move'?{before:effect.before}:{}) });
+      state.receipts.push({ id: effect.id, kind, parameters: effect.parameters, verified: true, receipt: structuredClone(receipt),...(keepBefore(effect,request)?{before:effect.before}:{}) });
       state.pending = null; state.last_graph=structuredClone(after);
       await commit();
       return after;
@@ -390,7 +421,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       }else{
       const proof=verifyPreparedTargetEffect({...state.pending,receipt:recovery.receipt},graph,adapter.positionMatches,request,state);
       if (!recovery?.verified || recovery.cleanup_complete !== true || !proof) throw new Error('Pending graph effect is unresolved');
-      state.receipts.push({ id: state.pending.id, kind: state.pending.kind, parameters: state.pending.parameters, verified: true, receipt: recovery,...(state.pending.kind==='move'?{before:state.pending.before}:{}) });
+      state.receipts.push({ id: state.pending.id, kind: state.pending.kind, parameters: state.pending.parameters, verified: true, receipt: recovery,...(keepBefore(state.pending,request)?{before:state.pending.before}:{}) });
       if (state.pending.kind === 'create') rememberCreatedTarget(state,proof);
       state.pending = null;state.last_graph=structuredClone(graph); await commit(); graph = await observe();
       }
@@ -598,6 +629,12 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     }
     // Native links derive these default captions. Preserve an explicitly
     // requested label after the owned transitions, without relinking.
+    if(request.target.kind==='new'&&['transform.join_data','variables.to_table','variables.column_union'].includes(request.target.type)
+      &&state.receipts.at(-1)?.kind==='connect'){
+      const current=await observe();
+      if(!sameDomainGraph(graph,current)&&!lateNativeCaption(graph,current))throw Error('Graph effect needs reconciliation');
+      graph=current;
+    }
     const finalTarget=node(graph,state.targetId);
     const joinCaption=request.target.type==='transform.join_data'&&request.target.label===joinDesignTitle&&finalTarget.label==='Левое';
     if(request.target.kind==='new'&&(joinCaption||['variables.to_table','variables.column_union'].includes(request.target.type))
@@ -620,7 +657,8 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
   } catch (error) {
     if(state.move_mismatch)return structuredClone(state.result);
     return { status: state.effect_possible ? 'AMBIGUOUS' : 'NOT_APPLIED', phase: 'target_incomplete',
-      error: String(error?.message ?? error), node_id: state.targetId, partial_effect: state.effect_possible,
+      error: String(error?.message ?? error), ...(error?.code==='NODE_GRAPH_CONFLICT'?{error_code:error.code}:{}),
+      node_id: state.targetId, partial_effect: state.effect_possible,
       cleanup_complete: !state.pending,
       pending: state.pending?.id ?? null, effects: state.receipts.map(({ id, kind, verified }) => ({ id, kind, verified })),
       configured: false, executed: false, package_saved: false };
@@ -648,7 +686,7 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
     const proof=verifyPreparedTargetEffect({...effect,receipt:recovery.receipt},graph,adapter.positionMatches,request,state);
     if(!recovery.verified || recovery.cleanup_complete!==true || !proof)return {status:'AMBIGUOUS',phase:'target_incomplete',cleanup_complete:recovery.cleanup_complete===true,pending:effect.id};
     if(effect.kind==='create')rememberCreatedTarget(state,proof);
-    state.receipts.push({id:effect.id,kind:effect.kind,parameters:effect.parameters,verified:true,receipt:recovery,...(effect.kind==='move'?{before:effect.before}:{})});
+    state.receipts.push({id:effect.id,kind:effect.kind,parameters:effect.parameters,verified:true,receipt:recovery,...(keepBefore(effect,request)?{before:effect.before}:{})});
     state.pending=null;state.last_graph=structuredClone(graph);
     }
   }else if(!same(state.completed?state.final_graph:(state.last_graph??state.baseline),graph))throw new Error('Partial node target graph changed');
