@@ -671,14 +671,16 @@ test('package schema observes unsaved graph edits and keeps native node and port
     return node;
   };
   const source=add('48FC4BE7-DCBE-4621-91D7-86D822FD3292','Source','Output','source-port');
-  const target=add('320790e8-3d1c-4612-b1b3-86c025cddb81','Target','Input','target-port');
+  const target=add('320790e8-3d1c-4612-b1b3-86c025cddb81','Submodel output','Input','target-port');
+  target.FIconCls='bg-vendor-icon-nullvendor';
+  target.FCell.geometry.x=480;
   const query=fixture.context.document.querySelectorAll;
   fixture.context.document.querySelectorAll=selector=>{
     if(selector==='[role="dialog"],.bg-mask-message,.x-mask-msg')return query('[role="dialog"]');
     return [...query(selector),...elements.filter(element=>selector==='[data-tid='+JSON.stringify(element.getAttribute())+']')];
   };
   Object.assign(tab.model,{FCreateDraggedNodeStarted:false,FDraggingOverGraph:false});
-  Object.assign(tab.model.FDiagram,{FNodes:{FCollection:[source,target]},FLinks:{FCollection:[{
+  Object.assign(tab.model.FDiagram,{FIsSubmodel:true,GenericOutputNode:target,FNodes:{FCollection:[source,target]},FLinks:{FCollection:[{
     FSourcePort:source.FPorts[0].FCollection[0],FTargetPort:target.FPorts[0].FCollection[0],
   }]}});
   tab.graph.contains=element=>elements.includes(element);
@@ -705,9 +707,14 @@ test('package schema observes unsaved graph edits and keeps native node and port
   });
   assert.deepEqual(after.links,before.links);
   assert.deepEqual(after.links,[{source:source.FGuid,output:'source-port',target:target.FGuid,input:'target-port'}]);
+  const outputBoundary=after.nodes.find(node=>node.guid===target.FGuid);
+  assert.equal(outputBoundary.boundary_role,'output');
+  assert.deepEqual(outputBoundary.position,{x:480,y:80});
   const step=await snapshot(false);
   assert.deepEqual(step.links,after.links);
-  assert.deepEqual(step.nodes,after.nodes.map(({guid,type,label,position})=>({guid,type,label,position})));
+  assert.deepEqual(step.nodes,after.nodes.map(({guid,type,label,position})=>({
+    guid,type,label,position:guid===target.FGuid?{x:0,y:80}:position,
+  })));
   fixture.setBlocked(true);
   assert.equal(await snapshot(),null);
   fixture.setBlocked(false);

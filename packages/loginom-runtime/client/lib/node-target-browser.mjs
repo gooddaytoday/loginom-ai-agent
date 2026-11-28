@@ -89,7 +89,9 @@ export async function readGraph(page, task) {
         }
         const boundary=diagram.FIsSubmodel===true&&(diagram.GenericInputNode===node?'input':diagram.GenericOutputNode===node?'output':null);
         const type=boundary==='output'?'control.supernode_output':nodeTypes.find(t=>t.type!=='control.supernode_output'&&t.icon_class===node.FIconCls)?.type??node.FIconCls;
-        return {guid:node.FGuid,type,label:nativeLabel.FRawValue,position:{x:boundary==='output'?0:geometry.x,y:geometry.y},
+        // The step diff ignores viewport-driven movement of the output boundary.
+        const x=!snapshot_details&&boundary==='output'?0:geometry.x;
+        return {guid:node.FGuid,type,label:nativeLabel.FRawValue,position:{x,y:geometry.y},
           ...(snapshot_details?{ports:descriptors,...(boundary?{boundary_role:boundary}:{})}:{})};
       });
       const links=nativeLinks.map(({FSourcePort:output,FTargetPort:input})=>{
