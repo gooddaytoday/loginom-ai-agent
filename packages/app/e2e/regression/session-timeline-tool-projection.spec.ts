@@ -220,7 +220,7 @@ test("Loginom: a checked write still waits for the operation's retry permission"
                   save: null,
                 },
               },
-              writeID: "7ffd612f-4f02-4d65-b99d-40e4679d64de",
+              writeID,
             },
           },
         ),
@@ -228,8 +228,11 @@ test("Loginom: a checked write still waits for the operation's retry permission"
     ],
     pluginRpc(rpc, method, input) {
       if (rpc === "loginom.connection" && method === "status") return connection(true)
+
       if (rpc === "loginom.write-outcome" && method === "check") {
-        return { status: "not_applied", writeID: "7ffd612f-4f02-4d65-b99d-40e4679d64de" }
+        expect(input).toEqual({ sessionID, writeID })
+
+        return { status: "not_applied", writeID }
       }
 
       if (rpc !== "loginom.step" || method !== "checkState") return
@@ -293,6 +296,16 @@ for (const outcome of ["applied", "not_applied", "unknown"] as const) {
       ],
       pluginRpc(rpc, method, input) {
         if (rpc === "loginom.connection" && method === "status") return connection(ready)
+
+        if (rpc === "loginom.step" && method === "checkState" && outcome === "not_applied") {
+          expect(input).toEqual({ sessionID, operationId: "write-2" })
+
+          return {
+            state: "observed",
+            retryAvailable: true,
+            step: { outcome: "not_applied", retryAvailable: true, persistence: "step_unsaved", save: null },
+          }
+        }
 
         if (rpc !== "loginom.write-outcome" || method !== "check") return
         checks++

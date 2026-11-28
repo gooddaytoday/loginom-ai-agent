@@ -102,25 +102,28 @@ export default function Block(props: {
     const client = props.session.server.client
     let result: Check = { kind: "unknown" }
 
-    if (failure.operationId) {
+    const checkOperation = async (operationId: string): Promise<Check> => {
       const response = await client
         .rpc(StepRpc)
-        .checkState({ sessionID, operationId: failure.operationId }, options)
+        .checkState({ sessionID, operationId }, options)
         .catch(() => undefined)
 
       const decoded = await StepRpc.methods.checkState.output["~standard"].validate(response)
 
-      if (!decoded.issues && decoded.value.state === "observed") {
-        const observed = decoded.value
-        result =
-          observed.step.outcome === "not_applied"
-            ? {
-                kind: "not_applied",
-                retryAvailable: observed.retryAvailable && observed.step.retryAvailable,
-                step: observed.step,
-              }
-            : { kind: observed.step.outcome === "completed" ? "applied" : "unknown", step: observed.step }
-      }
+      if (decoded.issues || decoded.value.state !== "observed") return { kind: "unknown" }
+      const observed = decoded.value
+
+      return observed.step.outcome === "not_applied"
+        ? {
+            kind: "not_applied",
+            retryAvailable: observed.retryAvailable && observed.step.retryAvailable,
+            step: observed.step,
+          }
+        : { kind: observed.step.outcome === "completed" ? "applied" : "unknown", step: observed.step }
+    }
+
+    if (failure.operationId && !failure.writeID) {
+      result = await checkOperation(failure.operationId)
     } else {
       const response = await client
         .rpc(WriteOutcomeRpc)
@@ -131,7 +134,14 @@ export default function Block(props: {
 
       if (!decoded.issues && failure.writeID && decoded.value.writeID === failure.writeID) {
         const status = decoded.value.status
-        result = status === "not_applied" ? { kind: status, retryAvailable: true } : { kind: status }
+
+        if (status === "not_applied") {
+          result = failure.operationId
+            ? await checkOperation(failure.operationId)
+            : { kind: status, retryAvailable: true }
+        } else {
+          result = { kind: status }
+        }
       }
     }
 
