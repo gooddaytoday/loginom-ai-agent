@@ -205,8 +205,7 @@ const FEED_PREVIEW_MAX_BYTES = 12 * 1024;
 const SAVED_GRAPH_MAX_BYTES = LOGINOM_METADATA_FIELD_MAX_BYTES.savedPackageGraph;
 const SAVE_ACTIONS = ['package.save_as', 'package.save_checkpoint'];
 
-function projectSavedPackageGraph(graph, knownSecrets) {
-  const {text} = createRedactor(knownSecrets);
+function projectSavedPackageGraph(graph, text) {
   const packagePath = text(graph.package_path).toWellFormed();
   const identity = {saveOperationId:graph.save_operation_id, packagePath};
   if (graph.status === 'unavailable') return {status:'unavailable', ...identity};
@@ -233,7 +232,7 @@ function projectSavedPackageGraph(graph, knownSecrets) {
   return result;
 }
 
-export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts, busy, save, savedPackageGraph}) {
+export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts, busy, save, savedPackageGraph, maskSavedGraph}) {
   const busyFor = operationId => busy?.version === 1 && busy.operationId === operationId
     && /^[A-Za-z0-9_.:-]{1,128}$/.test(busy.operationId)
     && typeof busy.active === 'boolean' && typeof busy.windowId === 'string'
@@ -243,7 +242,7 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
     const signal = tool === 'dock_action_run' ? busyFor(save.operation_id) : undefined;
     const graph = save.status === 'SUCCEEDED' && savedPackageGraph?.save_operation_id === save.operation_id
       && savedPackageGraph.package_path === save.output?.package_ref?.path
-      ? projectSavedPackageGraph(savedPackageGraph, knownSecrets) : undefined;
+      ? projectSavedPackageGraph(savedPackageGraph, maskSavedGraph ?? createRedactor(knownSecrets).text) : undefined;
     const bounded = graph && loginomMetadataBytes(graph) <= SAVED_GRAPH_MAX_BYTES ? graph : undefined;
     return signal || bounded ? {v:1, operationId:save.operation_id, state:'settled', status:save.status,
       ...(signal ? {busy:signal} : {}), ...(bounded ? {savedPackageGraph:bounded} : {})} : undefined;

@@ -5,8 +5,8 @@ const usageCounters = new Set(['input_tokens', 'output_tokens', 'prompt_tokens',
   'cache_read_tokens', 'cache_write_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens', 'cached_tokens', 'reasoning_tokens']);
 const secretField = key => sensitiveKey.test(key.replace(/([a-z])([A-Z])/g, '$1_$2'));
 
-export function createRedactor(knownValues = []) {
-  const known = new Set(knownValues.filter(value => typeof value === 'string' && value.length >= 4));
+export function createRedactor(knownValues = [], {minimumLength=4} = {}) {
+  const known = new Set(knownValues.filter(value => typeof value === 'string' && value.length >= minimumLength));
   const scalar = value => JSON.isRawJSON(value) ? JSON.parse(value.rawJSON) : value;
   function text(raw) {
     let value = raw;

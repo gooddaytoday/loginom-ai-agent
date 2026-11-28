@@ -7,21 +7,92 @@ const guid = value => {
   return value.toLowerCase();
 };
 
-export function readSaveGraph() {
-  const app = globalThis.bg?.app;
-  const diagram = app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab()?.Controller?.FController?.FDiagram;
+export async function readSaveGraph(budgetMs) {
+  const bg = globalThis.bg, app = bg?.app;
+  const activeDiagram = () => app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab()?.Controller?.FController?.FDiagram;
+  const diagram = activeDiagram();
   const nodes = diagram?.FNodes?.FCollection, links = diagram?.FLinks?.FCollection;
   if (!Array.isArray(nodes) || nodes.length > 200 || !Array.isArray(links) || links.length > 500)
     throw Error('Bounded pre-save diagram unavailable');
   if (nodes.some(node => node.FLabel?.parent !== node || typeof node.FLabel.FRawValue !== 'string'))
     throw Error('Pre-save node labels are not bound to their GUIDs');
   const owned = new Set(nodes);
-  return {
+  const graph = {
     nodes: nodes.map(node => ({id: node.FGuid, label: node.FLabel.FRawValue,
       sorting: node.FIconCls === 'bg-vendor-icon-sorting'})),
     links: links.filter(link => owned.has(link.FSourcePort?.parent) && owned.has(link.FTargetPort?.parent))
       .map(link => [link.FSourcePort.parent.FGuid, link.FSourcePort.FGuid, link.FTargetPort.parent.FGuid, link.FTargetPort.FGuid]),
   };
+  const deadline = Date.now() + budgetMs;
+  const sameGraph = () => activeDiagram() === diagram && diagram.FNodes.FCollection === nodes && diagram.FLinks.FCollection === links;
+  const live = () => sameGraph() && Date.now() < deadline;
+  const readNames = async (model, readCollection) => {
+    const acquired = [];
+    const own = async read => {
+      if (!live()) throw Error('Sorting pre-save read expired');
+      const proxy = await read();
+      if (!proxy || typeof proxy.dispose !== 'function') throw Error('Sorting proxy unavailable');
+      acquired.push(proxy);
+      if (proxy.$S !== model.$S || !live()) throw Error('Sorting proxy owner changed');
+      return proxy;
+    };
+    try {
+      const collection = await readCollection(own);
+      const count = await collection.get_Count();
+      if (!Number.isSafeInteger(count) || count < 0 || count > 128) return undefined;
+      const names = [];
+      for (let index = 0; index < count; index++) {
+        const item = await own(() => collection.getItem(index));
+        const name = await item.get_Name();
+        if (typeof name !== 'string' || !name || name.length > 128 || !live()) return undefined;
+        names.push(name);
+      }
+      if (new Set(names).size !== names.length) return undefined;
+      return names;
+    } catch { return undefined; }
+    finally {
+      let released = true;
+      for (const proxy of acquired.reverse()) try { await proxy.dispose(); } catch { released = false; }
+      if (!released) throw Error('Sorting proxy release unconfirmed');
+    }
+  };
+  const readSorting = async () => {
+    let bytes = 0;
+    for (const [index, node] of nodes.entries()) {
+      const snapshot = graph.nodes[index], model = node.data;
+      if (!live()) break;
+      if (!snapshot?.sorting || !model?.$S || !Array.isArray(node.FPorts) || node.FPorts.length > 16
+        || node.FPorts.some(list => !Array.isArray(list.FCollection) || list.FCollection.length > 16)) continue;
+      const ports = node.FPorts.flatMap(list => list.FCollection)
+        .filter(port => port.parent === node && port.FType === 1 && port.FSubType === 1 && port.data?.$S === model.$S);
+      const fields = ports.length === 1 ? await readNames(model, async own => {
+        const socket = await own(() => ports[0].data.get_Socket());
+        const output = await own(() => socket.get_Output());
+        const source = await own(() => output.QueryInterface(bg.IBGCustomDerivedDataSource));
+        const definitions = await own(() => source.get_ColumnDefs());
+        if (await definitions.get_Count() !== 0 || await source.get_SyncThroughColumns() !== true) return definitions;
+        const effective = await own(() => output.QueryInterface(bg.IBGDataSource));
+        return own(() => effective.get_Columns());
+      }).catch(() => undefined) : undefined;
+      const keys = bg.IBGSortingEngine ? await readNames(model, async own => {
+        const component = await own(() => model.get_Component());
+        const engine = await own(() => component.get_Engine());
+        const sorting = await own(() => engine.QueryInterface(bg.IBGSortingEngine));
+        return own(() => sorting.get_SortingColumns());
+      }).catch(() => undefined) : undefined;
+      const order = {keys, fields};
+      bytes += new TextEncoder().encode(JSON.stringify(order)).length;
+      if (bytes > 16 * 1024) break;
+      if (live() && nodes[index] === node && node.data === model && node.FGuid === snapshot.id && (keys || fields)) snapshot.sortingOrder = order;
+    }
+  };
+  if (budgetMs > 0 && graph.nodes.some(node => node.sorting)) {
+    let timer;
+    try { await Promise.race([readSorting(), new Promise(resolve => { timer = setTimeout(resolve, budgetMs); })]); }
+    finally { clearTimeout(timer); }
+  }
+  if (!sameGraph()) throw Error('Pre-save diagram changed');
+  return graph;
 }
 
 async function inSavedFileTab(page, options) {
@@ -44,9 +115,19 @@ async function inSavedFileTab(page, options) {
         throw Error('Saved package owner changed');
     };
     const session = connection?.Session;
-    verify();
-    const cards = workspace.items?.items;
-    if (!Array.isArray(cards) || cards.length > 32 || !cards.includes(card)) throw Error('Workspace tab inventory unavailable');
+    const previousRead = globalThis.__loginomDockSavedFileReadV1;
+    if (previousRead && !previousRead.released) throw Error('Previous saved package stream release is unconfirmed');
+    const release = {token:options.token, document, released:false};
+    globalThis.__loginomDockSavedFileReadV1 = release;
+    let cards;
+    try {
+      verify();
+      cards = workspace.items?.items;
+      if (!Array.isArray(cards) || cards.length > 32 || !cards.includes(card)) throw Error('Workspace tab inventory unavailable');
+    } catch (error) {
+      release.released = true;
+      throw error;
+    }
     const initial = new Set(cards);
     const isFiles = candidate => candidate?.Controller?.FController?.constructor?.name === 'FileStorageForm';
     const inventory = () => {
@@ -59,10 +140,10 @@ async function inSavedFileTab(page, options) {
       if (added.length > 1) throw Error('Ambiguous new Files tabs');
       return added[0];
     };
-    return {verify, workspace, card, isFiles, inventory, openedFiles, path: options.path, limit: options.limit};
+    return {verify, workspace, card, isFiles, inventory, openedFiles, path: options.path, limit: options.limit, release};
   }, options);
   const tab = page.locator('[data-tid='+JSON.stringify(options.tabTid)+']');
-  let files, attempted = false;
+  let files, attempted = false, readerStarted = false;
   try {
     if (await tab.count() !== 1 || !await tab.evaluate((element, owner) =>
       owner.card.tab?.el?.dom === element && element.classList.contains('x-tab-active'), owner))
@@ -74,30 +155,37 @@ async function inSavedFileTab(page, options) {
       const card = owner.workspace.getActiveTab(), controller = card?.Controller?.FController;
       return controller?.constructor?.name === 'FileStorageForm' && controller.FFileStorage ? card : null;
     }, owner, {timeout: 2500});
+    readerStarted = true;
     return await page.evaluate(async ({owner, files}) => {
       const verify = () => {
         owner.verify();
         if (owner.workspace.getActiveTab() !== files) throw Error('Saved package Files tab changed');
       };
-      verify();
-      const name = owner.path.split('/').at(-1), dir = owner.path.slice(0, -name.length);
-      if (bg.TBGFileOpenMode.fomRead !== 0) throw Error('Native read-only mode changed');
-      const downloader = new bg.filestorage.FileDownloader(name, dir, files.Controller.FController.FFileStorage);
-      let readTimer, cleanupTimer, opening, stream;
+      let downloader, readTimer, cleanupTimer, opening;
       const deadline = new Promise((_, reject) => {
         readTimer = setTimeout(() => reject(Error('Saved package read timed out')), 9000);
       });
-      const dispose = async acquired => {
-        await downloader.Dispose();
-        if (!downloader.IsDisposed || (acquired && !downloader.IsStreamReleased())) throw Error('Saved package stream did not close');
+      const dispose = async () => {
+        const acquired = await opening;
+        if (downloader) {
+          if (acquired && await downloader.ReleaseStreamObj() === false) throw Error('Saved package stream release refused');
+          const result = await downloader.Dispose();
+          if (result === false || !downloader.IsDisposed || (acquired && !downloader.IsStreamReleased()))
+            throw Error('Saved package stream did not close');
+        }
+        owner.release.released = true;
       };
       try {
+        verify();
+        const name = owner.path.split('/').at(-1), dir = owner.path.slice(0, -name.length);
+        if (bg.TBGFileOpenMode.fomRead !== 0) throw Error('Native read-only mode changed');
+        downloader = new bg.filestorage.FileDownloader(name, dir, files.Controller.FController.FFileStorage);
         if (downloader.FullFilename !== owner.path) throw Error('Native saved path differs');
         const size = await Promise.race([downloader.GetFileSize(), deadline]);
         if (!Number.isSafeInteger(size) || size < 1 || size > owner.limit) throw Error('Saved package size outside bound');
         verify();
-        opening = Promise.resolve(downloader.GetFileStream()).finally(() => { opening = undefined; });
-        stream = await Promise.race([opening, deadline]);
+        opening = Promise.resolve().then(() => downloader.GetFileStream());
+        const stream = await Promise.race([opening, deadline]);
         if (downloader.FShareDenyNone) throw Error('Saved package does not have an exclusive read');
         const bytes = new Uint8Array(size);
         for (let offset = 0; offset < size; offset += 16384) {
@@ -110,19 +198,16 @@ async function inSavedFileTab(page, options) {
         return {base64:bytes.toBase64()};
       } finally {
         clearTimeout(readTimer);
-        if (opening) {
-          void opening.then(dispose, () => dispose()).catch(() => {});
-        } else {
-          const cleanupDeadline = new Promise((_, reject) => {
-            cleanupTimer = setTimeout(() => reject(Error('Saved package stream cleanup timed out')), 2500);
-          });
-          try { await Promise.race([dispose(stream), cleanupDeadline]); }
-          finally { clearTimeout(cleanupTimer); }
-        }
+        const cleanupDeadline = new Promise((_, reject) => {
+          cleanupTimer = setTimeout(() => reject(Error('Saved package stream cleanup timed out')), 2500);
+        });
+        try { await Promise.race([dispose(), cleanupDeadline]); }
+        finally { clearTimeout(cleanupTimer); }
       }
     }, {owner, files});
   } finally {
     try {
+      if (!readerStarted) await owner.evaluate(owner => { owner.release.released = true; });
       if (attempted) {
         const opened = await owner.evaluateHandle((owner, files) => {
           if (files) return owner.openedFiles() === files ? files : null;
@@ -167,10 +252,24 @@ export function makeSavedPackageGraphCode(options) {
   return `async page=>(${inSavedFileTab.toString()})(page,${JSON.stringify({...options, limit:maxBytes})})`;
 }
 
+export function makeSavedPackageReleaseCode(token) {
+  return `async page=>page.evaluate(token=>{
+    const read=globalThis.__loginomDockSavedFileReadV1;
+    return {released:read?.token===token && read.document===document && read.released===true};
+  },${JSON.stringify(token)})`;
+}
+
+export function savedPackageReleaseConfirmed(response) {
+  return !response?.isError && response?.content?.some(block => block.type === 'text'
+    && /^\{\s*"released"\s*:\s*true\s*\}$/.test(resultText(block).trim()));
+}
+
+const resultText = block => block.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/)?.[1] ?? block.text;
+
 export function parseSavedPackageBytes(response) {
   if (!response?.isError) for (const block of response?.content ?? []) {
     if (block.type !== 'text') continue;
-    const text = block.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/)?.[1] ?? block.text;
+    const text = resultText(block);
     if (text.length > Math.ceil(maxBytes / 3) * 4 + 64) continue;
     try {
       const {base64} = JSON.parse(text);
@@ -218,7 +317,7 @@ async function savedGraphs(bytes) {
   } finally { await archive.close(); }
 }
 
-export async function compareSavedPackageGraph({bytes, before, sorting = new Map(), intendedLabels = new Map()}) {
+export async function compareSavedPackageGraph({bytes, before, intendedLabels = new Map()}) {
   const expected = new Map(before.nodes.map(node => [guid(node.id), node]));
   if (!expected.size || expected.size !== before.nodes.length) throw Error('Pre-save node identity unavailable');
   const graphs = await savedGraphs(bytes);
@@ -242,7 +341,7 @@ export async function compareSavedPackageGraph({bytes, before, sorting = new Map
         repair:{label:'Попросить исправить', prompt:`Проверьте, можно ли восстановить имя ${JSON.stringify(baseline)} у узла ${id}, сейчас сохранённого как ${JSON.stringify(label)}.`}});
     }
     if (!previous.sorting) continue;
-    const intended = sorting.get(id);
+    const prior = previous.sortingOrder;
     const component = child(node, 'Component'), engine = child(component, 'Engine');
     const keys = child(engine, 'SortingColumns');
     const sheet = section => child(child(items(child(component, section)).find(socket => socket.getAttribute('Name') === 'DataSource'), 'Socket'), 'DataSource');
@@ -251,9 +350,12 @@ export async function compareSavedPackageGraph({bytes, before, sorting = new Map
     const savedOutput = columns && names(columns);
     const fields = savedOutput?.length === 0 && output.getAttribute('SyncThroughColumns') === 'true'
       ? child(input, 'ColumnDefs') && names(child(input, 'ColumnDefs')) : savedOutput;
-    if (!intended || type(engine) !== 'TBGSortingEngine' || !keys || !fields) { uncheckedSorting.push(id); continue; }
-    for (const [kind, prior, saved] of [['sorting_key_order', intended.keys, names(keys)], ['sorting_field_order', intended.fields, fields]]) {
-      if (JSON.stringify(prior) !== JSON.stringify(saved)) changes.push({kind, node_id:id, label, before:prior, saved});
+    if (type(engine) !== 'TBGSortingEngine') { uncheckedSorting.push(id); continue; }
+    const orders = [['sorting_key_order', prior?.keys, keys && names(keys)], ['sorting_field_order', prior?.fields, fields]];
+    if (orders.some(([, before, saved]) => !before || !saved || saved.some(name => !name))) uncheckedSorting.push(id);
+    for (const [kind, before, saved] of orders) {
+      if (before && saved && saved.every(Boolean) && JSON.stringify(before) !== JSON.stringify(saved))
+        changes.push({kind, node_id:id, label, before, saved});
     }
   }
   const edge = values => values.map(guid).join('/');
@@ -267,9 +369,9 @@ export async function compareSavedPackageGraph({bytes, before, sorting = new Map
   return {scope:'active_workflow', saved_labels:savedLabels, changes, unchecked_sorting:uncheckedSorting};
 }
 
-export function savedGraphMessage(report) {
+export function savedGraphMessage(report, mask = value => value) {
   if (report.status === 'unavailable') return 'Пакет сохранён, но его сохранённую структуру не удалось сверить. Не повторяйте сохранение только ради сверки.';
-  const label = value => value.replace(/\s+/g, ' ').slice(0, 100);
+  const label = value => [...mask(value).replace(/\s+/g, ' ').toWellFormed()].slice(0, 100).join('');
   const renames = report.changes.filter(change => change.kind === 'node_renamed');
   const order = report.changes.some(change => change.kind.startsWith('sorting_'));
   const links = report.changes.some(change => change.kind.startsWith('link_'));

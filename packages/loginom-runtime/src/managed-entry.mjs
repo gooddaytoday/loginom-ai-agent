@@ -259,6 +259,7 @@ async function handle(message) {
       const knownSecrets = [input.connection.apiKey, input.connection.password]
       state.protectedOperation = createProtectedOperation(authenticated.context, new URL(input.connection.url).origin)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+        browserSecrets: knownSecrets,
         protectOperation: state.protectedOperation.begin,
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
         presentNodeReply: async (reply, project) => {
