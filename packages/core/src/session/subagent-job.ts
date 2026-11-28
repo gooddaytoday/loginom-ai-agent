@@ -18,8 +18,9 @@ export function start(
   jobs: Job.Interface,
   execution: SessionExecution.Interface,
   recovery: Recovery,
-  notificationID?: Job.Background["notificationID"],
+  options: { readonly notificationID?: Job.Background["notificationID"]; readonly continuation?: boolean } = {},
 ) {
+  const { notificationID, continuation } = options
   const id = recovery.childSessionID
   return jobs.start({
     id,
@@ -29,7 +30,7 @@ export function start(
     recovery,
     notificationID,
     background: true,
-    run: execution.resume(id, { continuation: notificationID !== undefined }).pipe(
+    run: execution.resume(id, { continuation }).pipe(
       // Only an explicit caller cancel releases the child's claim. A server shutdown
       // interrupts this job but must leave the child resumable on the next start.
       Effect.onInterrupt(() =>

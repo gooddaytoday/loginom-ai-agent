@@ -512,7 +512,10 @@ export const layer = (options?: Options) =>
           yield* Effect.forEach(
             resumable,
             Effect.fnUntraced(function* ({ background, recovery }) {
-              yield* SubagentJob.start(jobs, execution, recovery, background.notificationID)
+              yield* SubagentJob.start(jobs, execution, recovery, {
+                notificationID: background.notificationID,
+                continuation: true,
+              })
               suspended.delete(recovery.childSessionID)
             }),
             { discard: true },

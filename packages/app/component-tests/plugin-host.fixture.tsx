@@ -584,6 +584,8 @@ export function mountDashboard(initialLink: typeof Schema.Json.Type) {
     ),
   })
 
+  host.release()
+
   return {
     drafts,
     previews,
