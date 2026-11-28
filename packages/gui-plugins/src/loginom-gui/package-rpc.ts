@@ -1,35 +1,20 @@
 import { Definition } from "@loginom-ai-agent/loginom-agent/package-list"
 import type { Package as ServerPackage } from "@loginom-ai-agent/loginom-host/package-folder"
-import * as Settings from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { UploadRpc } from "@loginom-ai-agent/loginom-host/package-upload"
-import type { Context } from "@opencode/plugin/gui"
+import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import type { Package, Listing } from "./package-model"
+import { loginomLocation, type LoginomServer } from "./server"
 
 function toPackage(item: typeof ServerPackage.Type, folder: string): Package {
   return { name: item.name, path: item.path, modified: item.modifiedAt, size: item.sizeBytes, folder }
 }
 
-export function loginomServer(ctx: Context) {
-  const servers = ctx.servers.list().flatMap((id) => ctx.servers.get(id) ?? [])
-
-  if (ctx.desktop) return servers.find((server) => server.builtin)
-  const serving = ctx.servers.get(location.origin)
-
-  if (serving) return serving
-  const local = servers.filter((server) => server.local)
-
-  if (local.length === 1) return local.at(0)
-}
-
-export async function packageConnection(server: NonNullable<ReturnType<typeof loginomServer>>, signal: AbortSignal) {
-  const directory = server.data.location.default().directory || (await server.client.location.get({}, { signal })).directory
-
-  if (!directory) throw Error("Loginom location unavailable")
-  const location = { directory }
+export async function packageConnection(server: LoginomServer, signal: AbortSignal) {
+  const location = await loginomLocation(server, signal)
   const { client } = server
-  const result = await client.rpc(Settings.Definition).status({}, { location, signal })
+  const result = await client.rpc(ConnectionSettingsRpc).status({}, { location, signal })
 
-  if (!result.ok || (result.value.state === "ready" && result.value.failed)) throw Error("Loginom status unavailable")
+  if (!result.ok || result.value.failed) throw Error("Loginom status unavailable")
 
   if (result.value.state !== "ready") return
   const rpc = client.rpc(Definition)

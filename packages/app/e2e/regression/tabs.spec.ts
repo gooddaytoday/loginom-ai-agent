@@ -67,7 +67,7 @@ for (const viewport of [
     })
 
     const calls: Schema.Json[] = []
-    let status: "ready" | "unconfigured" | "error" = "ready"
+    let status: "ready" | "unconfigured" | "recoverable-error" | "error" = "ready"
     const nextSearchPage = Promise.withResolvers<void>()
     const searchCursor = "380e21c6-581f-48d7-8dbd-978650e8c285"
     const directory = "C:/OpenCode/Packages"
@@ -111,8 +111,7 @@ for (const viewport of [
             folder: "/user",
             hasPassword: false,
             state: status,
-            failed: false,
-            deviceOnly: false,
+            failed: status === "recoverable-error",
           },
         })
       }
@@ -220,6 +219,10 @@ for (const viewport of [
 
     status = "error"
     await page.getByRole("button", { name: "Из Loginom" }).click()
+    await expect(picker.getByRole("alert")).toHaveText("Не удалось проверить подключение к Loginom.")
+    await expect(picker.getByRole("button", { name: "Подключить Loginom" })).toHaveCount(0)
+    status = "recoverable-error"
+    await picker.getByRole("button", { name: "Повторить" }).click()
     await expect(picker.getByRole("alert")).toHaveText("Не удалось проверить подключение к Loginom.")
     await expect(picker.getByRole("button", { name: "Подключить Loginom" })).toHaveCount(0)
     status = "unconfigured"

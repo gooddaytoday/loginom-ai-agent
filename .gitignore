@@ -48,6 +48,7 @@ legal-drafts-private/
 !.env.example
 !.env.*.example
 local.env
+auth.json
 /loginom-ai-agent.json
 /.local/project-memory/
 /packages/opencode/config.json

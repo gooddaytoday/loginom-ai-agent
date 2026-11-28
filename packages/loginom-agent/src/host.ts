@@ -10,6 +10,7 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
+import { Loginom } from "@loginom-ai-agent/loginom-host/loginom"
 import { decodeFolderListing, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
 import type { UploadInput } from "@loginom-ai-agent/loginom-host/package-upload"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
@@ -20,12 +21,11 @@ export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
 export type Connection = {
   port: Port
   close(): Promise<void>
-  request?: (method: string, input: unknown, timeout?: number) => Promise<unknown>
+  request?: (method: string, input: unknown, timeout?: number, signal?: AbortSignal) => Promise<unknown>
 }
 
 type Started = {
   readonly directory: string
-  readonly deviceOnly: boolean
   ready: Promise<Connection | undefined>
   connected?: boolean
   held: Map<Lease, string>
@@ -39,7 +39,9 @@ const decodeRecord = Schema.decodeUnknownOption(
 const decodeStatus = Schema.decodeUnknownOption(
   Schema.Struct({ generation: Schema.Number, recoveries: Schema.optional(Schema.Array(Schema.String)) }),
 )
-const decodeView = Schema.decodeUnknownOption(Schema.Struct({ url: Schema.String, generation: Schema.Number }))
+const decodeView = Schema.decodeUnknownOption(
+  Schema.Struct({ url: Schema.String, state: Loginom.State, generation: Schema.Number }),
+)
 const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSource), { onExcessProperty: "error" })
 
 /**
@@ -53,7 +55,6 @@ const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSo
 export async function start(input: {
   data: string
   resources?: string
-  deviceOnly?: boolean
   connect?: () => Promise<Connection>
 }) {
   if (state.current && !state.current.closing) throw Error("LOGINOM_HOST_ALREADY_STARTED")
@@ -78,7 +79,6 @@ export async function start(input: {
   const connect = input.connect ?? (input.resources ? nodeHost(root, input.resources) : undefined)
   const current: Started = {
     directory,
-    deviceOnly: input.deviceOnly ?? false,
     ready: Promise.resolve(undefined),
     held: new Map(),
   }
@@ -143,7 +143,6 @@ export const dashboard = {
 
 export const connectionSettings = {
   request,
-  deviceOnly: () => state.current?.deviceOnly ?? false,
   holdTurn() {
     const id = randomUUID()
     const held = request("connection.settings.turn", { id, active: true }).catch(() => undefined)
@@ -172,12 +171,7 @@ export const packageFolders = {
 
 export async function uploadPackage(input: UploadInput, signal: AbortSignal) {
   const view = await connectionView()
-  if (view.generation !== input.generation) throw Error("LOGINOM_CONNECTION_NOT_READY")
-  if (connectionSettings.deviceOnly()) {
-    const hostname = new URL(view.url).hostname
-    if (hostname !== "localhost" && hostname !== "[::1]" && !/^127(?:\.\d{1,3}){3}$/.test(hostname))
-      throw Error("LOGINOM_CONNECTION_NOT_READY")
-  }
+  if (view.state !== "ready" || view.generation !== input.generation) throw Error("LOGINOM_CONNECTION_NOT_READY")
   return packageRequest("packages.upload", input, signal)
 }
 
@@ -200,11 +194,11 @@ async function packageRequest(method: "packages.list" | "packages.upload", input
     }
 }
 
-async function request(method: string, input: unknown, timeout?: number) {
+async function request(method: string, input: unknown, timeout?: number, signal?: AbortSignal) {
   const current = state.current
   const connection = await current?.ready
   if (!connection?.request || current?.closing) throw new Error("LOGINOM_HOST_NOT_READY")
-  return connection.request(method, input, timeout)
+  return connection.request(method, input, timeout, signal)
 }
 
 /** Releases every lease still held, disconnects and closes the Host. Idempotent: soft stop (B2.3b) may call it first. */

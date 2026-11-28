@@ -7,6 +7,7 @@ import { remember, type Package } from "./package-model"
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   const Settings = lazy(() => import("./page"))
+  const Catalog = lazy(() => import("./catalog-page"))
   const Picker = lazy(() => import("./package-picker"))
   const Packages = lazy(() => import("./packages-page"))
   const history = ctx.stores.recent
@@ -157,6 +158,18 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     ),
   })
 
+  ctx.add(Page, {
+    id: "catalog",
+    nav: {},
+    get title() {
+      return ctx.t("catalog.title")
+    },
+    render: () => (
+      <Suspense>
+        <Catalog />
+      </Suspense>
+    ),
+  })
   ctx.add(SettingsPage, {
     id: "loginom",
     icon: "arrow-up-right",

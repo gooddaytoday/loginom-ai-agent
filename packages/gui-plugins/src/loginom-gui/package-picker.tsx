@@ -7,7 +7,8 @@ import type { PackageInput } from "./contract"
 import type definition from "./index"
 import { transitionUpload, type UploadState } from "./machine"
 import { matches, visible, type Folder, type Listing, type Package, type Recent } from "./package-model"
-import { loginomServer, packageConnection } from "./package-rpc"
+import { packageConnection } from "./package-rpc"
+import { loginomServer } from "./server"
 
 const PERSONAL = "/user"
 

@@ -1,11 +1,11 @@
-import { Definition, type Issue } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import { ConnectionSettingsRpc, type Issue } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { createKeyed, usePlugin } from "@opencode/plugin/gui"
 import { Checkbox } from "@opencode/ui/checkbox"
 import { TextField } from "@opencode/ui/text-field"
 import { createMemo, createSignal, onCleanup, Show, untrack } from "solid-js"
 import type definition from "./index"
 import { initial, transition, view } from "./machine"
-import { loginomServer } from "./package-rpc"
+import { loginomLocation, loginomServer } from "./server"
 
 export default function Page() {
   const ctx = usePlugin<typeof definition>()
@@ -15,7 +15,9 @@ export default function Page() {
 
   const errorText = (issue: Issue | undefined) => (issue ? ctx.t(issue) : undefined)
 
-  const client = createMemo(() => loginomServer(ctx)?.client)
+  const service = createMemo(() => loginomServer(ctx))
+
+  const client = () => service()?.client
 
   let controller: AbortController | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -36,30 +38,41 @@ export default function Page() {
 
     const request = async () => {
       controller = new AbortController()
-
-      const signal = AbortSignal.any([
-        controller.signal,
-        AbortSignal.timeout(effect.type === "check" ? 245_000 : 12_000),
-      ])
-
-      const rpc = untrack(client)?.rpc(Definition)
+      const timeout = effect.type === "check" ? 245_000 : 12_000
+      const deadline = effect.type === "status" ? Math.min(timeout, effect.timeout ?? timeout) : timeout
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(deadline)])
+      const server = untrack(service)
+      // Connection settings are service-wide. Use the selected service's default Location.
+      const location = server && (await loginomLocation(server, signal).catch(() => undefined))
+      const rpc = server?.client.rpc(ConnectionSettingsRpc)
+      const options = location ? { location, signal } : undefined
 
       switch (effect.type) {
         case "status": {
-          const result = await rpc?.status({}, { signal }).catch(() => undefined)
-          dispatch({ type: "status", attempt: effect.attempt, result: result ?? { ok: false, issue: "unavailable" } })
+          const result = options && (await rpc?.status({}, options).catch(() => undefined))
+          dispatch({
+            type: "status",
+            attempt: effect.attempt,
+            now: Date.now(),
+            result: result ?? { ok: false, issue: "unavailable" },
+          })
           break
         }
 
         case "check": {
-          const result = await rpc?.check(effect.input, { signal }).catch(() => undefined)
+          const result = options && (await rpc?.check(effect.input, options).catch(() => undefined))
           dispatch({ type: "checked", attempt: effect.attempt, result: result ?? { ok: false, issue: "unavailable" } })
           break
         }
 
         case "save": {
-          const result = await rpc?.save(effect.input, { signal }).catch(() => undefined)
-          dispatch({ type: "saved", attempt: effect.attempt, result: result ?? { ok: false, issue: "saveFailed" } })
+          const result = options && (await rpc?.save(effect.input, options).catch(() => undefined))
+          dispatch({
+            type: "saved",
+            attempt: effect.attempt,
+            now: Date.now(),
+            result: result ?? { ok: false, issue: "saveFailed" },
+          })
           break
         }
       }
@@ -97,8 +110,7 @@ export default function Page() {
                     label={ctx.t("url")}
                     value={draft().url}
                     inputMode="url"
-                    placeholder={page().deviceOnly ? "http://127.0.0.1:8080" : "https://loginom.example.org"}
-                    description={page().deviceOnly && !page().fieldErrors.url ? ctx.t("deviceAddress") : undefined}
+                    placeholder="https://loginom.example.org"
                     disabled={page().readOnly}
                     validationState={page().fieldErrors.url ? "invalid" : "valid"}
                     error={errorText(page().fieldErrors.url)}
@@ -167,7 +179,7 @@ export default function Page() {
                 </ui.Button>
               </Show>
               <Show when={page().retry}>
-                <ui.Button onClick={reload}>{ctx.t("retry")}</ui.Button>
+                <ui.Button onClick={() => dispatch({ type: "refresh" })}>{ctx.t("retry")}</ui.Button>
               </Show>
             </div>
           </Show>
