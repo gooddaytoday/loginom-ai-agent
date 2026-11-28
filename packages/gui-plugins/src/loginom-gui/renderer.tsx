@@ -19,7 +19,8 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       </Suspense>
     ),
   })
-  ctx.add(SettingsPage, {
+
+  const network: SettingsPage = {
     id: "network",
     icon: "globe",
     get title() {
@@ -27,7 +28,6 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     },
     get entries() {
       return [
-        { id: "network-mode", title: ctx.t("network.mode") },
         { id: "network-proxy", title: ctx.t("network.proxy") },
         { id: "network-port", title: ctx.t("network.port") },
       ]
@@ -37,7 +37,11 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
         <Network />
       </Suspense>
     ),
-  })
+  }
+
+  // #1439 adds "work" to the registry type.
+  Object.assign(network, { group: "work" })
+  ctx.add(SettingsPage, network)
 }
 
 export default setup

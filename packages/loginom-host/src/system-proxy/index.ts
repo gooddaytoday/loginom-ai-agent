@@ -24,3 +24,4 @@ export type {
   SystemProxyState,
   SystemProxySummary,
 } from "./types"
+export { serviceProxyStatus } from "./service-status"

@@ -855,7 +855,6 @@ export const dict = {
   "sidebar.project.clearNotifications": "Clear notifications",
 
   "settings.section.server": "Server",
-  "settings.group.application": "Application",
   "settings.backToApp": "Back to app",
   "settings.backToSettings": "Back to settings",
   "settings.backToProjects": "Back to projects",
@@ -871,6 +870,7 @@ export const dict = {
   "settings.search.empty": "No results for {{query}}",
   "settings.search.empty.query": '"{{query}}"',
   "settings.search.refine": "Narrow your search to see more specific results.",
+  "settings.group.work": "Work",
   "settings.tab.preferences": "Preferences",
   "settings.tab.shortcuts": "Shortcuts",
   "settings.tab.notifications": "Notifications",

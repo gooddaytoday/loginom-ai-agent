@@ -6,6 +6,7 @@ import path from "node:path"
 import { Definition } from "@loginom-ai-agent/loginom-host/network-settings-rpc"
 import { OpenCode } from "@opencode/client/promise"
 import { NetworkMode } from "../src/network-mode"
+import { ServiceConfig } from "../src/services/service-config"
 import { isolatedEnv } from "./fixture/environment"
 import { scriptedModel } from "./fixture/product-run"
 
@@ -42,43 +43,42 @@ describe("network mode in the global config", () => {
   })
 })
 
-test("settings RPC writes the global network mode and keeps the active port until restart", async () => {
+test("settings RPC strips proxy credentials and keeps the active port until restart", async () => {
   const root = await temporary("cli-network-settings-")
-  const file = path.join(root, "config", "loginom-ai-agent.jsonc")
-  await Bun.write(file, '{\n  // Keep the user comment\n  "network": "online",\n  "network": "online",\n}\n')
-  const occupied = await listen()
-  const starting = await listen()
-  const next = await listen()
+  const [occupied, starting, next] = await Promise.all([listen(), listen(), listen()])
   const current = boundPort(starting)
   const saved = boundPort(next)
   await close(starting)
   await close(next)
   await Bun.write(path.join(root, "config", "service-local.json"), JSON.stringify({ port: current }))
-
+  const env = {
+    LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "true",
+    HTTPS_PROXY: "http://sample-user:sample-pass@127.0.0.1:1",
+    https_proxy: "http://sample-user:sample-pass@127.0.0.1:1",
+    HTTP_PROXY: undefined,
+    http_proxy: undefined,
+    ALL_PROXY: undefined,
+    all_proxy: undefined,
+  }
+  const location = { location: { directory: root } }
+  const maximum = ServiceConfig.maximumPort()
   try {
     const result = await serve(
       root,
       async (call, client) => {
         await active(call, root)
         const settings = client.rpc(Definition)
-        expect(await settings.status({})).toEqual({
-          mode: "online",
-          activeMode: "online",
-          port: { current, saved: current, editable: true },
+        expect(await settings.status({}, location)).toEqual({
+          proxy: { source: "environment", hosts: ["127.0.0.1:1"] },
+          port: { current, saved: current, editable: true, maximum },
         })
-        expect((await settings.setMode({ mode: "device" })).mode).toBe("device")
-        expect(await NetworkMode.read(path.dirname(file))).toBe("device")
-        expect(await Bun.file(file).text()).toContain("// Keep the user comment")
-        expect(await settings.savePort({ port: boundPort(occupied) })).toBe("occupied")
-        expect((await settings.status({})).port?.saved).toBe(current)
-        expect(await settings.savePort({ port: saved })).toBe("saved")
-        expect(await settings.status({})).toEqual({
-          mode: "device",
-          activeMode: "online",
-          port: { current, saved, editable: true },
-        })
+        if (process.platform === "win32") expect(await settings.savePort({ port: 0x8000 }, location)).toBe("invalid")
+        expect(await settings.savePort({ port: boundPort(occupied) }, location)).toBe("occupied")
+        expect((await settings.status({}, location)).port?.saved).toBe(current)
+        expect(await settings.savePort({ port: saved }, location)).toBe("saved")
+        expect((await settings.status({}, location)).port).toEqual({ current, saved, editable: true, maximum })
       },
-      { LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "true" },
+      env,
       ["--service"],
     )
     expect(result.requests).toEqual([])
@@ -86,13 +86,14 @@ test("settings RPC writes the global network mode and keeps the active port unti
       root,
       async (call, client) => {
         await active(call, root)
-        expect(await client.rpc(Definition).status({})).toEqual({
-          mode: "device",
-          activeMode: "device",
-          port: { current: saved, saved, editable: true },
+        expect((await client.rpc(Definition).status({}, location)).port).toEqual({
+          current: saved,
+          saved,
+          editable: true,
+          maximum,
         })
       },
-      {},
+      env,
       ["--service"],
     )
   } finally {
@@ -100,9 +101,59 @@ test("settings RPC writes the global network mode and keeps the active port unti
   }
 }, 60_000)
 
-function listen() {
-  const server = net.createServer()
-  return new Promise<net.Server>((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)))
+test("Windows accepts configured ports only below 0x8000", () => {
+  expect(ServiceConfig.maximumPort("win32")).toBe(0x7fff)
+  expect(ServiceConfig.maximumPort("linux")).toBe(65_535)
+})
+
+test.skipIf(process.platform !== "win32")(
+  "an occupied saved port falls back to the Desktop default",
+  async () => {
+    const root = await temporary("cli-network-fallback-")
+    const [occupied, fallbackListener] = await Promise.all([listen(), listen()])
+    const saved = boundPort(occupied)
+    const fallback = boundPort(fallbackListener)
+    await close(fallbackListener)
+    const name = "network-test"
+    await Bun.write(path.join(root, "config", `service-${name}.json`), JSON.stringify({ port: saved }))
+    try {
+      await serve(
+        root,
+        async (call, client) => {
+          await active(call, root)
+          expect((await client.rpc(Definition).status({}, { location: { directory: root } })).port).toEqual({
+            current: fallback,
+            saved,
+            fallback: saved,
+            editable: true,
+            maximum: 0x7fff,
+          })
+        },
+        {
+          LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "true",
+          LOGINOM_AI_AGENT_SERVICE_IDENTITY: name,
+          LOGINOM_AI_AGENT_SERVICE_PORT: String(fallback),
+        },
+        ["--service"],
+      )
+    } finally {
+      await close(occupied)
+    }
+  },
+  60_000,
+)
+
+async function listen() {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const server = net.createServer()
+    const port = process.platform === "win32" ? 20_000 + Math.floor(Math.random() * 12_000) : 0
+    const success = await new Promise<boolean>((resolve) => {
+      server.once("error", () => resolve(false))
+      server.listen(port, "127.0.0.1", () => resolve(true))
+    })
+    if (success) return server
+  }
+  throw new Error("No test port available")
 }
 
 function boundPort(server: net.Server) {
@@ -355,6 +406,7 @@ async function serve<A>(
       LOGINOM_AI_AGENT_PASSWORD: password,
       LOGINOM_AI_AGENT_SERVICE_IDENTITY: undefined,
       LOGINOM_AI_AGENT_SERVICE_PORT: undefined,
+      LOGINOM_AI_AGENT_RUNTIME_PROXY_SOURCE: undefined,
       OPENCODE_API_KEY: undefined,
       HTTPS_PROXY: address,
       HTTP_PROXY: address,
@@ -373,7 +425,11 @@ async function serve<A>(
     const url = await listening(child)
     // A service keeps its password in its config file, written before it listens.
     const secret = args.includes("--service")
-      ? (await Bun.file(path.join(root, "config", "service-local.json")).json()).password
+      ? (
+          await Bun.file(
+            path.join(root, "config", ServiceConfig.filename("local", ServiceConfig.identity(overrides))),
+          ).json()
+        ).password
       : password
     const client = OpenCode.make({
       baseUrl: url,

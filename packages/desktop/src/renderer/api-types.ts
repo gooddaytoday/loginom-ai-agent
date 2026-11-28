@@ -1,6 +1,5 @@
 import type { DesktopMenuAction, DesktopZoomLevel } from "@opencode/app/desktop-menu"
 import type { DesktopNativeBundle } from "@opencode/app/i18n/desktop-native"
-import type { ServiceProxyStatus } from "@opencode/plugin/gui/builtin"
 import type { StorageSnapshot } from "../shared/ipc-transport"
 import type { WindowBootstrap } from "../shared/window-bootstrap"
 import type {
@@ -79,12 +78,7 @@ export type ElectronAPI = {
   setForceFocus(enabled: boolean): Promise<void>
   getSpellcheckEnabled(): Promise<boolean>
   setSpellcheckEnabled(enabled: boolean): Promise<void>
-  getSystemProxySetting(): Promise<{
-    enabled: boolean
-    unreachable: boolean
-    socksOnly: boolean
-    status: ServiceProxyStatus
-  }>
+  getSystemProxySetting(): Promise<{ enabled: boolean; unreachable: boolean; socksOnly: boolean }>
   setSystemProxyEnabled(enabled: boolean): Promise<void>
   recordFatalRendererError(error: FatalRendererError): Promise<void>
   setNativeTranslations(bundle: DesktopNativeBundle): Promise<void>

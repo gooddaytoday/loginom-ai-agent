@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { createServer } from "node:http"
 import { runtimeEnvironment } from "../src/supervisor"
-import { desktopServiceProxy, onceDesktopServiceProxy } from "../src/system-proxy"
+import { desktopServiceProxy, onceDesktopServiceProxy, serviceProxyStatus } from "../src/system-proxy"
 
 const inherited = { NO_PROXY: "private.example", no_proxy: "another.example" }
 const loopback = ["localhost", "127.0.0.1", "::1", "[::1]"]
@@ -19,7 +19,7 @@ test("WinINET reaches the Desktop service but not its Loginom runtime", async ()
     },
   })
   expect(proxy.state).toBe("applied")
-  expect(proxy.status).toEqual({ source: "windows", hosts: ["proxy.example:8080", "secure.example:8080"] })
+  expect(serviceProxyStatus(proxy.environment)).toEqual({ source: "windows", hosts: ["proxy.example:8080", "secure.example:8080"] })
   expect(proxy.environment.HTTPS_PROXY).toBe("http://secure.example:8080")
   expect(proxy.environment.NO_PROXY?.split(",")).toEqual(
     expect.arrayContaining([...loopback, "private.example", "another.example", "internal.example"]),
@@ -46,7 +46,7 @@ test("explicit HTTPS_PROXY skips system and PAC readers and survives in the runt
     },
   })
   expect(proxy.state).toBe("environment")
-  expect(proxy.status).toEqual({ source: "environment", hosts: ["explicit.example:8080"] })
+  expect(serviceProxyStatus({ ...environment, ...proxy.environment })).toEqual({ source: "environment", hosts: ["explicit.example:8080"] })
   const noProxy = [...loopback, "private.example", "another.example"].join(",")
   expect(runtimeEnvironment({ ...environment, ...proxy.environment }, "linux")).toEqual({
     ...environment,

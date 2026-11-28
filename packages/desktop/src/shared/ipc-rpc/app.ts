@@ -64,25 +64,7 @@ export const AppSetSpellcheckEnabled = Rpc.make("AppSetSpellcheckEnabled", {
 })
 
 export const AppGetSystemProxySetting = Rpc.make("AppGetSystemProxySetting", {
-  success: Schema.Struct({
-    enabled: Schema.Boolean,
-    unreachable: Schema.Boolean,
-    socksOnly: Schema.Boolean,
-    status: Schema.Struct({
-      source: Schema.Literals([
-        "windows",
-        "macos",
-        "gnome",
-        "kde",
-        "chromium",
-        "environment",
-        "none",
-        "disabled",
-        "unavailable",
-      ]),
-      hosts: Schema.Array(Schema.String),
-    }),
-  }),
+  success: Schema.Struct({ enabled: Schema.Boolean, unreachable: Schema.Boolean, socksOnly: Schema.Boolean }),
 })
 
 export const AppSetSystemProxyEnabled = Rpc.make("AppSetSystemProxyEnabled", {

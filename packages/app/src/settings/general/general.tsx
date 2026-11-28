@@ -252,9 +252,9 @@ export const SettingsGeneral: Component = () => {
     initial: true,
     initialMeta: { unreachable: false, socksOnly: false },
     load: async (read) => {
-      const { enabled, unreachable, socksOnly } = await read()
+      const { enabled, ...status } = await read()
 
-      return { value: enabled, meta: { unreachable, socksOnly } }
+      return { value: enabled, meta: status }
     },
     write: (enabled) => platform.setSystemProxyEnabled?.(enabled),
   })

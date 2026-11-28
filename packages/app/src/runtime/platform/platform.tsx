@@ -3,7 +3,6 @@ import type { AsyncStorage, SyncStorage } from "@solid-primitives/storage"
 import type { Accessor } from "solid-js"
 import type { DesktopMenuAction, DesktopZoomLevel } from "@/shell/commands/desktop-menu"
 import type { DraftStore } from "@/runtime/persistence/drafts"
-import type { ServiceProxyStatus } from "@opencode/plugin/gui/builtin"
 import type { Bridge } from "@opencode/plugin/gui/host"
 
 type PickerPaths = string | string[] | null
@@ -117,12 +116,7 @@ type PlatformBase = {
   /** Turn the native spellchecker on or off (desktop only) */
   setSpellcheckEnabled?(enabled: boolean): Promise<void>
 
-  getSystemProxySetting?(): Promise<{
-    enabled: boolean
-    unreachable: boolean
-    socksOnly: boolean
-    status: ServiceProxyStatus
-  }>
+  getSystemProxySetting?(): Promise<{ enabled: boolean; unreachable: boolean; socksOnly: boolean }>
   setSystemProxyEnabled?(enabled: boolean): Promise<void>
 
   /** Run a desktop-only menu action from the app chrome */

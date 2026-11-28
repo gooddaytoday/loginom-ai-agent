@@ -1,66 +1,53 @@
 import { createServer } from "node:net"
-import type { Definition, Mode, Status } from "@loginom-ai-agent/loginom-host/network-settings-rpc"
+import type { Definition, ProxyStatus, Status } from "@loginom-ai-agent/loginom-host/network-settings-rpc"
 import type { RpcHandlers } from "@opencode/plugin/promise/rpc"
 import { Effect, Semaphore } from "effect"
-import { NetworkMode } from "../network-mode"
 import { ServiceConfig } from "./service-config"
 
 export const networkSettings = Effect.fnUntraced(function* (input: {
-  directory: string
-  activeMode: Mode
   editable: boolean
-  hostname?: string
+  hostname: string
+  proxy: ProxyStatus
 }) {
   const readService = ServiceConfig.read()
   const run = Effect.runPromiseWith(yield* Effect.context<Effect.Services<typeof readService>>())
   const gate = yield* Semaphore.make(1)
-  let currentPort: number | undefined
+  const maximum = ServiceConfig.maximumPort()
+  let listening: { current: number; fallback?: number } | undefined
 
   const status = async (): Promise<Status> => {
-    const current = currentPort
-    const mode = await NetworkMode.read(input.directory)
-    if (current === undefined) return { mode, activeMode: input.activeMode }
-
-    const saved = input.editable ? ((await run(readService)).port ?? current) : current
-    return { mode, activeMode: input.activeMode, port: { current, saved, editable: input.editable } }
+    const port = listening
+    if (!port) return { proxy: input.proxy }
+    const saved = input.editable ? ((await run(readService)).port ?? port.current) : port.current
+    return { proxy: input.proxy, port: { ...port, saved, maximum, editable: input.editable } }
   }
 
   const handlers: RpcHandlers<typeof Definition> = {
     status,
-    setMode: ({ mode }) =>
-      run(
-        gate.withPermit(
-          Effect.tryPromise(async () => {
-            await NetworkMode.write(input.directory, mode)
-            return status()
-          }),
-        ),
-      ),
-    savePort: ({ port }) =>
-      run(
+    savePort: ({ port }, { signal }) => {
+      if (port > maximum) return Promise.resolve("invalid")
+      return run(
         gate.withPermit(
           Effect.gen(function* () {
-            if (!input.editable || currentPort === undefined) return "unavailable"
-
-            const config = yield* readService
-            if (port !== currentPort) {
-              const result = yield* Effect.promise(() =>
-                checkPort(input.hostname ?? config.hostname ?? "127.0.0.1", port),
-              )
+            if (!input.editable || !listening) return "unavailable"
+            if (port !== listening.current) {
+              const result = yield* Effect.promise(() => checkPort(input.hostname, port))
               if (result !== "free") return result
             }
-            // The current service keeps its listener and registration until it stops.
-            yield* ServiceConfig.savePort(port)
+            // Once the write starts, finish its atomic rename even if the client goes away.
+            yield* ServiceConfig.savePort(port).pipe(Effect.uninterruptible)
             return "saved"
           }),
         ),
-      ),
+        { signal },
+      )
+    },
   }
 
   return {
     handlers,
-    listening(port: number) {
-      currentPort = port
+    listening(current: number, fallback?: number) {
+      listening = fallback === undefined ? { current } : { current, fallback }
     },
   }
 })

@@ -54,6 +54,10 @@ export function filename(channel = LOGINOM_AI_AGENT_CHANNEL, service = identity(
   return `service-${channel.replace(/[^a-zA-Z0-9._-]/g, "-")}.json`
 }
 
+export function maximumPort(platform = process.platform) {
+  return platform === "win32" ? 0x7fff : 65_535
+}
+
 export function defaultPort(channel = LOGINOM_AI_AGENT_CHANNEL, platform = process.platform, service = identity()) {
   // A stated port is used as given; the product states one below 0x8000, the same on every platform.
   if (service?.port) return service.port
@@ -297,7 +301,8 @@ export const set = Effect.fn("cli.service-config.set")(function* (key: string, v
     }
     case "port": {
       const port = Number(value)
-      if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new Error("Port must be between 1 and 65535")
+      if (!Number.isInteger(port) || port < 1 || port > maximumPort())
+        throw new Error(`Port must be between 1 and ${maximumPort()}`)
       yield* Service.stop(yield* options())
       yield* savePort(port)
       return

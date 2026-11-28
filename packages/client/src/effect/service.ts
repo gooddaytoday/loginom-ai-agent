@@ -30,13 +30,13 @@ export const discover = Effect.fn("service.discover")(function* (options: Discov
   return found.endpoint
 })
 
-/** Recognize an authenticated compatible service bound to an expected URL, including while it starts or fails. */
+/** Recognize an authenticated compatible service, including while it starts or fails. */
 export const incumbent = Effect.fn("service.incumbent")(function* (
-  options: DiscoverOptions & { readonly url: string },
+  options: DiscoverOptions & { readonly url?: string },
 ) {
   const info = yield* read(options.file)
   if (info === undefined) return undefined
-  const found = (yield* Effect.promise(() => probeResult({ ...info, url: options.url }))).service
+  const found = (yield* Effect.promise(() => probeResult(options.url ? { ...info, url: options.url } : info))).service
   if (!found?.compatible) return undefined
   if (!matchesVersion(found.version, options)) return undefined
   return { endpoint: found.endpoint, state: found.state }
