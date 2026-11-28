@@ -5,6 +5,7 @@ import { defaultEnsureTiming, ensureTiming, type EnsureTiming } from "../service
 import { matchesVersion } from "../service-version.js"
 import { PtyHandoff } from "../pty-handoff.js"
 import { decide, fallback, headers, isServiceProcessAlive, probeResult, requestStop, same } from "../service-probe.js"
+import { lockRegistration } from "../service-registration-lock.js"
 
 export * from "../service.js"
 export { fallback, headers }
@@ -159,9 +160,11 @@ async function terminate(info: Info, options: { readonly file?: string }, timing
       if (!(await waitUntilStopped(info.pid, timing))) throw new Error(`Server process ${info.pid} is still running`)
     }
   }
-  const latest = await read(options.file)
+  const file = options.file ?? fallback()
+  await using _ = await lockRegistration(file)
+  const latest = await read(file)
   if (latest === undefined || !same(latest, info)) return
-  await rm(options.file ?? fallback(), { force: true })
+  await rm(file, { force: true })
 }
 
 function delay(milliseconds: number) {

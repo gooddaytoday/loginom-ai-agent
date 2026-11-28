@@ -67,14 +67,16 @@
     {
       "id": "CAT-13",
       "title": "Product storage root and own background service (U5)",
-      "note": "Service discovery and stop distinguish an unreaped Linux process from a live service (LAB-2276).",
+      "note": "Service discovery and stop distinguish an unreaped Linux process from a live service. Registration publication and conditional removal serialize through the same per-registration filesystem lock (LAB-2276).",
       "paths": [
         "packages/util/src/global.ts", "packages/client/src/service-probe.ts", "packages/cli/src/services/service-config.ts",
         "packages/desktop/src/main/service/sidecar-probe.ts", "packages/desktop/src/main/service/background-service.ts",
         "packages/desktop/src/main/native/logging.ts", "packages/core/src/config/discovery.ts",
         "packages/process-daemon/src/daemon.rs", "packages/process-daemon/src/daemon/unix.rs", "packages/process-daemon/src/client.rs",
         "packages/server/src/process.ts", "packages/client/src/service-timing.ts", "packages/client/src/promise/service.ts",
-        "packages/client/src/effect/service.ts", "packages/cli/src/shutdown-deadline.ts",
+        "packages/client/src/effect/service.ts", "packages/client/src/service-registration-lock.ts",
+        "packages/client/package.json", "bun.lock", "packages/cli/src/services/service-registration.ts",
+        "packages/cli/src/shutdown-deadline.ts",
         "packages/server/test/process.test.ts", "packages/client/test/fixture/service.ts",
         "packages/client/test/fixture/service-timing.ts", "packages/client/test/promise-service.test.ts",
         "packages/client/test/service.test.ts", "packages/cli/test/service.test.ts",

@@ -5,6 +5,7 @@ import { defaultEnsureTiming, ensureTiming, type EnsureTiming } from "../service
 import { matchesVersion } from "../service-version.js"
 import { PtyHandoff } from "../pty-handoff.js"
 import { decide, fallback, headers, isServiceProcessAlive, probeResult, requestStop, same } from "../service-probe.js"
+import { lockRegistration } from "../service-registration-lock.js"
 
 export * from "../service.js"
 export { headers }
@@ -148,6 +149,14 @@ export const Info = Schema.Struct({
 })
 
 const decode = Schema.decodeUnknownEffect(Schema.fromJsonString(Info))
+
+export const withRegistrationLock = <A, E, R>(file: string, operation: Effect.Effect<A, E, R>) =>
+  Effect.acquireUseRelease(
+    Effect.tryPromise(() => lockRegistration(file)),
+    () => Effect.uninterruptible(operation),
+    (lock) => Effect.promise(() => lock.release()),
+  )
+
 // A missing or corrupt file means no valid info; callers treat both
 // the same (the registering server self-evicts, clients rediscover).
 const read = Effect.fnUntraced(function* (file?: string) {
@@ -199,10 +208,16 @@ const terminate = Effect.fnUntraced(function* (info: Info, options: { readonly f
       yield* stopped(info.pid).pipe(Effect.retry(poll(timing)))
     }
   }
-  const latest = yield* read(options.file)
-  if (latest === undefined || !same(latest, info)) return
-  const fs = yield* FileSystem.FileSystem
-  yield* fs.remove(options.file ?? fallback()).pipe(Effect.ignore)
+  const file = options.file ?? fallback()
+  yield* withRegistrationLock(
+    file,
+    Effect.gen(function* () {
+      const latest = yield* read(file)
+      if (latest === undefined || !same(latest, info)) return
+      const fs = yield* FileSystem.FileSystem
+      yield* fs.remove(file).pipe(Effect.ignore)
+    }),
+  )
 })
 
 /** Effect-based local service lifecycle operations. */

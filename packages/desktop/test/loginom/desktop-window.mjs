@@ -179,7 +179,7 @@ test(
 
 test("recovery-ui: the same window reconnects after the service crashes", async (t) => {
   const { page, servicePids } = await launch(t)
-  const ready = page.getByText("Create a session to get started", { exact: true })
+  const ready = page.getByText(/^(Create a session to get started|Создайте (сессию|разговор), чтобы начать)$/)
   await expectWindow(ready).toBeVisible()
   const pid = Number((await readFile(servicePids, "utf8")).trim().split("\n").at(-1))
   expect(Number.isSafeInteger(pid) && pid > 1).toBe(true)
@@ -200,18 +200,20 @@ test("recovery-ui: the same window reconnects after the service crashes", async 
   )
 
   await Promise.all([reconnected, Promise.resolve().then(() => process.kill(pid, "SIGKILL"))])
-  await page.getByRole("button", { name: "Settings", exact: true }).click({ timeout })
+  await page.getByRole("button", { name: /^(Settings|Настройки)$/ }).click({ timeout })
   await expectWindow(page.getByTestId("settings-screen")).toBeVisible()
-  await page.getByRole("button", { name: "Home", exact: true }).click()
+  await page.getByRole("button", { name: /^(Home|Главная)$/ }).click()
   await expectWindow(ready).toBeVisible()
 })
 
 test("startup-failure: the window explains why the local service did not start", async (t) => {
   const { page } = await launch(t, { failStartup: true })
   await expectWindow(
-    page.getByText("An error occurred while starting the local server.", { exact: true }),
+    page.getByText(/^(An error occurred while starting the local server|Произошла ошибка при запуске локального сервера)\.$/),
   ).toBeVisible()
-  await expectWindow(page.getByRole("textbox", { name: "Error Details" })).toHaveValue(new RegExp(startupFailure))
+  await expectWindow(page.getByRole("textbox", { name: /^(Error Details|Детали ошибки)$/ })).toHaveValue(
+    new RegExp(startupFailure),
+  )
 })
 
 test("plugin inventory is available even when the local CLI cannot start", async (t) => {
