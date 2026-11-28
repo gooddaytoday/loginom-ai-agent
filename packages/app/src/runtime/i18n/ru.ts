@@ -15,6 +15,7 @@ export const dict = {
   "session.modelStop.limitLabel": "Лимит на сегодня исчерпан — обновится в {{time}}",
   "session.modelStop.saved": "Сделанные шаги остались в разговоре.",
   "session.modelStop.connect": "Подключить модель",
+  "session.modelStop.contactAdmin": "Обратитесь к администратору",
   "session.modelStop.switch": "Продолжить с другой моделью",
   "session.modelStop.same": "Продолжить с этой же",
   "session.modelStop.copy": "Скопировать текст ошибки",

@@ -166,6 +166,83 @@ for (const [type, reason, same] of [
   })
 }
 
+test("removes the free-limit countdown at the reset time without reloading", async ({ page }) => {
+  const now = new Date("2026-11-27T02:00:00Z")
+  await page.clock.install({ time: now })
+  const messages = history("provider.free-limit", now.getTime())
+  await openSession(page, {
+    name: "Дневной лимит",
+    sessions: [{ id: sessionID, title: "Обработка таблицы", model, outcome: "failed" }],
+    provider: provider({ id: model.id, name: "Бесплатная модель" }),
+    pageMessages: (_id, limit, _before, type) => ({
+      items: messages.filter((message) => !type || message.type === type).slice(-limit),
+    }),
+  })
+
+  const stop = page.locator('[data-component="model-stop"]')
+  const composerWarning = page.getByRole("status").filter({ hasText: /^Лимит на сегодня исчерпан — обновится в 03:00/ })
+  const reset = stop.getByText("Лимит обновится в 03:00", { exact: true })
+  await expect(composerWarning).toBeVisible()
+  await expect(reset).toBeVisible()
+  await page.clock.fastForward(3_600_000)
+  await expect(composerWarning).toHaveCount(0)
+  await expect(reset).toHaveCount(0)
+  await expect(stop.getByRole("status")).toContainText("Ход остановлен: дневной лимит исчерпан")
+})
+
+for (const action of ["provider.use", "integration.connect"] as const) {
+  test(`directs users to the administrator when ${action} is restricted`, async ({ page }) => {
+    const messages = history("provider.auth", Date.now())
+    await openSession(page, {
+      name: "Управляемые модели",
+      configEntries: [
+        {
+          type: "document",
+          info: { policies: [{ action, resource: "*", effect: "deny" }] },
+        },
+      ],
+      sessions: [{ id: sessionID, title: "Обработка таблицы", model, outcome: "failed" }],
+      provider: provider({ id: model.id, name: "Разрешённая модель" }),
+      pageMessages: (_id, limit, _before, type) => ({
+        items: messages.filter((message) => !type || message.type === type).slice(-limit),
+      }),
+    })
+
+    const stop = page.locator('[data-component="model-stop"]')
+    await expect(stop.getByText("Обратитесь к администратору", { exact: true })).toBeVisible()
+    await expect(stop.getByRole("button", { name: "Подключить модель" })).toHaveCount(0)
+  })
+}
+
+test("can retry copying a model stop error after the clipboard stops responding", async ({ page }) => {
+  await page.clock.install()
+  await page.addInitScript(() => {
+    let writes = 0
+    Object.defineProperty(navigator.clipboard, "writeText", {
+      value: () => (++writes === 1 ? new Promise<void>(() => {}) : Promise.resolve()),
+    })
+  })
+  const messages = history("provider.auth", Date.now())
+  await openSession(page, {
+    name: "Сбой модели",
+    sessions: [{ id: sessionID, title: "Обработка таблицы", model, outcome: "failed" }],
+    provider: provider({ id: model.id, name: "Тестовая модель" }),
+    pageMessages: (_id, limit, _before, type) => ({
+      items: messages.filter((message) => !type || message.type === type).slice(-limit),
+    }),
+  })
+
+  const stop = page.locator('[data-component="model-stop"]')
+  const copy = stop.getByRole("button", { name: "Скопировать текст ошибки" })
+  await copy.click()
+  await expect(copy).toBeDisabled()
+  await page.clock.fastForward(30_000)
+  await expect(stop.getByRole("alert")).toHaveText("Не удалось выполнить действие. Попробуйте ещё раз.")
+  await copy.click()
+  await expect(copy).toBeEnabled()
+  await expect(stop.getByRole("alert")).toHaveCount(0)
+})
+
 test("offers another model when the context overflows at 390px", async ({ page }, testInfo) => {
   await page.setViewportSize(narrowViewport)
   const messages = history("provider.invalid-request", Date.now(), {

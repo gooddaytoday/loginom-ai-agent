@@ -1,6 +1,9 @@
 import { useModels } from "@/providers/models/models"
 import { useServerSDK } from "@/runtime/server/client"
-import { freeLimitReset, ModelRetry, ModelStop, readModelContinuation, sameModel, stopReason } from "./model-stop"
+import { ModelRetry, ModelStop, readModelContinuation, stopReason } from "./model-stop"
+import { MODEL_STOP_ACTION_TIMEOUT_MS } from "./model-stop-machine"
+import { createLimitClock, freeLimitResetAt, sameModel } from "../free-limit-reset"
+import { modelConnectionRestricted, useSessionConfig } from "../config"
 import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js"
 import { Predicate } from "effect"
 import { abort } from "@opencode/util/abort"
@@ -307,6 +310,8 @@ function MessageTimelineView(
   const models = useModels()
   const api = useServerSDK().api
   const history = props.session.history.messages
+  const config = useSessionConfig(sessionDirectory)
+  const modelsManaged = createMemo(() => config.isSuccess && modelConnectionRestricted(config.data))
 
   const modelName = (model: ModelRef | undefined) =>
     model ? (models.find({ modelID: model.id, providerID: model.providerID })?.name ?? model.id) : "—"
@@ -365,6 +370,24 @@ function MessageTimelineView(
         sessionStatus().type === "idle" &&
         history().findLast((message) => message.type === "user")?.id === presentation().userMessageID
 
+      const candidates = createMemo(() =>
+        !canContinue()
+          ? []
+          : models.list().flatMap((item) => {
+              const model = { id: item.id, providerID: item.provider.id }
+              if (
+                !models.visible({ modelID: model.id, providerID: model.providerID }) ||
+                sameModel(model, presentation().model)
+              )
+                return []
+              return [{ model, name: item.name, reset: freeLimitResetAt(history(), model) }]
+            }),
+      )
+      const clock = createLimitClock(() => candidates().map((item) => item.reset))
+      const alternatives = createMemo(() =>
+        candidates().filter((item) => item.reset === undefined || item.reset <= clock()),
+      )
+
       return (
         <ModelStop
           reason={presentation().reason}
@@ -372,23 +395,21 @@ function MessageTimelineView(
           model={presentation().model}
           modelName={modelName(presentation().model)}
           resetAt={presentation().resetAt}
-          alternatives={models.list().flatMap((item) => {
-            const model = { id: item.id, providerID: item.provider.id }
-
-            if (!models.visible({ modelID: model.id, providerID: model.providerID })) return []
-            if (sameModel(model, presentation().model) || freeLimitReset(history(), model)) return []
-
-            return [{ model, name: item.name }]
-          })}
+          alternatives={alternatives()}
           canContinue={canContinue() && !!props.actions?.chooseModel}
+          modelsManaged={modelsManaged()}
           connect={() => command.trigger("provider.connect")}
           resume={async (model) => {
             const id = sessionID()
 
             if (!id || !canContinue()) return
+            const signal = AbortSignal.timeout(MODEL_STOP_ACTION_TIMEOUT_MS)
             await data.session.prompt({
               sessionID: id,
-              prepare: () => api.session.switchModel({ sessionID: id, model }),
+              prepare: async () => {
+                await api.session.switchModel({ sessionID: id, model }, { signal })
+                signal.throwIfAborted()
+              },
               text: language.t("session.modelStop.continuePrompt"),
               metadata: { modelContinuation: modelName(model), previousModel: modelName(presentation().model) },
             })

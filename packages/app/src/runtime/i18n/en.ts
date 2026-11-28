@@ -17,6 +17,7 @@ export const dict = {
   "session.modelStop.limitLabel": "Daily limit reached — resets at {{time}}",
   "session.modelStop.saved": "Completed steps remain in the conversation.",
   "session.modelStop.connect": "Connect a model",
+  "session.modelStop.contactAdmin": "Contact your administrator",
   "session.modelStop.switch": "Continue with another model",
   "session.modelStop.same": "Continue with the same model",
   "session.modelStop.copy": "Copy error text",

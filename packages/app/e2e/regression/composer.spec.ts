@@ -248,16 +248,15 @@ test("the free usage limit offers model connection without an upsell and restore
     },
   ])
 
-  await expect(page.getByText(/^You've used today's free messages\. They reset at /)).toBeVisible()
-  const panel = page.getByRole("status").filter({ hasText: "Model stopped the turn" })
-  await expect(panel).toContainText("Free usage resets at")
-  await expect(panel).toContainText("Connect a model with a subscription, an API key, or your own server.")
-  await expect(panel.getByRole("button")).toHaveText(["Connect model"])
+  await expect(page.getByText(/^Daily limit reached — resets at /)).toBeVisible()
+  const panel = page.getByRole("status").filter({ hasText: "Turn stopped: daily limit reached" })
+  await expect(panel).toContainText("Limit resets at")
+  await expect(panel.getByRole("link")).toHaveCount(0)
   await expect(page.getByRole("dialog")).toHaveCount(0)
-  await expect(view.editor).toHaveCount(0)
+  await expect(view.editor).toHaveText("Refactor the parser")
   await expect(page.getByText("Free usage limit reached.")).toHaveCount(0)
 
-  await panel.getByRole("button", { name: "Connect model", exact: true }).click()
+  await panel.getByRole("button", { name: "Connect a model", exact: true }).click()
   const providers = page.getByRole("dialog", { name: "Connect provider", exact: true })
   await providers.getByText("OpenCode Go", { exact: true }).click()
   const connect = page.getByRole("dialog", { name: "Connect OpenCode Go", exact: true })
@@ -305,7 +304,7 @@ test("the free usage limit offers model connection without an upsell and restore
     },
   ])
 
-  await expect(page.getByRole("status").filter({ hasText: "You've used today's free messages." })).toBeVisible()
+  await expect(panel).toBeVisible()
   await expect(page.getByRole("dialog")).toHaveCount(0)
   await expect(
     page.locator('[data-component="composer-attachments"]').getByRole("img", { name: "diagram.png", exact: true }),

@@ -1,4 +1,4 @@
-import { freeLimitReset } from "../timeline/model-stop"
+import { createLimitClock, freeLimitResetAt } from "../free-limit-reset"
 import type { SessionUserActions } from "@opencode/session-ui/message"
 import type { ShellOutputInput } from "@opencode/client/promise"
 import { getFilename, sameDirectory } from "@opencode/util/path"
@@ -252,7 +252,7 @@ export function createActiveSessionRegion(input: {
 
   const recalled = new Set<string>()
 
-  // A Go usage limit stops a prompt after it was sent. Hand its text back so switching models and
+  // The free allowance or a Go usage limit stops a prompt after it was sent. Hand its text back so switching models and
   // resending is one step, unless the user has already started typing something else.
   onCleanup(
     location().event.on("session.step.failed", (event) => {
@@ -261,7 +261,7 @@ export function createActiveSessionRegion(input: {
 
       if (!sessionID || event.data.sessionID !== sessionID) return
 
-      if (type !== "provider.go-limit") return
+      if (type !== "provider.free-limit" && type !== "provider.go-limit") return
 
       if (recalled.has(event.data.assistantMessageID)) return
       recalled.add(event.data.assistantMessageID)
@@ -556,13 +556,14 @@ export function ActiveSessionComposerRegion(props: {
     return props.session.data.info()?.outcome
   }
 
-  const limitLabel = () => {
+  const resetAt = createMemo(() => {
     const key = props.model.composer.model.selection.key()
-
-    const reset =
-      key && freeLimitReset(props.session.history.messages(), { id: key.modelID, providerID: key.providerID })
-
-    if (!reset) return
+    return key && freeLimitResetAt(props.session.history.messages(), { id: key.modelID, providerID: key.providerID })
+  })
+  const clock = createLimitClock(() => [resetAt()])
+  const limitLabel = () => {
+    const reset = resetAt()
+    if (reset === undefined || reset <= clock()) return
     const time = new Intl.DateTimeFormat(language.locale(), { timeStyle: "short" }).format(reset)
 
     return language.t("session.modelStop.limitLabel", { time })

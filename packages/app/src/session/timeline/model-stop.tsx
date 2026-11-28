@@ -1,17 +1,19 @@
 import { Option, Schema } from "effect"
-import { For, Show, createSignal } from "solid-js"
-import type {
-  ModelRef,
-  SessionMessageAssistant,
-  SessionMessageInfo,
-  SessionMessageUser,
-} from "@opencode/client/promise"
+import { For, Show, createMemo, createSignal, onCleanup } from "solid-js"
+import type { ModelRef, SessionMessageAssistant, SessionMessageUser } from "@opencode/client/promise"
 import { useLanguage } from "@/runtime/i18n/language"
 import { Button } from "@opencode/ui/button"
 import { TextShimmer } from "@opencode/ui/text-shimmer"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { usePlatform } from "@/runtime/platform/platform"
-import { limitResetAt } from "../usage-exceeded-dialogs"
+import { createLimitClock } from "../free-limit-reset"
+import {
+  initialModelStopAction,
+  MODEL_STOP_ACTION_TIMEOUT_MS,
+  modelStopActionView,
+  transitionModelStopAction,
+  type ModelStopActionState,
+} from "./model-stop-machine"
 
 const decodeModelContinuation = Schema.decodeUnknownOption(
   Schema.Struct({ modelContinuation: Schema.String, previousModel: Schema.optional(Schema.String) }),
@@ -114,22 +116,6 @@ export function ModelRetry(props: { attempt: number; seconds: number; message: s
   )
 }
 
-export function freeLimitReset(messages: readonly SessionMessageInfo[], model: ModelRef | undefined) {
-  const failed = messages.findLast(
-    (message) =>
-      message.type === "assistant" && message.error?.type === "provider.free-limit" && sameModel(message.model, model),
-  )
-
-  if (failed?.type !== "assistant") return
-  const at = limitResetAt(failed.time.completed ?? failed.time.created, failed.error?.retryAfterMs)
-
-  if (at !== undefined && at > Date.now()) return at
-}
-
-export function sameModel(a: ModelRef, b: ModelRef | undefined) {
-  return a.providerID === b?.providerID && a.id === b.id
-}
-
 export function ModelStop(props: {
   reason: StopReason
   error: string
@@ -138,13 +124,16 @@ export function ModelStop(props: {
   resetAt?: number
   alternatives: { model: ModelRef; name: string }[]
   canContinue: boolean
+  modelsManaged: boolean
   connect: () => void
   resume: (model: ModelRef) => Promise<void>
 }) {
   const language = useLanguage()
   const platform = usePlatform()
-  const [busy, setBusy] = createSignal(false)
-  const [actionError, setActionError] = createSignal(false)
+  const [action, setAction] = createSignal<ModelStopActionState>(initialModelStopAction)
+  const view = createMemo(() => modelStopActionView(action()))
+  const clock = createLimitClock(() => [props.resetAt])
+  const reset = () => (props.resetAt !== undefined && props.resetAt > clock() ? props.resetAt : undefined)
   const reason = () => language.t(props.reason)
 
   const same = () =>
@@ -152,17 +141,31 @@ export function ModelStop(props: {
       ? props.model
       : undefined
 
-  async function run(action: () => Promise<void>) {
-    if (busy()) return
-    setBusy(true)
-    setActionError(false)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => {
+    clearTimeout(timer)
+    setAction((state) => transitionModelStopAction(state, { type: "disposed" }))
+  })
 
+  async function run(work: () => Promise<void>) {
+    const current = action()
+    const next = transitionModelStopAction(current, { type: "started" })
+    if (next === current || next.status !== "running") return
+    setAction(next)
+
+    const settle = (type: "succeeded" | "failed") => {
+      const current = action()
+      const settled = transitionModelStopAction(current, { type, attempt: next.attempt })
+      if (current === settled) return
+      clearTimeout(timer)
+      setAction(settled)
+    }
+    timer = setTimeout(() => settle("failed"), MODEL_STOP_ACTION_TIMEOUT_MS)
     try {
-      await action()
+      await work()
+      settle("succeeded")
     } catch {
-      setActionError(true)
-    } finally {
-      setBusy(false)
+      settle("failed")
     }
   }
 
@@ -176,7 +179,7 @@ export function ModelStop(props: {
         role="status"
       >
         <strong class="text-v2-state-fg-warning">{language.t("session.modelStop.title", { reason: reason() })}</strong>
-        <Show when={props.resetAt}>
+        <Show when={reset()}>
           {(at) => (
             <span>
               {language.t("session.modelStop.reset", {
@@ -191,9 +194,14 @@ export function ModelStop(props: {
             <Show
               when={props.alternatives.length}
               fallback={
-                <Button size="small" variant="neutral" type="button" disabled={busy()} onClick={props.connect}>
-                  {language.t("session.modelStop.connect")}
-                </Button>
+                <Show
+                  when={!props.modelsManaged}
+                  fallback={<span>{language.t("session.modelStop.contactAdmin")}</span>}
+                >
+                  <Button size="small" variant="neutral" type="button" disabled={view().busy} onClick={props.connect}>
+                    {language.t("session.modelStop.connect")}
+                  </Button>
+                </Show>
               }
             >
               <details>
@@ -207,7 +215,7 @@ export function ModelStop(props: {
                         size="small"
                         variant="neutral"
                         type="button"
-                        disabled={busy()}
+                        disabled={view().busy}
                         onClick={() => void run(() => props.resume(item.model))}
                       >
                         {item.name}
@@ -223,7 +231,7 @@ export function ModelStop(props: {
                   size="small"
                   variant="neutral"
                   type="button"
-                  disabled={busy()}
+                  disabled={view().busy}
                   onClick={() => void run(() => props.resume(model()))}
                 >
                   {language.t("session.modelStop.same")}
@@ -235,7 +243,7 @@ export function ModelStop(props: {
             size="small"
             variant="neutral"
             type="button"
-            disabled={busy()}
+            disabled={view().busy}
             onClick={() =>
               void run(() => platform.writeClipboardText?.(props.error) ?? navigator.clipboard.writeText(props.error))
             }
@@ -243,7 +251,7 @@ export function ModelStop(props: {
             {language.t("session.modelStop.copy")}
           </Button>
         </div>
-        <Show when={actionError()}>
+        <Show when={view().failed}>
           <span role="alert">{language.t("session.modelStop.actionError")}</span>
         </Show>
       </div>
