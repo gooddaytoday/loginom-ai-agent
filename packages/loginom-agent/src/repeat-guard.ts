@@ -175,10 +175,7 @@ export function repeatGuard(options: {
                     {
                       key: "hint",
                       type: "string",
-                      required: true,
-                      pattern: "\\S",
-                      title: "Подсказать агенту",
-                      when: [{ key: "decision", op: "eq", value: "hint" }],
+                      title: "Подсказать агенту (необязательно)",
                     },
                   ],
                 },
@@ -196,10 +193,8 @@ export function repeatGuard(options: {
                 throw new Tool.Error({ message: stopped })
               }
               if (reply.answer.decision !== "continue") {
-                const hint = reply.answer.hint
-                throw new Tool.Error({
-                  message: typeof hint === "string" ? `${stopped}\nПодсказка пользователя: ${hint}` : stopped,
-                })
+                const hint = typeof reply.answer.hint === "string" ? reply.answer.hint.trim() : ""
+                throw new Tool.Error({ message: hint ? `${stopped}\nПодсказка пользователя: ${hint}` : stopped })
               }
               // Continue runs this call and starts a new streak for later identical calls.
               if (recent.get(session) === streak) recent.delete(session)
