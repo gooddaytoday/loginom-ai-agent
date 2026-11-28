@@ -32,6 +32,7 @@ export async function launchNodeHost(
     root: string
     resources: string
     headless: boolean
+    desktopWindow?: boolean
     environment?: NodeJS.ProcessEnv
     // The version that keys the resource verification cache; without it the Host reads the CLI artifact's manifest.
     resourceVersion?: string
@@ -188,6 +189,7 @@ export async function launchNodeHost(
         root: input.root,
         resources: input.resources,
         headless: input.headless,
+        ...(input.desktopWindow !== undefined ? { desktopWindow: input.desktopWindow } : {}),
         ...(input.resourceVersion !== undefined ? { resourceVersion: input.resourceVersion } : {}),
         ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
         ...(input.desktopWriteOutcomes !== undefined ? { desktopWriteOutcomes: input.desktopWriteOutcomes } : {}),

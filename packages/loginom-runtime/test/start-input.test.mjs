@@ -84,3 +84,10 @@ test("browser recovery never reaches validation or Help readiness", () => {
     assert.throws(() => validateStartInput({ ...base, ...patch, browserRecovery: true }), /^Error: LOGINOM_START_INVALID$/)
   assert.equal(validateStartInput({ ...base, validation: true, browserRecovery: false }).browserRecovery, false)
 })
+
+test("only chat launches accept the Desktop window policy", () => {
+  assert.doesNotThrow(() => validateStartInput({ ...base, desktopWindow: true }))
+  for (const value of [null, {}, "true"])
+    assert.throws(() => validateStartInput({ ...base, desktopWindow: value }), /LOGINOM_START_INVALID/)
+  assert.throws(() => validateStartInput({ ...base, desktopWindow: true, validation: true }), /LOGINOM_START_INVALID/)
+})

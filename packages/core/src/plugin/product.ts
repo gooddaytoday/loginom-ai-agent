@@ -8,6 +8,7 @@ import LoginomAgent, {
   modelServerFetch,
   modelServerHandlers,
   ModelServerRpc,
+  registerWindowRpc,
 } from "@loginom-ai-agent/loginom-agent"
 import { Integration } from "@opencode/schema/integration"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
@@ -46,6 +47,7 @@ export const plugins: readonly InternalPlugin[] = [
         yield* formatter.transform((editor) => {
           if (dashboard()) editor.list().forEach((name) => editor.remove(name))
         })
+        yield* registerWindowRpc(ctx).pipe(Effect.orDie)
         yield* product.effect(ctx)
         const config = yield* Config.Service
         const credential = yield* Credential.Service

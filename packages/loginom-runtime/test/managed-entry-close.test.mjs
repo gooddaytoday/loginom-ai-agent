@@ -11,7 +11,7 @@ for (const heldSocket of [true, false]) test(`checked managed close ${heldSocket
   const directory = await mkdtemp(join(tmpdir(), "managed-exit-fallback-"))
   // Entry, input validation and resource closure remain byte-identical. Only
   // external browser/MCP boundaries are fixtures, as in managed-work-entry.
-  for (const name of ["managed-entry", "managed-resources-close", "start-input", "call-timeout", "dashboard-storage"]) {
+  for (const name of ["managed-entry", "managed-resources-close", "start-input", "call-timeout", "dashboard-storage", "browser-window"]) {
     await mkdir(join(directory, "src"), { recursive: true })
     await copyFile(new URL(`../src/${name}.mjs`, import.meta.url), join(directory, "src", `${name}.mjs`))
   }

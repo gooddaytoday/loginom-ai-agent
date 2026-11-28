@@ -85,7 +85,8 @@
       "title": "Providers, plugins, proxy",
       "paths": [
         "packages/core/src/plugin/internal.ts", "packages/core/src/plugin/supervisor.ts", "packages/server/src/options.ts",
-        "packages/server/src/routes.ts", "packages/cli/src/server-process.ts", "packages/core/test/location-layer.test.ts",
+        "packages/server/src/routes.ts", "packages/server/test/loginom-window.test.ts",
+        "packages/cli/src/server-process.ts", "packages/core/test/location-layer.test.ts",
         "packages/core/test/shell-restart.test.ts", "packages/server/test/schedule.test.ts",
         "packages/sdk/test/embedded.test.ts", "packages/core/src/schedule/check.ts",
         "packages/core/src/tool/plugin/shell.ts", "packages/core/src/tool.ts", "packages/core/src/formatter.ts",
