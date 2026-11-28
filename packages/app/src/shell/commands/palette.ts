@@ -35,7 +35,7 @@ import {
 
 export type CommandPaletteEntry = {
   id: string
-  type: "command" | "file" | "session" | "setting"
+  type: "command" | "file" | "project" | "session" | "setting"
   title: string
   description?: string
   keywords?: string
@@ -281,6 +281,7 @@ export function createServerSessionEntries(props: {
   category: () => string
   recentCategory: () => string
   recentLimit?: number
+  debounceMs?: number
 }) {
   const [sourceState, setSourceState] = createSignal(INITIAL_SESSION_SOURCE_STATE)
 
@@ -409,7 +410,11 @@ export function createServerSessionEntries(props: {
     const query = text.trim()
 
     // Typed searches wait for a pause; an empty query lists recent sessions right away.
-    dispatch({ type: "search.requested", query, delayMs: query ? PALETTE_SESSION_DEBOUNCE_MS : 0 })
+    dispatch({
+      type: "search.requested",
+      query,
+      delayMs: query ? (props.debounceMs ?? PALETTE_SESSION_DEBOUNCE_MS) : 0,
+    })
     const current = untrack(sourceState)
     const started = current.status === "debouncing" ? runs.get(current.attempt) : undefined
 
