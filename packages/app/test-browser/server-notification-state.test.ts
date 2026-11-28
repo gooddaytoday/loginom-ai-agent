@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, expect, mock, setSystemTime, test, vi } from "bu
 import { createEffect, createRoot } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { OpenCodeEvent } from "@opencode/client/promise"
+import { dict as ru } from "@/runtime/i18n/ru"
 import type { ServerConnection } from "@/runtime/server/registry"
 import { ServerScope } from "@/runtime/server/scope"
 import type { Tab } from "@/shell/tabs/tabs"
@@ -16,6 +17,8 @@ const server = "local\nhttp://localhost:4096" as ServerConnection.Key
 const session = { id: "session-1", title: "Test session", location: { directory: "/project" } }
 
 const alerts: string[] = []
+
+const descriptions: Array<string | undefined> = []
 
 const sounds: string[] = []
 
@@ -41,9 +44,8 @@ let createServerNotificationState: typeof import("@/shell/notifications/notifica
 
 const preferences = {
   autoApprove: false,
-  agent: true,
-  permissions: true,
-  questions: true,
+  turnFinished: true,
+  decision: true,
   permissionsSound: true,
   questionsSound: true,
 }
@@ -69,16 +71,21 @@ beforeAll(async () => {
       platform: desktopStorage.has("desktop") ? "desktop" : "web",
       windowID: "notification-test",
       storage: () => desktopStorage.get("desktop"),
-      notify: async (title: string, _description?: string, onClick?: () => void) => {
+      notify: async (title: string, description?: string, onClick?: () => void) => {
         alerts.push(title)
+        descriptions.push(description)
 
         if (onClick) clicks.push(onClick)
+
+        return true
       },
     }),
   }))
   mock.module("@/runtime/i18n/language", () => ({
     ...real.language,
-    useLanguage: () => ({ t: (key: string) => key }),
+    useLanguage: () => ({
+      t: (key: string) => (key === "notification.session.fallbackDescription" ? ru[key] : key),
+    }),
   }))
   mock.module("@/settings/model", () => ({
     ...real.settings,
@@ -92,10 +99,9 @@ beforeAll(async () => {
         questions: () => "alert-02",
       },
       notifications: {
-        agent: () => preferences.agent,
+        turnFinished: () => preferences.turnFinished,
         errors: () => true,
-        permissions: () => preferences.permissions,
-        questions: () => preferences.questions,
+        decision: () => preferences.decision,
       },
       permissions: { autoApproves: () => preferences.autoApprove },
     }),
@@ -111,15 +117,15 @@ beforeAll(async () => {
 
 beforeEach(() => {
   alerts.length = 0
+  descriptions.length = 0
   sounds.length = 0
   clicks.length = 0
   selected.length = 0
   desktopStorage.clear()
   Object.assign(preferences, {
     autoApprove: false,
-    agent: true,
-    permissions: true,
-    questions: true,
+    turnFinished: true,
+    decision: true,
     permissionsSound: true,
     questionsSound: true,
   })
@@ -136,7 +142,7 @@ test.each(
   requests.flatMap((request) =>
     [
       "enabled",
-      "other category disabled",
+      "other sound disabled",
       "notifications disabled",
       "sound disabled",
       "resolved",
@@ -148,14 +154,12 @@ test.each(
     ].map((scenario) => ({ ...request, scenario })),
   ),
 )("request alerts: $kind / $scenario", async (options) => {
-  preferences.agent = false
   preferences.autoApprove = options.scenario === "auto approve"
-  preferences[options.category] = options.scenario !== "notifications disabled"
+  preferences.decision = options.scenario !== "notifications disabled"
   preferences[options.category === "questions" ? "questionsSound" : "permissionsSound"] =
     options.scenario !== "sound disabled"
 
-  if (options.scenario === "other category disabled") {
-    preferences[options.category === "questions" ? "permissions" : "questions"] = false
+  if (options.scenario === "other sound disabled") {
     preferences[options.category === "questions" ? "permissionsSound" : "questionsSound"] = false
   }
 
@@ -187,7 +191,7 @@ test.each(
         session: {
           get: () => ({ ...session, parentID: "root", projectID: "project-1" }),
           root: () => "root",
-          permission: { list: () => (pending.value ? [{ id: "request-1" }] : []) },
+          permission: { list: () => (pending.value ? [{ id: "request-1", action: "shell" }] : []) },
           form: { list: () => (pending.value ? [{ id: "request-1" }] : []) },
         },
       },
@@ -292,7 +296,7 @@ test.each([
         },
       },
       data: { session: { get: () => session, family: () => [session.id], status: () => "idle" } },
-      coordinator: { system: async (_id: string, fn: () => Promise<void>) => fn() },
+      coordinator: { system: async (_id: string, fn: NotificationDelivery) => fn() },
     })
 
     return dispose
@@ -303,6 +307,7 @@ test.each([
   expect(alerts).toEqual([])
 
   tabs.store = [{ type: "session", server, sessionId: session.id }]
+
   if (type === "session.status") {
     listeners.forEach((listener) =>
       listener({
@@ -313,11 +318,106 @@ test.each([
         data: { sessionID: session.id },
       }),
     )
+    await Promise.resolve()
+    expect(alerts).toEqual([])
   }
+
   emit("event-2")
   await new Promise((resolve) => setTimeout(resolve, 0))
   expect(alerts).toEqual([title])
   dispose()
+})
+
+const systemNotificationCases = [
+  { title: undefined, expected: "Разговор", change: undefined },
+  { title: "Test session", expected: "Test session", change: undefined },
+  { title: String.raw`C:\Quarterly Reports\results.lgp`, expected: "Разговор", change: undefined },
+  { title: "Open /review/[2026]/results.lgp", expected: "Разговор", change: undefined },
+  { title: String.raw`Compare Quarterly Reports\results.lgp`, expected: "Разговор", change: undefined },
+  { title: "Review file:///review/Quarterly%20Reports/results.lgp", expected: "Разговор", change: undefined },
+  { title: "D:review-fixture.lgp", expected: "Разговор", change: undefined },
+  { title: "Review (D:review-fixture.lgp) before sending", expected: "Разговор", change: undefined },
+  { title: "Пароль — fixture-only", expected: "Разговор", change: undefined },
+  { title: "Check PWD|fixture-only", expected: "Разговор", change: undefined },
+  { title: "fixture-only (ключ)", expected: "Разговор", change: undefined },
+  { title: "Fix /private/key/report.csv", expected: "Разговор", change: undefined },
+  { title: "Secret fixture-only", expected: "Разговор", change: undefined },
+  { title: "Evaluate egressApiFixture", expected: "Разговор", change: undefined },
+  { title: "Check password=fixture-only", expected: "Разговор", change: undefined },
+  {
+    title: `Review ${["ghp", "exampleFixtureValue1234567890"].join("_")}`,
+    expected: "Разговор",
+    change: undefined,
+  },
+  { title: "Проверить пароль: пример", expected: "Разговор", change: undefined },
+  { title: "SDK_TOKEN=fixture-only", expected: "Разговор", change: undefined },
+  { title: "Basic project setup", expected: "Basic project setup", change: undefined },
+  { title: "Test session", expected: undefined, change: "tab closed" },
+  { title: "Test session", expected: undefined, change: "muted" },
+  { title: "Test session", expected: undefined, change: "disabled" },
+] as const
+
+test.each(
+  (["session.status", "permission.asked"] as const).flatMap((type) =>
+    systemNotificationCases.map((options) => ({ ...options, type, scenario: options.change ?? options.title ?? "untitled" })),
+  ),
+)("system notification $type / $scenario", async ({ type, title, expected, change }) => {
+  const delivery = Promise.withResolvers<NotificationDelivery>()
+  const listeners = new Array<(event: OpenCodeEvent) => void>()
+  const request = { sessionID: session.id, id: "request-1", action: "shell", resources: [], metadata: {} }
+  const muted = { value: false }
+  tabs.store = [{ type: "session", server, sessionId: session.id }]
+  preferences.permissionsSound = false
+
+  const dispose = createRoot((dispose) => {
+    createState({
+      muted: () => muted.value,
+      sdk: {
+        scope: ServerScope.local,
+        connection: { status: () => "connected" },
+        event: {
+          listen: (listener: (event: OpenCodeEvent) => void) => {
+            listeners.push(listener)
+
+            return () => {}
+          },
+        },
+      },
+      data: {
+        session: {
+          get: () => ({ ...session, title, projectID: "project-1" }),
+          family: () => [session.id],
+          status: () => "idle",
+          root: () => session.id,
+          permission: { list: () => [request] },
+        },
+      },
+      coordinator: { system: (_key: string, run: NotificationDelivery) => delivery.resolve(run) },
+    })
+
+    return dispose
+  })
+
+  try {
+    const event: OpenCodeEvent =
+      type === "session.status"
+        ? { type, id: "event-1", created: 1, data: { sessionID: session.id, status: { type: "idle" } } }
+        : { type, id: "event-1", created: 1, location: session.location, data: request }
+
+    listeners.forEach((listener) => listener(event))
+    const notifyAfterLock = await delivery.promise
+
+    if (change === "tab closed") tabs.store = []
+
+    if (change === "muted") muted.value = true
+
+    if (change === "disabled") preferences[type === "session.status" ? "turnFinished" : "decision"] = false
+
+    await notifyAfterLock()
+    expect(descriptions).toEqual(expected === undefined ? [] : [expected])
+  } finally {
+    dispose()
+  }
 })
 
 test("manual unread edits wait for desktop storage to load", async () => {

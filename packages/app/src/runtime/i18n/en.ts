@@ -588,10 +588,12 @@ export const dict = {
   "error.chain.configInvalidWithMessage": "Config file at {{path}} is invalid: {{message}}",
 
   "notification.permission.title": "Permission required",
+  "notification.permission.action.loginom_dock_action_run.title": "Allow writing to the package?",
   "notification.question.title": "Question requires an answer",
   "notification.elicitation.title": "Input requested",
 
-  "notification.session.responseReady.title": "Response ready",
+  "notification.session.fallbackDescription": "Conversation",
+  "notification.session.responseReady.title": "Turn finished",
   "notification.session.error.title": "Session error",
   "notification.session.error.fallbackDescription": "An error occurred",
 
@@ -1209,6 +1211,12 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Show system notification when a permission is required",
   "settings.general.notifications.questions.title": "Questions",
   "settings.general.notifications.questions.description": "Show system notification when the agent asks a question",
+  "settings.general.notifications.turnFinished.title": "Turn finished",
+  "settings.general.notifications.turnFinished.description":
+    "Notify when the conversation finishes while the window is out of focus",
+  "settings.general.notifications.decision.title": "Your decision is needed",
+  "settings.general.notifications.decision.description":
+    "Notify about questions and permission requests while the window is out of focus",
   "settings.general.notifications.errors.title": "Errors",
   "settings.general.notifications.errors.description": "Show system notification when an error occurs",
 

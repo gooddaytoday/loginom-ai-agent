@@ -11,6 +11,8 @@ const events: string[] = []
 class FakeNotification extends EventTarget implements Notification {
   static readonly permission: NotificationPermission = "granted"
 
+  static outcome: "show" | "error" | "silence" = "show"
+
   static async requestPermission(): Promise<NotificationPermission> {
     return "granted"
   }
@@ -37,6 +39,15 @@ class FakeNotification extends EventTarget implements Notification {
     this.silent = options?.silent ?? null
     events.push(`created:${title}:${this.body}`)
     created.push(this)
+
+    const outcome = FakeNotification.outcome
+
+    if (outcome === "silence") return
+
+    queueMicrotask(() => {
+      const handler = outcome === "show" ? this.onshow : this.onerror
+      handler?.call(this, new Event(outcome))
+    })
   }
 
   close() {
@@ -48,6 +59,7 @@ class FakeNotification extends EventTarget implements Notification {
 afterEach(() => {
   created.length = 0
   events.length = 0
+  FakeNotification.outcome = "show"
   globalThis.Notification = originalNotification
 })
 
@@ -65,9 +77,11 @@ describe("desktop notifications", () => {
       },
     })
 
-    await notify("Response ready", "Refactor auth flow", () => {
+    const sent = await notify("Response ready", "Refactor auth flow", () => {
       events.push("session.select")
     })
+
+    expect(sent).toBe(true)
 
     const notification = created[0]
     expect(notification).toBeDefined()
@@ -114,6 +128,42 @@ describe("desktop notifications", () => {
     },
   )
 
+  test("reports a system error before the notification is shown", async () => {
+    globalThis.Notification = FakeNotification
+    FakeNotification.outcome = "error"
+
+    const notify = createDesktopNotify({
+      getWindowFocused: async () => false,
+      showWindow: async () => {},
+      setWindowFocus: async () => {},
+    })
+
+    expect(await notify("Response ready")).toBeUndefined()
+    expect(created).toHaveLength(1)
+    expect(created[0]?.onclick).toBeNull()
+    expect(created[0]?.onclose).toBeNull()
+    expect(created[0]?.onerror).toBeNull()
+    expect(created[0]?.onshow).toBeNull()
+  })
+
+  test("abandons a notification when the system transport stays silent", async () => {
+    globalThis.Notification = FakeNotification
+    FakeNotification.outcome = "silence"
+
+    const notify = createDesktopNotify({
+      getWindowFocused: async () => false,
+      showWindow: async () => {},
+      setWindowFocus: async () => {},
+    })
+
+    expect(await notify("Response ready")).toBeUndefined()
+    expect(events).toEqual(["created:Response ready:", "notification.close"])
+    expect(created[0]?.onclick).toBeNull()
+    expect(created[0]?.onclose).toBeNull()
+    expect(created[0]?.onerror).toBeNull()
+    expect(created[0]?.onshow).toBeNull()
+  })
+
   // Loginom AI Agent (B4.12): the icon is the product's own file the renderer serves from its publicDir (app/public),
   // the same one the web notifications use since B4.6, so showing a notification requests nothing from opencode.ai.
   test("shows the product icon the renderer serves, not a remote one", async () => {
@@ -139,7 +189,7 @@ describe("desktop notifications", () => {
       setWindowFocus: async () => {},
     })
 
-    await notify("Response ready", "Active session")
+    expect(await notify("Response ready", "Active session")).toBeUndefined()
     expect(events).toEqual([])
     expect(created).toEqual([])
   })

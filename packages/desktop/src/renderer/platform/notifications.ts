@@ -5,6 +5,8 @@ type DesktopNotifyAPI = Pick<ElectronAPI, "getWindowFocused" | "showWindow" | "s
 
 const MAX_ACTIVE_NOTIFICATIONS = 40
 
+const NOTIFICATION_SHOW_TIMEOUT_MS = 5_000
+
 const activeNotifications = new Set<Notification>()
 
 export function createDesktopNotify(api: DesktopNotifyAPI): Platform["notify"] {
@@ -28,21 +30,36 @@ export function createDesktopNotify(api: DesktopNotifyAPI): Platform["notify"] {
 
     activeNotifications.add(notification)
 
-    const release = () => {
-      activeNotifications.delete(notification)
-      notification.onclick = null
-      notification.onclose = null
-      notification.onerror = null
-    }
+    return new Promise<true | void>((resolve) => {
+      const release = () => {
+        clearTimeout(timeout)
+        activeNotifications.delete(notification)
+        notification.onclick = null
+        notification.onclose = null
+        notification.onerror = null
+        notification.onshow = null
+        resolve(undefined)
+      }
 
-    notification.onclose = release
-    notification.onerror = release
+      const timeout = setTimeout(() => {
+        release()
+        notification.close()
+      }, NOTIFICATION_SHOW_TIMEOUT_MS)
 
-    notification.onclick = () => {
-      release()
-      void Promise.all([api.showWindow(), api.setWindowFocus()])
-      onClick?.()
-      notification.close()
-    }
+      notification.onclose = release
+      notification.onerror = release
+      notification.onshow = () => {
+        clearTimeout(timeout)
+        notification.onshow = null
+        resolve(true)
+      }
+
+      notification.onclick = () => {
+        release()
+        void Promise.all([api.showWindow(), api.setWindowFocus()])
+        onClick?.()
+        notification.close()
+      }
+    })
   }
 }

@@ -1,6 +1,8 @@
 import { createBrowserDraftStore } from "@/runtime/persistence/drafts"
 import type { Platform } from "./platform"
 
+const NOTIFICATION_SHOW_TIMEOUT_MS = 5_000
+
 export function createWebPlatform(version: string) {
   const platform: Platform = {
     platform: "web",
@@ -36,6 +38,26 @@ export function createWebPlatform(version: string) {
         onClick?.()
         notification.close()
       }
+
+      return new Promise<true | void>((resolve) => {
+        const listeners = new AbortController()
+
+        const finish = (shown?: true) => {
+          clearTimeout(timeout)
+          listeners.abort()
+          resolve(shown)
+        }
+
+        const timeout = setTimeout(() => {
+          finish()
+          notification.onclick = null
+          notification.close()
+        }, NOTIFICATION_SHOW_TIMEOUT_MS)
+
+        notification.addEventListener("show", () => finish(true), { signal: listeners.signal })
+        notification.addEventListener("error", () => finish(), { signal: listeners.signal })
+        notification.addEventListener("close", () => finish(), { signal: listeners.signal })
+      })
     },
   }
 

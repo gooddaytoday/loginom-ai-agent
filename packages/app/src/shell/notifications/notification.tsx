@@ -4,6 +4,7 @@ import { isSessionNotFoundError, type SessionInfo } from "@opencode/client/promi
 import type { ServerSDK } from "@/runtime/server/client"
 import type { Data } from "@opencode/client/solid"
 import { usePlatform } from "@/runtime/platform/platform"
+import en from "@/runtime/i18n/en"
 import { useLanguage } from "@/runtime/i18n/language"
 import { projectSettingsKey, useSettings } from "@/settings/model"
 import { Persist, persisted, removePersisted } from "@/runtime/persistence/storage"
@@ -35,6 +36,35 @@ const requestTitles = {
   "mcp-elicitation": "notification.elicitation.title",
   "websearch.provider": "notification.permission.title",
 } as const
+
+function systemNotificationDescription(title: string | undefined, fallback: string) {
+  const original = title?.trim()
+
+  if (!original) return fallback
+
+  let text = original
+
+  try {
+    text = decodeURIComponent(text)
+  } catch {
+    // Conversation titles can contain literal percent signs.
+  }
+
+  if (/[\\/]|(?:^|[^\p{L}\p{N}])[a-z]:/iu.test(text)) return fallback
+
+  // A credential marker can occur anywhere, including inside a word.
+  if (/пароль|password|pwd|passwd|token|токен|ключ|key|secret|api|authorization|cookie/i.test(text)) return fallback
+
+  // Credential formats that do not need a label.
+  if (
+    /\bbearer\s+[\w.+=-]{8,}/i.test(text) ||
+    /\b(?:sk-|gh[pousr]_|github_pat_|glpat-|xox[baprs]-|AIza|AKIA)[\w-]{12,}|\beyJ[\w-]+\.[\w-]+\.[\w-]+/.test(text)
+  ) {
+    return fallback
+  }
+
+  return original
+}
 
 export function openNotificationSession(tabs: NotificationTabs, server: ServerConnection.Key, sessionID: string) {
   const tab = tabs.addSessionTab({ server, sessionId: sessionID })
@@ -307,10 +337,10 @@ export function createServerNotificationState(input: {
       .catch(() => undefined)
   }
 
-  const handleSessionIdle = (sessionID: string, eventID: string) => {
-    // A running subagent's report wakes the session again, so it isn't done yet.
-    if (hasRunningChild(input.data, sessionID)) return
+  const notificationDescription = (session: SessionInfo) =>
+    systemNotificationDescription(session.title, language.t("notification.session.fallbackDescription"))
 
+  const handleSessionIdle = (sessionID: string, eventID: string) => {
     void lookup(sessionID).then((session) => {
       if (disposed.value || input.muted(sessionID)) return
 
@@ -318,18 +348,35 @@ export function createServerNotificationState(input: {
 
       if (session.parentID) return
 
+      // A new turn may have started during lookup. A running subagent can also wake its parent with a report.
+      const busy = () => input.data.session.status(sessionID) === "running" || hasRunningChild(input.data, sessionID)
+
+      if (busy()) return
+
       const hasOpenTab = sessionIDHasOpenTab(tabs.store, input.key, sessionID)
 
       if (hasOpenTab && settings.sounds.agentEnabled()) {
         void input.coordinator.sound(`${input.key}\0${eventID}`, () => playSoundById(settings.sounds.agent()))
       }
 
-      if (hasOpenTab && settings.notifications.agent()) {
-        void input.coordinator.system(`${input.key}\0${eventID}`, () =>
-          platform.notify(language.t("notification.session.responseReady.title"), session.title ?? sessionID, () =>
-            openNotificationSession(tabs, input.key, sessionID),
-          ),
-        )
+      if (hasOpenTab && settings.notifications.turnFinished()) {
+        void input.coordinator.system(`${input.key}\0${eventID}`, () => {
+          if (
+            disposed.value ||
+            input.muted(sessionID) ||
+            !sessionIDHasOpenTab(tabs.store, input.key, sessionID) ||
+            !settings.notifications.turnFinished() ||
+            busy()
+          ) {
+            return
+          }
+
+          return platform.notify(
+            language.t("notification.session.responseReady.title"),
+            notificationDescription(session),
+            () => openNotificationSession(tabs, input.key, sessionID),
+          )
+        })
       }
     })
   }
@@ -346,7 +393,9 @@ export function createServerNotificationState(input: {
         void input.coordinator.sound(`${input.key}\0${eventID}`, () => playSoundById(settings.sounds.errors()))
       }
 
-      const description = session?.title ?? language.t("notification.session.error.fallbackDescription")
+      const description = session?.title
+        ? notificationDescription(session)
+        : language.t("notification.session.error.fallbackDescription")
 
       if (hasOpenTab && settings.notifications.errors()) {
         void input.coordinator.system(`${input.key}\0${eventID}`, () =>
@@ -372,13 +421,13 @@ export function createServerNotificationState(input: {
     const category = kind === "question" || kind === "mcp-elicitation" ? "questions" : "permissions"
 
     const pending = () => {
-      if (disposed.value || input.muted(sessionID) || input.muted(input.data.session.root(sessionID))) return false
+      if (disposed.value || input.muted(sessionID) || input.muted(input.data.session.root(sessionID))) return
 
-      if (kind !== "permission") return input.data.session.form.list(sessionID)?.some((form) => form.id === requestID)
+      if (kind !== "permission") return input.data.session.form.list(sessionID)?.find((form) => form.id === requestID)
 
-      if (settings.permissions.autoApproves(projectSettingsKey(input.sdk.scope, session.projectID))) return false
+      if (settings.permissions.autoApproves(projectSettingsKey(input.sdk.scope, session.projectID))) return
 
-      return input.data.session.permission.list(sessionID)?.some((request) => request.id === requestID)
+      return input.data.session.permission.list(sessionID)?.find((request) => request.id === requestID)
     }
 
     if (!pending()) return
@@ -391,12 +440,23 @@ export function createServerNotificationState(input: {
       })
     }
 
-    if (!settings.notifications[category]()) return
+    if (!settings.notifications.decision()) return
 
     void input.coordinator.system(key, () => {
-      if (!pending()) return
+      const request = pending()
 
-      return platform.notify(language.t(requestTitles[kind]), session.title ?? sessionID, () =>
+      if (!request || !sessionIDHasOpenTab(tabs.store, input.key, target) || !settings.notifications.decision()) return
+
+      // Request messages, form copy and tool arguments can contain paths or credentials.
+      const actionTitle = "action" in request ? `notification.permission.action.${request.action}.title` : undefined
+
+      // SAFETY: Object.hasOwn verifies the computed key against the base dictionary.
+      const subject =
+        actionTitle && Object.hasOwn(en, actionTitle)
+          ? (actionTitle as Extract<keyof typeof en, `notification.permission.action.${string}.title`>)
+          : requestTitles[kind]
+
+      return platform.notify(language.t(subject), notificationDescription(session), () =>
         openNotificationSession(tabs, input.key, target),
       )
     })

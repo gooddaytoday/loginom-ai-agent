@@ -525,10 +525,12 @@ export const dict = {
   "error.chain.configInvalidWithMessage": "Недопустимый конфигурационный файл по адресу {{path}}: {{message}}",
 
   "notification.permission.title": "Требуется разрешение",
-
+  "notification.permission.action.loginom_dock_action_run.title": "Разрешить запись в пакет?",
   "notification.question.title": "Агент ждёт ответа",
   "notification.elicitation.title": "Агент ждёт ввода данных",
-  "notification.session.responseReady.title": "Ответ готов",
+
+  "notification.session.fallbackDescription": "Разговор",
+  "notification.session.responseReady.title": "Ход закончен",
   "notification.session.error.title": "Ошибка разговора",
   "notification.session.error.fallbackDescription": "Произошла ошибка",
 
@@ -803,6 +805,11 @@ export const dict = {
     "Показывать системное уведомление, когда требуется разрешение",
   "settings.general.notifications.questions.title": "Вопросы",
   "settings.general.notifications.questions.description": "Показывать системное уведомление, когда агент задаёт вопрос",
+  "settings.general.notifications.turnFinished.title": "Ход закончен",
+  "settings.general.notifications.turnFinished.description": "Уведомлять об окончании хода, когда окно не в фокусе",
+  "settings.general.notifications.decision.title": "Нужно ваше решение",
+  "settings.general.notifications.decision.description":
+    "Уведомлять о вопросах и запросах разрешений, когда окно не в фокусе",
   "settings.general.notifications.errors.title": "Ошибки",
   "settings.general.notifications.errors.description": "Показывать системное уведомление, когда происходит ошибка",
 

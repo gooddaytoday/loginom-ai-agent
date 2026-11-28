@@ -173,9 +173,8 @@ const workspacesSchema = Persistence.struct({
 })
 
 const notificationsSchema = Persistence.struct({
-  agent: Schema.Boolean,
-  permissions: Schema.Boolean,
-  questions: Schema.Boolean,
+  turnFinished: Schema.Boolean,
+  decision: Schema.Boolean,
   errors: Schema.Boolean,
 })
 
@@ -276,25 +275,46 @@ export const settingsPersistence = Persistence.migrate(
         editToolPartsExpanded: Persistence.optional(Schema.Boolean),
       }),
     ),
+    notifications: Persistence.optional(
+      Persistence.legacy({
+        turnFinished: Persistence.optional(Schema.Boolean),
+        decision: Persistence.optional(Schema.Boolean),
+        agent: Persistence.optional(Schema.Boolean),
+        permissions: Persistence.optional(Schema.Boolean),
+        questions: Persistence.optional(Schema.Boolean),
+      }),
+    ),
   }).pipe(
     Schema.decode({
       decode: SchemaGetter.transform((value) => {
         const general = value.general
-
-        if (!general || general.timelineDetail !== undefined) return value
+        const notifications = value.notifications
 
         return {
           ...value,
-          general: {
-            ...general,
-            timelineDetail: {
-              shell: legacyTimelineActivity(general.shellToolPartsExpanded),
-              edit: legacyTimelineActivity(general.editToolPartsExpanded),
-              thinking: legacyTimelineActivity(
-                general.reasoningMode === undefined ? general.showReasoningSummaries : general.reasoningMode,
-              ),
+          ...(general &&
+            general.timelineDetail === undefined && {
+              general: {
+                ...general,
+                timelineDetail: {
+                  shell: legacyTimelineActivity(general.shellToolPartsExpanded),
+                  edit: legacyTimelineActivity(general.editToolPartsExpanded),
+                  thinking: legacyTimelineActivity(
+                    general.reasoningMode === undefined ? general.showReasoningSummaries : general.reasoningMode,
+                  ),
+                },
+              },
+            }),
+          ...(notifications && {
+            notifications: {
+              ...notifications,
+              turnFinished: notifications.turnFinished ?? notifications.agent,
+              // Preserve an opt-out from either category when combining the old switches.
+              decision:
+                notifications.decision ??
+                (notifications.permissions === false ? false : (notifications.questions ?? notifications.permissions)),
             },
-          },
+          }),
         }
       }),
       encode: SchemaGetter.transform((value) => value),
@@ -320,7 +340,7 @@ export const defaultSettings: Settings = {
   keybinds: {},
   permissions: { autoApprove: false, autoApproveProjects: {} },
   workspaces: { defaultDestination: "last-used", lastUsed: {} },
-  notifications: { agent: false, permissions: true, questions: true, errors: false },
+  notifications: { turnFinished: true, decision: true, errors: false },
   sounds: {
     agentEnabled: true,
     agent: "staplebops-01",
@@ -569,17 +589,13 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         },
       },
       notifications: {
-        agent: withFallback(() => store.notifications?.agent, defaultSettings.notifications.agent),
-        setAgent(value: boolean) {
-          setStore("notifications", "agent", value)
+        turnFinished: withFallback(() => store.notifications?.turnFinished, defaultSettings.notifications.turnFinished),
+        setTurnFinished(value: boolean) {
+          setStore("notifications", "turnFinished", value)
         },
-        permissions: withFallback(() => store.notifications?.permissions, defaultSettings.notifications.permissions),
-        setPermissions(value: boolean) {
-          setStore("notifications", "permissions", value)
-        },
-        questions: withFallback(() => store.notifications?.questions, defaultSettings.notifications.questions),
-        setQuestions(value: boolean) {
-          setStore("notifications", "questions", value)
+        decision: withFallback(() => store.notifications?.decision, defaultSettings.notifications.decision),
+        setDecision(value: boolean) {
+          setStore("notifications", "decision", value)
         },
         errors: withFallback(() => store.notifications?.errors, defaultSettings.notifications.errors),
         setErrors(value: boolean) {

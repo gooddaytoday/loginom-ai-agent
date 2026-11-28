@@ -1,24 +1,36 @@
 import type { Page } from "@playwright/test"
 
-export async function recordNotifications(page: Page) {
-  const notifications: { title: string; body?: string }[] = []
+type RecordedNotification = { title: string; body?: string }
+
+export async function recordNotifications(page: Page, options: { autoShow?: boolean } = {}) {
+  const attempts: RecordedNotification[] = []
+
+  const notifications: RecordedNotification[] = []
 
   const sounds: string[] = []
 
-  await page.exposeBinding("recordNotification", (_source, notification: { title: string; body?: string }) => {
-    notifications.push(notification)
-  })
+  await page.exposeBinding(
+    "recordNotification",
+    (_source, event: "attempt" | "show", notification: RecordedNotification) => {
+      if (event === "attempt") attempts.push(notification)
+      else notifications.push(notification)
+    },
+  )
   await page.exposeBinding("recordNotificationSound", (_source, src: string) => {
     sounds.push(src)
   })
-  await page.addInitScript(() => {
+  await page.addInitScript((autoShow) => {
     // SAFETY: exposeBinding above installs these callbacks before the app starts.
     const host: Window & {
-      recordNotification?: (notification: { title: string; body?: string }) => Promise<void>
+      recordNotification?: (event: "attempt" | "show", notification: RecordedNotification) => Promise<void>
       recordNotificationSound?: (src: string) => Promise<void>
     } = window
 
     document.hasFocus = () => false
+    let clickLatest: (() => void) | undefined
+    let failLatest: (() => void) | undefined
+    window.addEventListener("test:notification-click", () => clickLatest?.())
+    window.addEventListener("test:notification-error", () => failLatest?.())
     Object.defineProperty(window, "Notification", {
       value: class extends EventTarget {
         static permission = "granted"
@@ -26,7 +38,14 @@ export async function recordNotifications(page: Page) {
 
         constructor(title: string, options?: NotificationOptions) {
           super()
-          void host.recordNotification!({ title, body: options?.body })
+          clickLatest = () => this.onclick?.()
+          failLatest = () => this.dispatchEvent(new Event("error"))
+          const notification = { title, body: options?.body }
+
+          void host.recordNotification!("attempt", notification)
+          this.addEventListener("show", () => void host.recordNotification!("show", notification), { once: true })
+
+          if (autoShow) queueMicrotask(() => this.dispatchEvent(new Event("show")))
         }
 
         close() {}
@@ -45,7 +64,13 @@ export async function recordNotifications(page: Page) {
         pause() {}
       },
     })
-  })
+  }, options.autoShow ?? true)
 
-  return { notifications, sounds }
+  return {
+    attempts,
+    notifications,
+    sounds,
+    clickLatest: () => page.evaluate(() => window.dispatchEvent(new Event("test:notification-click"))),
+    failLatest: () => page.evaluate(() => window.dispatchEvent(new Event("test:notification-error"))),
+  }
 }

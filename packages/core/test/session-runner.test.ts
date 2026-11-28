@@ -40,6 +40,7 @@ import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/core/session"
 import { Snapshot } from "@opencode/core/snapshot"
 import { SessionEvent } from "@opencode/core/session/event"
+import { SessionStatusEvent } from "@opencode/schema/session-status-event"
 import { SessionCompaction } from "@opencode/core/session/compaction"
 import { SessionInbox } from "@opencode/core/session/inbox"
 import { SessionMessage } from "@opencode/core/session/message"
@@ -5064,7 +5065,18 @@ describe("SessionRunnerLLM", () => {
     expect(yield* s.inbox).toMatchObject([{ id: queued.id, delivery: "queue", payload: { text: "Leave this queued" } }])
   })
 
-  scenario("parks queued prompts admitted during a failed turn", function* (s) {
+  scenario("parks queued prompts admitted during a failed turn without signaling idle", function* (s) {
+    const completions: string[] = []
+    yield* Effect.acquireRelease(
+      s.bus.listen((event) => {
+        if (event.type !== SessionStatusEvent.Status.type || !Schema.is(SessionStatusEvent.Status.data)(event.data))
+          return Effect.void
+        return event.data.sessionID === sessionID && event.data.status.type === "idle"
+          ? Effect.sync(() => void completions.push(event.id))
+          : Effect.void
+      }),
+      (unsubscribe) => unsubscribe,
+    )
     yield* s.admit("Start working")
     const failure = invalidRequest()
     yield* s.llm.push(Stream.fail(failure), Stream.fail(failure))
@@ -5075,6 +5087,7 @@ describe("SessionRunnerLLM", () => {
     expect(yield* active.finish.pipe(Effect.flip)).toBe(failure)
     yield* s.session.wait(sessionID)
 
+    expect(completions).toEqual([])
     expect(s.requests.map(userTexts)).toEqual([["Start working"]])
     expect((yield* s.inbox).map(({ id, delivery }) => ({ id, delivery }))).toEqual([
       { id: first.id, delivery: "queue" },
@@ -5085,6 +5098,7 @@ describe("SessionRunnerLLM", () => {
     yield* s.session.wait(sessionID)
     expect(s.requests.map(userTexts)).toEqual([["Start working"], ["Start working", "First queued"]])
     expect(yield* s.inbox).toMatchObject([{ id: second.id, delivery: "queue", payload: { text: "Second queued" } }])
+    expect(completions).toEqual([])
   })
 
   scenario("settles abandoned compactions before continuing after a process crash", function* (s) {

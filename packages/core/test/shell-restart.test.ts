@@ -127,8 +127,11 @@ const until = (check: () => boolean) =>
     while (!check()) yield* Effect.sleep(5)
   })
 
-for (const admission of ["while draining", "during settlement"] as const)
-  it.live(`signals completion once after a prompt queued ${admission}`, () =>
+for (const { admission, prompts } of [
+  { admission: "while draining", prompts: ["First queued prompt", "Second queued prompt"] },
+  { admission: "during settlement", prompts: ["Queued prompt"] },
+] as const)
+  it.live(`signals completion once after ${prompts.length} queued prompt(s) admitted ${admission}`, () =>
     Effect.gen(function* () {
       const { llm, project, server } = yield* world
       const context = yield* server(yield* Scope.fork(yield* Effect.scope))
@@ -178,18 +181,34 @@ for (const admission of ["while draining", "during settlement"] as const)
         yield* active.release
         yield* Deferred.await(settling)
       }
-      yield* sessions.prompt({ sessionID, text: "Queued prompt", delivery: "queue" })
+      for (const text of prompts) yield* sessions.prompt({ sessionID, text, delivery: "queue" })
       if (admission === "during settlement") yield* Deferred.succeed(release, undefined)
       else yield* active.release
-      yield* queued.started
 
-      expect(JSON.stringify((yield* llm.requests())[1]?.messages)).toContain("Queued prompt")
-      expect(completions).toEqual([])
+      let request = queued
+      for (const [index, text] of prompts.entries()) {
+        yield* request.started
+        const requests = yield* llm.requests()
+        const messages = JSON.stringify(requests[index + 1]?.messages)
+        expect(messages).toContain(text)
+        const pending = prompts[index + 1]
+        if (pending) {
+          expect(messages).not.toContain(pending)
+        }
+        expect(completions).toEqual([])
+
+        if (pending) {
+          const nextRequest = yield* llm.gate()
+          yield* request.release
+          request = nextRequest
+        }
+      }
       const idle = yield* sessions.wait(sessionID).pipe(Effect.forkChild({ startImmediately: true }))
-      yield* queued.release
+      yield* request.release
       yield* Fiber.join(idle)
 
-      expect(yield* llm.requests()).toHaveLength(2)
+      expect(yield* llm.requests()).toHaveLength(prompts.length + 1)
+      expect(yield* sessions.inbox(sessionID)).toEqual([])
       expect(completions).toHaveLength(1)
     }),
   )

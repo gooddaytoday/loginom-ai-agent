@@ -324,6 +324,40 @@ export const SettingsGeneral: Component = () => {
       <div class="settings-tab-body settings-tab-body--sectioned">
         <GeneralSection />
 
+        <section class="settings-section" aria-label={language.t("settings.general.section.notifications")}>
+          <h3 class="settings-section-title">{language.t("settings.general.section.notifications")}</h3>
+          <SettingsList>
+            <SettingsRow
+              title={language.t("settings.general.notifications.turnFinished.title")}
+              description={language.t("settings.general.notifications.turnFinished.description")}
+            >
+              <div data-action="settings-notifications-turn-finished">
+                <Switch
+                  hideLabel
+                  checked={settings.notifications.turnFinished()}
+                  onChange={settings.notifications.setTurnFinished}
+                >
+                  {language.t("settings.general.notifications.turnFinished.title")}
+                </Switch>
+              </div>
+            </SettingsRow>
+            <SettingsRow
+              title={language.t("settings.general.notifications.decision.title")}
+              description={language.t("settings.general.notifications.decision.description")}
+            >
+              <div data-action="settings-notifications-decision">
+                <Switch
+                  hideLabel
+                  checked={settings.notifications.decision()}
+                  onChange={settings.notifications.setDecision}
+                >
+                  {language.t("settings.general.notifications.decision.title")}
+                </Switch>
+              </div>
+            </SettingsRow>
+          </SettingsList>
+        </section>
+
         <section class="settings-section" aria-label={language.t("settings.timeline.title")}>
           <h3 class="settings-section-title">{language.t("settings.timeline.title")}</h3>
           <SettingsList>
