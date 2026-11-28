@@ -66,11 +66,35 @@ type SavedWorkflow = {
   submodels: SavedWorkflow[]
 }
 
+function redactTextImportSource(value: string) {
+  return value
+    .split("|")
+    .map((source) => {
+      const candidate = source.trim()
+      const url = URL.parse(candidate)
+      if (!url) return /^https?:/i.test(candidate) ? "[URL omitted]" : source
+      if (url.protocol !== "http:" && url.protocol !== "https:") return source
+
+      url.username = ""
+      url.password = ""
+      // A signed URL can carry credentials under arbitrary query parameter names.
+      url.search = ""
+      url.hash = ""
+      return url.href
+    })
+    .join("|")
+}
+
 function savedWorkflow(workflow: Workflow, key: string[], label: string): SavedWorkflow {
   return {
     key,
     label,
     nodes: workflow.workflow_nodes.map((entry) => {
+      const fileOrUrl = entry.text_import?.file_or_url
+      const textImport =
+        fileOrUrl === undefined
+          ? entry.text_import
+          : { ...entry.text_import, file_or_url: redactTextImportSource(fileOrUrl) }
       const ports = (entries: typeof entry.input_ports, direction: "input" | "output", kind: "workflow" | "service") =>
         entries.map((port, index) => ({ direction, kind, index, name: port.display_name, guid: guid(port.guid) }))
       return {
@@ -86,7 +110,7 @@ function savedWorkflow(workflow: Workflow, key: string[], label: string): SavedW
         ],
         ...(entry.filter_conditions ? { filter_conditions: entry.filter_conditions } : {}),
         ...(entry.grouping_fields ? { grouping_fields: entry.grouping_fields } : {}),
-        ...(entry.text_import ? { text_import: entry.text_import } : {}),
+        ...(textImport ? { text_import: textImport } : {}),
       }
     }),
     links: workflow.links.map((link) =>

@@ -40,34 +40,63 @@ test("saved schema reports text-import settings without attributing them to othe
   expect(nodes.find((node) => node.type === "TBGExportTextFile")).not.toHaveProperty("text_import")
 })
 
-test("saved schema keeps the file URL and explicit separator without inferring missing settings", async () => {
-  const url = "https://example.invalid/" + "a".repeat(500)
+async function savedWithTextImports(nodes: string) {
   const zip = new ZipWriter(new Uint8ArrayWriter())
   await zip.add("PackageInfo.xml", new TextReader('<PackageInfo Name="Fixture"/>'), { useWebWorkers: false })
   await zip.add(
     "Unit_0/Unit.xml",
     new TextReader(`
     <Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-      <WorkFlow><Nodes>
-        <Item Name="With source">
-          <Component><Engine xsi:type="TBGImportTextFile" FileName="${url}" DelimiterChar="&#9;"/></Component>
-        </Item>
-        <Item Name="With separator">
-          <Component><Engine xsi:type="TBGImportTextFile" DelimiterChar=""/></Component>
-        </Item>
-        <Item Name="Unconfigured">
-          <Component><Engine xsi:type="TBGImportTextFile"/></Component>
-        </Item>
-      </Nodes></WorkFlow>
+      <WorkFlow><Nodes>${nodes}</Nodes></WorkFlow>
     </Unit>
   `),
     { useWebWorkers: false },
   )
-  const schema = await savedPackageSchema("import.lgp", await zip.close())
+  return savedPackageSchema("import.lgp", await zip.close())
+}
+
+test("saved schema keeps the file URL and explicit separator without inferring missing settings", async () => {
+  const url = "https://example.invalid/" + "a".repeat(500)
+  const schema = await savedWithTextImports(`
+    <Item Name="With source">
+      <Component><Engine xsi:type="TBGImportTextFile" FileName="${url}" DelimiterChar="&#9;"/></Component>
+    </Item>
+    <Item Name="With separator">
+      <Component><Engine xsi:type="TBGImportTextFile" DelimiterChar=""/></Component>
+    </Item>
+    <Item Name="Unconfigured">
+      <Component><Engine xsi:type="TBGImportTextFile"/></Component>
+    </Item>
+  `)
   const nodes = schema.workflows[0].nodes
   expect(nodes[0].text_import).toEqual({ file_or_url: url, column_separator: "\t" })
   expect(nodes[1].text_import).toEqual({ column_separator: "" })
   expect(nodes[2]).not.toHaveProperty("text_import")
+})
+
+test("saved schema strips credentials, query and fragment from each text-import URL", async () => {
+  const local = "data/Вход #1/*.csv"
+  const sources = [
+    "https://fixture-sensitive-user:fixture-sensitive-password@example.invalid/orders.csv?token=fixture-sensitive-query#fixture-sensitive-fragment",
+    local,
+    "HTTP://example.invalid/clients.tsv?ticket=fixture-sensitive-ticket",
+    "https://[invalid]/malformed.csv?token=fixture-sensitive-malformed",
+  ].join("|")
+  const schema = await savedWithTextImports(`
+    <Item Name="Multiple sources">
+      <Component><Engine xsi:type="TBGImportTextFile" FileName="${sources}" DelimiterChar="&#9;"/></Component>
+    </Item>
+  `)
+  expect(JSON.stringify(schema)).not.toContain("fixture-sensitive")
+  expect(schema.workflows[0].nodes[0].text_import).toEqual({
+    file_or_url: [
+      "https://example.invalid/orders.csv",
+      local,
+      "http://example.invalid/clients.tsv",
+      "[URL omitted]",
+    ].join("|"),
+    column_separator: "\t",
+  })
 })
 
 test("saved schema reports grouping keys and measures and keeps the nested workflow keys", async () => {
