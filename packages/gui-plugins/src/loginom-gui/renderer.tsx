@@ -2,9 +2,9 @@ import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { Spinner } from "@opencode/ui/spinner"
 import { Option } from "effect"
-import { createMemo, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js"
-import { createKeyed, Slot, usePlugin, type Plugin } from "@opencode/plugin/gui"
-import { builtinContext, BuiltinSlot, ToolRenderer, type ToolRendererProps } from "@opencode/plugin/gui/builtin"
+import { createMemo, createSignal, createUniqueId, For, lazy, onCleanup, Show, Suspense } from "solid-js"
+import { createKeyed, SettingsPage, Slot, usePlugin, type Plugin } from "@opencode/plugin/gui"
+import { builtinContext, BuiltinSlot, Page as PluginPage, ToolRenderer, type ToolRendererProps } from "@opencode/plugin/gui/builtin"
 import type definition from "./index"
 import { decodeNodeOutput, decodeOutputCounters } from "./node-output"
 import { NodeOutputPort } from "./node-output-view"
@@ -18,6 +18,33 @@ type OutputSelection = {
 }
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
+  const Catalog = lazy(() => import("./catalog-page"))
+  ctx.add(PluginPage, {
+    id: "catalog",
+    nav: {},
+    get title() {
+      return ctx.t("catalog.title")
+    },
+    render: () => (
+      <Suspense>
+        <Catalog />
+      </Suspense>
+    ),
+  })
+  const Page = lazy(() => import("./page"))
+  ctx.add(SettingsPage, {
+    id: "loginom",
+    icon: "arrow-up-right",
+    get title() {
+      return ctx.t("title")
+    },
+    render: () => (
+      <Suspense>
+        <Page />
+      </Suspense>
+    ),
+  })
+
   const timeline = builtinContext(ctx).timeline
   const [openPorts, setOpenPorts] = createSignal(new Map<string, string>())
   createKeyed(
