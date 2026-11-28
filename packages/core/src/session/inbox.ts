@@ -2,6 +2,7 @@ export * as SessionInbox from "./inbox.js"
 
 import { and, asc, eq, or } from "drizzle-orm"
 import { Context, DateTime, Effect, Layer, Schema } from "effect"
+import type { Skill } from "@opencode/schema/skill"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import {
   Compaction,
@@ -599,28 +600,51 @@ const publish = Effect.fn("SessionInbox.publish")(function* (
  * Steered compaction takes priority over pending prompts, without crossing a move.
  * Only the "input" scope may fall through to one queued input.
  */
-export const promote = Effect.fn("SessionInbox.promote")(function* (
+export const promote = Effect.fn("SessionInbox.promote")(function* <E = never>(
   db: DatabaseService,
   bus: Bus.Interface,
   sessionID: SessionSchema.ID,
   scope: Promotable,
+  onUser?: (input: {
+    readonly messageID: SessionMessage.ID
+    readonly delivery: Delivery
+    readonly skillIDs: ReadonlyArray<Skill.ID>
+    readonly metadata?: Readonly<Record<string, unknown>>
+  }) => Effect.Effect<void, E>,
 ) {
-  return yield* serialized(
+  const result = yield* serialized(
     sessionID,
     Effect.gen(function* () {
       const steers = yield* pendingSteers(db, sessionID)
       if (steers.length > 0 || scope === "steer") {
         if (steers.length > 0 && isControl(steers[0])) return undefined
-        return yield* publish(db, bus, sessionID, beforeControl(steers))
+        const rows = beforeControl(steers)
+        const count = yield* publish(db, bus, sessionID, rows)
+        return { count, user: rows.findLast((row) => row.type === "user") }
       }
 
       const queued = yield* firstQueued(db, sessionID)
-      if (!queued) return 0
+      if (!queued) return { count: 0 }
       if (isControl(queued)) return undefined
       const promoted = yield* publish(db, bus, sessionID, [queued])
-      return promoted + (yield* publish(db, bus, sessionID, beforeControl(yield* pendingSteers(db, sessionID))))
+      const rows = beforeControl(yield* pendingSteers(db, sessionID))
+      const count = promoted + (yield* publish(db, bus, sessionID, rows))
+      return {
+        count,
+        user: rows.findLast((row) => row.type === "user") ?? (queued.type === "user" ? queued : undefined),
+      }
     }),
   )
+  if (result?.user && onUser) {
+    const payload = decodeStoredUser(result.user.payload)
+    yield* onUser({
+      messageID: result.user.id,
+      delivery: result.user.delivery,
+      skillIDs: payload.skills?.map((skill) => skill.id) ?? [],
+      metadata: payload.metadata,
+    })
+  }
+  return result?.count
 })
 
 const isControl = (row: typeof SessionInboxTable.$inferSelect) => row.type === "compaction" || row.type === "move"

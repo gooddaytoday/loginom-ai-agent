@@ -62,21 +62,13 @@ export type AdmitHost = ReferenceHost & {
 export type Lease = { host: AdmitHost & { readonly generation: number }; userMessage: string }
 type Authorized = { sourcePath: string; canonicalPath: string; verifyAttachment?: (bytes?: Buffer) => Promise<unknown> }
 
-function addQueuedReferences(
-  messages: SessionContext["messages"],
-  history: Awaited<ReturnType<Plugin.Context["session"]["context"]>>,
-) {
-  const positions = new Map(messages.map((message, index) => [message.id, index]))
-  let before = messages.length
-
-  for (const item of history.toReversed()) {
-    before = positions.get(item.id) ?? before
-    const text = item.type === "user" ? item.metadata?.[queuedReference] : undefined
-    const id = `${item.id}:loginom-file-reference`
-
-    if (typeof text === "string" && text && !positions.has(id))
-      messages.splice(before, 0, { id, role: "user", content: [{ type: "text", text }] })
-  }
+function addQueuedReferences(event: SessionContext) {
+  event.messages = event.messages.map((message) => {
+    if (message.role !== "user" || !message.metadata) return message
+    const { [queuedReference]: text, ...metadata } = message.metadata
+    if (typeof text !== "string" || !text) return message
+    return { ...message, metadata, content: [{ type: "text", text }, ...message.content] }
+  })
 }
 
 const admittedReferences = new WeakMap<ReferenceHost, Map<string, { sourcePath: string; artifact: unknown }>>()
@@ -94,7 +86,6 @@ export async function localFiles(
   // taken when the prompt is admitted and kept with its message. The attachment then authorizes that file only while it
   // is unchanged, and is checked again before the file is admitted.
   await plugin.session.hook("prompt", async (event) => {
-    const queued = event.delivery === "queue" || event.operation === "edit"
     const references = (event.prompt.files ?? []).flatMap((file) => {
       const path = attachedPath(file.uri)
       return path ? [{ file, path, text: referenceText(path) }] : []
@@ -109,30 +100,15 @@ export async function localFiles(
     )
     const text = references.flatMap(({ text }) => (text ? [text] : [])).join("\n\n")
     if (event.metadata) delete event.metadata[queuedReference]
-    if (queued) {
-      if (text) event.metadata = { ...event.metadata, [queuedReference]: text }
-      return
-    }
-    // Core sends the model nothing of a data file it cannot read as text, so a synthetic message (0.4: a synthetic text
-    // part) names the tool for it. Without a description the timeline does not show it, and the user's message keeps its
-    // own text. It is admitted without a wake: the prompt that is being admitted starts the run.
-    if (text)
-      await plugin.session.synthetic({
-        sessionID: event.sessionID,
-        text,
-        metadata: { loginom_attachment_reference: event.messageID },
-        resume: false,
-      })
+    if (text) event.metadata = { ...event.metadata, [queuedReference]: text }
   })
-  await plugin.session.hook("context", async (event) => {
-    addQueuedReferences(event.messages, await plugin.session.context({ sessionID: event.sessionID }))
-  })
+  await plugin.session.hook("context", addQueuedReferences)
   // A compaction keeps the attachments of the messages it summarizes, as 0.4 replayed their prompt (B2.5d). The hook runs
   // while the compaction is open, before its summary is written; once completed, its message heads the session's
   // context, and only then do the attachments it carried count. A failed or reverted compaction never heads it.
   await plugin.session.hook("compaction", async (event) => {
     const history = await plugin.session.context({ sessionID: event.sessionID })
-    addQueuedReferences(event.messages, history)
+    addQueuedReferences(event)
     const open = history.findLast((message) => message.type === "compaction" && message.status === "running")
     if (open)
       await plugin.storage.set(carriedKey(event.sessionID, open.id), await attachments(event.sessionID, history))

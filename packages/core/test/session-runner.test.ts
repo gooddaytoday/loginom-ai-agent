@@ -1221,6 +1221,39 @@ describe("SessionRunnerLLM", () => {
     expect(JSON.stringify(compiled.body)).not.toContain('"metadata"')
   })
 
+  scenario("lets a context hook supply content for a stored user message with metadata only", function* (s) {
+    const hooks = yield* PluginHooks.Service
+    yield* hooks.register("session", "context", (event) =>
+      Effect.sync(() => {
+        event.messages = event.messages.map((message) =>
+          message.role === "user" && message.metadata?.publish === true
+            ? Message.make({ id: message.id, role: "user", content: "Published by the hook" })
+            : message,
+        )
+      }),
+    )
+    const omitted = yield* s.session.prompt({
+      sessionID,
+      text: "",
+      metadata: { publish: false },
+      resume: false,
+    })
+    const published = yield* s.session.prompt({
+      sessionID,
+      text: "",
+      metadata: { publish: true },
+      resume: false,
+    })
+    yield* s.llm.push(TestLLM.text("Done", "text-done"))
+    yield* s.runPrompt("Start")
+
+    const messages = s.requests[0]?.messages ?? []
+    expect(messages.some((message) => message.id === omitted.id)).toBe(false)
+    expect(messages.find((message) => message.id === published.id)?.content).toEqual([
+      Message.text("Published by the hook"),
+    ])
+  })
+
   scenario("keeps context hook edits to messages without stored metadata", function* (s) {
     const hooks = yield* PluginHooks.Service
     yield* hooks.register("session", "context", (event) =>

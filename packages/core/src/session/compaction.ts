@@ -856,7 +856,7 @@ export const layer = Layer.effect(
       budget: number,
       webSocket?: "session",
     ) => {
-      const base = transcript(context, messages)
+      const base = transcript(context, messages, true)
       return requests.compaction({
         session: context.session,
         agent: context.agent.id,
@@ -998,13 +998,18 @@ const previousCompaction = (messages: ReadonlyArray<SessionMessage.Info>) => {
   return first?.type === "compaction" && first.status === "completed" ? first : undefined
 }
 
-const transcript = (context: SessionContext.Loaded, messages: ReadonlyArray<SessionMessage.Info>) =>
+const transcript = (
+  context: SessionContext.Loaded,
+  messages: ReadonlyArray<SessionMessage.Info>,
+  includeMetadataOnly = false,
+) =>
   SessionModelRequest.baseTranscript({
     agent: context.agent.info,
     model: context.model,
     tools: context.tools,
     initial: context.initial,
     messages,
+    includeMetadataOnly,
   })
 
 /**

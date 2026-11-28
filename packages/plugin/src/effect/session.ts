@@ -7,6 +7,7 @@ import type { Session } from "@opencode/schema/session"
 import type { SessionInbox } from "@opencode/schema/session-inbox"
 import type { SessionError } from "@opencode/schema/session-error"
 import type { SessionMessage } from "@opencode/schema/session-message"
+import type { Skill } from "@opencode/schema/skill"
 import type { TokenUsage } from "@opencode/schema/token-usage"
 import type { JsonSchema, Types } from "effect"
 import type { ModelHooks } from "./registration.js"
@@ -18,6 +19,14 @@ export interface SessionPrompt {
   prompt: Types.DeepMutable<PromptInput.Prompt>
   metadata?: Record<string, unknown>
   delivery: SessionInbox.Delivery
+}
+
+export interface SessionPromptDelivered {
+  readonly sessionID: Session.ID
+  readonly messageID: SessionMessage.ID
+  readonly delivery: SessionInbox.Delivery
+  readonly skillIDs: ReadonlyArray<Skill.ID>
+  readonly metadata?: Readonly<Record<string, unknown>>
 }
 
 /** Request overrides. Typed keys are generation settings; any other key is a provider option. */
@@ -202,6 +211,7 @@ export interface SessionIdle {
 export interface SessionHooks {
   readonly fork: { readonly sessionID: Session.ID }
   readonly prompt: SessionPrompt
+  readonly "prompt.delivered": SessionPromptDelivered
   readonly context: SessionContext
   readonly compaction: SessionCompaction
   readonly generate: SessionGenerate
