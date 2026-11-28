@@ -41,6 +41,62 @@ story.beforeEach(async ({ mount }) => {
   await mount("ui-line-comment--editor")
 })
 
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  story(`a Studio link opens a dashboard and its edit draft at ${viewport.width}px`, async ({ page }, info) => {
+    await page.setViewportSize(viewport)
+
+    const target = {
+      id: "665afd45-1298-4c90-9086-1dd73ca94902",
+      directory: "/data/dashboards/orders/work",
+      nodeName: "Заказы",
+      action: "edit" as const,
+    }
+
+    const host = await page.evaluateHandle(
+      async ({ fixture, target }) => {
+        const { mountDashboard } = await import(fixture)
+
+        return mountDashboard(target)
+      },
+      { fixture, target },
+    )
+
+    const panel = page.getByRole("region", { name: "Дашборд", exact: true })
+    await expect(panel.getByRole("heading", { name: "Заказы" })).toBeVisible()
+    await expect(panel.getByText("Строк в результате: 2")).toBeVisible()
+    await page.screenshot({ path: info.outputPath(`dashboard-${viewport.width}x${viewport.height}.png`) })
+
+    const expired = /Ссылка из Studio уже использована.*получите новую ссылку/
+
+    await host.evaluate((dashboard) => dashboard.deliver({ id: "other", code: "DASHBOARD_SNAPSHOT_UNAVAILABLE" }))
+    await expect(page.getByRole("alert")).toHaveText(expired)
+    await expect(panel.getByRole("alert")).toHaveCount(0)
+    await host.evaluate((dashboard, id) => dashboard.deliver({ id, code: "DASHBOARD_SNAPSHOT_UNAVAILABLE" }), target.id)
+    await expect(panel.getByRole("alert")).toHaveText(expired)
+    await expect(panel.getByRole("heading", { name: "Заказы" })).toBeVisible()
+    await panel.getByRole("button", { name: "Изменить в чате" }).click()
+    await expect
+      .poll(() => host.evaluate((dashboard) => dashboard.drafts))
+      .toEqual([
+        {
+          server: "sidecar",
+          directory: target.directory,
+          prompt: "Помоги изменить дашборд для узла «Заказы».",
+        },
+      ])
+
+    const locations = await host.evaluate((dashboard) =>
+      [...dashboard.previews, ...dashboard.finds].map((url) => new URL(url).searchParams.get("location[directory]")),
+    )
+
+    expect(locations).toEqual([target.directory, target.directory, target.directory])
+    await host.evaluate((dashboard) => dashboard.unmount())
+  })
+}
+
 story(
   "a plugin page uses its contribution context and becomes unavailable when its plugin is disabled",
   async ({ page }) => {
@@ -79,6 +135,47 @@ story("a plugin page that fails to render shows a way back to Home", async ({ pa
   await page.getByRole("button", { name: "Back to Home" }).click()
   await expect(page.getByRole("heading", { name: "Fixture Home" })).toBeVisible()
   await host.evaluate((host) => host.unmount())
+})
+
+story("a restored plugin page shows a loader while waiting for settings and while loading", async ({ page }) => {
+  const host = await page.evaluateHandle(async (fixture) => {
+    const { mountLoadingPluginPage } = await import(fixture)
+
+    return mountLoadingPluginPage()
+  }, fixture)
+
+  const loader = page.getByRole("img", { name: "Loading", exact: true })
+  const unavailable = page.getByRole("heading", { name: "Plugin page unavailable" })
+  expect(await host.evaluate((host) => host.status())).toBeUndefined()
+  expect(await loader.isVisible()).toBe(true)
+  await expect(unavailable).toHaveCount(0)
+
+  await host.evaluate((host) => host.releaseSettings())
+  await expect(loader).toBeVisible()
+  await expect(unavailable).toHaveCount(0)
+
+  await host.evaluate((host) => host.fail(0, new Error("Fixture load failed")))
+  await expect(unavailable).toBeVisible()
+  await expect(loader).toHaveCount(0)
+  await host.evaluate((host) => host.unmount())
+})
+
+story("a third-party plugin cannot register a page with a public registry token", async ({ page }) => {
+  const result = await page.evaluate(async (fixture) => {
+    const { mountPluginHost, Registry, until } = await import(fixture)
+    const host = mountPluginHost()
+
+    try {
+      host.load((ctx: Context) => ctx.add(Registry.define("page"), { id: "overview", title: "Third-party page" }))
+      await until(() => host.status() === "failed" || host.status() === "active")
+
+      return { status: host.status(), pages: host.entries("page") }
+    } finally {
+      host.unmount()
+    }
+  }, fixture)
+
+  expect(result).toEqual({ status: "failed", pages: 0 })
 })
 
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {

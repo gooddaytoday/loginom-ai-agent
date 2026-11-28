@@ -345,13 +345,14 @@ to the displayed repository or worktree instead of adding a second menu item.
 | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `onIdle(fn)`                                            | Runs work while the main thread is idle, e.g. a lazy chunk's preload                           |
 | `BuiltinPanel`, `BuiltinPanelTab`                       | `legacy` stored keys of a panel; `first` and stable `dom` ids of a tab                         |
+| `Page`                                                  | Top-level plugin pages with optional navigation entries                                        |
 | `BuiltinCommand`                                        | `follows`: share another command's shortcut inside `scope`                                     |
 | `BuiltinStore`, `BuiltinStoreFrom`                      | Window stores imported from parts of the app's own keys                                        |
 | `builtinContext(ctx)`                                   | `ctx.desktop.forceFocus`, `ctx.locale.setDirection`                                            |
 | `builtinMainContext(ctx)`, `MainStoreFrom`, `Lifecycle` | Main stores imported from settings files or other namespaces, and `lifecycle.restart(handoff)` |
 | `builtinCatalog(catalog)`, `BuiltinCatalog`             | Locales other than English as loaders, loaded when the user picks the locale                   |
 
-Each registry token has the same id as the public one, so the host reads every item through it. The host builds every context with the built-in members; `builtinContext` and `builtinMainContext` only type them. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
+Registry tokens that extend a public registry share its id, so the host reads every item through it. The host accepts `Page` registrations only from built-in plugins. The host builds every context with the built-in members; `builtinContext` and `builtinMainContext` only type them. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
 
 ```ts
 i18n: builtinCatalog({ en, de: () => import("./i18n/de") }),
@@ -781,7 +782,7 @@ export const builtins = compose({
   "microsoft-office": microsoftOffice,
   sources,
   goal,
-  "loginom-gui": loginom,
+  "loginom-gui": { ...loginom, mainEntry: () => import("./loginom-gui/main") },
 })
 ```
 

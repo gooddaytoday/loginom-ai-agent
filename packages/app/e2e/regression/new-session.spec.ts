@@ -105,6 +105,40 @@ for (const product of [true, false]) {
 test.describe("touch draft", () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })
 
+  test("shows ten full suggestion rows on the narrow Loginom start screen", async ({ page }, testInfo) => {
+    const numbers = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0"))
+    const { editor: prompt } = await openDraft(page, {
+      name: "NarrowDraftSuggestions",
+      findFiles: () => numbers.map((number) => `file-${number}.lgp`),
+      commands: numbers.map((number) => ({ name: `review-${number}`, description: "Review a draft" })),
+    })
+    await expect(page.getByRole("region", { name: "Example tasks" })).toBeVisible()
+
+    const suggestions = page.locator('[data-component="composer-suggestions"]')
+    for (const { query, names } of [
+      { query: "@file", names: /^file-\d\d\.lgp$/ },
+      { query: "/review", names: /^\/review-\d\d / },
+    ]) {
+      await prompt.fill(query)
+      const rows = suggestions.getByRole("button", { name: names })
+      await expect(rows).toHaveCount(numbers.length)
+      await expect(suggestions).toBeInViewport({ ratio: 0.98 })
+      const measure = () =>
+        suggestions.evaluate((menu) => {
+          const bounds = menu.getBoundingClientRect()
+          const fullRows = Array.from(menu.querySelectorAll("button")).filter((row) => {
+            const rect = row.getBoundingClientRect()
+            return rect.top >= bounds.top && rect.bottom <= bounds.bottom
+          }).length
+          return { fullRows, height: Math.round(bounds.height) }
+        })
+      await expect.poll(async () => (await measure()).fullRows).toBeGreaterThanOrEqual(10)
+      const { fullRows, height } = await measure()
+      testInfo.annotations.push({ type: "390×844", description: `${query}: ${fullRows} rows / ${height}px` })
+      await expect(rows.nth(9)).toBeInViewport({ ratio: 1 })
+    }
+  })
+
   test("restores dismissed Loginom examples through the Add menu", async ({ page }) => {
     const errors: Error[] = []
     page.on("pageerror", (error) => errors.push(error))

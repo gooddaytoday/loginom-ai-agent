@@ -112,11 +112,7 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       const host = yield* Effect.acquireRelease(
         Effect.promise(() =>
           // A CLI profile keeps its Host in `<root>/loginom`, next to the connection 0.4 saved there.
-          ServiceHost.start({
-            data: profile?.root ?? global.data,
-            resources: process.env.LOGINOM_AI_AGENT_RESOURCES,
-            deviceOnly: network === "device",
-          }),
+          ServiceHost.start({ data: profile?.root ?? global.data, resources: process.env.LOGINOM_AI_AGENT_RESOURCES }),
         ),
         () => Effect.promise(() => ServiceHost.close().catch(() => undefined)),
       )
