@@ -7,7 +7,7 @@ import { createRequire } from 'node:module';
 import { executableExists, privateDirectory } from './platform.mjs';
 import {createArtifactStore} from './artifacts.mjs';
 import {browserDownloadScript,browserDownloadsPath} from './browser-downloads.mjs';
-import {browserLaunch} from './browser-launch.mjs';
+import {browserLaunch, prepareBrowserProfile} from './browser-launch.mjs';
 
 const require = createRequire(import.meta.url);
 const packagePath = (name) => require.resolve(`${name}/package.json`);
@@ -28,6 +28,8 @@ export async function createSession(config, { headless = false, managed = null }
   for (const path of [directory, profile, artifacts, browserDownloadsPath(directory)]) {
     await mkdir(path, { recursive: true, mode: 0o700 });
   }
+  // Managed MCP receives an already running context whose profile loginBrowser prepared.
+  if (!managed) await prepareBrowserProfile(profile);
   const browserRoot = managed?.browserRoot ?? join(config.stateDir, 'runtime', 'browsers');
   if (!managed) process.env.PLAYWRIGHT_BROWSERS_PATH = browserRoot;
   const { chromium } = await import('playwright-core');
