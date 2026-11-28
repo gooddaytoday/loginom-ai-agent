@@ -32,6 +32,7 @@ const Query = Schema.Struct({
   parentID: Schema.optional(Schema.String),
   archived: Schema.optional(Schema.String),
   search: Schema.optional(Schema.String),
+  searchField: Schema.optional(Schema.Literals(["title", "project", "prompt"])),
   order: Schema.optional(Schema.String),
   cursor: Schema.optional(Schema.String),
   limit: Schema.optional(Schema.NumberFromString),

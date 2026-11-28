@@ -6,7 +6,7 @@ export default {
   "tab.count.other": "{{count}} файла изменено",
   "mobile.title.one": "Изменение",
   "mobile.title.few": "Изменения",
-  "mobile.title.many": "Изменений",
+  "mobile.title.many": "Изменения",
   "mobile.title.other": "Изменения",
   "empty.git": "Пока нет незафиксированных изменений",
   "empty.branch": "Пока нет изменений в ветке",
@@ -15,5 +15,5 @@ export default {
   loadingChanges: "Загрузка изменений…",
   noChanges: "Нет изменений",
   "settings.wrapLines.title": "Переносить строки",
-  "settings.wrapLines.description": "Перенос длинных строк в мобильных различиях вместо горизонтальной прокрутки",
+  "settings.wrapLines.description": "Переносить длинные строки при просмотре изменений на узком экране",
 }
