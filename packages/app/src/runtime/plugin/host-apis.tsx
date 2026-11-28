@@ -1147,6 +1147,7 @@ export function createPluginAttachment(apis: HostApis) {
             options.message,
             session && (() => openSession(session, { focus: true })),
           )
+
           result.notification = sent === true
 
           return sent

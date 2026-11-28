@@ -566,6 +566,7 @@ test("a second page delivers a notification when the first closes the conversati
   const secondRecorded = await recordNotifications(second)
   const firstEvents = await installSseTransport(page, { server: SERVER })
   const secondEvents = await installSseTransport(second, { server: SERVER })
+
   const input = {
     name: "Shared conversation",
     seed: { settings: { notifications: { turnFinished: true }, sounds: { agentEnabled: false } } },
@@ -581,6 +582,7 @@ test("a second page delivers a notification when the first closes the conversati
     created: 1700000001000,
     data: { sessionID: session.id, status: { type: "idle" } },
   }
+
   const tab = (window: Page) => window.locator(`[data-titlebar-tab-link][href="${sessionHref(session.id)}"]`)
   const pending = () => page.evaluate(() => navigator.locks.query().then((state) => state.pending?.map((lock) => lock.name)))
 
