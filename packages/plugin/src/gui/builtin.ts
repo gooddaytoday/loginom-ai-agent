@@ -32,6 +32,7 @@ export interface ProviderSetup {
   readonly id: string
   /** Localized label for the action and dialog. */
   readonly title: string
+  /** Whether to list this action before the provider groups for the current service and Location. */
   readonly preferFirst?: (client: OpenCodeClient, directory: string | undefined, signal: AbortSignal) => Promise<boolean>
   /** Identifies configured providers to place alongside the action in Settings. */
   readonly matchesProvider?: (id: string) => boolean
