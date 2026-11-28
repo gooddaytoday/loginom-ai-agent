@@ -16,11 +16,14 @@ export default function Page() {
 
   const service = createMemo(() => {
     const servers = ctx.servers.list().flatMap((id) => ctx.servers.get(id) ?? [])
+
     // Desktop owns the sidecar. Web uses the serving origin, or the single local service in development.
     if (ctx.desktop) return servers.find((server) => server.builtin)
     const serving = ctx.servers.get(location.origin)
+
     if (serving) return serving
     const local = servers.filter((server) => server.local)
+
     if (local.length === 1) return local.at(0)
   })
 
@@ -28,6 +31,7 @@ export default function Page() {
 
   let controller: AbortController | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
+
   const dispatch = (event: Parameters<typeof transition>[1]) => {
     const next = transition(untrack(state), event)
     setState(next.state)
@@ -38,36 +42,74 @@ export default function Page() {
     if (effect.type === "cancel") {
       clearTimeout(timer)
       controller?.abort()
+
       return
     }
+
     const request = async () => {
+      const current = untrack(state)
+      const startup = effect.type === "status" && current.type === "loading" ? current : undefined
+      const now = Date.now()
+
+      if (startup && now >= startup.until) {
+        dispatch({ type: "status", attempt: effect.attempt, now, result: undefined })
+
+        return
+      }
+
       controller = new AbortController()
       const timeout = effect.type === "check" ? 245_000 : 12_000
-      const deadline = effect.type === "status" ? Math.min(timeout, effect.timeout ?? timeout) : timeout
+
+      const deadline = startup
+        ? Math.min(timeout, startup.until - now)
+        : effect.type === "status"
+          ? Math.min(timeout, effect.timeout ?? timeout)
+          : timeout
+
       const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(deadline)])
       const server = untrack(service)
+
       // Connection settings are service-wide. Use the selected service's default Location.
       const directory =
         server?.data.location.default().directory ||
         (await server?.client.location.get({}, { signal }).catch(() => undefined))?.directory
+
       const rpc = server?.client.rpc(ConnectionSettingsRpc)
       const options = directory ? { location: { directory }, signal } : undefined
+
       switch (effect.type) {
         case "status": {
-          const result = options && (await rpc?.status({}, options).catch(() => undefined))
+          // A cold Location can answer the inventory before the product RPC is callable.
+          const plugin =
+            startup && options
+              ? await server?.client.plugin
+                  .list({ location: options.location }, { signal })
+                  .then(({ data }) => data.find((entry) => entry.id === "loginom.product")?.state.status ?? "starting")
+                  .catch(() => "failed")
+              : undefined
+
+          const result =
+            !options || plugin === "failed"
+              ? undefined
+              : plugin === "starting"
+                ? ({ ok: true, state: "starting" } as const)
+                : await rpc?.status({}, options).catch(() => undefined)
+
           dispatch({
             type: "status",
             attempt: effect.attempt,
             now: Date.now(),
-            result: result ?? { ok: false, issue: "unavailable" },
+            result,
           })
           break
         }
+
         case "check": {
           const result = options && (await rpc?.check(effect.input, options).catch(() => undefined))
           dispatch({ type: "checked", attempt: effect.attempt, result: result ?? { ok: false, issue: "unavailable" } })
           break
         }
+
         case "save": {
           const result = options && (await rpc?.save(effect.input, options).catch(() => undefined))
           dispatch({
@@ -80,21 +122,26 @@ export default function Page() {
         }
       }
     }
+
     if (effect.type === "status" && effect.delay) {
       timer = setTimeout(() => void request(), effect.delay)
+
       return
     }
+
     void request()
   }
 
-  const reload = () => dispatch({ type: "target", available: !!client() })
+  const reload = () => dispatch({ type: "target", available: !!client(), now: Date.now() })
   createKeyed(
     client,
     (target) => {
       const events = target.rpc(ConnectionSettingsRpc).events
+
       for (const outcome of ["applied", "failed"] as const) {
         onCleanup(events.on(outcome, ({ data }) => dispatch({ type: "application", ...data })))
       }
+
       reload()
     },
     { otherwise: reload },
@@ -194,7 +241,7 @@ export default function Page() {
                 </ui.Button>
               </Show>
               <Show when={page().retry}>
-                <ui.Button onClick={() => dispatch({ type: "refresh" })}>{ctx.t("retry")}</ui.Button>
+                <ui.Button onClick={() => dispatch({ type: "refresh", now: Date.now() })}>{ctx.t("retry")}</ui.Button>
               </Show>
             </div>
           </Show>

@@ -10,6 +10,7 @@ import { installSseTransport } from "../utils/sse-transport"
 import {
   loginomAddress,
   loginomDiagnosticKey,
+  loginomProductPlugin,
   loginomSettingsFixture,
   openLoginomSettings,
 } from "../utils/loginom-settings"
@@ -53,6 +54,81 @@ function open(page: Page, input: Partial<WorkspaceInput> = {}) {
 }
 
 const loginomPassword = "fixture-wrong-password"
+
+test("Loginom settings recover from a cold Location, a slow Host and one dropped status request", async ({ page }) => {
+  let registered = false
+  let host: "handshake" | "catalog" | "ready" = "handshake"
+  let earlyStatusCalls = 0
+  const fixture = loginomSettingsFixture()
+
+  await mockWorkspace(page, {
+    name: "Loginom first start",
+    directory,
+    sessions: [],
+    provider: NO_PROVIDER,
+    seed: { locale: "ru" },
+    plugins: () => (registered ? [loginomProductPlugin] : []),
+    onRpc(request) {
+      if (request.rpcID !== "loginom.connection" || request.method !== "status") return
+
+      if (!registered) {
+        earlyStatusCalls++
+
+        return { unavailable: true }
+      }
+
+      if (host === "handshake") return { output: { ok: true, state: "starting" } }
+
+      if (host === "catalog")
+        return { output: { ok: true, value: { ...fixture.status, state: "starting" } } }
+
+      return fixture.onRpc?.(request)
+    },
+  })
+
+  await page.clock.install()
+  await page.goto("/settings?tab=loginom")
+  const settings = page.getByRole("tabpanel").filter({ has: page.getByRole("heading", { name: "Loginom", exact: true }) })
+  const notice = settings.getByRole("status")
+  await expect(notice).toHaveText("Запускаем службу…")
+  expect(earlyStatusCalls).toBe(0)
+
+  const now = await page.evaluate(() => Date.now())
+  await page.clock.pauseAt(now + 1_000)
+  await page.clock.fastForward(36_000)
+  await page.clock.resume()
+
+  const statusPath = "/api/rpc/loginom.connection/status"
+
+  const nextStatus = () =>
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        new URL(response.url()).pathname === statusPath,
+    )
+
+  const handshakeStatus = nextStatus()
+  registered = true
+  expect((await handshakeStatus).status()).toBe(200)
+  await expect(notice).toHaveText("Запускаем службу…")
+
+  const interrupted = page.waitForEvent("requestfailed", {
+    predicate: (request) => new URL(request.url()).pathname === statusPath,
+  })
+
+  await page.route((url) => url.pathname === statusPath, (route) => route.abort("connectionreset"), { times: 1 })
+  await interrupted
+  await expect(notice).toHaveText("Запускаем службу…")
+
+  const catalogStatus = nextStatus()
+  host = "catalog"
+  expect((await catalogStatus).status()).toBe(200)
+  await expect(notice).toHaveText("Запускаем службу…")
+
+  host = "ready"
+  await expect(notice).toHaveText("Подключён как analyst · папка /analyst")
+  await expect(settings.getByRole("textbox", { name: "Адрес" })).toHaveValue(loginomAddress)
+})
 
 for (const [issue, text, address] of [
   ["knowledgeAuthFailed", "The knowledge service rejected its access key.", loginomAddress],
@@ -154,6 +230,7 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
     sessions: [],
     directory: serviceDirectory,
     provider: NO_PROVIDER,
+    plugins: [loginomProductPlugin],
     onRpc: (request) => {
       if (request.rpcID !== "loginom.connection") return
 
@@ -239,6 +316,7 @@ async function loginomApplication(page: Page, outcome: "applied" | "failed") {
     sessions: [],
     directory,
     provider: NO_PROVIDER,
+    plugins: [loginomProductPlugin],
     seed: { locale: "ru" },
     onRpc: (request) => {
       if (request.rpcID !== "loginom.connection") return

@@ -38,7 +38,12 @@ export function connectionSettings(request: Request = ServiceHost.connectionSett
     }
   }
   return {
-    status: () => status("connection.status", {}),
+    async status() {
+      const startup = ServiceHost.connectionSettings.startup()
+      if (startup === "starting") return { ok: true, state: "starting" }
+      if (typeof startup === "object") return { ok: false, issue: "unavailable", reason: startup.reason }
+      return status("connection.status", {})
+    },
     async check(candidate: Candidate, context: { signal: AbortSignal }) {
       try {
         if (!Schema.is(Address)(candidate.url)) return { ok: false, issue: "invalidAddress" }
