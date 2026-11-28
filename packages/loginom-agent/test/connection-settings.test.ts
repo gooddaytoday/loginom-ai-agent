@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { ConnectionSettingsRpc, type Candidate } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import { ConnectionSettingsRpc, type Candidate, type Issue } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { connectionSettings } from "../src/connection-settings"
 
 test("the settings RPC emits only the display status, even for a migrated address", async () => {
@@ -32,21 +32,28 @@ test("the settings RPC emits only the display status, even for a migrated addres
   })
 })
 
-test("Loginom credential rejection and malformed input do not echo secrets", async () => {
-  const input = {
-    revision: 0,
-    url: "https://loginom.example",
-    username: "analyst",
-    password: { operation: "replace", value: "synthetic-password" },
-  } satisfies Candidate
-  const settings = connectionSettings(async () => {
-    throw new Error("LOGINOM_LOGIN_REJECTED", { cause: input.password.value })
-  })
-  expect(await settings.check(input, { signal: new AbortController().signal })).toEqual({
-    ok: false,
-    issue: "credentialsRejected",
-  })
+const input = {
+  revision: 0,
+  url: "https://loginom.example/",
+  username: "analyst",
+  password: { operation: "replace", value: "synthetic-password" },
+} satisfies Candidate
 
+test.each([
+  ["LOGINOM_KNOWLEDGE_AUTH_FAILED", "knowledgeAuthFailed"],
+  ["LOGINOM_LOGIN_UNAVAILABLE", "loginUnavailable"],
+  ["LOGINOM_LOGIN_REJECTED", "credentialsRejected"],
+] satisfies [string, Issue][])(
+  "settings RPC translates %s without including the private cause",
+  async (code, issue) => {
+    const settings = connectionSettings(async () => {
+      throw new Error(code, { cause: { password: input.password.value, apiKey: "synthetic-key" } })
+    })
+    expect(await settings.check(input, { signal: new AbortController().signal })).toEqual({ ok: false, issue })
+  },
+)
+
+test("malformed Loginom settings input does not echo the password", async () => {
   const schema = ConnectionSettingsRpc.methods.check.input["~standard"]
   const invalid = await schema.validate({ ...input, password: { operation: input.password.value } })
   expect(invalid.issues).toBeDefined()

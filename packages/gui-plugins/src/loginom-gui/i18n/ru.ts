@@ -57,6 +57,7 @@ export default {
   invalidAddress: "Введите адрес Loginom, начиная с http:// или https://, без учётных данных и параметров URL.",
   invalidUsername: "Проверьте имя пользователя Loginom.",
   passwordRequired: "Введите пароль или отметьте «Пароль не нужен».",
+  knowledgeAuthFailed: "Сервис знаний отклонил ключ доступа.",
   credentialsRejected: "Loginom отклонил вход. Проверьте имя пользователя и пароль.",
   loginUnavailable: "Страница входа Loginom недоступна. Проверьте адрес и сеть.",
   logoutUnconfirmed: "Не удалось подтвердить выход из Loginom. Проверьте подключение ещё раз.",

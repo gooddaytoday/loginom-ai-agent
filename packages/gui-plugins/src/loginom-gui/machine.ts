@@ -247,6 +247,7 @@ export function view(state: State) {
       issue === "changed" ||
       issue === "expired" ||
       issue === "saveFailed" ||
+      issue === "knowledgeAuthFailed" ||
       issue === "checkFailed" ||
       issue === "logoutUnconfirmed"
         ? issue
