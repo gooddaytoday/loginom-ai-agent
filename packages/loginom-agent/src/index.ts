@@ -1,6 +1,7 @@
 // Loginom AI Agent product plugin. Core runs it as a built-in server plugin: last in `post`, with a guarded and
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
+import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
@@ -213,7 +214,10 @@ export default Plugin.define({
     // The task's user message, which a Host input belongs to: the latest admitted prompt, as for grants. A session this
     // process has not seen a prompt for (resumed after a restart) uses its latest user message.
     const tasks = new Map<string, string>()
-    const receipts = exportReceipts(join(Global.Path.data, "loginom", "export-receipts"))
+    const receiptScope = createHash("sha256")
+      .update(JSON.stringify([ctx.location.directory, ctx.location.workspaceID]))
+      .digest("hex")
+    const receipts = exportReceipts(join(Global.Path.data, "loginom", "export-receipts", receiptScope))
     const task = async (sessionID: string) =>
       tasks.get(sessionID) ??
       (await ctx.session.context({ sessionID })).findLast((message) => message.type === "user")?.id ??
@@ -518,11 +522,7 @@ export default Plugin.define({
     await ctx.rpc.register(exportReceiptsRpc, {
       turn: async (input, call) => {
         const session = await ctx.session.get({ sessionID: input.sessionID }).catch(() => undefined)
-        if (
-          !session ||
-          session.location.directory !== ctx.location.directory ||
-          session.location.workspaceID !== ctx.location.workspaceID
-        )
+        if (session?.location.directory !== ctx.location.directory)
           return call.error("not_found", "Turn not found")
         return receipts.turn(input) ?? call.error("not_found", "Turn not found")
       },
