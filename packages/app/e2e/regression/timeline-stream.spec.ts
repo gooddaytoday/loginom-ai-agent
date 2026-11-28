@@ -35,6 +35,9 @@ import {
 } from "../utils/timeline"
 
 const detailed = timelinePresets[2].value
+const saveEvidence = Schema.decodeUnknownSync(
+  Schema.mutable(Schema.Array(Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number])))),
+)(receipts.save.evidence)
 
 const user = { id: "msg_user", type: "user", text: "Run it", time: { created: 1 } } satisfies SessionMessageInfo
 
@@ -3439,7 +3442,7 @@ for (const width of [1280, 390]) {
               "completed",
               {},
               {
-                metadata: { loginom: Schema.decodeUnknownSync(Schema.Json)(receipts.save) },
+                metadata: { loginom: { ...receipts.save, evidence: saveEvidence } },
               },
             ),
             toolPart(
