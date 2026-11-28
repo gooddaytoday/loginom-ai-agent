@@ -16,6 +16,7 @@ export function scriptedHost(
   options: {
     catalog?: (generation: number) => Tool[]
     call?: (request: Record<string, unknown>) => unknown
+    admit?: (files: { name: string }[]) => unknown
     interrupt?: () => void
     acquire?: () => string | undefined
     tools?: () => string | undefined
@@ -87,7 +88,10 @@ export function scriptedHost(
     if (request.method === "admit") {
       if (run.scope?.profile !== "loginom-automation" || !run.prepared) return fail("LOGINOM_SCOPE_DENIED")
       const files = input.files as { name: string }[]
-      return reply(files.map((file, index) => ({ artifact_id: `artifact-${index + 1}`, name: file.name })))
+      return reply(
+        options.admit?.(files) ??
+          files.map((file, index) => ({ artifact_id: `artifact-${index + 1}`, name: file.name })),
+      )
     }
     if (dashboardMethods.includes(request.method)) {
       // As `host-port.ts`: only a run bound to the dashboard's profile reaches the publications.

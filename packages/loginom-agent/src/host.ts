@@ -10,6 +10,7 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
+import type { Loginom } from "@loginom-ai-agent/loginom-host/loginom"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { Option, Schema } from "effect"
@@ -30,6 +31,7 @@ type Started = {
 }
 
 const state: { current?: Started } = {}
+const applicationListeners = new Set<Loginom.ConnectionApplicationListener>()
 const decodeRecord = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ session: Schema.String, pid: Schema.Number })),
 )
@@ -142,12 +144,16 @@ export const dashboard = {
 
 export const connectionSettings = {
   request,
-  holdTurn() {
+  onApplication(listener: Loginom.ConnectionApplicationListener) {
+    applicationListeners.add(listener)
+    return () => applicationListeners.delete(listener)
+  },
+  holdTurn(session: string) {
     const id = randomUUID()
-    const held = request("connection.settings.turn", { id, active: true }).catch(() => undefined)
+    const held = request("connection.settings.turn", { id, session, active: true }).catch(() => undefined)
     return async () => {
       await held
-      await request("connection.settings.turn", { id, active: false }).catch(() => undefined)
+      await request("connection.settings.turn", { id, session, active: false }).catch(() => undefined)
     }
   },
 }
@@ -222,6 +228,7 @@ function nodeHost(root: string, resources: string) {
       entry: join(resources, "host", "node-host.mjs"),
       root,
       resources,
+      onConnectionApplication: (outcome, event) => applicationListeners.forEach((listener) => listener(outcome, event)),
       // As the Desktop Host of 0.4, the user sees the browser at work. The product CLI's `run --headless` reaches only the
       // private server of that run (B2.7a4b): the profile's service started its Host before, for every client. Strict
       // recovery holds for a server of a CLI profile started with it, as for each process of 0.4's CLI; never for
