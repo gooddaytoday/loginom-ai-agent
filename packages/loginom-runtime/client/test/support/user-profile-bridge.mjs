@@ -143,10 +143,16 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     loginomUrl: 'https://loginom.invalid/?testable=true', mode: 'executor-replay', resultProfile: 'user-v1',
     actionManifestUri: catalog.manifestUri, actionManifestSha256: catalog.manifestSha256,
     storageDirectories:{inputs:'/user',packages:'/user',exports:'/user'} };
-  const bridge = await createBridge(config, session, {reauthenticateReload:async options=>{
-    reloadLogins.push(options);
-    return true;
-  }});
+  const bridge = await createBridge(config, session, {
+    reauthenticateReload:async options=>{
+      reloadLogins.push(options);
+      return true;
+    },
+    presentNodeReply:async (reply, project)=>{
+      const loginom=project({});
+      return loginom ? {...reply,_meta:{...reply._meta,loginom}} : reply;
+    },
+  });
   const client = new Client({ name: 'unit-agent', version: '1' });
   try {
     const [agent, server] = InMemoryTransport.createLinkedPair();
@@ -482,7 +488,10 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const local=await bridge.prepareLocalPackage({intent:'open_package',operation_id:expectedOperation},
       {artifactID:artifact.artifact_id,uploadGrantID:artifact.upload.grant_id},{signal:new AbortController().signal});
     assert.notEqual(local.isError,true,JSON.stringify(local));
-    assert.equal(local._meta?.confirmedLocalPackage,true);
+    assert.deepEqual(local._meta?.loginom,{
+      v:1,operationId:expectedOperation,state:'settled',status:'SUCCEEDED',
+      packageVariables:{source:'saved',state:'deferred'},
+    });
     const opened=JSON.parse(local.content[0].text);
     assert.equal(packageDeliveries.length,1);assert.equal(packageDeliveries[0].artifact_id,artifact.artifact_id);
     assert.equal(packageDeliveries[0].upload_grant_id,artifact.upload.grant_id);
@@ -494,7 +503,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const failed=await bridge.prepareLocalPackage({intent:'open_package',operation_id:expectedOperation},
       {artifactID:artifact.artifact_id,uploadGrantID:artifact.upload.grant_id},{signal:new AbortController().signal});
     assert.equal(failed.isError,true,JSON.stringify(failed));
-    assert.equal(failed._meta?.confirmedLocalPackage,undefined);
+    assert.equal(failed._meta?.loginom,undefined);
     const openRefusal=JSON.parse(failed.content[0].text);
     assert.deepEqual(openRefusal.next_step.arguments,{intent:'open_package',operation_id:expectedOperation,package_path:expectedPackage});
     assert.equal(session.metadata.workspaceReady,false);

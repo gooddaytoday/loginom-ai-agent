@@ -28,7 +28,7 @@ import {javascriptContextReceiptSchema} from './javascript-context-read.mjs';
 import { createRecoveryContext } from './recovery-context.mjs';
 import { outcomeVerification } from './outcome-verification.mjs';
 import { createHostArtifactAdmission, codexInputIdentity } from './host-artifacts.mjs';
-import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle } from './user-results.mjs';
+import { compactActionResult, compactNodeRequestFailure, userResultSchema, compactKnowledgeBundle, loginomFeedMetadata } from './user-results.mjs';
 import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
@@ -93,7 +93,7 @@ export function browserProcessEnvironment(browserRoot, { platform = process.plat
   return inherited;
 }
 
-export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload } = {}) {
+export async function createBridge(config, session, { browserTransport: managedBrowserTransport, startup: startupOptions, reauthenticateReload, presentNodeReply } = {}) {
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
@@ -573,8 +573,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             // retain its full receipt locally without spending delivery space.
             if(preparationRequest.intent==='open_package')delete delivered.workspace.browser_geometry;
             const budget={tool:'dock_prepare',operationId:preparationRequest.operation_id};
-            const meta=ready&&localPackageUpload?{_meta:{confirmedLocalPackage:true}}:{};
-            let reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}],...meta},budget);
+            let reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},budget);
             if(first&&ready&&reply.isError===true){
               // Preparation is a discovery step. Node rules/schemas are still
               // required through describe before apply; do not let the number
@@ -582,11 +581,15 @@ export async function createBridge(config, session, { browserTransport: managedB
               delivered.knowledge={...bundle,node_types:bundle.node_types.map(node=>({
                 type:node.type,candidate_node_apply_available:node.candidate_node_apply_available,modes:node.modes}))};
               delivered.next_step={tool:'dock_action_describe',instruction:'The preparation catalog lists types and modes only. Request selected node_types and modes for complete semantics, rules and parameter schemas before applying nodes.'};
-              reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}],...meta},budget);
+              reply=boundedUserToolReply({content:[{type:'text',text:JSON.stringify(delivered)}]},budget);
             }
             if (ready && reply.isError !== true) userBundleDelivered = true;
             undeliveredDraft = ready && reply.isError === true && workspace?.created_draft === true
               && preparationRequest.intent === 'new_draft' ? session.metadata.workspacePreparation.identity : null;
+            if (ready && localPackageUpload && reply.isError !== true && presentNodeReply)
+              return presentNodeReply(reply, () => loginomFeedMetadata(reply, {
+                tool: 'dock_prepare', localPackageOperationId: preparationRequest.operation_id,
+              }));
             return reply;
           }
           return { content: [{ type: 'text', text: JSON.stringify({
@@ -961,14 +964,21 @@ export async function createBridge(config, session, { browserTransport: managedB
         return { isError: true, content: [{ type: 'text', text: message }] };
       }
     };
+    const presentDeliveredNode = (reply, tool) => {
+      if(!presentNodeReply||!userProfile||!isNodeApiTool(tool)||reply.structuredContent?.result_version!=='user-v1')return reply;
+      const facts=actionRuntime?.nodeFeedFacts(reply.structuredContent.operation_id);
+      return presentNodeReply(reply,options=>loginomFeedMetadata(reply,{...options,tool,facts}));
+    };
     server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       const reply=await callTool(request,extra);
-      return userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
+      const delivered=userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
+      return presentDeliveredNode(delivered,request.params.name);
     });
     return { server, catalog,
-      applyWithScanReceipt(args,receipt,extra) {
-        return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);
+      async applyWithScanReceipt(args,receipt,extra) {
+        const tool='dock_node_apply';
+        return presentDeliveredNode(await callTool({params:{name:tool,arguments:args}},extra,null,receipt),tool);
       },
       async prepareLocalPackage(args,pair,extra) {
         if(!userProfile||!actionRuntime||!config.storageDirectories||args?.intent!=='open_package'

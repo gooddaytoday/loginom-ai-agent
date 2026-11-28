@@ -108,20 +108,28 @@ export async function extractPackageVariables(bytes: Uint8Array) {
     const elements = registry?.localName === "Variables" ? child(registry, "Elements") : undefined
     const definitions: { name: string; type: string }[] = []
     const defaults: { name: string; value: string }[] = []
+    const nonPublic = new Set<string>()
+    let defaultsWithheld = false
     let definitionsCoverage: "complete" | "partial" | "unavailable" = elements ? "complete" : "unavailable"
     for (const entry of children(elements)) {
       const name = entry.getAttribute("Name"), type = entry.getAttribute("DataType")
+      const visible = explicitlyVisible(entry)
+      if (name && !visible) nonPublic.add(name)
       if (entry.localName !== "Item" || !name || !type) {
         definitionsCoverage = "partial"
         continue
       }
       definitions.push({ name, type })
       const value = child(entry, "DefaultValue")
-      if (value?.hasAttribute("Value")) defaults.push({ name, value: value.getAttribute("Value") ?? "" })
+      if (value?.hasAttribute("Value")) {
+        if (visible) defaults.push({ name, value: value.getAttribute("Value") ?? "" })
+        else defaultsWithheld = true
+      }
     }
+    const packageNames = new Set(definitions.map(({ name }) => name))
 
     const modules = unitPaths(await xml("PackageIndex.xml"), entries)
-    const usages: { name: string; kind: "template" | "binding"; scope: "control"; module: string; branch: string[];
+    const usages: { name: string; kind: "template" | "binding"; scope: "package" | "control" | "unknown"; module: string; branch: string[];
       nodeID: string; nodeLabel: string; parameter: string }[] = []
     for (const module of modules) {
       const unit = await xml(module + "/Unit.xml")
@@ -130,20 +138,30 @@ export async function extractPackageVariables(bytes: Uint8Array) {
       while (pending.length) {
         const flow = pending.pop()
         if (!flow) break
+        const packageTargets = packageVariableTargets(flow.root)
         for (const node of items(child(flow.root, "Nodes"))) {
           const component = child(node, "Component")
           const engine = child(component, "Engine")
           const { guid: nodeID, label: nodeLabel } = nodeIdentity(node, engine)
           if (!nodeID) continue
-          const location = { module, branch: flow.branch, nodeID, nodeLabel, scope: "control" as const }
+          const controlPort = namedPort(child(component, "InputSockets"), "ControlVariables")
+          const controlPortID = controlPort?.getAttribute("Guid")
+          const linkedToPackage = controlPortID && packageTargets.get(nodeID)?.has(controlPortID)
+          const localNames = new Set(items(child(child(child(controlPort, "Socket"), "Variables"), "Elements"))
+            .filter((entry) => entry.getAttribute("OriginType") === "iotCustom")
+            .map((entry) => entry.getAttribute("Name")))
+          const scope = (name: string) => localNames.has(name) ? "control"
+            : packageNames.has(name) && linkedToPackage
+              ? "package" : controlPort ? "control" : "unknown"
+          const location = { module, branch: flow.branch, nodeID, nodeLabel }
           for (const parameter of ["FileName", "TableName"]) {
             const setting = engine?.getAttribute(parameter) ?? ""
             const names = new Set(Array.from(setting.matchAll(/%([\p{L}_][\p{L}\p{N}_]*)%/gu), (match) => match[1]))
-            for (const name of names) usages.push({ ...location, name, parameter, kind: "template" })
+            for (const name of names) usages.push({ ...location, name, parameter, kind: "template", scope: scope(name) })
           }
           for (const binding of items(child(child(component, "PropBinder"), "PropertyBindSavers"))) {
             const name = binding.getAttribute("VariableName"), parameter = binding.getAttribute("PropertyPath")
-            if (name && parameter) usages.push({ ...location, name, parameter, kind: "binding" })
+            if (name && parameter) usages.push({ ...location, name, parameter, kind: "binding", scope: scope(name) })
           }
           const inner = child(child(engine, "ModelUnit"), "WorkFlow")
           if (inner) pending.push({ root: inner, branch: [...flow.branch, nodeLabel] })
@@ -151,8 +169,37 @@ export async function extractPackageVariables(bytes: Uint8Array) {
       }
     }
     return { source: "saved" as const, definitionsCoverage, usagesCoverage: "partial" as const,
-      definitions: elements ? definitions : null, defaults: elements ? defaults : null, usages }
+      definitions: elements ? definitions : null,
+      defaultsCoverage: defaultsWithheld ? "partial" as const : definitionsCoverage,
+      defaults: elements ? defaults.filter(({ name }) => !nonPublic.has(name)) : null, usages }
   }, 16 * 1024 * 1024)
+}
+
+function explicitlyVisible(entry: Element) {
+  const flags = ["Hidden", "IsHidden"].filter((name) => entry.hasAttribute(name)).map((name) => entry.getAttribute(name))
+  return flags.length > 0 && flags.every((flag) => flag === "false" || flag === "0")
+}
+
+function namedPort(ports: Element | undefined, name: string) {
+  return items(ports).find((port) => port.getAttribute("Name") === name)
+}
+
+function packageVariableTargets(flow: Element | undefined) {
+  const targets = new Map<string, Set<string>>()
+  const variables = items(child(flow, "ServiceNodes")).find((node) => node.getAttribute("Name") === "VariablesNode")
+  const nodeID = variables?.getAttribute("Guid")
+  const portID = namedPort(child(child(variables, "Component"), "OutputSockets"), "PackageVariables")?.getAttribute("Guid")
+  if (!nodeID || !portID) return targets
+  for (const link of [...items(child(flow, "ServiceLinks")), ...items(child(flow, "Links"))]) {
+    const source = child(link, "SourcePort"), target = child(link, "TargetPort")
+    if (source?.getAttribute("NodeGuid") !== nodeID || source.getAttribute("PortGuid") !== portID) continue
+    const targetNode = target?.getAttribute("NodeGuid"), targetPort = target?.getAttribute("PortGuid")
+    if (!targetNode || !targetPort) continue
+    const ports = targets.get(targetNode) ?? new Set<string>()
+    ports.add(targetPort)
+    targets.set(targetNode, ports)
+  }
+  return targets
 }
 
 function normalized(name: string) { return name.replaceAll("\\", "/").replace(/^\/+/, "").toLowerCase() }
