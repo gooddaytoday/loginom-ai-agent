@@ -14,6 +14,8 @@ import {withStorageIdentity} from '../lib/storage-policy.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
+import {makeWorkspaceStepCode} from '../lib/workspace.mjs';
+import {readGraph} from '../lib/node-target-browser.mjs';
 import {savedCopyDigest} from '../../src/saved-copy-readback.mjs';
 
 test('an independent readback opens only the exact saved package, in read mode',async()=>{
@@ -1134,6 +1136,43 @@ test('ambiguous REST reopen then overwrite and native cleanup: '+fault,async()=>
  assert.equal(closed,accepted?1:0);assert.equal(loggedOut,accepted);
 });
 
+test('Save recovery refuses a link added after the saved graph snapshot',async()=>{
+ const page=await restSavePage([true,true]);
+ const prep=page.context.__loginomDockPreparationV1,receipt=prep.receipts.get('prepared');
+ const oldTab=receipt.tab,oldPackage=receipt.packageNode,oldWorkflow=receipt.nodeTargetWorkflowNode;
+ const oldCrumbs=[{tid:'old-crumb',label:'Draft'}];
+ receipt.crumbs=oldCrumbs;
+ page.model.FDiagram.FNodes.FCollection[0].FIconCls='bg-vendor-icon-modelgeneric';
+ oldPackage.FSubNodes={FItems:[{FCustomForm:{FDiagram:{FNodes:{FCollection:[{FIconCls:'bg-vendor-icon-restclientconnection'}]}}}}]};
+ const path='/user/data/packages/recovery-graph-race.lgp';
+ const first=await run(page,'package.save_checkpoint',{path,conflict_policy:'fail'});
+ assert.equal(first.status,'AMBIGUOUS',JSON.stringify(first));
+ const pending=prep.savedPackageReopen;
+ assert.ok(pending);
+ const writesBefore=page.saveWrites,getCmp=page.context.Ext.getCmp;
+ page.context.Ext.getCmp=id=>{
+  const component=getCmp(id);
+  if(page.saveWrites>writesBefore&&id==='save-crumb-4'&&page.edges.length===0){
+   page.edges.push('Источник|Output_Data-0|Приёмник|Input_Data-0');
+   const graph=page.model.FDiagram.FmxGraph.container;
+   graph.children=page.elements().find(element=>element.symbol==='workflow.graph').children;
+   for(const child of graph.children)child.parentElement=graph;
+  }
+  return component;
+ };
+ const second=await run(page,'package.save_checkpoint',{path,conflict_policy:'replace'});
+ assert.equal(page.storage.get(path).edges.length,0);
+ assert.equal(page.edges.length,1);
+ assert.equal(second.status,'AMBIGUOUS',JSON.stringify(second));
+ assert.equal(second.effect_possible,true);
+ assert.deepEqual(second.output?.workflow_continuations??[],[]);
+ assert.equal(receipt.tab,oldTab);
+ assert.equal(receipt.packageNode,oldPackage);
+ assert.equal(receipt.nodeTargetWorkflowNode,oldWorkflow);
+ assert.deepEqual(receipt.crumbs,oldCrumbs);
+ assert.equal(prep.savedPackageReopen,pending);
+});
+
 for(const missing of [['packages.close'],['packages.open'],['packages.close','packages.open']])
 test('REST checkpoint retains the legacy path without catalog selectors: '+missing,async()=>{
  const page=await restSavePage([true,true]);
@@ -1415,6 +1454,29 @@ test('saved continuation returns current navigation with the same native workflo
  assert.equal(continuation.workflow_ref.tab_tid,continuation.previous_workflow_ref.tab_tid);
 });
 
+test('the next node step accepts the issued continuation after a keep-open Save',async()=>{
+ const page=await restSavePage([false],false);
+ const {session_id:sessionId,origin}=page.storageBinding;
+ const connection=page.app.Application.FInstance.FMainForm.FMapTree.FServerConnection;
+ const receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ receipt.crumbs=page.context.document.querySelectorAll(`[data-tid^="${page.prefix};cnrNaviMode;b.s_"]`)
+  .map(element=>({tid:element.tid,label:element.textContent}));
+ receipt.stepSession={connection,nativeSession:connection.Session,account:connection.UserName};
+ page.context.location.pathname='/';
+ const path='/user/data/packages/continued.lgp';
+ const saved=await run(page,'package.save_checkpoint',{path,conflict_policy:'fail'});
+ assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));
+ assert.equal(saved.output.reopened,false);
+ const [continuation]=saved.output.workflow_continuations;
+ const step=async workflow_ref=>(await page.execute(makeWorkspaceStepCode({loginomUrl:origin,build,sessionId,
+  workflowRef:{document_id:continuation.document_id,...workflow_ref},readGraph,types:{}}))).output;
+ const next=await step(continuation.workflow_ref);
+ assert.equal(next.status,'READY',next.reason);
+ assert.equal(next.package_ref.path,path);
+ assert.deepEqual(next.workflow_ref,continuation.workflow_ref);
+ assert.equal((await step(continuation.previous_workflow_ref)).reason,'WORKFLOW_CHANGED');
+});
+
 test('saved continuation ends at its native workflow after a visible ExportCSV breadcrumb',async()=>{
  const {page}=await continuationPage();page.continuationSuffix='ExportCSV';
  const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/exported.lgp',conflict_policy:'fail'});
@@ -1608,7 +1670,13 @@ test('Save-copy before the first node read retains the prepared native workflow 
  const {page,flow}=await continuationPage(),receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
  receipt.crumbs=page.elements().filter(e=>['save_crumb','save_nav_parent'].includes(e.kind))
    .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent}));
+ receipt.stepWorkflowNode=flow;
  delete receipt.nodeTargetWorkflowNode;
+ const returnToWorkflow=page.afterDoubleClick;
+ page.afterDoubleClick=async()=>{
+  await returnToWorkflow();
+  page.packagePath='user\\data\\packages\\\\copied-before-read.lgp';
+ };
  const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/copied-before-read.lgp',conflict_policy:'fail'});
  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
  const [continuation]=result.output.workflow_continuations;
@@ -1633,6 +1701,75 @@ test('unread prepared Save-copy rejects a changed initial binding: '+fault,async
  assert.notEqual(result.status,'SUCCEEDED');
  assert.equal(page.storage.size,0,'reject before Save');
  assert.equal(receipt.nodeTargetWorkflowNode,undefined);
+});
+
+test('unread prepared Save-copy rejects a different native workflow with identical breadcrumbs',async()=>{
+ const {page,flow,card}=await continuationPage(),receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ receipt.crumbs=page.elements().filter(e=>['save_crumb','save_nav_parent'].includes(e.kind))
+   .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent}));
+ receipt.stepWorkflowNode=flow;
+ delete receipt.nodeTargetWorkflowNode;
+ const replacement=new page.app.WorkFlowTreeNode();replacement.ParentNode=flow.ParentNode;
+ card.Controller.Node.data.node=replacement;
+ const getCmp=page.context.Ext.getCmp;
+ page.context.Ext.getCmp=id=>{
+  const component=getCmp(id);
+  if(id==='save-crumb-4')component._node.data.node=replacement;
+  return component;
+ };
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/must-not-save.lgp',conflict_policy:'fail'});
+ assert.equal(result.status,'FAILED');
+ assert.match(result.error.message,/initial native identity changed/);
+ assert.equal(result.effect_possible,false);
+ assert.equal(page.storage.size,0);
+});
+
+test('keep-open Save does not publish breadcrumbs if the destination changes during navigation refresh',async()=>{
+ const {page}=await continuationPage(),receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ const originalCrumbs=page.elements().filter(e=>['save_crumb','save_nav_parent'].includes(e.kind))
+   .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent}));
+ receipt.crumbs=originalCrumbs;
+ const returnToWorkflow=page.afterDoubleClick;
+ page.afterDoubleClick=async()=>{
+  await returnToWorkflow();
+  page.packagePath='/user/data/packages/foreign.lgp';
+ };
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/refresh-race.lgp',conflict_policy:'fail'});
+ assert.equal(result.status,'AMBIGUOUS');
+ assert.match(result.error.message,/destination changed while refreshing navigation/i);
+ assert.equal(result.effect_possible,true);
+ assert.ok(result.trace.some(row=>row.event==='saved_navigation_workflow_returned'));
+ assert.deepEqual(receipt.crumbs,originalCrumbs);
+});
+
+test('keep-open Save does not publish breadcrumbs if the graph changes at publication',async()=>{
+ const {page}=await continuationPage(),receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ const originalCrumbs=page.elements().filter(e=>['save_crumb','save_nav_parent'].includes(e.kind))
+   .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent}));
+ receipt.crumbs=originalCrumbs;
+ let returned=false;
+ const returnToWorkflow=page.afterDoubleClick;
+ page.afterDoubleClick=async()=>{await returnToWorkflow();returned=true;};
+ const getCmp=page.context.Ext.getCmp;
+ page.context.Ext.getCmp=id=>{
+  const component=getCmp(id);
+  if(returned&&id==='save-crumb-4'){
+   returned=false;
+   page.addNode('Поздний_узел',600,104);
+   const graph=page.model.FDiagram.FmxGraph.container;
+   graph.children=page.elements().find(e=>e.symbol==='workflow.graph').children;
+   for(const child of graph.children)child.parentElement=graph;
+  }
+  return component;
+ };
+ const path='/user/data/packages/graph-race.lgp';
+ const result=await run(page,'package.save_checkpoint',{path,conflict_policy:'fail'});
+ assert.equal(page.storage.get(path).nodes.length,2);
+ assert.equal(page.nodes.length,3);
+ assert.equal(result.status,'AMBIGUOUS');
+ assert.match(result.error.message,/Saved graph changed/);
+ assert.equal(result.effect_possible,true);
+ assert.deepEqual(receipt.crumbs,originalCrumbs);
 });
 
 for(const action of ['package.save_checkpoint','package.save_as'])test(action+' accepts the observed builtin without a Label;Label',async()=>{
