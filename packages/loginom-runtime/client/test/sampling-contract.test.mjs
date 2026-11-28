@@ -52,6 +52,22 @@ test('fresh reads preserve NULL, false, zero and empty strings on every distinct
  assert.equal(result.status,'complete');assert.equal(result.cleanup_complete,true);
  assert.deepEqual(result.ports.map(p=>p.sample[0]),[row,row,row]);
 });
+test('sampling keeps native order on reads with autosync and binds data kinds by field name',async()=>{
+ const schema=samplingOutputColumns({kind:'data_partition',input_fields:fields},0);
+ const native=[schema[2],schema[0],schema[1]].map(({data_kind,...field},index)=>({...field,index}));
+ const sample=[[1.25,false,7]];
+ const run=(autosync,observed=native)=>readSamplingOutputs({
+  readOutputPort:async({port})=>({output:{port,port_guid:'p'+port,schema:structuredClone(observed),sample_complete:true,sample}}),
+ },{ports:[0],sample_rows:100,require_exact_numbers:true},{execution:{execution_id:'e'},receipt_id:'r',portExecution:{verified:true}},
+ {ports:[{port:0,schema,native_mapping:{autosync}}]});
+ const result=await run(true);
+ assert.deepEqual(result.ports[0].schema,native.map(field=>({...field,data_kind:schema.find(f=>f.name===field.name).data_kind})));
+ assert.deepEqual(result.ports[0].sample,sample);
+ await assert.rejects(()=>run(false),/field types or order/);
+ for(const changed of [{name:'Foreign'},{label:'Foreign'},{type:'string'},{...native[1],index:0}]){
+  await assert.rejects(()=>run(true,[{...native[0],...changed},...native.slice(1)]),{code:'NODE_READ_SCHEMA_CHANGED'});
+ }
+});
 test('group binding follows observed group labels rather than current row positions',()=>{
  assert.equal(sequentialGroup({text:'Тестовое множество',values:{}},true),'test');
  assert.equal(sequentialGroup({text:'Обучающее множество',values:{}},true),'train');

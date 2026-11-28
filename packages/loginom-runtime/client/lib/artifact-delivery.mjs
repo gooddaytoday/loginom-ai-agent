@@ -6,6 +6,9 @@ import {operationFailureDiagnostic} from './browser-failure.mjs';
 const requireValue=(value,message)=>{if(!value)throw Error(message);};
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const one=(values,message)=>{requireValue(values.length===1,message);return values[0];};
+// Mirrors the executor's terminal answer for this upload state (LAB-2054).
+const UPLOAD_CLEANUP_BLOCKER='The original upload browser cleanup is unconfirmed; uploads cannot be restored or abandoned. '
+ +'Do not resume, deliver, upload or download it again; report it as a blocker.';
 
 // Private orchestration over the existing upload/inspect/download verifiers.
 // Never submits bytes itself and never repeats an uncertain child operation.
@@ -31,6 +34,14 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   const preUploadResume=!!resumeId&&job.preUploadResume===true;
   const check=()=>{signal?.throwIfAborted();requireValue(now()<job.deadline,'Artifact delivery deadline elapsed');};
   const privateDeadline=job.packageUpload||job.largeUpload?{signal,deadlineAt:job.deadline}:{};
+  // The executor's settled refusal for an upload whose own cleanup is
+  // unconfirmed. After verification started, an unreleased temporary file of
+  // the comparison can still settle, so that state is never terminal here.
+  const cleanupBlocked=r=>!job.verificationStarted&&r?.output?.operation_id===job.uploadId&&r.output.cleanup_confirmed===false
+    &&r.output.outcome?.operation_id===job.uploadId&&r.output.outcome.action_key==='artifact.upload'
+    &&r.output.outcome.error?.code==='CLEANUP_RECEIPT_MISSING';
+  // The next_step instruction follows this run's latest inspection only.
+  job.uploadCleanupBlocked=false;
   const readPages=async options=>{
    check();const r=await runtime.observe({...options,...privateDeadline});
    if(r.status!=='SUCCEEDED')throw Object.assign(Error('Delivery observation failed: '+(r.error?.code??r.status)),{code:r.error?.code});
@@ -135,8 +146,14 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
       verification_started:job.verificationStarted===true,deadline_at:job.deadline});
     inspected=await runtime.inspect({operationId:job.uploadId});
     await acknowledge(job,'artifact_delivery_resume_inspected',{resume_id:resumeId,inspection:inspected});
+    // Only the executor's settled verification without confirmed cleanup is
+    // terminal (LAB-2054); a lost verification reply may still reconcile.
+    job.uploadCleanupBlocked=cleanupBlocked(inspected);
     requireValue(inspected.output?.operation_id===job.uploadId&&inspected.output?.cleanup_confirmed===true
-      &&inspected.output?.outcome?.operation_id===job.uploadId,'Original delivery receipt remains uncertain');
+      &&inspected.output?.outcome?.operation_id===job.uploadId,job.verificationStarted
+      &&inspected.output?.outcome?.error?.code==='TRANSFER_VERIFICATION_UNRESOLVED'
+      ? 'The existing verification remains unresolved; no repeated download allowed'
+      : job.uploadCleanupBlocked?UPLOAD_CLEANUP_BLOCKER:'Original delivery receipt remains uncertain');
     if(inspected.output?.state==='resolved'&&inspected.output.outcome.status==='SUCCEEDED') {
      await finish(job,artifact,inspected);job.state='settled';return snapshot(job);
     }
@@ -233,8 +250,9 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    await acknowledge(job,'artifact_delivery_upload_receipt',{upload});
    if(upload.error?.code==='BROWSER_CALL_UNCERTAIN') {
     check();inspected=await runtime.inspect({operationId:job.uploadId});
+    job.uploadCleanupBlocked=cleanupBlocked(inspected);
     requireValue(inspected.output?.operation_id===job.uploadId&&inspected.output?.cleanup_confirmed===true
-      &&inspected.output?.outcome?.operation_id===job.uploadId,'Original upload receipt remains uncertain');
+      &&inspected.output?.outcome?.operation_id===job.uploadId,job.uploadCleanupBlocked?UPLOAD_CLEANUP_BLOCKER:'Original upload receipt remains uncertain');
     upload=inspected.output.outcome;
     await acknowledge(job,'artifact_delivery_upload_reconciled',{inspection:inspected});
    }
@@ -347,7 +365,7 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    job.outcome={status:navigationResumable?'NOT_APPLIED':effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,upload_submitted_or_unknown:submitted,upload_operation_id:job.uploadId,inspection_required:submitted||effectPossible&&!navigationResumable,
     ...(!submitted&&!effectPossible?{cleanup_complete:true}:{}),
     ...(submitted?{next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
-      instruction:job.verificationStarted
+      instruction:job.uploadCleanupBlocked?UPLOAD_CLEANUP_BLOCKER:job.verificationStarted
        ? 'Inspect and finalize the original upload with its original operation_id, a new resume_id and budget_ms; do not upload or download again. '
         +'If resume answers that the existing verification remains unresolved, the delivery stays unconfirmed: do not call deliver or resume again; report it as a blocker.'
        : 'Continue verification of the original upload with a new resume_id within its original deadline; do not upload again.'}}:{}),

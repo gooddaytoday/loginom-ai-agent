@@ -351,7 +351,7 @@ test("a shutdown interruption does not refresh the session", async () => {
   }
 })
 
-test.each(["loaded", "listed"] as const)("an execution end refreshes a %s root exactly once", async (source) => {
+test.each(["loaded", "listed"] as const)("a restart interruption refreshes a %s root exactly once", async (source) => {
   let gets = 0
   const requested = Promise.withResolvers<void>()
   const refreshed = { ...session, time: { created: 0, updated: 50 } }
@@ -372,7 +372,7 @@ test.each(["loaded", "listed"] as const)("an execution end refreshes a %s root e
   try {
     if (source === "loaded") setup.seed(10)
     else setup.data.session.apply([session])
-    setup.emit("session.execution.succeeded", 50)
+    setup.emit("session.execution.interrupted", 50, { reason: "restart", lastKnown: { at: 30, stepID: "msg_step" } })
     await requested.promise
     await setup.data.session.sync(session.id)
 

@@ -67,10 +67,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "Gemini er allt of heitt núna",
   "ui.sessionTurn.error.freeUsageExceeded": "Farið yfir ókeypis notkun",
   "ui.sessionTurn.error.addCredits": "Bæta við inneign",
-  "dialog.usageExceeded.freeTier.title": "Ókeypis hámarki náð",
-  "dialog.usageExceeded.freeTier.description":
-    "Gerast áskrifandi að OpenCode Go fyrir $10 á mánuði og fá áreiðanlegan aðgang að bestu opnu gerðunum.",
-  "dialog.usageExceeded.freeTier.actionLabel": "Gerast áskrifandi",
   "ui.sessionTurn.status.delegating": "Framselja vinnu",
   "ui.sessionTurn.status.planning": "Skipuleggja næstu skref",
   "ui.sessionTurn.status.gatheringContext": "Að kanna",

@@ -35,6 +35,7 @@ export const Issue = Schema.Literals([
   "invalidAddress",
   "invalidUsername",
   "passwordRequired",
+  "knowledgeAuthFailed",
   "credentialsRejected",
   "loginUnavailable",
   "logoutUnconfirmed",

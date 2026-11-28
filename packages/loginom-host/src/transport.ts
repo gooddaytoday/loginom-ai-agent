@@ -16,6 +16,7 @@ export function transport(port: Port) {
       reject(error: Error): void
       cleanup(): void
       observe?(value: unknown): void
+      progress?(value: unknown): void
     }
   >()
   function close() {
@@ -31,6 +32,10 @@ export function transport(port: Port) {
     if (!data || typeof data !== "object" || !("id" in data) || typeof data.id !== "string") return
     const request = pending.get(data.id)
     if (!request) return
+    if ("progress" in data) {
+      request.progress?.(data.progress)
+      return
+    }
     pending.delete(data.id)
     request.cleanup()
     request.observe?.(data)
@@ -47,6 +52,7 @@ export function transport(port: Port) {
       input: unknown,
       timeout = 180_000,
       observe?: (value: unknown) => void,
+      progress?: (value: unknown) => void,
       signal?: AbortSignal,
     ) {
       if (state.closed) return Promise.reject(new Error("LOGINOM_HOST_CLOSED"))
@@ -70,7 +76,7 @@ export function transport(port: Port) {
             close()
           }
         }
-        pending.set(id, { resolve, reject, cleanup, observe })
+        pending.set(id, { resolve, reject, cleanup, observe, progress })
         signal?.addEventListener("abort", abort, { once: true })
         try {
           port.postMessage({ id, method, input })

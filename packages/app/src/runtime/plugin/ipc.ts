@@ -25,8 +25,8 @@ type Encoded = Codec["Encoded"]
 
 type View = { available: boolean; generation: number; failed: boolean; value: Decoded }
 
-// How long main may take to answer a subscribe before the Ipc counts as failed.
-const subscribeTimeout = 10_000
+// Give the Desktop transport's 30 s port handshake time to answer or report its own failure first.
+const subscribeTimeout = 35_000
 
 /** Renderer-side clients for the Ipcs that plugins provide in the main process. */
 export function createIpcClients(bridge: Bridge | undefined) {
