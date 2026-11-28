@@ -6,6 +6,7 @@ export default {
   projectName: "Название проекта",
   createProject: "Создать",
   projectCreateFailed: "Не удалось создать проект. Попробуйте ещё раз.",
+  projectCreateTimedOut: "Сервер слишком долго создаёт проект. Попробуйте ещё раз.",
   cancelProject: "Отмена",
   openProject: "Открыть страницу проекта",
   newInProject: "Новый разговор в проекте",

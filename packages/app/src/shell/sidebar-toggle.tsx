@@ -66,8 +66,10 @@ export function SidebarToggle(props: { handoff?: "out" | "in" }) {
   let full: SVGSVGElement | undefined
   let outline: HTMLSpanElement | undefined
   const unread = () => !settings.appearance.sidebarOpen() && sidebarUnread()
+
   const conversation = () =>
     side === "in" && !settings.appearance.sidebarOpen() ? sidebarConversationActivity() : undefined
+
   const conversationStatus = () => conversation()?.status
 
   const paints = {

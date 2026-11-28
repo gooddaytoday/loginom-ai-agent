@@ -171,8 +171,6 @@ import type {
   CredentialRemoveOutput,
   ProjectListInput,
   ProjectListOutput,
-  ProjectRegisterInput,
-  ProjectRegisterOutput,
   ProjectUpdateInput,
   ProjectUpdateOutput,
   FormListInput,
@@ -273,6 +271,11 @@ import type {
   ExperimentalArtifactsViewOutput,
   ExperimentalJobListInput,
   ExperimentalJobListOutput,
+  ExperimentalProjectListOutput,
+  ExperimentalProjectRegisterInput,
+  ExperimentalProjectRegisterOutput,
+  ExperimentalProjectForgetInput,
+  ExperimentalProjectForgetOutput,
   ShellListInput,
   ShellListOutput,
   ShellCreateInput,
@@ -1704,6 +1707,42 @@ export function make(options: ClientOptions) {
             requestOptions,
           ).then((value) => value.data),
       },
+      project: {
+        list: (requestOptions?: RequestOptions) =>
+          request<ExperimentalProjectListOutput>(
+            {
+              method: "GET",
+              path: `/api/experimental/project`,
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        register: (input: ExperimentalProjectRegisterInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalProjectRegisterOutput>(
+            {
+              method: "POST",
+              path: `/api/experimental/project`,
+              body: { directory: input["directory"], name: input["name"], experimental: input["experimental"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        forget: (input: ExperimentalProjectForgetInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalProjectForgetOutput>(
+            {
+              method: "DELETE",
+              path: `/api/experimental/project/${encodeURIComponent(input.projectID)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401],
+              empty: true,
+            },
+            requestOptions,
+          ),
+      },
       migration: {
         v1: {
           status: (requestOptions?: RequestOptions) =>
@@ -2052,19 +2091,7 @@ export function make(options: ClientOptions) {
           {
             method: "GET",
             path: `/api/project`,
-            query: { archived: input?.["archived"], includeHidden: input?.["includeHidden"] },
-            successStatus: 200,
-            declaredStatuses: [400, 401],
-            empty: false,
-          },
-          requestOptions,
-        ),
-      register: (input: ProjectRegisterInput, requestOptions?: RequestOptions) =>
-        request<ProjectRegisterOutput>(
-          {
-            method: "POST",
-            path: `/api/project`,
-            body: { directory: input["directory"], name: input["name"], hidden: input["hidden"] },
+            query: { archived: input?.["archived"] },
             successStatus: 200,
             declaredStatuses: [400, 401],
             empty: false,

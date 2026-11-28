@@ -389,6 +389,7 @@ export const dict = {
   "common.closeTab": "Закрыть вкладку",
   "common.dismiss": "Закрыть",
   "common.requestFailed": "Запрос не выполнен",
+  "session.new.workspaceTimedOut": "Не удалось вовремя открыть новый разговор. Попробуйте ещё раз.",
   "common.moreOptions": "Дополнительные опции",
   "common.learnMore": "Подробнее",
   "common.rename": "Переименовать",

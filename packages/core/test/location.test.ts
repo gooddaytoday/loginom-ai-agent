@@ -13,6 +13,7 @@ const projectLayer = Layer.succeed(
   Project.Service,
   Project.Service.of({
     register: () => Effect.die("not implemented"),
+    forget: () => Effect.void,
     list: () => Effect.succeed([]),
     update: () => Effect.die("not implemented"),
     activate: () => Effect.void,

@@ -108,6 +108,7 @@ export function createNewSessionComposerAdapter(props: {
       const projectDirectory = props.root()
       const worktree = props.worktree()
       const directory = worktree === "main" ? projectDirectory : worktree
+
       const prepare =
         server.conn.type === "sidecar"
           ? navigation()?.value.prepare({
@@ -116,6 +117,7 @@ export function createNewSessionComposerAdapter(props: {
               register: (input) => registerNavigationWorkspace(server.ctx, input),
             })
           : undefined
+
       const sessionID = Session.ID.create()
       const settled = Promise.withResolvers<Started>()
 
@@ -141,6 +143,7 @@ export function createNewSessionComposerAdapter(props: {
           const ended = new AbortController()
           let timer: ReturnType<typeof setTimeout> | undefined
           let prepared: Awaited<ReturnType<NonNullable<typeof prepare>>> | undefined
+
           const finish = async (keep: boolean) => {
             const workspace = prepared
             prepared = undefined
@@ -186,7 +189,9 @@ export function createNewSessionComposerAdapter(props: {
                   prepare
                     ? prepare().then(async (workspace) => {
                         prepared = workspace
+
                         if (ended.signal.aborted) await finish(false)
+
                         return workspace.directory
                       })
                     : createWorktree({
@@ -247,6 +252,7 @@ export function createNewSessionComposerAdapter(props: {
 
             if (effect.type === "session.promote") {
               void finish(true)
+
               const cleanupReady = startTransition(() => {
                 local.session.promote(effect.directory, effect.sessionID, {
                   agent: selection.agent,

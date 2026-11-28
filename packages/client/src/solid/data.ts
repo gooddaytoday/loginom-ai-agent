@@ -1155,8 +1155,7 @@ export function createData(config: CreateDataInput) {
             error: event.data.error,
             input: typeof tool.state.input === "string" ? {} : tool.state.input,
             metadata: event.data.metadata,
-            content:
-              omitFiles() && event.data.content ? omitFileData(event.data.content) : event.data.content,
+            content: omitFiles() && event.data.content ? omitFileData(event.data.content) : event.data.content,
           }
           tool.executed = event.data.executed || tool.executed === true
           if (event.data.native) tool.native = { ...tool.native, ...event.data.native }
@@ -2073,7 +2072,10 @@ export function createData(config: CreateDataInput) {
     project: {
       list(options?: { includeHidden?: boolean }) {
         return Object.values(store.project.info)
-          .filter((project) => project.time.archived === undefined && (!project.hidden || options?.includeHidden))
+          .filter(
+            (project) =>
+              project.time.archived === undefined && (!project.experimental?.hidden || options?.includeHidden),
+          )
           .toSorted((a, b) => b.time.active - a.time.active)
       },
       get(projectID: string) {
@@ -2082,14 +2084,32 @@ export function createData(config: CreateDataInput) {
       remember(project: Project) {
         setStore("project", "info", project.id, project)
       },
-      sync() {
-        return sync.run("project", async () => {
-          const projects = await api().project.list({ includeHidden: true })
-          setStore("project", "info", reconcile(Object.fromEntries(projects.map((project) => [project.id, project]))))
+      forget(projectID: string) {
+        setStore(
+          "project",
+          "info",
+          produce((projects) => {
+            delete projects[projectID]
+          }),
+        )
+      },
+      sync(options?: { includeHidden?: boolean }) {
+        const includeHidden = options?.includeHidden
+        return sync.run(includeHidden ? "project.experimental" : "project", async () => {
+          const projects = await (includeHidden ? api().experimental.project.list() : api().project.list())
+          const retained = includeHidden
+            ? []
+            : Object.values(store.project.info).filter((project) => project.experimental?.hidden)
+          setStore(
+            "project",
+            "info",
+            reconcile(Object.fromEntries([...retained, ...projects].map((project) => [project.id, project]))),
+          )
         })
       },
       invalidate() {
         sync.invalidate("project")
+        sync.invalidate("project.experimental")
       },
       permission: {
         list(projectID: string) {

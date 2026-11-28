@@ -6,6 +6,7 @@ import { availableProjectName, conversationTitle } from "./folders"
 import { managedFolders } from "./folders-main"
 
 const roots: string[] = []
+
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
@@ -25,6 +26,7 @@ test("each draft is private and conversations have separate dated folders", asyn
   const [first, second] = await Promise.all([api.conversation(title), api.conversation(title)])
   expect(first).not.toBe(second)
   expect([first, second]).toContain(path.join(documents, "Loginom AI Agent", "Без проекта", "2026-11-27 Анализ продаж"))
+
   for (const directory of [first, second]) {
     expect(path.dirname(directory)).toBe(path.join(documents, "Loginom AI Agent", "Без проекта"))
     expect((await stat(directory)).isDirectory()).toBe(true)
@@ -68,4 +70,22 @@ test("project display names preserve punctuation and distinguish duplicates", ()
   expect(availableProjectName(requested, ["Отчёт- Q1-Q2"])).toBe(requested)
   expect(availableProjectName(requested, [requested])).toBe("Отчёт: Q1/Q2 (2)")
   expect(availableProjectName(requested, [requested, "ОТЧЁТ: Q1/Q2 (2)"])).toBe("Отчёт: Q1/Q2 (3)")
+})
+
+test("closing a draft removes an empty private directory but leaves projects and nonempty drafts intact", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "loginom-drafts-"))
+  roots.push(root)
+
+  const api = managedFolders(path.join(root, "Documents"), path.join(root, "profile"))
+  const draft = await api.draftDirectory("unused")
+  const populated = await api.draftDirectory("with-file")
+  const project = await api.project("Project")
+  await writeFile(path.join(populated, "data.csv"), "value\n42\n")
+
+  expect(await api.discardDraft(draft)).toBe(true)
+  expect(await api.discardDraft(populated)).toBe(false)
+  expect(await api.discardDraft(project)).toBe(false)
+  expect(await readdir(path.dirname(draft))).toEqual(["with-file"])
+  expect(await readdir(populated)).toEqual(["data.csv"])
+  expect(await readdir(project)).toEqual([])
 })

@@ -32,6 +32,7 @@ const spring: DurationOptions = { duration: 0.18, bounce: 0 }
 
 /** Whether any session in the vertical sidebar draws its unread dot, published by the sidebar's tab strip. */
 export const [sidebarUnread, setSidebarUnread] = createSignal(false)
+
 export const [sidebarConversationActivity, setSidebarConversationActivity] = createSignal<{
   status: "input" | "running" | "idle"
   label: string

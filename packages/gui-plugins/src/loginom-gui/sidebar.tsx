@@ -1,12 +1,13 @@
 import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
-import { For, Show, createMemo, createSignal, type JSX } from "solid-js"
-import { createStore } from "solid-js/store"
+import { Predicate } from "effect"
+import { For, Show, createMemo, createSignal, onCleanup, type Accessor, type JSX } from "solid-js"
 import en from "./i18n/en"
 import { transitionProjectForm, type ProjectForm } from "./machine"
 
 export type SidebarActivity = "input" | "running" | "idle"
+
 export type SidebarConversation = {
   id: string
   title: string
@@ -14,13 +15,23 @@ export type SidebarConversation = {
   active: boolean
   activity: SidebarActivity
 }
-export type SidebarProject = { directory: string; title: string; conversations: readonly SidebarConversation[] }
+
+export type SidebarProject = {
+  id: string
+  directory: string
+  title: string
+  conversations: readonly SidebarConversation[]
+}
+
 export type SidebarText = (key: keyof typeof en) => string
 
 const pageSize = 6
+
 const row =
   "flex min-w-0 min-h-7 w-full items-center gap-2 rounded-md px-2 text-start text-sm hover:bg-v2-overlay-simple-overlay-hover focus-visible:bg-v2-overlay-simple-overlay-hover"
-const projectActions = "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 max-md:opacity-100"
+
+const projectActions =
+  "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"
 
 function newest(items: readonly SidebarConversation[]) {
   return items.toSorted((left, right) => right.created - left.created || right.id.localeCompare(left.id))
@@ -28,6 +39,7 @@ function newest(items: readonly SidebarConversation[]) {
 
 export function folderActivity(items: readonly SidebarConversation[]): SidebarActivity {
   if (items.some((item) => item.activity === "input")) return "input"
+
   return items.some((item) => item.activity === "running") ? "running" : "idle"
 }
 
@@ -52,51 +64,100 @@ export function ConversationSidebar(props: {
   projects: readonly SidebarProject[]
   conversations: readonly SidebarConversation[]
   text: SidebarText
-  onCreate(name: string): Promise<void>
+  onCreate(name: string, signal: AbortSignal): Promise<void>
   onOpenProject(directory: string): void
   onNewInProject(directory: string): void
   onOpenConversation(id: string): void
 }) {
-  const [expanded, setExpanded] = createStore<Record<string, number | undefined>>({})
+  const [expanded, setExpanded] = createSignal(new Map<string, number>())
   const [form, setForm] = createSignal<ProjectForm>({ type: "closed" })
-  const open = (directory: string) => setExpanded(directory, (limit) => limit || pageSize)
+  let attempt: AbortController | undefined
+  const expand = (id: string, limit: number) => setExpanded((current) => new Map(current).set(id, limit))
+  const open = (id: string) => expand(id, expanded().get(id) || pageSize)
+
   const send = (event: Parameters<typeof transitionProjectForm>[1]) =>
     setForm((state) => transitionProjectForm(state, event))
+
   const loose = createMemo(() => newest(props.conversations))
+  const projects = createMemo(() => new Map(props.projects.map((project) => [project.id, project])))
+
+  const issue = () => {
+    const state = form()
+
+    return state.type === "editing" ? state.issue : undefined
+  }
+
+  const cancel = () => {
+    const current = attempt
+    attempt = undefined
+    current?.abort()
+  }
+
+  onCleanup(cancel)
 
   const submit: JSX.EventHandler<HTMLFormElement, SubmitEvent> = async (event) => {
     event.preventDefault()
+
     const name = new FormData(event.currentTarget).get("name")
-    if (form().type !== "editing" || typeof name !== "string") return
+
+    if (form().type !== "editing" || !Predicate.isString(name)) return
+
     const next = send({ type: "submit", name })
+
     if (next.type !== "saving") return
+
+    const controller = new AbortController()
+    attempt = controller
+
+    const timer = setTimeout(() => {
+      cancel()
+      send({ type: "timedOut" })
+    }, 15_000)
+
+    controller.signal.addEventListener("abort", () => clearTimeout(timer), { once: true })
+
     try {
-      await props.onCreate(next.name)
-      send({ type: "created" })
+      await props.onCreate(next.name, controller.signal)
+
+      if (!controller.signal.aborted) send({ type: "created" })
     } catch {
-      send({ type: "failed" })
+      if (!controller.signal.aborted) send({ type: "failed" })
+    } finally {
+      clearTimeout(timer)
+
+      if (attempt === controller) attempt = undefined
     }
   }
 
-  const conversation = (item: SidebarConversation, directory?: string) => (
+  const conversation = (item: Accessor<SidebarConversation>, project?: string) => (
     <button
       type="button"
       class={row}
-      classList={{ "ps-7": !!directory, "bg-v2-overlay-simple-overlay-hover": item.active }}
-      aria-current={item.active ? "page" : undefined}
+      classList={{ "ps-7": !!project, "bg-v2-overlay-simple-overlay-hover": item().active }}
+      aria-current={item().active ? "page" : undefined}
       onClick={() => {
-        if (directory) open(directory)
-        props.onOpenConversation(item.id)
+        if (project) open(project)
+        props.onOpenConversation(item().id)
       }}
     >
       <span class="min-w-0 flex-1 truncate" dir="auto">
-        {item.title}
+        {item().title}
       </span>
-      <Show when={!directory}>
-        <Activity value={item.activity} text={props.text} />
+      <Show when={!project}>
+        <Activity value={item().activity} text={props.text} />
       </Show>
     </button>
   )
+
+  const conversations = (items: Accessor<readonly SidebarConversation[]>, project?: string) => {
+    const byID = createMemo(() => new Map(items().map((item) => [item.id, item])))
+
+    return (
+      <For each={[...byID().keys()]}>
+        {(id) => <Show when={byID().get(id)}>{(item) => conversation(item, project)}</Show>}
+      </For>
+    )
+  }
 
   return (
     <nav
@@ -135,90 +196,97 @@ export function ConversationSidebar(props: {
                 type="button"
                 variant="ghost"
                 size="small"
-                disabled={form().type === "saving"}
-                onClick={() => send({ type: "close" })}
+                onClick={() => {
+                  cancel()
+                  send({ type: "close" })
+                }}
               >
                 {props.text("cancelProject")}
               </Button>
             </div>
-            <Show
-              when={(() => {
-                const state = form()
-                return state.type === "editing" && state.failed
-              })()}
-            >
-              <p role="alert">{props.text("projectCreateFailed")}</p>
+            <Show when={issue()}>
+              {(reason) => (
+                <p role="alert">
+                  {props.text(reason() === "timedOut" ? "projectCreateTimedOut" : "projectCreateFailed")}
+                </p>
+              )}
             </Show>
           </form>
         </Show>
-        <For each={props.projects}>
-          {(project) => {
-            const limit = () =>
-              expanded[project.directory] ?? (project.conversations.some((item) => item.active) ? pageSize : 0)
-            const ordered = createMemo(() => newest(project.conversations))
-            return (
-              <div>
-                <div class="group flex items-center">
-                  <button
-                    type="button"
-                    class={row}
-                    aria-expanded={limit() > 0}
-                    onClick={() => setExpanded(project.directory, limit() ? 0 : pageSize)}
-                  >
-                    <Icon name="folder" size="small" class="shrink-0" />
-                    <span class="min-w-0 flex-1 truncate" dir="auto">
-                      {project.title}
-                    </span>
-                    <Show when={!limit()}>
-                      <Activity value={folderActivity(project.conversations)} text={props.text} />
+        <For each={[...projects().keys()]}>
+          {(id) => (
+            <Show when={projects().get(id)}>
+              {(project) => {
+                const limit = () =>
+                  expanded().get(id) ?? (project().conversations.some((item) => item.active) ? pageSize : 0)
+
+                const ordered = createMemo(() => newest(project().conversations).slice(0, limit()))
+
+                return (
+                  <div>
+                    <div class="group flex items-center">
+                      <button
+                        type="button"
+                        class={row}
+                        aria-expanded={limit() > 0}
+                        onClick={() => expand(id, limit() ? 0 : pageSize)}
+                      >
+                        <Icon name="folder" size="small" class="shrink-0" />
+                        <span class="min-w-0 flex-1 truncate" dir="auto">
+                          {project().title}
+                        </span>
+                        <Show when={!limit()}>
+                          <Activity value={folderActivity(project().conversations)} text={props.text} />
+                        </Show>
+                      </button>
+                      <IconButton
+                        icon={<Icon name="plus" size="small" />}
+                        size="small"
+                        variant="ghost"
+                        class={projectActions}
+                        aria-label={props.text("newInProject")}
+                        title={props.text("newInProject")}
+                        onClick={() => {
+                          open(id)
+                          props.onNewInProject(project().directory)
+                        }}
+                      />
+                      <IconButton
+                        icon={<Icon name="edit" size="small" />}
+                        size="small"
+                        variant="ghost"
+                        class={projectActions}
+                        aria-label={props.text("openProject")}
+                        title={props.text("openProject")}
+                        onClick={() => {
+                          open(id)
+                          props.onOpenProject(project().directory)
+                        }}
+                      />
+                    </div>
+                    <Show when={limit() > 0}>
+                      {conversations(ordered, id)}
+                      <Show when={project().conversations.length > limit()}>
+                        <Button
+                          variant="ghost-muted"
+                          size="small"
+                          class="ms-5"
+                          onClick={() => expand(id, limit() + pageSize)}
+                        >
+                          {props.text("showMoreConversations")}
+                        </Button>
+                      </Show>
                     </Show>
-                  </button>
-                  <IconButton
-                    icon={<Icon name="plus" size="small" />}
-                    size="small"
-                    variant="ghost"
-                    class={projectActions}
-                    aria-label={props.text("newInProject")}
-                    title={props.text("newInProject")}
-                    onClick={() => {
-                      open(project.directory)
-                      props.onNewInProject(project.directory)
-                    }}
-                  />
-                  <IconButton
-                    icon={<Icon name="edit" size="small" />}
-                    size="small"
-                    variant="ghost"
-                    class={projectActions}
-                    aria-label={props.text("openProject")}
-                    title={props.text("openProject")}
-                    onClick={() => {
-                      open(project.directory)
-                      props.onOpenProject(project.directory)
-                    }}
-                  />
-                </div>
-                <Show when={limit() > 0}>
-                  <For each={ordered().slice(0, limit())}>{(item) => conversation(item, project.directory)}</For>
-                  <Show when={project.conversations.length > limit()}>
-                    <Button
-                      variant="ghost-muted"
-                      size="small"
-                      class="ms-5"
-                      onClick={() => setExpanded(project.directory, limit() + pageSize)}
-                    >
-                      {props.text("showMoreConversations")}
-                    </Button>
-                  </Show>
-                </Show>
-              </div>
-            )
-          }}
+                  </div>
+                )
+              }}
+            </Show>
+          )}
         </For>
       </section>
       <section aria-label={props.text("conversations")}>
         <h2 class="px-2 text-sm font-medium text-v2-text-text-muted">{props.text("conversations")}</h2>
-        <For each={loose()}>{(item) => conversation(item)}</For>
+        {conversations(loose)}
       </section>
     </nav>
   )

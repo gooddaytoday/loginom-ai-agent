@@ -6,6 +6,7 @@ export default {
   projectName: "Project name",
   createProject: "Create",
   projectCreateFailed: "Couldn't create the project. Try again.",
+  projectCreateTimedOut: "Creating the project took too long. Try again.",
   cancelProject: "Cancel",
   openProject: "Open project page",
   newInProject: "New conversation in project",

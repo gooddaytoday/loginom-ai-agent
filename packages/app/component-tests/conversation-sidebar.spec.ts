@@ -1,6 +1,6 @@
 import { expect, sourceURL, story } from "../../stories/playwright/story"
 
-const fixture = sourceURL(new URL("./conversation-sidebar.fixture.tsx", import.meta.url))
+const fixture = sourceURL(new URL("../../gui-plugins/src/loginom-gui/sidebar.fixture.tsx", import.meta.url))
 
 story(
   "project folders expand independently, reveal six conversations, and show pending activity",
@@ -29,6 +29,8 @@ story(
     await expect(latest.getByRole("img")).toHaveCount(0)
     await latest.click()
     await expect(page.locator("[data-opened]")).toHaveAttribute("data-opened", "report-7")
+    await page.evaluate(() => document.dispatchEvent(new Event("sidebar-refresh")))
+    await expect(latest).toBeFocused()
     await conversations.getByRole("button", { name: /^Разговор без проекта/ }).click()
     await expect(page.locator("[data-opened]")).toHaveAttribute("data-opened", "loose")
     await reports.click()
@@ -50,4 +52,22 @@ story("project creation preserves the entered name when retrying an error", asyn
   await create.click()
   await expect(name).toHaveCount(0)
   await expect(page.locator("[data-created]")).toHaveAttribute("data-created", "Отчёт: Q1/Q2")
+})
+
+story("a hung project save times out and lets the user retry or cancel", async ({ mount, page }) => {
+  await mount("ui-line-comment--editor")
+  await page.clock.install()
+  await page.evaluate(async (url) => (await import(url)).mountSidebar("timeout"), fixture)
+  await page.getByRole("button", { name: "newProject" }).click()
+  const name = page.getByRole("textbox", { name: "projectName" })
+  const create = page.getByRole("button", { name: "createProject" })
+  await name.fill("Отчёт")
+  await create.click()
+  await expect(create).toBeDisabled()
+  await page.clock.fastForward(15_500)
+  await expect(page.getByRole("alert")).toHaveText("projectCreateTimedOut")
+  await expect(name).toHaveValue("Отчёт")
+  await create.click()
+  await page.getByRole("button", { name: "cancelProject" }).click()
+  await expect(name).toHaveCount(0)
 })

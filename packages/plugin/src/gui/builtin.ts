@@ -146,13 +146,17 @@ export const BuiltinPanel = Registry.define<BuiltinPanel>("panel")
 
 /** Whether a conversation is idle, running, or waiting for input. */
 export type NavigationActivity = "idle" | "running" | "input"
+
 /** A visible project in the navigation. */
 export type NavigationProject = {
+  /** Stable project ID on the connected server. */
+  id: string
   /** Canonical path on the server. */
   directory: string
   /** The project's display name. */
   title: string
 }
+
 /** A conversation in the navigation, including those whose projects are hidden. */
 export type NavigationSession = {
   /** Session ID on this server. */
@@ -179,8 +183,12 @@ export interface ShellNavigationInput {
   readonly projects: readonly NavigationProject[]
   /** Top-level conversations on this server. */
   readonly sessions: readonly NavigationSession[]
-  /** Display names of all visible projects on the server, even if not used on this client. */
-  projectNames(): Promise<readonly string[]>
+  /**
+   * Display names of all visible projects on the server, even if not used on this client.
+   *
+   * @param signal - Cancels the lookup when the user leaves or it times out.
+   */
+  projectNames(signal: AbortSignal): Promise<readonly string[]>
   /**
    * Register a named project and open its page.
    *
@@ -191,6 +199,8 @@ export interface ShellNavigationInput {
     directory: string
     /** The name to display, independently of the path. */
     name: string
+    /** Cancels the action before opening the project. */
+    signal: AbortSignal
   }): Promise<void>
   /**
    * Open an existing project's page.
@@ -239,6 +249,8 @@ export interface ShellNavigation {
   draft(input: {
     /** The draft's stable identifier. */
     draftID: string
+    /** Cancels opening this draft when its workspace times out. */
+    signal: AbortSignal
     /** The selected directory, if the current route has one. */
     directory?: string
     /** Whether the selected project is hidden from inventories. */
@@ -246,6 +258,17 @@ export interface ShellNavigation {
     /** Registers a workspace before the window opens it. */
     register: RegisterWorkspace
   }): Promise<string>
+  /**
+   * Remove an unused private draft workspace; leave explicit project directories intact.
+   *
+   * @param input - The draft location and its server cleanup.
+   */
+  discardDraft(input: {
+    /** Directory used by the draft that was closed or promoted. */
+    directory: string
+    /** Removes metadata after the directory is gone. */
+    forget(): Promise<void>
+  }): Promise<void>
   /**
    * Provide optional workspace preparation instead of the normal worktree creation flow.
    *
@@ -272,7 +295,14 @@ export interface ShellNavigation {
     | undefined
 }
 
-/** The built-in registry for replacing the shell's local navigation. */
+/**
+ * The built-in registry for replacing the shell's local navigation.
+ *
+ * @example
+ * ```ts
+ * ctx.add(ShellNavigation, navigation)
+ * ```
+ */
 export const ShellNavigation = Registry.define<ShellNavigation>("shell-navigation")
 
 /** A top-level page at `/page/<plugin>/<id>`. */

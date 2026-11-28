@@ -177,8 +177,6 @@ import type {
   CredentialRemoveOutput,
   ProjectListInput,
   ProjectListOutput,
-  ProjectRegisterInput,
-  ProjectRegisterOutput,
   ProjectUpdateInput,
   ProjectUpdateOutput,
   FormListInput,
@@ -271,6 +269,11 @@ import type {
   ExperimentalArtifactsDeleteOutput,
   ExperimentalJobListInput,
   ExperimentalJobListOutput,
+  ExperimentalProjectListOutput,
+  ExperimentalProjectRegisterInput,
+  ExperimentalProjectRegisterOutput,
+  ExperimentalProjectForgetInput,
+  ExperimentalProjectForgetOutput,
   ShellListInput,
   ShellListOutput,
   ShellCreateInput,
@@ -1249,16 +1252,7 @@ const adaptGroupCredential = (raw: RawClient["server.credential"]) => ({
 
 const EndpointProjectList = (raw: RawClient["server.project"]) => (input?: ProjectListInput) =>
   preserveEffect<ProjectListOutput>()(
-    raw["project.list"]({ query: { archived: input?.["archived"], includeHidden: input?.["includeHidden"] } }).pipe(
-      Effect.mapError(mapClientError),
-    ),
-  )
-
-const EndpointProjectRegister = (raw: RawClient["server.project"]) => (input: ProjectRegisterInput) =>
-  preserveEffect<ProjectRegisterOutput>()(
-    raw["project.register"]({
-      payload: { directory: input["directory"], name: input["name"], hidden: input["hidden"] },
-    }).pipe(Effect.mapError(mapClientError)),
+    raw["project.list"]({ query: { archived: input?.["archived"] } }).pipe(Effect.mapError(mapClientError)),
   )
 
 const EndpointProjectUpdate = (raw: RawClient["server.project"]) => (input: ProjectUpdateInput) =>
@@ -1271,7 +1265,6 @@ const EndpointProjectUpdate = (raw: RawClient["server.project"]) => (input: Proj
 
 const adaptGroupProject = (raw: RawClient["server.project"]) => ({
   list: EndpointProjectList(raw),
-  register: EndpointProjectRegister(raw),
   update: EndpointProjectUpdate(raw),
 })
 
@@ -1727,6 +1720,27 @@ const EndpointExperimentalJobList = (raw: RawClient["server.experimental"]) => (
     ),
   )
 
+const EndpointExperimentalProjectList = (raw: RawClient["server.experimental"]) => () =>
+  preserveEffect<ExperimentalProjectListOutput>()(
+    raw["project.experimental.list"]({}).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointExperimentalProjectRegister =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalProjectRegisterInput) =>
+    preserveEffect<ExperimentalProjectRegisterOutput>()(
+      raw["project.experimental.register"]({
+        payload: { directory: input["directory"], name: input["name"], experimental: input["experimental"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointExperimentalProjectForget =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalProjectForgetInput) =>
+    preserveEffect<ExperimentalProjectForgetOutput>()(
+      raw["project.experimental.forget"]({ params: { projectID: input["projectID"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
 const adaptGroupExperimental = (raw: RawClient["server.experimental"]) => ({
   persistentPty: {
     read: EndpointExperimentalPersistentPtyRead(raw),
@@ -1757,6 +1771,11 @@ const adaptGroupExperimental = (raw: RawClient["server.experimental"]) => ({
     delete: EndpointExperimentalArtifactsDelete(raw),
   },
   job: { list: EndpointExperimentalJobList(raw) },
+  project: {
+    list: EndpointExperimentalProjectList(raw),
+    register: EndpointExperimentalProjectRegister(raw),
+    forget: EndpointExperimentalProjectForget(raw),
+  },
 })
 
 const EndpointShellList = (raw: RawClient["server.shell"]) => (input?: ShellListInput) =>

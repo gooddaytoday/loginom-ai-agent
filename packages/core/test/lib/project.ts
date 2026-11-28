@@ -13,6 +13,7 @@ export const globalProjectNode = makeGlobalNode({
       return Project.Service.of({
         list: () => Effect.succeed([]),
         register: () => Effect.die("not implemented"),
+        forget: () => Effect.void,
         update: () => Effect.die("not implemented"),
         activate: () => Effect.void,
         sweep: () => Effect.void,

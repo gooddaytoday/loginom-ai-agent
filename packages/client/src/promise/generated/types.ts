@@ -799,7 +799,7 @@ export type Project = {
   canonical: AbsolutePath
   vcs?: ProjectVcs
   name?: string
-  hidden?: boolean
+  experimental?: { hidden?: boolean }
   icon?: ProjectIcon
   commands?: ProjectCommands
   time: ProjectTime
@@ -1869,7 +1869,7 @@ export type ProjectUpdated = {
     canonical: AbsolutePath
     vcs?: ProjectVcs
     name?: string
-    hidden?: boolean
+    experimental?: { hidden?: boolean }
     icon?: ProjectIcon
     commands?: ProjectCommands
     time: ProjectTime
@@ -4256,17 +4256,9 @@ export type CredentialRemoveInput = { readonly credentialID: string }
 
 export type CredentialRemoveOutput = void
 
-export type ProjectListInput = { readonly archived?: boolean | undefined; readonly includeHidden?: boolean | undefined }
+export type ProjectListInput = { readonly archived?: boolean | undefined }
 
 export type ProjectListOutput = Array<Project>
-
-export type ProjectRegisterInput = {
-  readonly directory: string
-  readonly name?: string | undefined
-  readonly hidden?: boolean | undefined
-}
-
-export type ProjectRegisterOutput = Project
 
 export type ProjectUpdateInput = {
   readonly projectID: string
@@ -4767,6 +4759,20 @@ export type ExperimentalJobListInput = {
 }
 
 export type ExperimentalJobListOutput = { data: Array<JobInfo> }["data"]
+
+export type ExperimentalProjectListOutput = Array<Project>
+
+export type ExperimentalProjectRegisterInput = {
+  readonly directory: string
+  readonly name?: string | undefined
+  readonly experimental?: { readonly hidden?: boolean } | undefined
+}
+
+export type ExperimentalProjectRegisterOutput = Project
+
+export type ExperimentalProjectForgetInput = { readonly projectID: string }
+
+export type ExperimentalProjectForgetOutput = void
 
 export type ShellListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
 

@@ -123,7 +123,7 @@ function createServerSyncContextInner(serverSDK: ServerSDK, data: Data) {
     setGlobalStore("project", (projects) => {
       const rest = projects.filter((project) => project.id !== update.id)
 
-      if (update.hidden || update.time.archived) return rest
+      if (update.experimental?.hidden || update.time.archived) return rest
 
       const previous = projects.find((project) => project.id === update.id)
 

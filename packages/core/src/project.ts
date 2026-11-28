@@ -2,7 +2,7 @@ export * as Project from "./project.js"
 
 import { Cache, Context, Duration, Effect, Layer, Schedule, Schema, Scope } from "effect"
 import { ChildProcess } from "effect/process"
-import { and, asc, desc, eq, gte, isNotNull, isNull, lt, lte, ne, sql } from "drizzle-orm"
+import { and, asc, desc, eq, gte, isNotNull, isNull, lt, lte, ne, notExists, sql } from "drizzle-orm"
 import path from "path"
 import { AbsolutePath } from "./schema.js"
 import { Bus } from "./bus.js"
@@ -17,6 +17,7 @@ import { ProjectSchema } from "./project/schema.js"
 import type { Project as ProjectContract } from "@opencode/schema/project"
 import { ProjectTable, upsertProject } from "./project/sql.js"
 import { ProjectIcon } from "./project/icon.js"
+import { SessionTable } from "./session/sql.js"
 import { WorktreeTable } from "./worktree/sql.js"
 
 export const ID = ProjectSchema.ID
@@ -96,6 +97,7 @@ export interface ActivateOptions {
 export interface Interface {
   readonly list: (input?: ListInput) => Effect.Effect<ReadonlyArray<Info>>
   readonly register: (input: ProjectContract.RegisterInput) => Effect.Effect<Info, RegistrationError>
+  readonly forget: (id: ID) => Effect.Effect<void>
   readonly update: (input: UpdateInput) => Effect.Effect<Info, NotFoundError>
   /** Records Project activity for recency ordering, at most once per minute per Project. */
   readonly activate: (projectID: ID, options?: ActivateOptions) => Effect.Effect<void>
@@ -121,7 +123,7 @@ function fromRow(row: typeof ProjectTable.$inferSelect): Info {
     canonical: row.worktree,
     vcs: row.vcs ?? undefined,
     name: row.name ?? undefined,
-    ...(row.hidden ? { hidden: true } : {}),
+    ...(row.hidden ? { experimental: { hidden: true } } : {}),
     icon,
     commands: row.commands ?? undefined,
     time: {
@@ -526,7 +528,7 @@ const layer = Layer.effect(
       const resolved = yield* resolve(directory, { persist: false })
       if (resolved.canonical !== directory)
         return yield* new RegistrationError({ message: "Directory belongs to another project" })
-      yield* persist(resolved, { name: input.name, hidden: input.hidden })
+      yield* persist(resolved, { name: input.name, hidden: input.experimental?.hidden })
       const row = yield* db.select().from(ProjectTable).where(eq(ProjectTable.id, resolved.id)).get().pipe(Effect.orDie)
       if (!row) return yield* Effect.die(new Error("Registered project not found"))
       const project = fromRow(row)
@@ -534,7 +536,29 @@ const layer = Layer.effect(
       return project
     })
 
-    return Service.of({ list, register, update, activate, resolve, sweep })
+    const forget = Effect.fn("Project.forget")(function* (id: ID) {
+      const filter = and(eq(ProjectTable.id, id), eq(ProjectTable.hidden, true))
+      const row = yield* db
+        .select({ directory: ProjectTable.worktree })
+        .from(ProjectTable)
+        .where(filter)
+        .get()
+        .pipe(Effect.orDie)
+      if (!row || (yield* fs.exists(row.directory).pipe(Effect.orElseSucceed(() => true)))) return
+      yield* db
+        .delete(ProjectTable)
+        .where(
+          and(
+            filter,
+            eq(ProjectTable.worktree, row.directory),
+            notExists(db.select({ id: SessionTable.id }).from(SessionTable).where(eq(SessionTable.project_id, id))),
+          ),
+        )
+        .run()
+        .pipe(Effect.orDie)
+    })
+
+    return Service.of({ list, register, forget, update, activate, resolve, sweep })
   }),
 )
 

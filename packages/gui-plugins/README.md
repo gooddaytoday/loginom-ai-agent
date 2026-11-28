@@ -332,6 +332,12 @@ to the displayed repository or worktree instead of adding a second menu item.
 
 ### Built-in only
 
+`ShellNavigation` replaces the local Desktop sidecar's conversation navigation. Register it with
+`ctx.add(ShellNavigation, navigation)` from `@opencode/plugin/gui/builtin`; the host rejects external registrations.
+Its render input supplies the live project and session inventory plus navigation actions. The draft policy chooses
+an empty private directory when the user is not in a project, honors the host's timeout signal, and discards that
+directory when a draft is closed or promoted. An explicit project directory is never removed by the policy.
+
 `@opencode/plugin/gui/builtin` holds what only the built-ins use. It is never published and is not in the modules a plugin bundle may require; a public SDK module never imports it.
 
 | Export                                                  | What it adds                                                                                   |

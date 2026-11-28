@@ -9,7 +9,6 @@
     "./renderer": "./src/renderer.ts",
     "./main": "./src/main.ts",
     "./terminal": "./src/terminal/index.ts",
-    "./conversation-sidebar": "./src/loginom-gui/sidebar.tsx",
     "./debug/options": "./src/debug/options.ts"
   },
   "scripts": {

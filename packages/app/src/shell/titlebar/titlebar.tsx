@@ -17,6 +17,7 @@ import {
   hiddenWorkspace,
   PluginNavigation,
   registerNavigationWorkspace,
+  useDiscardNavigationDraft,
   useShellNavigation,
 } from "@/runtime/plugin/navigation"
 import { showToast } from "@/shell/notifications/toast"
@@ -215,6 +216,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
 
             const tabs = useTabs()
             const tabsStore = tabs.store
+            onCleanup(tabs.onDraftDisposed(useDiscardNavigationDraft()))
 
             createEffect(() => {
               if (
@@ -234,10 +236,12 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
             const session = routeSync.session
             const currentTab = routeSync.currentTab
             const pluginPage = useActivePluginPage()
+
             const managedConnection = createMemo(() => {
               const server = currentTab()?.server ?? layout.home.selection().server
               const connections = global.servers.list()
               const conn = server ? connections.find((item) => ServerConnection.key(item) === server) : connections[0]
+
               return conn?.type === "sidecar" && navigation() ? conn : undefined
             })
 
@@ -250,16 +254,38 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
             ) => {
               const policy = navigation()?.value
               const ctx = global.serverCtx(server)
+
               if (!policy || !ctx || server !== ServerConnection.Key.make("sidecar")) return false
+
+              const signal = AbortSignal.timeout(15_000)
+
+              const timedOut = () =>
+                showToast({
+                  variant: "error",
+                  title: language.t("common.requestFailed"),
+                  description: language.t("session.new.workspaceTimedOut"),
+                })
+
+              signal.addEventListener("abort", timedOut, { once: true })
               void policy
                 .draft({
                   directory,
                   draftID,
+                  signal,
                   hidden: hiddenWorkspace(ctx, directory, projectID),
-                  register: (input) => registerNavigationWorkspace(ctx, input),
+                  register: (input) => registerNavigationWorkspace(ctx, input, signal),
                 })
-                .then((directory) => tabs.newDraft({ server, directory, draftID }, "", model))
-                .catch(() => showToast({ variant: "error", title: language.t("common.requestFailed") }))
+                .then((directory) => {
+                  signal.throwIfAborted()
+                  signal.removeEventListener("abort", timedOut)
+
+                  return tabs.newDraft({ server, directory, draftID }, "", model)
+                })
+                .catch(() => {
+                  if (!signal.aborted) showToast({ variant: "error", title: language.t("common.requestFailed") })
+                })
+                .finally(() => signal.removeEventListener("abort", timedOut))
+
               return true
             }
 
@@ -280,6 +306,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
 
                   if (pending) {
                     const model = tabs.stateValue<ComposerState>(pending.draft, "prompt")?.model.current()
+
                     if (openNavigationDraft(route.server, draftID, pending.draft.directory, model)) return true
                     void tabs.newDraft({ server: route.server, directory: pending.draft.directory, draftID }, "", model)
 
@@ -297,6 +324,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   }
 
                   const model = tabs.stateValue<ComposerState>(sessionTab, "prompt")?.model.current()
+
                   if (
                     openNavigationDraft(
                       route.server,
@@ -322,6 +350,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                   if (activeTab?.type !== "draft") return false
 
                   const model = tabs.stateValue<ComposerState>(activeTab, "prompt")?.model.current()
+
                   if (openNavigationDraft(activeTab.server, draftID, activeTab.directory, model)) return true
                   void tabs.newDraft({ server: activeTab.server, directory: activeTab.directory, draftID }, "", model)
 
@@ -340,8 +369,10 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                     global.servers.list()[0]
 
                   const projects = conn ? global.serverCtx(ServerConnection.key(conn))?.projects : undefined
+
                   if (route.type === "page") {
                     const local = global.servers.list().find((item) => item.type === "sidecar")
+
                     if (local && openNavigationDraft(ServerConnection.key(local), draftID)) return true
                   } else if (conn && openNavigationDraft(ServerConnection.key(conn), draftID, selection.directory)) {
                     return true

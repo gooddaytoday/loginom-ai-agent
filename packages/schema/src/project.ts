@@ -37,12 +37,14 @@ export const Time = Schema.Struct({
 }).annotate({ identifier: "Project.Time" })
 export interface Time extends Schema.Schema.Type<typeof Time> {}
 
+const Experimental = Schema.Struct({ hidden: optional(Schema.Boolean) })
+
 export const Info = Schema.Struct({
   id: ID,
   canonical: AbsolutePath,
   vcs: optional(Vcs),
   name: optional(Schema.String),
-  hidden: optional(Schema.Boolean),
+  experimental: optional(Experimental),
   icon: optional(Icon),
   commands: optional(Commands),
   time: Time,
@@ -53,7 +55,7 @@ export interface Info extends Schema.Schema.Type<typeof Info> {}
 export const RegisterInput = Schema.Struct({
   directory: AbsolutePath,
   name: optional(Schema.String),
-  hidden: optional(Schema.Boolean),
+  experimental: optional(Experimental),
 }).annotate({ identifier: "Project.RegisterInput" })
 export interface RegisterInput extends Schema.Schema.Type<typeof RegisterInput> {}
 

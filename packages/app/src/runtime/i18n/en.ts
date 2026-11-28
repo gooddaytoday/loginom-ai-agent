@@ -728,6 +728,7 @@ export const dict = {
   "session.new.worktree.creating": "Creating worktree",
   "session.new.starting": "Starting session",
   "session.new.timedOut": "The server took too long to respond. Send again to retry.",
+  "session.new.workspaceTimedOut": "Opening a new conversation took too long. Try again.",
   "session.new.workspace.runIn": "Run session in",
   "session.new.workspace.local": "Local repository",
   "session.new.workspace.existingLabel": "Worktree",
