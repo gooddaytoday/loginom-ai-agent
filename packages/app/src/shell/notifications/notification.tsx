@@ -318,6 +318,7 @@ export function createServerNotificationState(input: {
 
       // A new turn may have started during lookup. A running subagent can also wake its parent with a report.
       const busy = () => input.data.session.status(sessionID) === "running" || hasRunningChild(input.data, sessionID)
+
       if (busy()) return
 
       const hasOpenTab = sessionIDHasOpenTab(tabs.store, input.key, sessionID)
@@ -399,6 +400,7 @@ export function createServerNotificationState(input: {
 
     void input.coordinator.system(key, () => {
       const request = pending()
+
       if (!request || !settings.notifications.decision()) return
 
       // Request messages, form copy and tool arguments can contain paths or credentials.
@@ -443,7 +445,8 @@ export function createServerNotificationState(input: {
       return
     }
 
-    if (event.type === "session.execution.succeeded-while-idle") handleSessionIdle(event.data.sessionID, event.id)
+    if (event.type === "session.status" && event.data.status.type === "idle")
+      handleSessionIdle(event.data.sessionID, event.id)
   })
 
   onCleanup(() => {

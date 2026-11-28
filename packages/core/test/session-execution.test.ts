@@ -60,82 +60,6 @@ describe("SessionExecution lifecycle", () => {
     expect(SessionExecution.terminal(interrupted, "user")).toEqual({ type: "interrupted", reason: "user" })
   })
 
-  for (const scenario of [
-    { name: "one queued correction", queued: 1 },
-    { name: "two queued corrections", queued: 2 },
-    { name: "a failed turn", queued: 0 },
-  ]) {
-    it.effect(`publishes only successful idle completion after ${scenario.name}`, () =>
-      Effect.gen(function* () {
-        const database = yield* Database.Service
-        const bus = yield* Bus.Service
-        const sessionID = Session.ID.make("ses_notify_idle")
-        yield* seedSessions(database, [sessionID])
-
-        const started = yield* Deferred.make<void>()
-        const release = yield* Deferred.make<void>()
-        const corrections = yield* Effect.forEach(Array.from({ length: scenario.queued }), () =>
-          Effect.gen(function* () {
-            return { started: yield* Deferred.make<void>(), release: yield* Deferred.make<void>() }
-          }),
-        )
-        const scope = yield* Scope.fork(yield* Effect.scope)
-        const context = yield* buildExecution(scope, ({ force }) =>
-          Effect.gen(function* () {
-            if (!force) return
-            yield* Deferred.succeed(started, undefined)
-            yield* Deferred.await(release)
-            if (scenario.queued === 0)
-              return yield* new AIError({
-                reason: new TransportError({ message: "Disconnected", transport: "http", operation: "request" }),
-              })
-            for (const correction of corrections) {
-              const promoted = yield* SessionInbox.promote(database.db, bus, sessionID, "input")
-              expect(promoted).toBeDefined()
-              yield* Deferred.succeed(correction.started, undefined)
-              yield* Deferred.await(correction.release)
-            }
-          }),
-        )
-        const execution = Context.get(context, SessionExecution.Service)
-        const observed: Array<{ type: string; active: boolean }> = []
-        yield* bus.listen((event) =>
-          event.type === SessionEvent.Execution.SucceededWhileIdle.type ||
-          event.type === SessionEvent.Execution.Failed.type
-            ? execution.isActive(sessionID).pipe(
-                Effect.map((active) => observed.push({ type: event.type, active })),
-                Effect.asVoid,
-              )
-            : Effect.void,
-        )
-        const run = yield* execution.resume(sessionID).pipe(Effect.forkChild)
-        yield* Deferred.await(started)
-        if (scenario.queued > 0) {
-          yield* seedInbox(
-            database,
-            sessionID,
-            corrections.map(() => "queue"),
-          )
-          yield* Effect.forEach(corrections, () => execution.wake(sessionID), { discard: true })
-        }
-        yield* Deferred.succeed(release, undefined)
-        for (const correction of corrections) {
-          yield* Deferred.await(correction.started)
-          expect(observed).toEqual([])
-          yield* Deferred.succeed(correction.release, undefined)
-        }
-
-        const exit = yield* Fiber.await(run)
-        expect(Exit.isSuccess(exit)).toBe(scenario.queued > 0)
-        expect(observed).toEqual(
-          scenario.queued > 0
-            ? [{ type: SessionEvent.Execution.SucceededWhileIdle.type, active: false }]
-            : [{ type: SessionEvent.Execution.Failed.type, active: true }],
-        )
-      }),
-    )
-  }
-
   it.effect("resumes a directly driven child after execution teardown", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service
@@ -535,6 +459,44 @@ describe("SessionExecution lifecycle", () => {
       // The terminal released the claim and reset the counter atomically.
       expect(yield* claims(database)).toEqual({ [sessionID]: false })
       expect(yield* attempts(database, sessionID)).toBe(0)
+    }),
+  )
+
+  it.effect("leaves the failed outcome visible when a recorded wake has only queued work left", () =>
+    Effect.gen(function* () {
+      const database = yield* Database.Service
+      const store = yield* SessionStore.Service
+      const sessionID = Session.ID.make("ses_failed_with_queue")
+      yield* seedSessions(database, [sessionID])
+      const draining = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      const failure = new AIError({
+        reason: new TransportError({ message: "Disconnected", transport: "http", operation: "request" }),
+      })
+      let drains = 0
+      const context = yield* buildExecution(yield* Scope.fork(yield* Effect.scope), () =>
+        Effect.suspend(() =>
+          ++drains === 1
+            ? Deferred.succeed(draining, undefined).pipe(
+                Effect.andThen(Deferred.await(release)),
+                Effect.andThen(Effect.fail(failure)),
+              )
+            : Effect.void,
+        ),
+      )
+      const execution = Context.get(context, SessionExecution.Service)
+      const running = yield* execution.resume(sessionID).pipe(Effect.forkChild)
+      yield* Deferred.await(draining)
+      yield* execution.wake(sessionID)
+      yield* seedInbox(database, sessionID, ["queue"])
+      yield* execution.wake(sessionID, "queue")
+      yield* Deferred.succeed(release, undefined)
+      expect(yield* Fiber.join(running).pipe(Effect.flip)).toBe(failure)
+      yield* execution.awaitIdle(sessionID)
+
+      expect(drains).toBe(1)
+      expect((yield* store.get(sessionID))?.outcome).toBe("failed")
+      expect(yield* SessionInbox.list(database.db, sessionID)).toMatchObject([{ delivery: "queue" }])
     }),
   )
 
@@ -1485,8 +1447,18 @@ describe("SessionRestart background recovery", () => {
       const jobs = yield* Job.Service
       const parent = Session.ID.make("ses_subagent_left_parent")
       const child = Session.ID.make("ses_subagent_left_child")
-      yield* seedSessions(database, [parent], { time_suspended: Date.now() })
-      yield* seedSessions(database, [child], { parent_id: parent, time_suspended: Date.now() })
+      const claimedAt = Date.now()
+      yield* seedSessions(database, [parent], { time_suspended: claimedAt })
+      yield* seedSessions(database, [child], { parent_id: parent, time_suspended: claimedAt })
+      const assistantMessageID = SessionMessage.ID.create()
+      const stepStartedAt = Date.now()
+      yield* bus.publish(SessionEvent.Step.Started, {
+        sessionID: parent,
+        assistantMessageID,
+        agent: Agent.ID.make("build"),
+        model: { id: ID.make("fixture"), providerID: Provider.ID.make("test") },
+        started: stepStartedAt,
+      })
       yield* jobs.start({
         id: child,
         type: "subagent",
@@ -1524,8 +1496,13 @@ describe("SessionRestart background recovery", () => {
       // Neither turn ran; both ended interrupted, with no restart notice, and their claims are released.
       expect(drained).toEqual([])
       expect(interrupted.map((event) => event.data)).toEqual([
-        { sessionID: child, reason: "user" },
-        { sessionID: parent, reason: "user" },
+        { sessionID: child, reason: "restart", lastKnown: { at: claimedAt } },
+        { sessionID: parent, reason: "restart", lastKnown: { at: expect.any(Number), stepID: assistantMessageID } },
+      ])
+      expect(interrupted[1]?.data.lastKnown?.at).toBeGreaterThanOrEqual(stepStartedAt)
+      const store = yield* SessionStore.Service
+      expect(yield* store.messages({ sessionID: parent, type: "idle" })).toMatchObject([
+        { interruption: { reason: "restart", lastKnown: interrupted[1]?.data.lastKnown } },
       ])
       expect(notices).toEqual([])
       expect(yield* claims(database)).toEqual({ [parent]: false, [child]: false })

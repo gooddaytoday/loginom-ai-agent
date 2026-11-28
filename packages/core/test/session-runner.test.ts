@@ -40,6 +40,7 @@ import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/core/session"
 import { Snapshot } from "@opencode/core/snapshot"
 import { SessionEvent } from "@opencode/core/session/event"
+import { SessionStatusEvent } from "@opencode/schema/session-status-event"
 import { SessionCompaction } from "@opencode/core/session/compaction"
 import { SessionInbox } from "@opencode/core/session/inbox"
 import { SessionMessage } from "@opencode/core/session/message"
@@ -464,18 +465,20 @@ const layer = Layer.unwrap(
         function drain(
           sessionID: Session.ID,
           force: boolean,
+          promotable: SessionInbox.Promotable,
           continuation?: SessionRunner.Continuation,
         ): Effect.Effect<void, SessionRunner.RunError> {
           return sessionRunner
-            .drain({ sessionID, force, continuation })
+            .drain({ sessionID, force, continuation, promotable })
             .pipe(
               Effect.flatMap((result) =>
-                result._tag === "Complete" ? Effect.void : drain(sessionID, false, result.continuation),
+                result._tag === "Complete" ? Effect.void : drain(sessionID, false, promotable, result.continuation),
               ),
             )
         }
         const coordinator = yield* SessionRunCoordinator.make<Session.ID, SessionRunner.RunError>({
-          drain: (sessionID, force) => drain(sessionID, force),
+          drain: (sessionID, force, promotable, continuation) =>
+            drain(sessionID, force, promotable, continuation ? { step: 1 } : undefined),
         })
         return SessionExecution.Service.of({
           active: coordinator.active,
@@ -4673,10 +4676,10 @@ describe("SessionRunnerLLM", () => {
     expect(userTexts(s.requests[2])).toEqual(["Start working", "Wait until continuation ends"])
   })
 
-  scenario("keeps queued input parked when a steer is cancelled during preparation", function* (s) {
+  scenario("rechecks queued input when a steer is cancelled during preparation", function* (s) {
     const runner = yield* SessionRunner.Service
     yield* s.admit("A")
-    yield* s.llm.push(TestLLM.stop(), TestLLM.stop(), TestLLM.stop())
+    yield* s.llm.push(TestLLM.stop(), TestLLM.stop())
     const stream = yield* s.llm.gate()
     const run = yield* runner.drain({ sessionID, force: false }).pipe(Effect.forkChild)
     yield* stream.started
@@ -4690,7 +4693,7 @@ describe("SessionRunnerLLM", () => {
     yield* stream.release
     yield* Fiber.join(run)
 
-    expect(s.requests.map(userTexts)).toEqual([["A"], ["A"], ["A", "B"]])
+    expect(s.requests.map(userTexts)).toEqual([["A"], ["A", "B"]])
     expect((yield* s.messages).some((message) => message.id === steer.id)).toBe(false)
     expect(yield* s.inbox).toEqual([])
   })
@@ -4700,7 +4703,7 @@ describe("SessionRunnerLLM", () => {
 
     const location = Location.Ref.make({ directory: AbsolutePath.make("/moved") })
     yield* s.admit("A")
-    yield* s.llm.push(TestLLM.stop(), TestLLM.stop())
+    yield* s.llm.push(TestLLM.stop())
     const stream = yield* s.llm.gate()
     const run = yield* runner.drain({ sessionID, force: false }).pipe(Effect.forkChild)
     yield* stream.started
@@ -4725,7 +4728,7 @@ describe("SessionRunnerLLM", () => {
       result: SessionRunner.DrainResult.Moved({ stepped: true }),
       location,
     })
-    expect(s.requests.map(userTexts)).toEqual([["A"], ["A"]])
+    expect(s.requests.map(userTexts)).toEqual([["A"]])
     expect(s.closedTransports).toEqual([sessionID])
     expect(yield* recordedEventTypes(sessionID)).toContain(Bus.versionedType(SessionEvent.Moved.type, 1))
     expect(yield* s.inbox).toEqual([])
@@ -4734,28 +4737,64 @@ describe("SessionRunnerLLM", () => {
   scenario("preserves durable queued input for a later wake after interruption", function* (s) {
     yield* s.admit("Interrupt current work")
 
-    yield* s.llm.push([], TestLLM.stop())
+    yield* s.llm.push([], TestLLM.stop(), TestLLM.stop())
     const stream = yield* s.llm.gate()
 
     const run = yield* s.resume.pipe(Effect.forkChild)
     yield* stream.started
-    yield* s.session.prompt({
+    const first = yield* s.session.prompt({
       sessionID,
       text: "Run after interrupt",
       delivery: "queue",
     })
+    const second = yield* s.session.prompt({ sessionID, text: "Run second", delivery: "queue" })
     yield* s.session.interrupt(sessionID)
     expect(yield* Fiber.await(run)).toMatchObject({ _tag: "Failure" })
+    yield* s.session.wait(sessionID)
     expect(s.requests).toHaveLength(1)
-    expect(yield* SessionInbox.has(s.db, sessionID, "queue")).toBe(true)
+    expect(yield* s.inbox).toMatchObject([
+      { id: first.id, delivery: "queue", payload: { text: "Run after interrupt" } },
+      { id: second.id, delivery: "queue", payload: { text: "Run second" } },
+    ])
     const resumed = yield* s.resume.pipe(Effect.forkChild)
     yield* stream.started
     yield* stream.release
     yield* Fiber.join(resumed)
 
-    expect(s.requests).toHaveLength(2)
-    expect(userTexts(s.requests[0])).toEqual(["Interrupt current work"])
-    expect(userTexts(s.requests[1])).toEqual(["Interrupt current work", "Run after interrupt"])
+    expect(s.requests.map(userTexts)).toEqual([
+      ["Interrupt current work"],
+      ["Interrupt current work", "Run after interrupt"],
+      ["Interrupt current work", "Run after interrupt", "Run second"],
+    ])
+    expect(yield* s.inbox).toEqual([])
+  })
+
+  scenario("delivers a queued prompt admitted while Stop is cleaning up", function* (s) {
+    yield* s.admit("Interrupt current work")
+    const started = yield* Deferred.make<void>()
+    const cleaningUp = yield* Deferred.make<void>()
+    const release = yield* Deferred.make<void>()
+    yield* s.llm.push(
+      Stream.unwrap(Deferred.succeed(started, undefined).pipe(Effect.as(Stream.never))).pipe(
+        Stream.ensuring(Deferred.succeed(cleaningUp, undefined).pipe(Effect.andThen(Deferred.await(release)))),
+      ),
+      TestLLM.stop(),
+    )
+
+    const running = yield* s.resume.pipe(Effect.forkChild)
+    yield* Deferred.await(started)
+    yield* s.session.interrupt(sessionID)
+    yield* Deferred.await(cleaningUp)
+    yield* s.session.prompt({ sessionID, text: "Admitted after Stop", delivery: "queue" })
+    yield* Deferred.succeed(release, undefined)
+    expect(yield* Fiber.await(running)).toMatchObject({ _tag: "Failure" })
+    yield* s.session.wait(sessionID)
+
+    expect(s.requests.map(userTexts)).toEqual([
+      ["Interrupt current work"],
+      ["Interrupt current work", "Admitted after Stop"],
+    ])
+    expect(yield* s.inbox).toEqual([])
   })
 
   scenario("preserves durable steering input for a later resume after interruption", function* (s) {
@@ -4788,17 +4827,76 @@ describe("SessionRunnerLLM", () => {
   scenario("promotes queued inputs one at a time in FIFO order", function* (s) {
     yield* s.admit("Start working")
 
-    yield* s.llm.push(TestLLM.stop(), TestLLM.stop(), TestLLM.stop())
+    yield* s.llm.push(
+      TestLLM.toolCall("call-before-queue", "echo", { text: "active work" }),
+      TestLLM.stop(),
+      TestLLM.stop(),
+      TestLLM.stop(),
+      TestLLM.stop(),
+    )
 
     const first = yield* s.resumePaused
-    yield* s.session.prompt({ sessionID, text: "Queue first", delivery: "queue" })
-    yield* s.session.prompt({ sessionID, text: "Queue second", delivery: "queue" })
+    const prompts = ["Queue first", "Queue second", "Queue third"]
+    const inputs = yield* Effect.forEach(prompts, (text) => s.session.prompt({ sessionID, text, delivery: "queue" }))
+    expect(yield* s.inbox).toMatchObject(inputs.map(({ id }) => ({ id, delivery: "queue" })))
     yield* first.finish
 
-    expect(s.requests).toHaveLength(3)
-    expect(userTexts(s.requests[0])).toEqual(["Start working"])
-    expect(userTexts(s.requests[1])).toEqual(["Start working", "Queue first"])
-    expect(userTexts(s.requests[2])).toEqual(["Start working", "Queue first", "Queue second"])
+    expect(s.requests.map(userTexts)).toEqual([
+      ["Start working"],
+      ["Start working"],
+      ["Start working", "Queue first"],
+      ["Start working", "Queue first", "Queue second"],
+      ["Start working", "Queue first", "Queue second", "Queue third"],
+    ])
+    expect(yield* s.inbox).toEqual([])
+  })
+
+  scenario("edits and removes queued prompts while the next turn is preparing", function* (s) {
+    yield* s.admit("Start working")
+    yield* s.llm.push(TestLLM.stop(), TestLLM.stop(), TestLLM.stop())
+    const active = yield* s.resumePaused
+    const edited = yield* s.session.prompt({ sessionID, text: "Original", delivery: "queue" })
+    const removed = yield* s.session.prompt({ sessionID, text: "Removed", delivery: "queue" })
+    const last = yield* s.session.prompt({ sessionID, text: "Last", delivery: "queue" })
+    s.systemLoadHook = Effect.gen(function* () {
+      s.systemLoadHook = Effect.void
+      yield* s.session.editInbox({ sessionID, inboxID: edited.id, text: "Edited" }).pipe(Effect.orDie)
+      yield* s.session.cancelInbox({ sessionID, inboxID: removed.id }).pipe(Effect.orDie)
+      expect(yield* s.inbox.pipe(Effect.orDie)).toMatchObject([
+        { id: edited.id, delivery: "queue", payload: { text: "Edited" } },
+        { id: last.id, delivery: "queue", payload: { text: "Last" } },
+      ])
+    })
+    yield* active.finish
+
+    expect(s.requests.map(userTexts)).toEqual([
+      ["Start working"],
+      ["Start working", "Edited"],
+      ["Start working", "Edited", "Last"],
+    ])
+    expect(yield* s.inbox).toEqual([])
+    const stale = { sessionID, inboxID: edited.id }
+    expect(yield* s.session.editInbox({ ...stale, text: "Too late" }).pipe(Effect.flip)).toBeInstanceOf(
+      Session.InboxConflictError,
+    )
+    expect(yield* s.session.cancelInbox(stale).pipe(Effect.flip)).toBeInstanceOf(Session.InboxConflictError)
+    expect(yield* s.session.message({ sessionID, messageID: edited.id })).toMatchObject({ text: "Edited" })
+  })
+
+  scenario("does not start a model request when the last queued prompt is removed at the boundary", function* (s) {
+    yield* s.admit("Start working")
+    yield* s.llm.push(TestLLM.stop(), TestLLM.stop())
+    const active = yield* s.resumePaused
+    const removed = yield* s.session.prompt({ sessionID, text: "Removed", delivery: "queue" })
+    s.systemLoadHook = Effect.gen(function* () {
+      s.systemLoadHook = Effect.void
+      yield* s.session.cancelInbox({ sessionID, inboxID: removed.id }).pipe(Effect.orDie)
+    })
+    yield* active.finish
+    yield* s.session.wait(sessionID)
+
+    expect(s.requests.map(userTexts)).toEqual([["Start working"]])
+    expect(yield* s.inbox).toEqual([])
   })
 
   scenario("stops a steer-scoped drain before queued input", function* (s) {
@@ -4947,6 +5045,60 @@ describe("SessionRunnerLLM", () => {
 
     expect(s.requests).toHaveLength(2)
     expect(userTexts(s.requests[1])).toEqual(["Start working", "Recover with this"])
+  })
+
+  scenario("parks a queued prompt when a tool continuation fails after consuming a steer", function* (s) {
+    yield* s.admit("Start working")
+    const tools = yield* s.blockTools()
+    const failure = invalidRequest()
+    yield* s.llm.push(TestLLM.toolCall("call-work", "echo", { text: "working" }), Stream.fail(failure), TestLLM.stop())
+
+    const active = yield* s.resume.pipe(Effect.forkChild)
+    yield* tools.started
+    yield* s.session.prompt({ sessionID, text: "Steer the current turn", delivery: "steer" })
+    const queued = yield* s.session.prompt({ sessionID, text: "Leave this queued", delivery: "queue" })
+    yield* tools.release
+    expect(yield* Fiber.join(active).pipe(Effect.flip)).toBe(failure)
+    yield* s.session.wait(sessionID)
+
+    expect(s.requests.map(userTexts)).toEqual([["Start working"], ["Start working", "Steer the current turn"]])
+    expect(yield* s.inbox).toMatchObject([{ id: queued.id, delivery: "queue", payload: { text: "Leave this queued" } }])
+  })
+
+  scenario("parks queued prompts admitted during a failed turn without signaling idle", function* (s) {
+    const completions: string[] = []
+    yield* Effect.acquireRelease(
+      s.bus.listen((event) => {
+        if (event.type !== SessionStatusEvent.Status.type || !Schema.is(SessionStatusEvent.Status.data)(event.data))
+          return Effect.void
+        return event.data.sessionID === sessionID && event.data.status.type === "idle"
+          ? Effect.sync(() => void completions.push(event.id))
+          : Effect.void
+      }),
+      (unsubscribe) => unsubscribe,
+    )
+    yield* s.admit("Start working")
+    const failure = invalidRequest()
+    yield* s.llm.push(Stream.fail(failure), Stream.fail(failure))
+
+    const active = yield* s.resumePaused
+    const first = yield* s.session.prompt({ sessionID, text: "First queued", delivery: "queue" })
+    const second = yield* s.session.prompt({ sessionID, text: "Second queued", delivery: "queue" })
+    expect(yield* active.finish.pipe(Effect.flip)).toBe(failure)
+    yield* s.session.wait(sessionID)
+
+    expect(completions).toEqual([])
+    expect(s.requests.map(userTexts)).toEqual([["Start working"]])
+    expect((yield* s.inbox).map(({ id, delivery }) => ({ id, delivery }))).toEqual([
+      { id: first.id, delivery: "queue" },
+      { id: second.id, delivery: "queue" },
+    ])
+
+    expect(yield* s.resume.pipe(Effect.flip)).toBe(failure)
+    yield* s.session.wait(sessionID)
+    expect(s.requests.map(userTexts)).toEqual([["Start working"], ["Start working", "First queued"]])
+    expect(yield* s.inbox).toMatchObject([{ id: second.id, delivery: "queue", payload: { text: "Second queued" } }])
+    expect(completions).toEqual([])
   })
 
   scenario("settles abandoned compactions before continuing after a process crash", function* (s) {

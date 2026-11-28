@@ -31,6 +31,9 @@ import { NEW_SESSION_CONTENT_WIDTH } from "@/new-session/layout"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { useSettings } from "@/settings/model"
+import { PluginSlot } from "@/runtime/plugin/render"
+import { usePluginHost } from "@/runtime/plugin/host"
+import { BuiltinSlot } from "@opencode/plugin/gui/builtin"
 import type { NewSessionWorkspaceController } from "./workspace/controller"
 import {
   CHECKOUT_PLACEHOLDER_DELAY_MS,
@@ -66,6 +69,8 @@ export function NewSessionView(props: {
   project: PromptProjectController
   workspace: NewSessionWorkspaceController
   location: ReturnType<typeof useNewSessionLocationDialog>
+  insertPrompt: (text: string, origin: string) => void
+  onStarted: (listener: (origin: string | undefined) => void) => () => void
 }) {
   const [onboarding, setOnboarding, , onboardingReady] = persisted(
     Persist.global("workspace-onboarding"),
@@ -74,6 +79,12 @@ export function NewSessionView(props: {
   )
 
   const settings = useSettings()
+  const host = usePluginHost()
+  const contributed = (at: BuiltinSlot["at"]) => host.items(BuiltinSlot).some((item) => item.value.at === at)
+  const scrollable = () => contributed("session.new.below")
+  const projectInToolbar = () => contributed("session.new.composer.project")
+  const addMenu = { render: () => <PluginSlot at="session.new.composer.add.menu" input={{}} /> }
+  const placeholder = { render: () => <PluginSlot at="session.new.composer.placeholder" input={{}} /> }
 
   const [wordmark, setWordmark] = createSignal(createWordmarkState(false))
   const [logo, setLogo] = createSignal<HTMLDivElement>()
@@ -106,25 +117,46 @@ export function NewSessionView(props: {
       <div
         ref={panel}
         data-component="new-session"
-        class="relative isolate flex-1 min-h-0 overflow-hidden rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)]"
+        data-scrollable={scrollable() ? "" : undefined}
+        class="relative isolate flex-1 min-h-0 rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)]"
+        classList={{ "overflow-y-auto": scrollable(), "overflow-hidden": !scrollable() }}
       >
         <ComposerDropzone
           active={props.composer.state.drag === "active"}
           input={props.composer.model.selection.current()?.capabilities.input}
         />
-        <div class="absolute inset-x-0 top-[25.375%] flex justify-center px-6">
+        <div
+          class="absolute inset-x-0 top-[25.375%] flex justify-center px-6"
+          classList={{ "@max-xl:top-[8%] pb-6": scrollable() }}
+        >
           <div class={NEW_SESSION_CONTENT_WIDTH}>
-            <NewSessionWordmark
-              ref={setLogo}
-              state={wordmark}
-              onEvent={dispatchWordmark}
-              play
-              sound={settings.sounds.interfaceEnabled}
+            <PluginSlot
+              at="session.new.heading"
+              input={{}}
+              fallback={
+                <NewSessionWordmark
+                  ref={setLogo}
+                  state={wordmark}
+                  onEvent={dispatchWordmark}
+                  play
+                  sound={settings.sounds.interfaceEnabled}
+                />
+              }
             />
             <div class="mt-8 flex flex-col gap-3">
               <div data-slot="new-session-composer" class="flex flex-col gap-1">
                 <div class="relative z-10">
-                  <Composer model={props.composer} />
+                  <Composer
+                    model={props.composer}
+                    suggestionViewport={() => (scrollable() ? panel : undefined)}
+                    addMenu={contributed("session.new.composer.add.menu") ? addMenu : undefined}
+                    placeholder={contributed("session.new.composer.placeholder") ? placeholder : undefined}
+                    toolbar={
+                      <Show when={projectInToolbar() && props.project.selected()}>
+                        {(project) => <NewSessionProjectPicker project={project()} onClick={() => location()} toolbar />}
+                      </Show>
+                    }
+                  />
                 </div>
                 <Show when={props.project.selected()}>
                   {(project) => (
@@ -135,7 +167,7 @@ export function NewSessionView(props: {
                       checkout={props.workspace.bar.checkout()}
                       branch={props.workspace.bar.branch()}
                       onboarding={onboardingVisible()}
-                      onClick={() => location()}
+                      onProject={projectInToolbar() ? undefined : () => location()}
                       onOpen={
                         project().id && project().vcs === "git" ? () => location(project(), "worktrees") : undefined
                       }
@@ -149,6 +181,10 @@ export function NewSessionView(props: {
               <Show when={props.project.empty()}>
                 <PromptProjectAddButton controller={props.project} />
               </Show>
+              <PluginSlot
+                at="session.new.below"
+                input={{ insertPrompt: props.insertPrompt, onStarted: props.onStarted }}
+              />
             </div>
           </div>
         </div>
@@ -290,6 +326,62 @@ function fitPath(value: string, width: number, font: string) {
 const TRIGGER =
   "flex h-7 items-center gap-1.5 rounded-sm text-start ps-1.5 pe-2 text-v2-text-text-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:bg-v2-overlay-simple-overlay-hover focus-visible:text-v2-text-text-base focus-visible:outline-none"
 
+function NewSessionProjectPicker(props: { project: PromptProject; onClick: () => void; toolbar?: boolean }) {
+  const language = useLanguage()
+  const command = useCommand()
+  const name = () => displayName(props.project)
+  const label = () => (
+    <>
+      <ProjectAvatar
+        class="shrink-0"
+        fallback={name()}
+        src={getProjectAvatarSource(props.project.id, props.project.icon)}
+        variant={getProjectAvatarVariant(props.project.icon?.color)}
+        generated={getProjectAvatarGenerated(props.project)}
+      />
+      <span class="min-w-0 truncate">{name()}</span>
+    </>
+  )
+
+  return (
+    <Tooltip
+      placement="top"
+      openDelay={800}
+      value={
+        <span class="flex items-center gap-2">
+          {language.t("session.new.project.trigger.tooltip")}
+          <Show when={command.keybindParts("project.select").length}>
+            <Keybind keys={command.keybindParts("project.select")} variant="neutral" />
+          </Show>
+        </span>
+      }
+      class="flex min-w-0"
+    >
+      <button
+        type="button"
+        data-action="prompt-project"
+        aria-haspopup="dialog"
+        aria-description={language.t("session.new.project.trigger.tooltip")}
+        class={`${TRIGGER} min-w-0`}
+        classList={{ "max-w-40 text-xs text-v2-text-text-base": props.toolbar }}
+        onClick={props.onClick}
+      >
+        <Show when={props.toolbar} fallback={label()}>
+          <PluginSlot
+            at="session.new.composer.project"
+            input={{
+              get project() {
+                return name()
+              },
+            }}
+            fallback={label()}
+          />
+        </Show>
+      </button>
+    </Tooltip>
+  )
+}
+
 /** The composer tray: the project picker, the checkout branch, and the session's directory. */
 function NewSessionLocation(props: {
   project: PromptProject
@@ -300,7 +392,7 @@ function NewSessionLocation(props: {
   checkout?: { branch?: string }
   branch?: string
   onboarding: boolean
-  onClick: () => void
+  onProject?: () => void
   /** Opens the project's worktree step; without it the project has no worktrees to choose. */
   onOpen?: () => void
   /** Opens the project's base-branch step; without it the project has no branches to choose. */
@@ -372,37 +464,9 @@ function NewSessionLocation(props: {
     <div class="relative flex min-h-9 min-w-0 items-center gap-3 ps-2 pe-1.5 text-[13px] font-[440] leading-[var(--line-height-compact)] tracking-[-0.04px]">
       <div class="flex min-w-0 max-w-full flex-wrap items-center gap-x-0 gap-y-1 py-1.5">
         <div class="flex min-w-0 max-w-full items-center">
-          <Tooltip
-            placement="top"
-            openDelay={800}
-            value={
-              <span class="flex items-center gap-2">
-                {language.t("session.new.project.trigger.tooltip")}
-                <Show when={command.keybindParts("project.select").length}>
-                  <Keybind keys={command.keybindParts("project.select")} variant="neutral" />
-                </Show>
-              </span>
-            }
-            class="flex min-w-0"
-          >
-            <button
-              type="button"
-              data-action="prompt-project"
-              aria-haspopup="dialog"
-              aria-description={language.t("session.new.project.trigger.tooltip")}
-              class={`${TRIGGER} min-w-0`}
-              onClick={props.onClick}
-            >
-              <ProjectAvatar
-                class="shrink-0"
-                fallback={displayName(props.project)}
-                src={getProjectAvatarSource(props.project.id, props.project.icon)}
-                variant={getProjectAvatarVariant(props.project.icon?.color)}
-                generated={getProjectAvatarGenerated(props.project)}
-              />
-              <span class="min-w-0 truncate">{displayName(props.project)}</span>
-            </button>
-          </Tooltip>
+          <Show when={props.onProject}>
+            {(onProject) => <NewSessionProjectPicker project={props.project} onClick={onProject()} />}
+          </Show>
           <Show when={props.onOpen}>
             {(onOpen) => (
               <NewSessionBranch

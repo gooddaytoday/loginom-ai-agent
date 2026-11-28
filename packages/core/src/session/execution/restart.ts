@@ -14,6 +14,7 @@ import { ShellTool } from "../../tool/plugin/shell.js"
 import { SessionEvent } from "../event.js"
 import { SessionExecution } from "../execution.js"
 import { SessionHistory } from "../history.js"
+import type { SessionMessage } from "../message.js"
 import { SessionSchema } from "../schema.js"
 import { SessionStore } from "../store.js"
 import { ImageNotice } from "../../image/notice.js"
@@ -124,12 +125,13 @@ export const layer = (options?: Options) =>
         return true
       })
 
-      // Ends a turn left to its user as a stop would: the terminal releases the claim and resets the counter. A
-      // "shutdown" reason would keep the session looking busy; "user" is the existing stop the clients show as such.
-      const leaveToUser = Effect.fnUntraced(function* (sessionID: SessionSchema.ID) {
+      const leaveToUser = Effect.fnUntraced(function* (
+        sessionID: SessionSchema.ID,
+        lastKnown: SessionMessage.Interruption["lastKnown"],
+      ) {
         yield* bus.publish(
           SessionEvent.Execution.Interrupted,
-          { sessionID, reason: "user" },
+          { sessionID, reason: "restart", ...(lastKnown && { lastKnown }) },
           { commit: () => store.release(sessionID) },
         )
         return false
@@ -350,6 +352,7 @@ export const layer = (options?: Options) =>
         background: Job.Background,
         recovery: Extract<Job.Recovery, { kind: "subagent" }>,
         notices: Notices,
+        lastKnown: SessionMessage.Interruption["lastKnown"],
       ): Effect.fn.Return<boolean> {
         const child = yield* store.get(recovery.childSessionID)
         if (!child || child.parentID !== recovery.parentSessionID || !(yield* store.get(recovery.parentSessionID))) {
@@ -365,7 +368,7 @@ export const layer = (options?: Options) =>
 
         if (yield* execution.isActive(recovery.childSessionID)) return false
         if (options?.resumeTurns === false) {
-          yield* leaveToUser(recovery.childSessionID)
+          yield* leaveToUser(recovery.childSessionID, lastKnown)
           yield* deliverSubagentSafe(notices, background.notificationID, recovery, {
             status: "cancelled",
             error: SUBAGENT_LEFT,
@@ -416,6 +419,13 @@ export const layer = (options?: Options) =>
           const suspended = new Set(
             [...(yield* store.listSuspended()), ...children].filter((sessionID) => !active.has(sessionID)),
           )
+          const lastKnown = new Map<SessionSchema.ID, SessionMessage.Interruption["lastKnown"]>()
+          if (options?.resumeTurns === false) {
+            // Recovery can update messages, so capture the last activity before settling any jobs.
+            for (const sessionID of suspended) {
+              lastKnown.set(sessionID, yield* SessionHistory.lastKnownActivity(db, sessionID))
+            }
+          }
           const state = { defer: true }
           const wakes = new Set<SessionSchema.ID>()
           yield* Effect.addFinalizer(() =>
@@ -472,7 +482,8 @@ export const layer = (options?: Options) =>
             Effect.fnUntraced(function* (background) {
               const recovery = background.recovery
               if (recovery.kind !== "subagent" || !(yield* recoverable(background))) return
-              if (yield* recoverSubagent(background, recovery, notices)) resumable.push({ background, recovery })
+              if (yield* recoverSubagent(background, recovery, notices, lastKnown.get(recovery.childSessionID)))
+                resumable.push({ background, recovery })
             }),
             { discard: true },
           )
@@ -482,13 +493,15 @@ export const layer = (options?: Options) =>
           const resumed = yield* execution.active
           const direct = yield* Effect.filter(
             (yield* store.listSuspended()).filter((sessionID) => !resumed.has(sessionID) && !children.has(sessionID)),
-            options?.resumeTurns === false ? leaveToUser : prepareResume,
+            options?.resumeTurns === false
+              ? (sessionID) => leaveToUser(sessionID, lastKnown.get(sessionID))
+              : prepareResume,
           )
           yield* Effect.forEach(
             direct,
             Effect.fnUntraced(function* (sessionID) {
               suspended.delete(sessionID)
-              yield* execution.resume(sessionID).pipe(Effect.ignore, Effect.forkIn(scope))
+              yield* execution.resume(sessionID, { continuation: true }).pipe(Effect.ignore, Effect.forkIn(scope))
             }),
             { concurrency: "unbounded", discard: true },
           )
@@ -499,7 +512,10 @@ export const layer = (options?: Options) =>
           yield* Effect.forEach(
             resumable,
             Effect.fnUntraced(function* ({ background, recovery }) {
-              yield* SubagentJob.start(jobs, execution, recovery, background.notificationID)
+              yield* SubagentJob.start(jobs, execution, recovery, {
+                notificationID: background.notificationID,
+                continuation: true,
+              })
               suspended.delete(recovery.childSessionID)
             }),
             { discard: true },
