@@ -1610,7 +1610,13 @@ test('Save-copy before the first node read retains the prepared native workflow 
  const {page,flow}=await continuationPage(),receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
  receipt.crumbs=page.elements().filter(e=>['save_crumb','save_nav_parent'].includes(e.kind))
    .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent}));
+ receipt.stepWorkflowNode=flow;
  delete receipt.nodeTargetWorkflowNode;
+ const returnToWorkflow=page.afterDoubleClick;
+ page.afterDoubleClick=async()=>{
+  await returnToWorkflow();
+  page.packagePath='user\\data\\packages\\\\copied-before-read.lgp';
+ };
  const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/copied-before-read.lgp',conflict_policy:'fail'});
  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
  const [continuation]=result.output.workflow_continuations;
@@ -1635,6 +1641,45 @@ test('unread prepared Save-copy rejects a changed initial binding: '+fault,async
  assert.notEqual(result.status,'SUCCEEDED');
  assert.equal(page.storage.size,0,'reject before Save');
  assert.equal(receipt.nodeTargetWorkflowNode,undefined);
+});
+
+test('unread prepared Save-copy rejects a different native workflow with identical breadcrumbs',async()=>{
+ const {page,flow,card}=await continuationPage(),receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ receipt.crumbs=page.elements().filter(e=>['save_crumb','save_nav_parent'].includes(e.kind))
+   .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent}));
+ receipt.stepWorkflowNode=flow;
+ delete receipt.nodeTargetWorkflowNode;
+ const replacement=new page.app.WorkFlowTreeNode();replacement.ParentNode=flow.ParentNode;
+ card.Controller.Node.data.node=replacement;
+ const getCmp=page.context.Ext.getCmp;
+ page.context.Ext.getCmp=id=>{
+  const component=getCmp(id);
+  if(id==='save-crumb-4')component._node.data.node=replacement;
+  return component;
+ };
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/must-not-save.lgp',conflict_policy:'fail'});
+ assert.equal(result.status,'FAILED');
+ assert.match(result.error.message,/initial native identity changed/);
+ assert.equal(result.effect_possible,false);
+ assert.equal(page.storage.size,0);
+});
+
+test('keep-open Save does not publish breadcrumbs if the destination changes during navigation refresh',async()=>{
+ const {page}=await continuationPage(),receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ const originalCrumbs=page.elements().filter(e=>['save_crumb','save_nav_parent'].includes(e.kind))
+   .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent}));
+ receipt.crumbs=originalCrumbs;
+ const returnToWorkflow=page.afterDoubleClick;
+ page.afterDoubleClick=async()=>{
+  await returnToWorkflow();
+  page.packagePath='/user/data/packages/foreign.lgp';
+ };
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/refresh-race.lgp',conflict_policy:'fail'});
+ assert.equal(result.status,'AMBIGUOUS');
+ assert.match(result.error.message,/destination changed while refreshing navigation/i);
+ assert.equal(result.effect_possible,true);
+ assert.ok(result.trace.some(row=>row.event==='saved_navigation_workflow_returned'));
+ assert.deepEqual(receipt.crumbs,originalCrumbs);
 });
 
 for(const action of ['package.save_checkpoint','package.save_as'])test(action+' accepts the observed builtin without a Label;Label',async()=>{

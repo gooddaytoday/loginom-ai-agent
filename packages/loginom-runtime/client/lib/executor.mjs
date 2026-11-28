@@ -1519,7 +1519,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     value = value.replaceAll('\\', '/').replace(/\/+/g, '/');
     return value.startsWith('/') ? value : '/' + value;
   };
-  const packageContinuations = async (binding, previous = null) => page.evaluate(({binding,previous}) => {
+  const packageContinuations = async (binding, previous = null, expectedPath = null) => page.evaluate(({binding,previous,expectedPath}) => {
     const preparation=globalThis.__loginomDockPreparationV1, app=globalThis.bg?.app;
     if(!preparation || preparation.document!==document){
       if(previous?.length)throw Error('Saved continuation identities changed');
@@ -1550,7 +1550,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       // cache. Bind it against the original prepared path before Save, so the
       // existing navigation refresh is not skipped for that workflow.
       if(!record.nodeTargetWorkflowNode) {
-        if(record.packageNode!==packageNode||!workflowNode||JSON.stringify(record.crumbs)!==JSON.stringify(crumbs))
+        if(record.packageNode!==packageNode||!workflowNode||(record.stepWorkflowNode&&record.stepWorkflowNode!==workflowNode)
+            ||JSON.stringify(record.crumbs)!==JSON.stringify(crumbs))
           throw Error('Saved continuation initial native identity changed');
         record.nodeTargetWorkflowNode=workflowNode;
       }
@@ -1564,9 +1565,12 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if(!previous)return continuations;
     const identity=({document_id,workflow_ref:{workflow_id,tab_tid,prefix}})=>({document_id,workflow_id,tab_tid,prefix});
     if(JSON.stringify(previous.map(identity))!==JSON.stringify(continuations.map(identity)))throw Error('Saved continuation identities changed');
+    const path=packageNode?.PackageFileName;
+    if(typeof path!=='string'||!path.trim()||('/'+path.replaceAll('\\','/')).replace(/\/+/g,'/')!==expectedPath)
+      throw Error('Saved destination changed while refreshing navigation');
     for(const record of records)record.crumbs=crumbs;
     return continuations.map((value,index)=>({...value,previous_workflow_ref:previous[index].workflow_ref}));
-  },{binding,previous});
+  },{binding,previous,expectedPath});
   const bindSavedContinuations = async (before, previous, mode) => page.evaluate(({previous,current,path,nativeNodes,binding,mode})=>{
       const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
       if(!binding)return [];
@@ -1859,7 +1863,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         await ensureReady();
         if(!same(await graphSnapshot(workflow.prefix),before.graph))throw Error('Saved graph changed while refreshing navigation');
       }
-      const continuations=recovered.length?recovered:await packageContinuations(before.workflow_ref,continuationsBefore);
+      const continuations=recovered.length?recovered:await packageContinuations(before.workflow_ref,continuationsBefore,before.path);
       record('save_continuations_observed', { continuations,...(recovered.length?{recovered_reopen:true,native_identity_verified:true}:{}) });
       transientDialog = false; phase = 'verified';
       record('postcondition_verified', { proof: 'awaited_save_flow_same_open_workflow', package_path: actualPath,
