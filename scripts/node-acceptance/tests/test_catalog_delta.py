@@ -4,7 +4,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from test_run_check import runner
+if __package__:
+    from .test_run_check import runner
+else:
+    from test_run_check import runner
 
 
 class UngroupSeasonalEdgesTests(unittest.TestCase):

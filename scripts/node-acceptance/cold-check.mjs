@@ -27,7 +27,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
-import {readColdNativeOutput,coldNativeEligible,performColdNodeAction,runColdExecution as runOwnedColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation,readColdPortWindows} from './cold-reader-policy.mjs'
+import {readColdNativeOutput,coldNativeEligible,performColdNodeAction,runColdExecution as runOwnedColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation,readColdPortWindows,MAX_COLD_WINDOW_ROWS,verifyColdPackageFile} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -56,29 +56,6 @@ if (!args.config || !args.resources || !args.saved || !args.expected || !args.ou
   throw Error("Required: --config --resources --saved --expected --output")
 
 const treeAuditPath=new URL('./run-check.py',import.meta.url).pathname
-const root = resolve(args.resources)
-const load = (name) => import(pathToFileURL(join(root, "runtime", name)).href)
-const { verifyResources } = await load("src/resources.mjs")
-const resources = await verifyResources(root)
-const compatibilityPlatform = resources.manifest.target?.startsWith("win32-")
-  ? "windows"
-  : resources.manifest.target?.startsWith("darwin-")
-    ? "macos"
-    : "linux"
-const { loginBrowser } = await load("src/connection-check.mjs")
-const { makeWorkspacePrepareCode } = await load("client/lib/workspace.mjs")
-const { createNodeTargetBrowserAdapter } = await load("client/lib/node-target-browser.mjs")
-const { createNodeProcedure } = await load("client/lib/node-procedure.mjs")
-const { createNodeExecutionProcedure,trainConfiguredNode } = await load("client/lib/node-execution-procedure.mjs")
-const { createExecutionJournal } = await load("client/lib/execution-journal.mjs")
-const { makeSavedPackageStateCode } = await load("client/lib/package-persistence.mjs")
-const { withBrowserReceipt } = await load("client/lib/executor.mjs")
-const { makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode } = await load("client/lib/package-cleanup.mjs")
-const { openNewOutputTable, configureTablePrecision, prepareTableRead, returnFromOutputTable } =
-  await load("client/lib/node-output-procedure.mjs")
-const { readTableOutputPages } = await load("client/lib/table-output-pages.mjs")
-const { decodeTableOutput } = await load("client/lib/table-output-values.mjs")
-
 const config = JSON.parse(await readFile(args.config, "utf8"))
 const loginPassword = config.workflow_profile?.password ?? ""
 if (config.workflow_profile?.passwordless_login === true && loginPassword !== "") throw Error("TEST_PASSWORD_UNAVAILABLE")
@@ -104,7 +81,12 @@ const sampling=expected.sampling_modes===undefined?null:parseSamplingExpected(ex
 if(sampling&&!args['sampling-baseline'])throw Error('SAMPLING_BASELINE_REQUIRED')
 if(!sampling&&args['sampling-baseline'])throw Error('SAMPLING_BASELINE_UNEXPECTED')
 const samplingBaseline=sampling?JSON.parse(await readFile(args['sampling-baseline'],'utf8')):null
-const {multiple,outputs:expectedOutputs}=sampling??parseExpectedOutputs(expected)
+const {multiple,outputs:expectedOutputs}=sampling??parseExpectedOutputs(expected,{
+ ...(args['exact-port-windows']?{maxRows:MAX_COLD_WINDOW_ROWS}:{}),
+})
+const nodeIds=expected.case_port_node_ids;
+if(nodeIds!==undefined&&(!Array.isArray(nodeIds)||nodeIds.length!==expectedOutputs.length
+ ||!nodeIds.every(id=>typeof id==='string'&&id.length>0)))throw Error('CASE_PORT_NODE_IDS_INVALID');
 if(!['names','labels'].includes(args['csv-header']))throw Error('COLD_EXPORT_CSV_HEADER_MODE_INVALID')
 // --csv is the actual runtime-downloaded export, already checked in full by
 // the scenario's file oracle. It supplies order only, never cold cell values.
@@ -115,6 +97,40 @@ const saved = await loadSaved(args.saved)
 if (saved.path !== expected.package_path) throw Error("PACKAGE_PATH_MISMATCH")
 
 await mkdir(args.output, { recursive: true, mode: 0o700 })
+if(nodeIds!==undefined){
+  const file=saved.file_version;
+  if(typeof file?.mtime!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(file.mtime)
+   ||!Number.isSafeInteger(file.size)||file.size<1||typeof file.hash!=='string'||!/^[a-f0-9]{64}$/.test(file.hash)){
+    const result={status:'UNKNOWN',phase:'independent_cold_reopen_readback',path:saved.path,settingsReapplied:false,
+      error:'CASE_PORT_SAVE_VERSION_UNKNOWN',cleanup:{status:'NOT_RUN',package_closed:false,logged_out:false}};
+    await writeFile(join(args.output,'result.json'),JSON.stringify(result,null,2)+'\n');
+    process.exit(0);
+  }
+}
+
+const root = resolve(args.resources)
+const load = (name) => import(pathToFileURL(join(root, "runtime", name)).href)
+const { verifyResources } = await load("src/resources.mjs")
+const resources = await verifyResources(root)
+const compatibilityPlatform = resources.manifest.target?.startsWith("win32-")
+  ? "windows"
+  : resources.manifest.target?.startsWith("darwin-")
+    ? "macos"
+    : "linux"
+const { loginBrowser } = await load("src/connection-check.mjs")
+const { makeWorkspacePrepareCode } = await load("client/lib/workspace.mjs")
+const { createNodeTargetBrowserAdapter } = await load("client/lib/node-target-browser.mjs")
+const { createNodeProcedure } = await load("client/lib/node-procedure.mjs")
+const { createNodeExecutionProcedure,trainConfiguredNode } = await load("client/lib/node-execution-procedure.mjs")
+const { createExecutionJournal } = await load("client/lib/execution-journal.mjs")
+const { makeSavedPackageStateCode } = await load("client/lib/package-persistence.mjs")
+const { withBrowserReceipt } = await load("client/lib/executor.mjs")
+const { makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode } = await load("client/lib/package-cleanup.mjs")
+const { openNewOutputTable, configureTablePrecision, prepareTableRead, returnFromOutputTable } =
+  await load("client/lib/node-output-procedure.mjs")
+const { readTableOutputPages } = await load("client/lib/table-output-pages.mjs")
+const { decodeTableOutput } = await load("client/lib/table-output-values.mjs")
+
 const session = randomUUID()
 const metadata = {
   sessionId: session,
@@ -192,12 +208,23 @@ page = context.pages()[0]
     state.openFailure={status:prepared.status,reason:'PACKAGE_PATH_MISMATCH'}
     throw Error("COLD_PACKAGE_PATH_MISMATCH")
   }
-  if(prepared.workflow_ref.navigation_path.some(item=>item.label.endsWith("(только чтение)"))) {
+  const readOnly=prepared.workflow_ref.navigation_path.some(item=>item.label.endsWith("(только чтение)"));
+  if(readOnly) {
     state.openFailure={status:prepared.status,reason:'PACKAGE_READ_ONLY'}
     throw Error("COLD_PACKAGE_NOT_WRITABLE")
   }
 
   const origin = new URL(config.loginom_url).origin
+  if(Object.hasOwn(saved,'file_version')){
+    const proof=await verifyColdPackageFile({load,execute,expected:saved.file_version,owner:{
+      origin,build:'7.4.2',path:saved.path,tabTid:prepared.workflow_ref.tab_tid,
+      documentId:prepared.document_id,sessionId:session,account:config.workflow_profile.loginom_user,token:randomUUID(),
+    }});
+    state.fileVersion=proof.file;
+    state.fileVersionFailure=proof.reason;
+    await record({phase:'cold_opened_file_version',expected:saved.file_version,observed:proof.file,reason:proof.reason});
+    if(proof.reason)throw Error(proof.reason);
+  }
   const modifiedOptions={sessionId:session,documentId:prepared.document_id,account:config.workflow_profile.loginom_user,
    packagePath:saved.path,loginomUrl:config.loginom_url,loginomBuild:'7.4.2'};
   await recordColdPackageModified({execute,record,makeSavedPackageStateCode,options:modifiedOptions,stage:'after_open'});
@@ -330,7 +357,7 @@ page = context.pages()[0]
 
   const reads=expectedOutputs.length===0&&(Array.isArray(expected.tree_outputs)&&expected.tree_outputs.length>0
    ||state.variableInventory?.outputs.length===variableInventory?.outputs.length&&state.variableInventory.outputs.length>0)
-   ?[]:selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
+   ?[]:selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node,nodeIds:expected.case_port_node_ids});
   if(expected.tree_outputs){
    for(const contract of expected.tree_outputs){
     const matches=graph.nodes.filter(n=>n.type===contract.output_node_type&&(contract.output_node_label===undefined||n.label===contract.output_node_label));
@@ -524,7 +551,7 @@ page = context.pages()[0]
   }
   // Variant cells have no exact table-visualizer proof; read them through the completed port.
   const variantPortRead=['transform.replace_columns','transform.group_data','transform.sorting'].includes(target.type)&&expectedOutputs.some(o=>o.columns?.some(c=>c.type==='variant'));
-  if(variantPortRead||['trees.to_table','trees.to_json','research.quality','variables.to_table','transform.collapse_columns','imports.lgd'].includes(target.type)){
+  if(!args['exact-port-windows']&&(variantPortRead||['trees.to_table','trees.to_json','research.quality','variables.to_table','transform.collapse_columns','imports.lgd'].includes(target.type))){
    // The approved tree cold path executes the saved conversion and reads every
    // resulting table cell through the existing completed-port reader.
    const read=await channel.readOutputPort({port:outputPort,execution,sampleRows:100,requireExactNumbers:true,
@@ -533,7 +560,12 @@ page = context.pages()[0]
    data=read.output;
   }
   if(args['exact-port-windows']){
-   data=await readColdPortWindows(channel,{node,execution,port:outputPort,rowCount:Math.max(...expectedOutputs.map(o=>o.rows.length))});
+   const matching=expectedOutputs.filter(o=>o.output_node_type===target.type
+    &&(o.output_node_label===undefined||o.output_node_label===target.label)&&(o.output_port??0)===outputPort
+    ||o.output_node_type==='export_input'&&exportInput?.node.ref.node_id===node.node_id&&exportInput.output_port===outputPort);
+   const rowCounts=new Set((matching.length?matching:expectedOutputs).map(o=>o.rows.length));
+   if(rowCounts.size!==1)throw Error('COLD_PORT_WINDOW_ROW_COUNT_AMBIGUOUS');
+   data=await readColdPortWindows(channel,{node,execution,port:outputPort,rowCount:[...rowCounts][0]});
   }else if(useNative){
    // Preview enforces the actual 50x8 bound; wide baseline reports retain their
    // existing formatted scalar reader. No native fallback after a failed read.
@@ -623,7 +655,7 @@ page = context.pages()[0]
    checkGmeansRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
   }
   if(expected.clustering_normalized)checkClusteringRound(expected,actual.filter(r=>r.type==='datamining.clustering'));
-  const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv,factorSigns:expected.factor_signs});
+  const correspondence=samplingResult?.correspondence??matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv,factorSigns:expected.factor_signs,nodeIds:expected.case_port_node_ids});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 
   if(variableInventory?.outputs.length===0){
@@ -664,10 +696,12 @@ page = context.pages()[0]
     status: "PASS",
     phase: "independent_cold_reopen_readback",
     path: saved.path,
+    ...(state.fileVersion?{file_version:state.fileVersion}:{}),
     ...(state.exportObservation?{export_observation:state.exportObservation}:{}),
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
+    ...(rawExpected.graph?.exact ? {case_graph:graph} : {}),
     ...(graph.loop_for?{loop_for:graph.loop_for}:{}),
     ...(graph.supernode_variable_boundary?{supernode_variable_boundary:graph.supernode_variable_boundary}:{}),
     ...(state.assnrulesExclusion?{assnrules_exclusion:state.assnrulesExclusion}:{}),
@@ -702,7 +736,7 @@ page = context.pages()[0]
     state.failure=state.failure.split(secret).join('[REDACTED]')
     if(state.openFailure)state.openFailure.reason=String(state.openFailure.reason).split(secret).join('[REDACTED]')
   }
-  if (!state.cancelled) throw error
+  if (!state.cancelled && state.failure!==state.fileVersionFailure) throw error
 } finally {
   // Cold teardown: one native cleanup, then browser, including cancellation.
   try {
@@ -756,8 +790,14 @@ page = context.pages()[0]
         await writeFile(join(args.output,'cleanup.json'),JSON.stringify(state.cleanup,null,2)+'\n')
       })
   }
-  if(state.failure&&!state.cleanupExpired)await writeFile(join(args.output,'result.json'),JSON.stringify({status:'FAIL',
+  if(state.failure&&!state.cleanupExpired){
+   const versionUnconfirmed=state.failure===state.fileVersionFailure;
+   const closeConfirmed=state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true&&state.cleanup.logged_out===true;
+   const status=versionUnconfirmed&&closeConfirmed?'UNKNOWN':'FAIL';
+   if(versionUnconfirmed&&!closeConfirmed)process.exitCode=1;
+   await writeFile(join(args.output,'result.json'),JSON.stringify({status,
    phase:'independent_cold_reopen_readback',path:saved.path,settingsReapplied:false,error:state.failure,
+   ...(state.fileVersion?{file_version:state.fileVersion}:{}),
    ...(state.openFailure?{reason:state.openFailure.reason,open_failure:state.openFailure}:{}),
    ...(state.openDiagnosticUnconfirmed?{open_diagnostic_recorded:false}:{}),
    ...(state.exportObservation?{export_observation:state.exportObservation}:{}),
@@ -766,6 +806,7 @@ page = context.pages()[0]
    cleanup:{status:state.cleanup?.status??'BLOCKED',reason:state.cleanup?.reason??(state.cleanup?.status==='SUCCEEDED'?null:state.cleanup?'CLEANUP_UNCONFIRMED':'CLEANUP_NOT_ADMITTED'),
     package_closed:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true,
     logged_out:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.logged_out===true}},null,2)+'\n')
+  }
   } finally {
     await context?.close()
     clearTimeout(state.cancelTimer)
@@ -778,7 +819,8 @@ async function loadSaved(value) {
   if (value.endsWith(".lgp")) return { path: value }
   const parsed = JSON.parse(await readFile(resolve(value), "utf8"))
   if (typeof parsed === "string" && parsed.endsWith(".lgp")) return { path: parsed }
-  if (parsed && typeof parsed.path === "string") return { path: parsed.path, node: parsed.node }
+  if (parsed && typeof parsed.path === "string") return { path: parsed.path, node: parsed.node,
+    ...(Object.hasOwn(parsed,'file_version')?{file_version:parsed.file_version}:{}) }
   throw Error("SAVED_SHAPE_INVALID")
 }
 

@@ -24,7 +24,7 @@ export function parseExportCsvHeader(text,delimiter=','){
  need(!quoted&&text.length>0,'COLD_EXPORT_CSV_INVALID');
  fields.push(value);return fields;
 }
-export function parseExpectedOutputs(expected){
+export function parseExpectedOutputs(expected,{maxRows=100}={}){
  need(expected&&typeof expected.package_path==='string'&&expected.package_path.endsWith('.lgp'),'EXPECTED_PACKAGE_PATH_REQUIRED');
  need(Array.isArray(expected.nodes),'EXPECTED_SHAPE_INVALID');
  const multiple=Object.hasOwn(expected,'outputs');
@@ -42,7 +42,7 @@ export function parseExpectedOutputs(expected){
    &&(output.output_node_label===undefined||typeof output.output_node_label==='string'&&output.output_node_label.length>0)
    &&typeof output.output_node_type==='string'&&output.output_node_type.length>0
    &&Array.isArray(output.columns)&&output.columns.length>0&&output.columns.length<=1000
-   &&Array.isArray(output.rows)&&output.rows.length<=100,'EXPECTED_SHAPE_INVALID');
+   &&Array.isArray(output.rows)&&output.rows.length<=maxRows,'EXPECTED_SHAPE_INVALID');
   need(output.output_node_type!=='export_input'||!['output_port','output_node_label'].some(k=>Object.hasOwn(output,k)),
    'EXPECTED_EXPORT_INPUT_OPTIONS_INVALID');
   need(output.output_node_type!=='table_content'||!['output_port','output_node_label'].some(k=>Object.hasOwn(output,k)),
@@ -97,18 +97,18 @@ export function parseExpectedOutputs(expected){
   return {...content,output_node_type:'table_content'};
  })};
 }
-export function selectColdOutputReads(graph,outputs,{exportInput,savedNode}={}){
+export function selectColdOutputReads(graph,outputs,{exportInput,savedNode,nodeIds=[]}={}){
  // Without a prescribed node/port, only reading all exposed tabular outputs
  // can establish both presence and uniqueness. Read failures remain failures.
  const content=outputs.some(o=>o.output_node_type==='table_content');
  const types=new Set(outputs.filter(o=>o.output_node_type!=='table_content').map(o=>o.output_node_type));
- const labelled=n=>outputs.some(o=>o.output_node_type===n.type&&(o.output_node_label===undefined||o.output_node_label===n.label));
- const nodes=graph.nodes.filter(n=>types.has(n.type)&&labelled(n)&&(!savedNode||n.ref.node_id===savedNode)
+ const matchesNode=(n,o,i)=>o.output_node_type===n.type&&(o.output_node_label===undefined||o.output_node_label===n.label)
+  &&(nodeIds[i]===undefined||nodeIds[i]===n.ref.node_id);
+ const nodes=graph.nodes.filter(n=>types.has(n.type)&&outputs.some((o,i)=>matchesNode(n,o,i))&&(!savedNode||n.ref.node_id===savedNode)
   ||exportInput&&n.ref.node_id===exportInput.node.ref.node_id||content&&n.outputs.length>0);
  need(nodes.length>0&&(content||nodes.length<=outputs.length),'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
  return nodes.map(node=>{
-  const requested=outputs.filter(o=>o.output_node_type===node.type
-   &&(o.output_node_label===undefined||o.output_node_label===node.label)).map(o=>o.output_port??0)
+  const requested=outputs.filter((o,i)=>matchesNode(node,o,i)).map(o=>o.output_port??0)
    .concat(exportInput&&node.ref.node_id===exportInput.node.ref.node_id?[exportInput.output_port]:[]);
   const ports=[...new Set(requested.concat(content?node.outputs:[]))];
   need(ports.length>0,'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
@@ -289,7 +289,7 @@ export function alignFactorSigns(actual,outputs,rule){
  }
  return outputs.map(o=>({...o,rows:o.rows.map(r=>Object.fromEntries(Object.entries(r).map(([k,v])=>[k,signs[k]&&v!==null?v*signs[k]:v])))}));
 }
-export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,exportInput,exportCsv,factorSigns}={}){
+export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,exportInput,exportCsv,factorSigns,nodeIds=[]}={}){
  outputs=alignFactorSigns(actual,outputs,factorSigns);
  need(allowExtraPortReads?actual.length>=outputs.length:actual.length===outputs.length,'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
  need(new Set(actual.map(a=>JSON.stringify([a.node.node_id,a.output_port??0]))).size===actual.length,'COLD_DUPLICATE_OUTPUT_PORT');
@@ -302,7 +302,8 @@ export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,e
   const candidates=content?actual.filter(a=>matchesContentSchema(a.data,want)):actual.filter(a=>(want.output_node_type==='export_input'
    ?exportInput&&a.node.node_id===exportInput.node.ref.node_id&&(a.output_port??0)===exportInput.output_port
    :a.type===want.output_node_type&&(a.output_port??0)===port
-    &&(want.output_node_label===undefined||a.label===want.output_node_label))
+    &&(want.output_node_label===undefined||a.label===want.output_node_label)
+    &&(nodeIds[index]===undefined||a.node.node_id===nodeIds[index]))
      &&(!csvOrder||matchesExportCsvOrder(a.data,want,exportCsv))
      &&matchesExpectedOutput(want.output_node_type==='export_input'?exportInputData(a.data,exportInput?.input_fields):a.data,
       csvOrder?{...want,column_order:'any'}:want));

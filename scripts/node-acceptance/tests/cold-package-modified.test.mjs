@@ -1,7 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {makeSavedPackageStateCode} from '../../../packages/loginom-runtime/client/lib/package-persistence.mjs';
+import {verifyColdPackageFile} from '../cold-reader-policy.mjs';
 const source=await readFile(new URL('../cold-check.mjs',import.meta.url),'utf8');
 const start=source.indexOf('async function recordColdPackageModified(');
 const observe=new Function('return ('+source.slice(start).trim()+')')();
@@ -32,4 +37,65 @@ test('unavailable diagnostic cannot replace an existing success or refusal',asyn
 test('cold observation brackets graph read before any settings or execution',()=>{
  const open=source.indexOf("stage:'after_open'"),graph=source.indexOf('let graph = await adapter.observe('),after=source.indexOf("stage:'after_observe'");
  assert.ok(source.indexOf('PACKAGE_PATH_MISMATCH')<open&&open<graph&&graph<after&&after<source.indexOf('if(expected.lgd'));
+});
+
+test('deferred ports require the version of the file read under the reopened workspace owner',async()=>{
+ const expected={mtime:'2026-11-28T00:00:00.000Z',size:100,hash:'a'.repeat(64)};
+ const owner={origin:'https://example.invalid',build:'7.4.2',path:'/own/saved.lgp',tabTid:'owned-tab',
+  documentId:'d',sessionId:'s',account:'own',token:'proof'};
+ for(const [mode,reason] of [
+  ['match',null],['mtime','CASE_PORT_OPENED_FILE_VERSION_CHANGED'],['size','CASE_PORT_OPENED_FILE_VERSION_CHANGED'],
+  ['hash','CASE_PORT_OPENED_FILE_VERSION_CHANGED'],['absent','CASE_PORT_OPENED_FILE_VERSION_UNKNOWN'],
+  ['release','CASE_PORT_OPENED_FILE_VERSION_UNKNOWN'],['missing reader','CASE_PORT_OPENED_FILE_VERSION_UNKNOWN'],
+ ]){
+  const native={fileExists:true,base64:'fixture bytes'};
+  const observed={...expected};
+  if(mode==='mtime')observed.mtime='2026-11-28T00:00:01.000Z';
+  if(mode==='size')observed.size++;
+  if(mode==='hash')observed.hash='b'.repeat(64);
+  const calls=[];
+  const load=async name=>{
+   assert.equal(name,'client/lib/saved-package-graph.mjs');
+   if(mode==='missing reader')throw Error('module unavailable');
+   return {
+    makeSavedPackageGraphCode:options=>{assert.deepEqual(options,owner);return 'read';},
+    makeSavedPackageReleaseCode:token=>{assert.equal(token,owner.token);return 'release';},
+    readSavedPackageFacts:async({response})=>{
+     assert.deepEqual(JSON.parse(response.content[0].text),native);
+     return mode==='absent'?{}:{evidence:{kind:'savedFileRead',scope:'package',file:observed}};
+    },
+   };
+  };
+  const execute=async code=>{calls.push(code);return code==='read'?native:{released:mode!=='release'};};
+  const proof=await verifyColdPackageFile({load,execute,owner,expected});
+  assert.deepEqual(calls,mode==='missing reader'?[]:['read','release']);
+  assert.equal(proof.reason,reason,mode);
+  assert.deepEqual(proof.file,['absent','release','missing reader'].includes(mode)?undefined:observed,mode);
+ }
+});
+
+test('direct cold port readback without a usable Save version reports UNKNOWN before opening',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'cold-ports-'));
+ t.after(()=>rm(root,{recursive:true,force:true}));
+ const config=join(root,'config.json'), expected=join(root,'expected.json');
+ const script=fileURLToPath(new URL('../cold-check.mjs',import.meta.url));
+ const packagePath='/own/saved.lgp';
+ await writeFile(config,JSON.stringify({workflow_profile:{passwordless_login:true}}));
+ await writeFile(expected,JSON.stringify({package_path:packagePath,nodes:[],case_port_node_ids:['node'],
+  outputs:[{output_node_type:'imports.text',columns:[{name:'id',type:'integer'}],rows:[{id:1}]}]}));
+ const version={mtime:'2026-11-28T00:00:00.000Z',size:100,hash:'a'.repeat(64)};
+ for(const [name,saved] of [
+  ['path-only',packagePath],['no version',{path:packagePath}],['null',{path:packagePath,file_version:null}],
+  ...Object.entries({mtime:'invalid',size:0,hash:'invalid'}).map(([key,value])=>
+   [key,{path:packagePath,file_version:{...version,[key]:value}}]),
+ ]) await t.test(name,async()=>{
+  const savedFile=join(root,'saved.json'), output=join(root,name);
+  await writeFile(savedFile,JSON.stringify(saved));
+  execFileSync(process.execPath,[script,'--config',config,'--resources',join(root,'missing-runtime'),
+   '--saved',typeof saved==='string'?saved:savedFile,'--expected',expected,'--output',output]);
+  const result=JSON.parse(await readFile(join(output,'result.json'),'utf8'));
+  assert.equal(result.status,'UNKNOWN');
+  assert.equal(result.error,'CASE_PORT_SAVE_VERSION_UNKNOWN');
+  assert.deepEqual(result.cleanup,{status:'NOT_RUN',package_closed:false,logged_out:false});
+ });
 });

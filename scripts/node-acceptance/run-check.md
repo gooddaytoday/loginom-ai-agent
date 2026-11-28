@@ -511,14 +511,17 @@ exist, `package_directory` wins). Unknown formats fail before detach and name
 the file, required fields and supplied keys; credential values are never printed.
 Runs use the worker account. The default is `deepseek/deepseek-flash` without a
 variant, using `DEEPSEEK_API_KEY`. Set `RUN_CHECK_MODEL` to select another model
-and `RUN_CHECK_VARIANT` for a `run` variant (not supported by the two-turn TUI
-cases). A variant on a two-turn TUI case or an unreadable `RUN_CHECK_AUTH` file
-is rejected before detach. `RUN_CHECK_AUTH` points to a legacy `auth.json`.
-The path is private to the runner and is not passed in the phase environment.
-The runner copies the file with mode `0600` into the fresh CLI profile for
-import and unlinks it as soon as the first model phase succeeds. On success,
+and `RUN_CHECK_VARIANT` for `run` or `--live-chain`. A variant on a two-turn
+TUI case or an unreadable `RUN_CHECK_AUTH` file is rejected before detach.
+`RUN_CHECK_AUTH` points to a legacy `auth.json`. The runner consumes the path
+privately and copies the file with mode `0600` into the fresh CLI profile for
+import. It unlinks the copy after the first completed model phase. On success,
 failure, or worker SIGTERM, cleanup removes any remaining copy and the entire
-OAuth profile, including its database, sidecars, and `execution-events.jsonl`.
+OAuth profile, including its database and sidecars. For live chains the private
+result directory retains runtime execution journals and cleanup/ACK receipts.
+The runner moves those files within the result filesystem. If the rename fails,
+it reports EVIDENCE_UNMOVED and records the retained evidence path in
+results.json. The other profile data is removed.
 If the worker is forcibly killed before cleanup (for example with SIGKILL),
 remove that run's OAuth profile manually before sharing any evidence.
 Without `RUN_CHECK_AUTH`, no copy is made and the profile is retained.
@@ -533,6 +536,16 @@ credentials before reusing the account for another scenario.
 docstring); remove it with `make-pair.py --remove DIR` after `wait`. Requires git, Python 3.9+, the pinned Bun/Node/browser bootstrap cache,
 and network access for the locked dependencies. Build inputs can be overridden
 with `LOGINOM_AI_AGENT_NODE_SOURCE` / `LOGINOM_AI_AGENT_BROWSER_SOURCE`.
+
+Use the repository's pinned Bun on `PATH`. On Linux x64 the runner builds a
+baseline CLI. To build without fetching Bun, set
+`LOGINOM_AI_AGENT_BUN_BASELINE_ARCHIVE` to the warm cache's original release ZIP.
+The build hashes the archive against the pinned SHA-256 before extraction and
+uses the extracted Linux executable for compilation.
+
+```sh
+export LOGINOM_AI_AGENT_BUN_BASELINE_ARCHIVE="$HOST_BUN_CACHE/bun-linux-x64-baseline-v1.4.4.zip"
+```
 
 Defaults: 1800 seconds per model phase, load1 and load5 ≤ 8, ≥60 seconds
 between phase starts, 85 minutes total per batch including builds. `--spacing`,
@@ -658,7 +671,7 @@ CSV comparison honors declared column-order freedom and checks every value.
 Unknown names are refused before detach. No automatic retries or account switching. Failed and UNKNOWN
 profiles/packages are retained; main cleanup never discards changes. Cold uses
 its stock diagnostic cleanup. Archive evidence before deleting run directories;
-never share a whole profile or `cold-config.json` (they contain credentials).
+never share a whole profile (it can contain credentials).
 
 Private large/server-file fixtures can use `--cases /absolute/private/cases`
 with named subdirectories passed in `--scenarios`. Each contains `task.md`,
@@ -669,10 +682,37 @@ export replacement list. Only `task.md` and files in `data/` reach the model;
 oracles remain private. All existing CSV, Save, cold and cleanup checks apply.
 
 A private case may add `case.json` with `base` (another case in the same
-`--cases` directory, run first in the same chat, then this case continues it),
-`input_files` (attachments of this turn) and `budget` (read only by
-`bughunt-audit.py`). The first turn of a private case attaches every file in
-`data/`, any format; a continuation attaches only its `input_files`.
+`--cases` directory), `input_files` (attachments of this turn) and `budget`
+(read by `bughunt-audit.py`). Pass the last case to `--scenarios`. The runner
+follows `base` to the root, then runs up to eight turns using the same chat,
+profile, workspace and package. The root attaches files in `data/` by default.
+A continuation attaches its listed `input_files`. Results include each turn.
+
+On Linux, add `--live-chain` to drive the built CLI TUI through a private
+terminal. Ordinary turns share the CLI process and its private server. The
+profile config selects the model and variant. The runner reads the v2 session
+database for the submitted prompt, attachments, selected model and terminal
+turn state, and verifies Save and the case's graph and outputs per turn.
+
+A case with a following turn may specify a `manual_edit` such as
+`{"kind":"rename","node":{"type":"imports.text","label":"Заказы"},"label":"Заказы (проверено)"}`.
+At that boundary, the runner verifies package close, logout and runtime ACK,
+applies the edit in a separate browser, reopens the package to confirm it, and
+resumes the same chat in a new CLI process. For `"output_mode":"ports"`, the
+runner checks native port receipts against the expected graph and values.
+A partial receipt requires a verified read from the same saved node. After
+CLI shutdown, package close, logout and runtime ACK, the runner checks the
+turn's v1 savedFileRead version against the segment's last Save receipt. The
+cold reader verifies modification time, size and SHA-256 for the reopened file
+before executing or reading any port. A direct cold-reader call with
+`case_port_node_ids` also requires a Save version. A missing or changed version
+reports `UNKNOWN`. After a cold reader fails, queued reads that did not run
+report `UNKNOWN` as well. If SIGTERM cancels the chain, all pending reads
+report `UNKNOWN` with reason `LIVE_CHAIN_CANCELLED`. Unconfirmed shutdown makes
+affected turns `UNKNOWN`.
+`results.json` records all observed closure failure codes in `live_cleanup_errors`.
+The runner removes the temporary login configuration and closes the reader
+before any manual edit or continuation.
 
 The model and any explicit variant are recorded per run in `results.json`.
 
@@ -858,8 +898,8 @@ names `Root_items_code`, `Root_items_qty` and labels `Root.Позиции.Код
    contract registration set `NODE_SCENARIOS=<name>` when executing its rows.
    `required-checks.py verify` results: `exit 0`, `FAIL`, `NOT_RUN`, `CI`, `COVERED`, `APPROVED` (formats and summary in `required-checks.md`).
 
-Offline tests: from `scripts/node-acceptance/tests`, run
-`python3 -m unittest test_run_check test_run_check_build test_catalog_delta -v`.
+Run the offline Python tests with `python3 -m unittest discover` from
+`scripts/node-acceptance`.
 
 CSV specification audit (the original 87 fixture names, including variants; D87 uses its generated manifest):
 

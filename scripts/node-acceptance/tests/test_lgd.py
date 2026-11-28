@@ -2,7 +2,10 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from test_run_check import runner
+if __package__:
+    from .test_run_check import runner
+else:
+    from test_run_check import runner
 
 
 class LgdTests(unittest.TestCase):
