@@ -275,6 +275,22 @@ def json_lines(path):
                 continue  # The writer may be appending its last record.
 
 
+def package_save_states(receipts, since):
+    saved_packages = {}
+    for event in receipts:
+        outcome = event.get('outcome')
+        operation = event.get('operation_id')
+        if (event.get('phase') == 'completed' and operation and isinstance(outcome, dict)
+                and outcome.get('status') == 'SUCCEEDED'
+                and outcome.get('action_key') in ('package.save_checkpoint', 'package.save_as')):
+            saved_packages[operation] = (outcome.get('output') or {}).get('package_ref') or {}
+        if event.get('phase') == 'saved_package_state_observed' and event.get('recorded_at', '') >= since:
+            state = event['state']
+            package = saved_packages.get(operation, {})
+            version = package.get('file_version') if package.get('path') == state.get('package_path') else None
+            yield dict(state, file_version=version)
+
+
 class LiveChain:
     def __init__(self, profile, workspace, folder, account, package, model, variant, daemon_pid, browser_executable):
         self.profile, self.workspace = profile, workspace
@@ -475,8 +491,7 @@ class LiveChain:
         if current_browser:
             receipts = json_lines(current_browser[2] / 'execution-events.jsonl')
             since = datetime.fromtimestamp(submitted, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
-            saved = [event['state'] for event in receipts if event.get('phase') == 'saved_package_state_observed'
-                     and event.get('recorded_at', '') >= since]
+            saved = list(package_save_states(receipts, since))
             if saved and all(state.get('account') == self.account and state.get('package_path') == self.package
                              for state in saved):
                 self.saved = self.turn_saved = saved[-1]

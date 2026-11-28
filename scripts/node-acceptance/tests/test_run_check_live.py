@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+import errno
 import os
 import runpy
 import socket
@@ -13,7 +14,7 @@ import sqlite3
 from tempfile import TemporaryDirectory
 import unittest
 
-from run_check_live import LiveChain, attachment_matches, browser_owner, read_turn, tool_failure, transcript, write_events
+from run_check_live import LiveChain, attachment_matches, browser_owner, package_save_states, read_turn, tool_failure, transcript, write_events
 
 
 class SessionV2TranscriptTests(unittest.TestCase):
@@ -368,8 +369,8 @@ class LiveChainTest(unittest.TestCase):
         edit = dict(kind='rename', node=dict(label='Before'), label='After')
         persisted = dict(complete=True, links=[], nodes=[
             dict(ref=dict(node_id='node'), label='After', type='imports.text', position=dict(x=64, y=64))])
-        for acknowledged in (True, False):
-            with self.subTest(acknowledged=acknowledged), TemporaryDirectory() as directory:
+        for acknowledged, version_known in ((True, True), (True, False), (False, True)):
+            with self.subTest(acknowledged=acknowledged, version_known=version_known), TemporaryDirectory() as directory:
                 root = Path(directory)
                 pair, cases = root / 'pair', root / 'cases'
                 pair.mkdir()
@@ -437,8 +438,10 @@ class LiveChainTest(unittest.TestCase):
                     live.browsers_seen.add(live.browser)
                     live.saved = dict(document_id='document')
                     if case == 'first':
+                        version = dict(mtime='2026-11-28T00:00:00Z', size=100, sha256='a' * 64) if version_known else None
+                        live.saved['file_version'] = version
                         write(stage / 'case-port-expected.json', dict(case_port_node_ids=['node']))
-                        live.port_readbacks.append((stage, package, login, build))
+                        live.port_readbacks.append((stage, package, login, build, version))
                         runner.current['csv'] = 'pending native port readback'
                     runner.current['cleanup'] = 'pending live shutdown'
                     return 'same-chat', dict(graph={}, outputs=[]), None, None
@@ -473,15 +476,112 @@ class LiveChainTest(unittest.TestCase):
                 self.assertTrue(list(evidence.rglob('saved-package-cleanup.json')))
                 self.assertFalse(list(evidence.rglob('auth.json')))
                 if acknowledged:
-                    self.assertEqual(calls, ['setup', 'first', 'exit', 'case-port-readback', 'case-port-sample-oracle', 'manual-edit', 'second', 'exit'])
+                    port_checks = ['case-port-readback', 'case-port-sample-oracle'] if version_known else []
+                    self.assertEqual(calls, ['setup', 'first', 'exit', *port_checks, 'manual-edit', 'second', 'exit'])
                     self.assertEqual(commands[1][-2:], ['--session', 'same-chat'])
-                    self.assertEqual(result['status'], 'PASS')
+                    self.assertEqual(result['status'], 'PASS' if version_known else 'UNKNOWN')
+                    if not version_known:
+                        self.assertEqual(result['failure_class'], 'CASE_PORT_SAVE_VERSION_UNKNOWN')
                     self.assertEqual(result['turns'][0]['manual_edit']['status'], 'PASS')
                 else:
                     self.assertEqual(calls, ['setup', 'first', 'exit'])
                     self.assertEqual(result['turns'][0]['status'], 'PASS')
                     self.assertEqual(result['turns'][0]['manual_edit']['failure_category'], 'product')
                     self.assertEqual(result['turns'][1]['status'], 'NOT_RUN')
+
+    def test_deferred_readback_matches_only_the_last_saved_file_version(self):
+        module = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'run-check.py'))
+        with TemporaryDirectory() as directory:
+            folder = Path(directory)
+            runner = module['Runner'].__new__(module['Runner'])
+            runner.current = dict(turns=[dict(case=name, status='PASS') for name in ('first', 'unknown', 'last')])
+            version = dict(mtime='2026-11-28T00:00:00Z', size=100, sha256='a' * 64)
+            older_version = dict(version, sha256='b' * 64)
+            arguments = ('/worker/sample.lgp', dict(username='worker'), folder / 'build')
+            live = Mock(profile=folder, previous_acks=set(), browsers_seen=set(), saved=dict(file_version=version),
+                        turn_log=folder / 'turns.jsonl', port_readbacks=[
+                            (folder / 'first', *arguments, older_version),
+                            (folder / 'unknown', *arguments, None),
+                            (folder / 'last', *arguments, version),
+                        ])
+            live.segment_attempts.return_value = []
+            live.remaining_browsers.return_value = set()
+            with patch.object(runner, 'case_port_readback') as reader:
+                runner.close_live(live)
+            reader.assert_called_once_with(folder / 'last', *arguments)
+            first, unknown, last = runner.current['turns']
+            self.assertEqual((first['status'], first['failure_class']), ('UNKNOWN', 'CASE_PORT_SAVE_VERSION_CHANGED'))
+            self.assertEqual((unknown['status'], unknown['failure_class']), ('UNKNOWN', 'CASE_PORT_SAVE_VERSION_UNKNOWN'))
+            self.assertEqual((last['status'], last['csv']), ('PASS', '— (native outputs PASS)'))
+
+    def test_save_version_requires_a_successful_receipt_for_this_operation_and_path(self):
+        version = dict(mtime='2026-11-28T00:00:00Z', size=100, sha256='a' * 64)
+        path = '/worker/sample.lgp'
+        saved = dict(phase='completed', operation_id='current', outcome=dict(status='SUCCEEDED',
+            action_key='package.save_checkpoint', output=dict(package_ref=dict(path=path, file_version=version))))
+        observed = dict(phase='saved_package_state_observed', operation_id='current',
+                        recorded_at='2026-11-28T00:01:00Z', state=dict(package_path=path))
+        since = '2026-11-28T00:00:30Z'
+        self.assertEqual(list(package_save_states(iter([saved, observed]), since)), [dict(package_path=path, file_version=version)])
+        for evidence in ([], [dict(saved, operation_id='previous')],
+                         [dict(saved, outcome=dict(saved['outcome'], status='FAILED'))]):
+            with self.subTest(evidence=evidence):
+                self.assertEqual(list(package_save_states([*evidence, observed], since)),
+                                 [dict(package_path=path, file_version=None)])
+        self.assertEqual(list(package_save_states([saved, observed], '2026-11-28T00:02:00Z')), [])
+
+    def test_evidence_survives_rename_enospc_and_keeps_only_receipts(self):
+        module = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'run-check.py'))
+        for blocked in (False, True):
+            with self.subTest(blocked=blocked), TemporaryDirectory() as directory:
+                folder = Path(directory)
+                profile = folder / 'profile'
+                runtime = profile / 'loginom/runtime'
+                attempt = runtime / 'attempt'
+                attempt.mkdir(parents=True)
+                destination = folder / 'live-evidence'
+                destination.mkdir()
+                for name in ('attempt/execution-events.jsonl', 'attempt/saved-package-cleanup.json', 'runtime-close-proof.json'):
+                    (runtime / name).write_text('{}\n')
+                (attempt / 'browser-cookie').write_text('synthetic credential')
+                (profile / 'data').mkdir()
+                (profile / 'data/auth.json').write_text('synthetic credential')
+                (attempt / 'foreign-cleanup.json').symlink_to(profile / 'data/auth.json')
+                inode = (attempt / 'execution-events.jsonl').stat().st_ino
+                runner = module['Runner'].__new__(module['Runner'])
+                runner.current = {}
+
+                if blocked:
+                    with patch.object(Path, 'rename', side_effect=OSError(errno.ENOSPC, 'No space left')):
+                        runner.preserve_live_evidence(profile, folder)
+                    self.assertIn('live_evidence_error', runner.current)
+                    self.assertFalse((profile / 'data').exists())
+                else:
+                    runner.preserve_live_evidence(profile, folder)
+                    self.assertFalse(runtime.exists())
+
+                evidence = Path(runner.current['live_evidence'])
+                self.assertEqual((evidence / 'attempt/execution-events.jsonl').stat().st_ino, inode)
+                self.assertEqual({path.name for path in evidence.rglob('*') if not path.is_dir()},
+                                 {'execution-events.jsonl', 'saved-package-cleanup.json', 'runtime-close-proof.json'})
+
+    def test_port_readback_removes_password_config_on_phase_failure(self):
+        module = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'run-check.py'))
+        for error in (TimeoutError('readback deadline'), InterruptedError('cancelled')):
+            with self.subTest(error=error), TemporaryDirectory() as directory:
+                folder = Path(directory)
+                runner = module['Runner'].__new__(module['Runner'])
+                login = dict(url='https://example.invalid', username='worker', password='synthetic')
+
+                def phase(name, command, stage):
+                    config = Path(command[command.index('--config') + 1])
+                    self.assertEqual(config.stat().st_mode & 0o777, 0o600)
+                    self.assertEqual(json.loads(config.read_text())['workflow_profile']['password'], 'synthetic')
+                    raise error
+
+                with patch.object(runner, 'phase', side_effect=phase), self.assertRaises(type(error)):
+                    runner.case_port_readback(folder, '/worker/sample.lgp', login, folder / 'build')
+                self.assertEqual(list(folder.iterdir()), [])
 
     def test_terminal_tool_failure_is_scoped_to_the_completed_turn(self):
         def tool(message):

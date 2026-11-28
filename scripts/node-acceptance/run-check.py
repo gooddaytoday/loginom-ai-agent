@@ -19,6 +19,7 @@ import signal
 import socket
 import subprocess
 import sys
+from tempfile import NamedTemporaryFile
 import time
 from zipfile import ZipFile
 
@@ -71,6 +72,25 @@ def write(path, value):
     temporary = path.with_suffix(path.suffix + '.tmp')
     temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n')
     temporary.replace(path)
+
+
+def saved_file_version(receipt):
+    version = receipt.get('file_version') if isinstance(receipt, dict) else None
+    if not isinstance(version, dict):
+        return None
+    mtime, size, sha256 = (version.get(key) for key in ('mtime', 'size', 'sha256'))
+    if (isinstance(mtime, str) and mtime.strip() and type(size) is int and size > 0
+            and isinstance(sha256, str) and re.fullmatch(r'[0-9a-f]{64}', sha256)):
+        return dict(mtime=mtime, size=size, sha256=sha256)
+
+
+@contextmanager
+def cold_config(folder, login):
+    with NamedTemporaryFile(mode='w', encoding='utf-8', dir=folder, prefix='cold-config-', suffix='.json') as config:
+        json.dump(dict(loginom_url=login['url'], workflow_profile=dict(loginom_user=login['username'],
+            password=login['password'], passwordless_login=login.get('passwordless_login', False))), config)
+        config.flush()
+        yield config.name
 
 
 def daemon_pid():
@@ -3611,10 +3631,16 @@ class Runner:
                     outputs=[target['output'] for target in readback],
                     case_port_node_ids=[target['node_id'] for target in readback],
                     **{key: expected[key] for key in ('nodes', 'n18_javascript_step') if key in expected}))
-                if live and live.child is not None:
-                    live.port_readbacks.append((folder, package, login, build))
-                    self.current['csv'] = 'pending native port readback'
-                    return session, expected, None, None
+                if live:
+                    version = saved_file_version(live.turn_saved)
+                    write(folder / 'case-port-save-version.json', version)
+                    if live.child is not None:
+                        live.port_readbacks.append((folder, package, login, build, version))
+                        self.current['csv'] = 'pending native port readback'
+                        return session, expected, None, None
+                    if version is None:
+                        self.current['csv'] = 'UNKNOWN'
+                        return session, expected, None, None
                 self.case_port_readback(folder, package, login, build)
             self.current['csv'] = '— (native outputs PASS)'
             return session, expected, None, None
@@ -3975,11 +4001,10 @@ class Runner:
 
     def case_port_readback(self, folder, package, login, build):
         node = build / 'resources/loginom/bin/node'
-        write(folder / 'case-port-config.json', dict(loginom_url=login['url'], workflow_profile=dict(
-            loginom_user=login['username'], password=login['password'], passwordless_login=login.get('passwordless_login', False))))
-        self.phase('case-port-readback', [node, REPO / 'scripts/node-acceptance/cold-check.mjs',
-            '--config', folder / 'case-port-config.json', '--resources', build / 'resources/loginom',
-            '--saved', package, '--expected', folder / 'case-port-expected.json', '--output', folder / 'case-port-readback'], folder)
+        with cold_config(folder, login) as config:
+            self.phase('case-port-readback', [node, REPO / 'scripts/node-acceptance/cold-check.mjs',
+                '--config', config, '--resources', build / 'resources/loginom', '--saved', package,
+                '--expected', folder / 'case-port-expected.json', '--output', folder / 'case-port-readback'], folder)
         result = folder / 'case-port-readback/result.json'
         verified = read(result)
         assert verified['status'] == 'PASS' and all(verified['cleanup'].get(key) is True
@@ -4067,31 +4092,60 @@ class Runner:
                 raise InterruptedError('LIVE_CHAIN_CANCELLED')
 
         readbacks, live.port_readbacks = live.port_readbacks, []
-        for request in readbacks:
-            stage = request[0]
+        final_version = saved_file_version(live.saved)
+        for stage, package, login, build, version in readbacks:
             turn = next(turn for turn in self.current['turns'] if turn['case'] == stage.name)
+            reason = None
             if not verify_ports:
-                turn.update(status='UNKNOWN', csv='— (deferred readback skipped)')
-                continue
-            try:
-                self.case_port_readback(*request)
-            except Exception as error:
-                turn.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL', csv='FAIL',
-                            failure_class=str(error).split(':')[0] or type(error).__name__)
-                raise
-            turn['csv'] = '— (native outputs PASS)'
+                reason = 'CASE_PORT_READBACK_SKIPPED'
+            elif version is None or final_version is None:
+                reason = 'CASE_PORT_SAVE_VERSION_UNKNOWN'
+            elif version != final_version:
+                reason = 'CASE_PORT_SAVE_VERSION_CHANGED'
+            if reason:
+                turn.update(csv='UNKNOWN', readback_reason=reason)
+                if turn['status'] == 'PASS':
+                    turn.update(status='UNKNOWN', failure_class=reason)
+            else:
+                try:
+                    self.case_port_readback(stage, package, login, build)
+                except Exception as error:
+                    turn.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL', csv='FAIL',
+                                failure_class=str(error).split(':')[0] or type(error).__name__)
+                    raise
+                turn['csv'] = '— (native outputs PASS)'
             if turn is self.current['turns'][-1]:
                 self.current['csv'] = turn['csv']
 
     def preserve_live_evidence(self, profile, folder):
         runtime = profile / 'loginom/runtime'
         destination = folder / 'live-evidence'
-        for pattern in ('execution-events.jsonl', '*-cleanup.json', 'runtime-close-*.json'):
-            for source in runtime.rglob(pattern):
-                target = destination / source.relative_to(runtime)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(source, target)
-        if destination.is_dir():
+        evidence = {path for pattern in ('execution-events.jsonl', '*-cleanup.json', 'runtime-close-*.json')
+                    for path in runtime.rglob(pattern) if not path.is_symlink() and path.is_file()}
+        if not evidence:
+            destination.rmdir()
+            return
+        keep_dirs = {parent for path in evidence for parent in path.parents}
+
+        def prune(directory):
+            for entry in directory.iterdir():
+                if entry in keep_dirs:
+                    prune(entry)
+                elif entry not in evidence:
+                    if entry.is_symlink() or not entry.is_dir():
+                        entry.unlink()
+                    else:
+                        shutil.rmtree(entry)
+
+        prune(runtime)
+        try:
+            runtime.rename(destination)
+        except OSError as error:
+            # A failed rename leaves the only receipts in place. Remove the rest of the profile.
+            prune(profile)
+            destination.rmdir()
+            self.current.update(live_evidence=str(runtime), live_evidence_error=str(error))
+        else:
             self.current['live_evidence'] = str(destination)
 
     def run(self):
@@ -4123,6 +4177,8 @@ class Runner:
                 env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile))
                 active_turn = live = None
                 try:
+                    if auth and live_chain:
+                        (folder / 'live-evidence').mkdir(mode=0o700)
                     case = r['scenario']
                     steps = scenario_steps(case, self.options.get('case_root'), cases=self.options.get('cases'))
                     spec = steps[-1][1]
@@ -4221,9 +4277,9 @@ class Runner:
                         if case in COLD_COLUMNS_BY_NAME_SCENARIOS:
                             cold_expected = stage / 'expected-cold.json'
                             write(cold_expected, cold_columns_by_name(expected, case))
-                        write(folder / 'cold-config.json', {'loginom_url': login['url'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
                         read_windows = spec.get('cold_port_windows') or case == 'types300'
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') or spec.get('output_mode') == 'ports' else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if read_windows else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
+                        with cold_config(folder, login) as config:
+                            self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', config, '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', cold_expected, '--output', folder / 'cold', *(['--xlsx', actual, '--xlsx-expected', stage / 'xlsx-expected.json'] if spec.get('xlsx') else ['--excel-books', actual] if spec.get('excel_mode') else [] if spec.get('variable_only') or spec.get('tree_only') or spec.get('text_folder_masks') or spec.get('output_mode') == 'ports' else ['--csv', actual, '--csv-delimiter', delimiter, '--csv-header', spec.get('csv_header', 'names')]), *(['--csv-encoding', spec['csv_encoding'], '--text-export-case', spec['text_export_cases'][-1]] if spec.get('text_export_cases') else []), *(['--exact-port-windows'] if read_windows else []), *(['--sampling-baseline', stage / 'sampling-baseline.json'] if expected.get('sampling_modes') else [])], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
@@ -4246,7 +4302,13 @@ class Runner:
                     if cli_failures and not r.get('failure_class'):
                         r.update(failure_class=cli_failures[0]['code'], location=cli_failures[0]['location'],
                                  detail='CLI returned a nonzero exit after the validated turn')
-                    r['status'] = 'FAIL' if r.get('failure_class') else (D76_STATUS if r.get('csv') == D76_STATUS else 'PASS')
+                    unknown_readback = next((turn for turn in r['turns'] if turn['status'] == 'UNKNOWN'), None)
+                    if r.get('failure_class'):
+                        r['status'] = 'FAIL'
+                    elif unknown_readback:
+                        r.update(status='UNKNOWN', failure_class=unknown_readback['failure_class'])
+                    else:
+                        r['status'] = D76_STATUS if r.get('csv') == D76_STATUS else 'PASS'
                 except Exception as error:
                     if isinstance(error, TimeoutError) and not r.get('started') and self.report['phase'].startswith('gate:'):
                         r.update(status='NOT_RUN', reason='BATCH_BUDGET_EXHAUSTED')
@@ -4274,17 +4336,20 @@ class Runner:
                     finally:
                         if auth:
                             try:
-                                if profile.exists():
-                                    try:
-                                        if live_chain:
-                                            try:
-                                                self.preserve_live_evidence(profile, folder)
-                                            except OSError as error:
-                                                r['live_evidence_error'] = str(error)
-                                                if r['status'] != 'FAIL': self.failure(r, error, folder)
-                                    finally:
-                                        try: auth_path.unlink(missing_ok=True)
-                                        finally: shutil.rmtree(profile)
+                                safe_to_remove_profile = not live_chain
+                                try:
+                                    if live_chain and (folder / 'live-evidence').is_dir():
+                                        self.preserve_live_evidence(profile, folder)
+                                    safe_to_remove_profile = not r.get('live_evidence_error')
+                                finally:
+                                    if profile.exists():
+                                        try:
+                                            auth_path.unlink(missing_ok=True)
+                                        finally:
+                                            if safe_to_remove_profile:
+                                                shutil.rmtree(profile)
+                                            elif auth_path.parent.is_dir():
+                                                shutil.rmtree(auth_path.parent)
                             except OSError as error:
                                 r['oauth_cleanup_error'] = str(error)
                                 if r['status'] != 'FAIL': self.failure(r, error, folder)
