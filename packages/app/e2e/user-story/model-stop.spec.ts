@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test"
 import type { OpenCodeEvent, SessionMessageAssistant, SessionMessageInfo } from "@opencode/client/promise"
-import { provider, sessionHref } from "../utils/app"
+import { provider, seed, sessionHref } from "../utils/app"
 import { openSession } from "../utils/workspace"
 
 test.use({ locale: "ru-RU", timezoneId: "UTC", video: "off" })
+test.beforeEach(async ({ page }) => await seed(page, { locale: "ru" }))
 
 const model = { providerID: "opencode", id: "free-test" }
 
@@ -190,6 +191,66 @@ test("removes the free-limit countdown at the reset time without reloading", asy
   await expect(stop.getByRole("status")).toContainText("Ход остановлен: дневной лимит исчерпан")
 })
 
+test("blocks both sends after a model hits its daily limit in an unopened conversation", async ({ page }, testInfo) => {
+  const now = new Date("2026-11-27T02:00:00Z")
+  await page.clock.install({ time: now })
+  const otherSession = "ses_unopened_limit"
+  const messages = history("provider.free-limit", now.getTime())
+  const prompts: { sessionID: string; text: unknown }[] = []
+
+  const view = await openSession(page, {
+    name: "Общий дневной лимит",
+    sessions: [
+      { id: sessionID, title: "Новый запрос", model },
+      { id: otherSession, title: "Фоновый разговор", model },
+    ],
+    provider: provider({ id: model.id, name: "Бесплатная модель" }, { id: "second-test", name: "Вторая модель" }),
+    pageMessages: (id) => ({ items: id === otherSession ? messages : [] }),
+    onPrompt: ({ sessionID, body }) => void prompts.push({ sessionID, text: body.text }),
+  })
+
+  const failure = messages.find((message) => message.type === "assistant" && message.error)
+
+  if (failure?.type !== "assistant" || !failure.error) throw new Error("Missing failed assistant in test history")
+
+  const warning = page.getByRole("status").filter({ hasText: /Лимит на сегодня исчерпан — обновится в 03:00/ })
+  await expect(warning).toHaveCount(0)
+  await view.push([
+    {
+      id: "evt_unopened_free_limit",
+      created: now.getTime(),
+      type: "session.step.failed",
+      location: { directory: view.directory },
+      durable: { aggregateID: otherSession, seq: 1, version: 1 },
+      data: { sessionID: otherSession, assistantMessageID: failure.id, error: failure.error },
+    },
+  ])
+  await expect(warning).toBeVisible()
+  const draft = "Подготовь отчёт по таблице"
+  await view.editor.fill(draft)
+  await view.editor.press("Enter")
+  await expect(view.editor).toHaveText(draft)
+  await page.locator('[data-action="composer-submit"]').click()
+  await expect(view.editor).toHaveText(draft)
+  expect(prompts).toEqual([])
+
+  const changeModel = warning.getByRole("button", { name: "Сменить модель", exact: true })
+  await changeModel.click()
+  await expect(page.getByRole("dialog")).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath("composer-model-limit-desktop.png") })
+  await page.setViewportSize(narrowViewport)
+  await expect(changeModel).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath("composer-model-limit-390.png") })
+
+  await page.clock.fastForward(3_600_000)
+  await expect(warning).toHaveCount(0)
+  await view.editor.press("Enter")
+  await expect.poll(() => prompts).toEqual([{ sessionID, text: draft }])
+  await expect(view.editor).toHaveText("")
+})
+
 for (const action of ["provider.use", "integration.connect"] as const) {
   test(`directs users to the administrator when ${action} is restricted`, async ({ page }) => {
     const messages = history("provider.auth", Date.now())
@@ -240,6 +301,31 @@ test("can retry copying a model stop error after the clipboard stops responding"
   await expect(stop.getByRole("alert")).toHaveText("Не удалось выполнить действие. Попробуйте ещё раз.")
   await copy.click()
   await expect(copy).toBeEnabled()
+  await expect(stop.getByRole("alert")).toHaveCount(0)
+})
+
+test("copies a model stop error when the Clipboard API is unavailable", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { value: undefined })
+    document.execCommand = (command) => {
+      const selected = document.activeElement
+
+      if (command !== "copy" || !(selected instanceof HTMLTextAreaElement)) return false
+      document.documentElement.dataset.copiedText = selected.value.slice(selected.selectionStart, selected.selectionEnd)
+
+      return true
+    }
+  })
+  await openSession(page, {
+    name: "Копирование по HTTP",
+    sessions: [{ id: sessionID, title: "Обработка таблицы", model, outcome: "failed" }],
+    provider: provider({ id: model.id, name: "Тестовая модель" }),
+    pageMessages: () => ({ items: history("provider.auth", Date.now()) }),
+  })
+
+  const stop = page.locator('[data-component="model-stop"]')
+  await stop.getByRole("button", { name: "Скопировать текст ошибки" }).click()
+  await expect(page.locator("html")).toHaveAttribute("data-copied-text", "Test provider refused the request")
   await expect(stop.getByRole("alert")).toHaveCount(0)
 })
 
@@ -295,11 +381,11 @@ for (const backgroundCompaction of [false, true]) {
     })
 
     const compaction = page.locator('[data-component="session-compaction-message"]')
-    const text = "Сжал начало разговора — дальше агент помнит его кратко"
+    const text = "История разговора сокращена"
     if (backgroundCompaction) await compaction.getByRole("button", { name: text }).click()
     const notice = compaction.getByText(text, { exact: true })
     await expect(compaction.getByText("Таблица прочитана.", { exact: true })).toBeVisible()
-    await expect(compaction.getByText("Начата компактизация сессии", { exact: true })).toHaveCount(0)
+    await expect(compaction.getByText("Сокращаем историю разговора", { exact: true })).toHaveCount(0)
     await expect(notice).toHaveCount(1)
     await expect(notice).toBeInViewport({ ratio: 1 })
     await expect

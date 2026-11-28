@@ -10,6 +10,34 @@ import { usePlatform } from "@/runtime/platform/platform"
 import { useSettings } from "@/settings/model"
 import { sidebarUnread } from "@/shell/sidebar-peek"
 
+export function SidebarSearchButton() {
+  const command = useCommand()
+  const language = useLanguage()
+
+  return (
+    <Tooltip
+      placement="bottom"
+      value={
+        <>
+          {language.t("sidebar.search")}
+          <Keybind keys={command.keybindParts("sessions.search")} variant="neutral" />
+        </>
+      }
+      class="shrink-0"
+    >
+      <IconButton
+        type="button"
+        variant="ghost-muted"
+        size="large"
+        class="shrink-0 [app-region:no-drag]"
+        icon={<Icon name="magnifying-glass" />}
+        onClick={() => command.trigger("sessions.search")}
+        aria-label={language.t("sidebar.search")}
+      />
+    </Tooltip>
+  )
+}
+
 // The toggle's dot for sidebar sessions with unread activity, shown while the sidebar is closed.
 function UnreadBadge(props: { show: boolean; ring: "base" | "deep" }) {
   return (
@@ -233,8 +261,11 @@ export function CollapsedSidebarToggle() {
         class={`absolute top-[calc(var(--shell-top-inset,8px)+10px)] start-[calc(var(--shell-inline-inset,8px)+10px)] z-40 flex shrink-0 justify-end`}
         inert={slot.open()}
       >
-        <div class="flex shrink-0 pe-1">
+        <div class="flex shrink-0 flex-col items-center gap-1 pe-1">
           <SidebarToggle handoff="in" />
+          <Show when={!slot.open()}>
+            <SidebarSearchButton />
+          </Show>
         </div>
       </div>
     </Show>

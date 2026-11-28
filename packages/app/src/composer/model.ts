@@ -38,6 +38,7 @@ import { parseClientSlashCommand } from "./client-slash-command"
 
 export type ComposerModel = ComposerEditorModel & {
   readonly model: ComposerControls["model"]
+  readonly modelStatus?: string
 }
 
 const sendFailedTitle = {
@@ -293,9 +294,16 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
 
   const variants = createMemo(() => ["default", ...adapter.controls().model.selection.variant.list()])
 
+  const modelResetAt = () => {
+    const key = adapter.controls().model.selection.key()
+
+    return key && server.ctx.freeModelLimits.resetAt({ id: key.modelID, providerID: key.providerID })
+  }
+
   const submission = createComposerSubmit({
     adapter,
     mode,
+    modelLimited: () => modelResetAt() !== undefined,
     commands: () => data.location.command.list({ directory: sdk().directory }),
     editor: () => editor,
     queueScroll: () => requestAnimationFrame(() => editor?.scrollIntoView({ block: "nearest" })),
@@ -574,7 +582,19 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     },
   })
 
-  Object.defineProperty(controller, "model", { get: () => adapter.controls().model })
+  Object.defineProperties(controller, {
+    model: { get: () => adapter.controls().model },
+    modelStatus: {
+      get: () => {
+        const reset = modelResetAt()
+
+        if (reset === undefined) return
+        const time = new Intl.DateTimeFormat(language.locale(), { timeStyle: "short" }).format(reset)
+
+        return language.t("session.modelStop.limitLabel", { time })
+      },
+    },
+  })
 
   command.register("composer-editor", () => [
     {

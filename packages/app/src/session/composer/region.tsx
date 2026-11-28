@@ -1,4 +1,3 @@
-import { createLimitClock, freeLimitResetAt } from "../free-limit-reset"
 import type { SessionUserActions } from "@opencode/session-ui/message"
 import type { ShellOutputInput } from "@opencode/client/promise"
 import { getFilename, sameDirectory } from "@opencode/util/path"
@@ -75,6 +74,8 @@ export function createActiveSessionRegion(input: {
   const state = createSessionRequestModel()
   const controls = createComposerControls()
   let promptRef: HTMLDivElement | undefined
+  const { freeModelLimits } = useServer().ctx
+  createEffect(on(input.session.history.messages, freeModelLimits.observeHistory))
 
   createEffect(
     on(
@@ -556,19 +557,6 @@ export function ActiveSessionComposerRegion(props: {
     return props.session.data.info()?.outcome
   }
 
-  const resetAt = createMemo(() => {
-    const key = props.model.composer.model.selection.key()
-    return key && freeLimitResetAt(props.session.history.messages(), { id: key.modelID, providerID: key.providerID })
-  })
-  const clock = createLimitClock(() => [resetAt()])
-  const limitLabel = () => {
-    const reset = resetAt()
-    if (reset === undefined || reset <= clock()) return
-    const time = new Intl.DateTimeFormat(language.locale(), { timeStyle: "short" }).format(reset)
-
-    return language.t("session.modelStop.limitLabel", { time })
-  }
-
   return (
     <SessionComposerRegion
       controller={props.model.region}
@@ -624,7 +612,6 @@ export function ActiveSessionComposerRegion(props: {
               <VoiceComposer session={props.session.data.info()}>
                 <Composer
                   model={props.model.composer}
-                  modelStatus={limitLabel()}
                   borderUnderlay
                   readOnly={props.model.queue.undoing()}
                   suggestionBoundary={props.suggestionBoundary}

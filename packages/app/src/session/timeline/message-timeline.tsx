@@ -2,7 +2,7 @@ import { useModels } from "@/providers/models/models"
 import { useServerSDK } from "@/runtime/server/client"
 import { ModelRetry, ModelStop, readModelContinuation, stopReason } from "./model-stop"
 import { MODEL_STOP_ACTION_TIMEOUT_MS } from "./model-stop-machine"
-import { createLimitClock, freeLimitResetAt, sameModel } from "../free-limit-reset"
+import { sameModel } from "../free-limit-reset"
 import { modelConnectionRestricted, useSessionConfig } from "../config"
 import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js"
 import { Predicate } from "effect"
@@ -157,7 +157,7 @@ function MessageTimelineView(
   const command = useCommand()
   const pluginScoped = usePluginScoped()
   const server = useServer()
-  const data = server.ctx.data
+  const { data, freeModelLimits } = server.ctx
   const sdk = useWorkspaceLocation()
   const sessionID = props.data.sessionID
   const sessionStatus = props.data.status
@@ -370,6 +370,11 @@ function MessageTimelineView(
         sessionStatus().type === "idle" &&
         history().findLast((message) => message.type === "user")?.id === presentation().userMessageID
 
+      const canResumeSame = () => {
+        const model = presentation().model
+
+        return !!model && freeModelLimits.resetAt(model) === undefined
+      }
       const candidates = createMemo(() =>
         !canContinue()
           ? []
@@ -377,15 +382,12 @@ function MessageTimelineView(
               const model = { id: item.id, providerID: item.provider.id }
               if (
                 !models.visible({ modelID: model.id, providerID: model.providerID }) ||
-                sameModel(model, presentation().model)
+                sameModel(model, presentation().model) ||
+                freeModelLimits.resetAt(model) !== undefined
               )
                 return []
-              return [{ model, name: item.name, reset: freeLimitResetAt(history(), model) }]
+              return [{ model, name: item.name }]
             }),
-      )
-      const clock = createLimitClock(() => candidates().map((item) => item.reset))
-      const alternatives = createMemo(() =>
-        candidates().filter((item) => item.reset === undefined || item.reset <= clock()),
       )
 
       return (
@@ -395,14 +397,15 @@ function MessageTimelineView(
           model={presentation().model}
           modelName={modelName(presentation().model)}
           resetAt={presentation().resetAt}
-          alternatives={alternatives()}
+          alternatives={candidates()}
+          canResumeSame={canResumeSame()}
           canContinue={canContinue() && !!props.actions?.chooseModel}
           modelsManaged={modelsManaged()}
           connect={() => command.trigger("provider.connect")}
           resume={async (model) => {
             const id = sessionID()
 
-            if (!id || !canContinue()) return
+            if (!id || !canContinue() || freeModelLimits.resetAt(model) !== undefined) return
             const signal = AbortSignal.timeout(MODEL_STOP_ACTION_TIMEOUT_MS)
             await data.session.prompt({
               sessionID: id,

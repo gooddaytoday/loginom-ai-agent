@@ -47,6 +47,7 @@ const statuses = new Map<string, PromptStatusState>()
 type ComposerSubmitInput = {
   adapter: ComposerAdapter
   mode: Accessor<"normal" | "shell">
+  modelLimited?: Accessor<boolean>
   commands: Accessor<readonly { name: string }[] | undefined>
   editor: () => HTMLDivElement | undefined
   queueScroll: () => void
@@ -248,6 +249,7 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
         dispatch({
           type: "hold.loaded",
           attempt: current.attempt,
+          modelLimited: input.modelLimited?.() ?? false,
           selection: currentSelection(input),
           commands: input.commands(),
         }),
@@ -272,7 +274,7 @@ export function createComposerSubmit(input: ComposerSubmitInput) {
     submitQuote(key: string, comment: string) {
       const adapter = input.adapter
 
-      if (adapter.kind !== "active-session") return Promise.resolve(false)
+      if (adapter.kind !== "active-session" || input.modelLimited?.()) return Promise.resolve(false)
       const quote = adapter.state.context.items().find((item) => item.key === key)
 
       return new Promise<boolean>((resolve) =>
@@ -340,6 +342,7 @@ function snapshot(input: ComposerSubmitInput, alternate: boolean, first = false)
     id: SessionMessage.ID.create(),
     commands: input.commands(),
     clientCommand: mode === "normal" ? input.clientCommand?.(text) : undefined,
+    modelLimited: input.modelLimited?.() ?? false,
     comments: input.comments.capture(),
     session: input.adapter.kind === "active-session" ? input.adapter.session() : undefined,
   }

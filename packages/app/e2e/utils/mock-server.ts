@@ -1209,13 +1209,31 @@ function mockHandlers(
               (session) =>
                 !!currentSession(session, config.directory).time.archived === (ctx.query.archived === "true"),
             )
-            .filter((session) =>
-              ctx.query.search === undefined
-                ? true
-                : String(session.title ?? "")
-                    .toLowerCase()
-                    .includes(ctx.query.search.toLowerCase()),
-            )
+            .filter((session) => {
+              const search = ctx.query.search?.toLowerCase()
+
+              if (!search) return true
+
+              if (ctx.query.searchField === "prompt") {
+                return config
+                  .pageMessages(session.id, Number.MAX_SAFE_INTEGER)
+                  .items.some((item) => item.type === "user" && item.text.toLowerCase().includes(search))
+              }
+
+              if (ctx.query.searchField === "project") {
+                const result = [config.project, ...(config.projects ? resolve(config.projects) : [])]
+                  .flatMap((item) => Option.toArray(decodeProject(item)))
+                  .find((item) => item.id === session.projectID)
+
+                const label = result?.name || result?.worktree?.split(/[/\\]/).filter(Boolean).at(-1)
+
+                return !!label?.toLowerCase().includes(search)
+              }
+
+              return String(session.title ?? "")
+                .toLowerCase()
+                .includes(search)
+            })
 
           const ordered = ctx.query.order === "asc" ? sessions : sessions.toReversed()
           const offset = Number(ctx.query.cursor ?? 0)
@@ -1631,6 +1649,7 @@ const decodeJsonObject = Schema.decodeUnknownOption(Schema.JsonObject)
 const decodeProject = Schema.decodeUnknownOption(
   Schema.Struct({
     id: lenient(Schema.String),
+    name: lenient(Schema.String),
     worktree: lenient(Schema.String),
     canonical: lenient(Schema.String),
     sandboxes: lenient(Schema.Array(Schema.String)),

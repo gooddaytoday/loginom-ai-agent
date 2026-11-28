@@ -24,7 +24,6 @@ import {
 export function Composer(props: {
   class?: string
   model: ComposerModel
-  modelStatus?: string
   borderUnderlay?: boolean
   readOnly?: boolean
   suggestionBoundary?: () => HTMLElement | undefined
@@ -63,7 +62,7 @@ export function Composer(props: {
 
   return (
     <div class="flex flex-col gap-3">
-      <Show when={props.modelStatus}>
+      <Show when={props.model.modelStatus}>
         {(status) => (
           <div role="status" class="flex flex-wrap items-center gap-2 text-sm text-v2-state-fg-warning">
             {status()}

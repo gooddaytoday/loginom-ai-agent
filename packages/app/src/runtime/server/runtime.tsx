@@ -29,6 +29,7 @@ import { createServerSyncContext } from "./sync"
 import { createData, createSessionRetention } from "@opencode/client/solid"
 import type { ServerScope } from "@/runtime/server/scope"
 import { createPermissionAutoApprover } from "@/session/requests/auto-approve"
+import { createFreeModelLimits } from "@/session/free-limit-reset"
 import { createSessionMessageHandoffs } from "@/session/handoff"
 import { createServerNotificationState } from "@/shell/notifications/notification"
 import { createNotificationCoordinator } from "@/shell/notifications/coordinator"
@@ -236,6 +237,28 @@ function createServerController(
     remove: (sessionID) => sdk.api.session.remove({ sessionID }),
   })
 
+  const freeModelLimits = createFreeModelLimits()
+  onCleanup(
+    sdk.event.on("session.step.failed", ({ created, data: { error, sessionID, assistantMessageID } }) => {
+      if (error.type !== "provider.free-limit") return
+      const message = data.session.message.get(sessionID, assistantMessageID)
+
+      if (message?.type === "assistant") {
+        freeModelLimits.remember(message.model, created, error.retryAfterMs)
+
+        return
+      }
+
+      // A failure can arrive for a session whose transcript has never been opened in this window.
+      void sdk.api.session.message
+        .get({ sessionID, messageID: assistantMessageID }, { signal: AbortSignal.timeout(10_000) })
+        .then((message) => {
+          if (message.type === "assistant") freeModelLimits.remember(message.model, created, error.retryAfterMs)
+        })
+        .catch(() => undefined)
+    }),
+  )
+
   // Transcripts otherwise stay loaded for every session this window ever opened. Open tabs and the three most
   // recently viewed sessions keep theirs; any other session reloads its transcript when it is opened again.
   createSessionRetention({
@@ -351,6 +374,7 @@ function createServerController(
 
   return {
     data,
+    freeModelLimits,
     sdk,
     sync,
     get isLocal() {

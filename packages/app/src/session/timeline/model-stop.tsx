@@ -2,6 +2,7 @@ import { Option, Schema } from "effect"
 import { For, Show, createMemo, createSignal, onCleanup } from "solid-js"
 import type { ModelRef, SessionMessageAssistant, SessionMessageUser } from "@opencode/client/promise"
 import { useLanguage } from "@/runtime/i18n/language"
+import { writeClipboard } from "@opencode/session-ui/copy"
 import { Button } from "@opencode/ui/button"
 import { TextShimmer } from "@opencode/ui/text-shimmer"
 import { Tooltip } from "@opencode/ui/tooltip"
@@ -124,6 +125,7 @@ export function ModelStop(props: {
   resetAt?: number
   alternatives: { model: ModelRef; name: string }[]
   canContinue: boolean
+  canResumeSame: boolean
   modelsManaged: boolean
   connect: () => void
   resume: (model: ModelRef) => Promise<void>
@@ -137,7 +139,7 @@ export function ModelStop(props: {
   const reason = () => language.t(props.reason)
 
   const same = () =>
-    props.reason === "session.modelStop.noRoute" || props.reason === "session.modelStop.invalid"
+    props.canResumeSame && (props.reason === "session.modelStop.noRoute" || props.reason === "session.modelStop.invalid")
       ? props.model
       : undefined
 
@@ -146,6 +148,12 @@ export function ModelStop(props: {
     clearTimeout(timer)
     setAction((state) => transitionModelStopAction(state, { type: "disposed" }))
   })
+
+  async function copyError() {
+    if (platform.writeClipboardText) return platform.writeClipboardText(props.error)
+
+    if (!(await writeClipboard(props.error))) throw new Error(language.t("common.requestFailed"))
+  }
 
   async function run(work: () => Promise<void>) {
     const current = action()
@@ -244,9 +252,7 @@ export function ModelStop(props: {
             variant="neutral"
             type="button"
             disabled={view().busy}
-            onClick={() =>
-              void run(() => platform.writeClipboardText?.(props.error) ?? navigator.clipboard.writeText(props.error))
-            }
+            onClick={() => void run(copyError)}
           >
             {language.t("session.modelStop.copy")}
           </Button>
