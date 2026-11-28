@@ -33,10 +33,11 @@ test("Dock forwards the runtime Save projection and its file proof alongside the
     saved_labels: [{ node_id: "node-guid", label: "Левое" }],
     unchecked_sorting: [],
   }
+  const options = { knownSecrets: [], busy, savedPackageGraph, savedFileRead }
   const input = withLoginomMetadata(reply(receipt), { receipt: loginomSaveMetadata({
     operation_id: "operation", action_key: "package.save_checkpoint", status: "SUCCEEDED",
     output: { package_ref: { path, active_identity: path } },
-  }, { busy, savedPackageGraph, savedFileRead }) })
+  }, options) })
   const result = await dockToolResult(input, 1)
   expect(result.metadata?.loginom).toEqual(input._meta.loginom)
   expect(result.metadata?.loginom).toMatchObject({
