@@ -1,12 +1,13 @@
 // Loginom AI Agent (B4.15, decisions В-85 and В-97 п. 9): the Desktop part of dashboards. 0.4 queued the product's links
 // for its window (`v0.4.0:packages/desktop/src/main/deep-links.ts`), and the window had main prepare a dashboard's folder
 // with main's own Host (`dashboard-target.ts`). The Host is the service's now, and its product plugin prepares the folder
-// (`loginom.dashboard`, B2.9h), so main asks it as soon as a link arrives. Showing the dashboard and its chat is the
-// window's (stage C); until then the answer goes to the Desktop log.
+// (`loginom.dashboard`, B2.9h), so main asks it as soon as a link arrives and hands the result to the window.
 export * as DashboardLinks from "./dashboard-links"
 
 import { Product } from "@loginom-ai-agent/product"
+import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
 import { Option, Schema } from "effect"
+import type { DeepLinkPayload } from "../../shared/ipc-rpc/events"
 import { SidecarCredentials } from "../service/sidecar-credentials"
 
 export type Link = { readonly id: string; readonly action: "create" | "edit" }
@@ -33,6 +34,17 @@ const Reply = Schema.Union([
 ])
 
 export type Reply = typeof Reply.Type
+
+export function delivery(link: Link, result: PromiseSettledResult<Reply>): Exclude<DeepLinkPayload, string> {
+  const channel = dashboardLinkChannel
+  const reply = result.status === "fulfilled" ? result.value : { code: "DASHBOARD_SERVICE_UNAVAILABLE" }
+
+  if ("code" in reply) return { channel, data: { id: link.id, code: reply.code } }
+
+  const data = { id: link.id, directory: reply.directory, nodeName: reply.nodeName, action: reply.action }
+
+  return { channel, data: reply.notice ? { ...data, notice: { kind: reply.notice.kind } } : data }
+}
 
 const decodeReply = Schema.decodeUnknownOption(Reply)
 

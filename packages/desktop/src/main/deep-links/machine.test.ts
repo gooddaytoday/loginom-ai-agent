@@ -29,6 +29,15 @@ const ready = (windowID: string, clientID: number): DeepLinkEvent[] => [
 ]
 
 describe("deep link delivery", () => {
+  test("delivers an opaque payload that arrives before the window is ready", () => {
+    const payload = { channel: "example", data: { outcome: "ready" } }
+    const result = replay([{ type: "links.received", urls: [payload] }, ...ready("a", 1)])
+
+    expect(result.commands.at(-1)).toEqual([
+      { type: "links.deliver", windowID: "a", clientID: 1, attempt: 1, urls: [payload] },
+    ])
+  })
+
   test("never hands an acknowledged link to a reloaded or new window", () => {
     const live = replay([
       ...ready("a", 1),
