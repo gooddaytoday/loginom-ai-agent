@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
+import { dict as uiEnglish } from "@opencode/ui/i18n/en"
+import { dict as uiRussian } from "@opencode/ui/i18n/ru"
 import { DESKTOP_NATIVE_LOCALES } from "./desktop-native"
-import { localizedListParts, richTemplateParts } from "./language"
+import { dict as appEnglish } from "./en"
+import { dict as appRussian } from "./ru"
+import { loadInitialLocale, localizedListParts, richTemplateParts } from "./language"
 
 describe("rich translations", () => {
   test("lets the translated phrase position a rich slot", () => {
@@ -17,6 +21,17 @@ describe("rich translations", () => {
 })
 
 describe("dictionaries", () => {
+  test("starts in Russian with no saved language", async () => {
+    expect(await loadInitialLocale()).toBe("ru")
+  })
+
+  test.each([
+    { name: "app", english: appEnglish, russian: appRussian },
+    { name: "UI", english: uiEnglish, russian: uiRussian },
+  ])("covers every English key in the Russian $name dictionary", ({ english, russian }) => {
+    expect(Object.keys(english).filter((key) => !Object.hasOwn(russian, key))).toEqual([])
+  })
+
   test("are flat string maps in every locale", async () => {
     const modules = await Promise.all(
       DESKTOP_NATIVE_LOCALES.flatMap((locale) => [

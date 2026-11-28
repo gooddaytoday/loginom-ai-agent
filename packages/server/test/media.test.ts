@@ -85,6 +85,58 @@ const client = (handler: (request: Request) => Promise<Response>, capabilities?:
 const media = (base64: string) => `media:${hash(base64)}`
 const route = (base64: string) => `http://opencode.local/api/experimental/media/${hash(base64)}`
 
+it.live("replaces queued prompt contents in place and cancels them over HTTP", () =>
+  Effect.gen(function* () {
+    const dir = (yield* tmpdirScoped("opencode-inbox-edit-")).path
+    const handler = yield* serve(path.join(dir, "loginom-ai-agent.db"), true)
+    const api = client(handler, "experimental-media-uri")
+
+    yield* Effect.promise(async () => {
+      const { id: sessionID } = await api.session.create({ title: "Queue editing" })
+      const { id: inboxID } = await api.session.prompt({
+        sessionID,
+        text: "Before",
+        files: [{ uri: `data:image/png;base64,${png}`, name: "before.png" }],
+        delivery: "queue",
+        resume: false,
+      })
+      const second = await api.session.prompt({ sessionID, text: "Second", delivery: "queue", resume: false })
+      const steered = await api.session.prompt({ sessionID, text: "Steered", delivery: "steer", resume: false })
+      const uri = `http://opencode.local/api/session/${sessionID}/inbox`
+      const edit = (id: string, body: unknown) =>
+        handler(
+          new Request(`${uri}/${id}`, {
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          }),
+        )
+
+      expect((await edit(inboxID, { text: "Invalid", files: [{ uri: "data:invalid" }] })).status).toBe(400)
+      expect((await edit(steered.id, { text: "Too late to edit" })).status).toBe(409)
+      expect((await handler(new Request(route(png)))).status).toBe(200)
+      await api.session.inbox.edit({ sessionID, inboxID, text: "After", metadata: { edited: true } })
+      expect(await api.session.inbox.list({ sessionID })).toEqual([
+        {
+          id: inboxID,
+          sessionID,
+          time: expect.any(Object),
+          type: "user",
+          delivery: "queue",
+          payload: { text: "After", metadata: { edited: true } },
+        },
+        second,
+        steered,
+      ])
+      expect((await handler(new Request(route(png)))).status).toBe(404)
+
+      await api.session.inbox.cancel({ sessionID, inboxID })
+      expect((await edit(inboxID, { text: "Cancelled" })).status).toBe(409)
+      expect(await api.session.inbox.list({ sessionID })).toEqual([second, steered])
+    })
+  }).pipe(Effect.scoped),
+)
+
 it.live("serves stored media as refs only to clients that opt in while experimental.media_blob is on", () =>
   Effect.gen(function* () {
     // Acquired first so it is removed after the servers below are released; Windows can't delete an open db.

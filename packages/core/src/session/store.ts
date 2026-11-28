@@ -7,6 +7,7 @@ import { Workspace } from "@opencode/schema/workspace"
 import { AbsolutePath, PositiveInt, RelativePath } from "@opencode/schema/schema"
 import { Database } from "../database/database.js"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
+import { ProjectTable } from "../project/sql.js"
 import { SessionHistory } from "./history.js"
 import { MessageDecodeError } from "./error.js"
 import { SessionMessage } from "./message.js"
@@ -17,6 +18,7 @@ import { fromRow } from "./info.js"
 const ListInputBase = {
   workspaceID: Workspace.ID.pipe(Schema.optional),
   search: Schema.String.pipe(Schema.optional),
+  searchField: Session.ListFilter.fields.searchField,
   limit: PositiveInt.pipe(Schema.optional),
   order: Schema.Literals(["asc", "desc"]).pipe(Schema.optional),
   parentID: Schema.NullOr(Session.ID).pipe(Schema.optional),
@@ -39,6 +41,17 @@ const ListAllInput = Schema.Struct(ListInputBase)
 
 export const ListInput = Schema.Union([ListDirectoryInput, ListProjectInput, ListAllInput])
 export type ListInput = typeof ListInput.Type
+
+function searchPattern(query: string) {
+  return `*${Array.from(query, (character) => {
+    if (character === "*" || character === "?" || character === "[") return `[${character}]`
+    const lower = character.toLowerCase()
+    const upper = character.toUpperCase()
+    return lower !== upper && Array.from(lower).length === 1 && Array.from(upper).length === 1
+      ? `[${lower}${upper}]`
+      : character
+  }).join("")}*`
+}
 
 export type MessagesInput = {
   sessionID: Session.ID
@@ -78,6 +91,7 @@ export interface Interface {
    * Sessions holding an execution claim, including directly driven children.
    */
   readonly listSuspended: () => Effect.Effect<ReadonlyArray<Session.ID>>
+  readonly isClaimed: (sessionID: Session.ID) => Effect.Effect<boolean>
   /**
    * Records the execution claim: the durable write-ahead intent that a turn is
    * (or was) in flight. Set when execution starts; a claim that survives to the
@@ -150,6 +164,8 @@ const layer = Layer.effect(
         return row ? fromRow(row) : undefined
       }),
       list: Effect.fn("SessionStore.list")(function* (input = {}) {
+        if (input.searchField === "prompt" && Array.from(input.search?.trim() ?? "").length < 3) return []
+
         const direction = input.anchor?.direction ?? "next"
         const requestedOrder = input.order ?? "desc"
         const order = direction === "previous" ? (requestedOrder === "asc" ? "desc" : "asc") : requestedOrder
@@ -159,7 +175,33 @@ const layer = Layer.effect(
         if (input.workspaceID) conditions.push(eq(SessionTable.workspace_id, input.workspaceID))
         if ("project" in input) conditions.push(eq(SessionTable.project_id, input.project))
         if ("project" in input && input.subpath !== undefined) conditions.push(eq(SessionTable.path, input.subpath))
-        if (input.search) conditions.push(like(SessionTable.title, `%${input.search}%`))
+        if (input.search) {
+          const pattern = input.searchField && searchPattern(input.search)
+          switch (input.searchField) {
+            case "title":
+              conditions.push(sql`${SessionTable.title} glob ${pattern}`)
+              break
+            case "project": {
+              const worktree = sql`replace(${ProjectTable.worktree}, ${"\\"}, '/')`
+              conditions.push(sql`exists (
+                select 1 from ${ProjectTable} where ${ProjectTable.id} = ${SessionTable.project_id}
+                and coalesce(nullif(${ProjectTable.name}, ''),
+                  json_extract('[' || replace(json_quote(rtrim(${worktree}, '/')), '/', '\",\"') || ']', '$[#-1]')
+                ) glob ${pattern}
+              )`)
+              break
+            }
+            case "prompt":
+              conditions.push(sql`exists (
+                select 1 from ${SessionMessageTable} where ${SessionMessageTable.session_id} = ${SessionTable.id}
+                and ${SessionMessageTable.type} = 'user'
+                and json_extract(${SessionMessageTable.data}, '$.text') glob ${pattern}
+              )`)
+              break
+            default:
+              conditions.push(like(SessionTable.title, `%${input.search}%`))
+          }
+        }
         if (input.parentID !== undefined)
           conditions.push(
             input.parentID === null ? isNull(SessionTable.parent_id) : eq(SessionTable.parent_id, input.parentID),
@@ -247,6 +289,15 @@ const layer = Layer.effect(
             Effect.orDie,
             Effect.map((rows) => rows.map((row) => row.sessionID)),
           )
+      }),
+      isClaimed: Effect.fn("SessionStore.isClaimed")(function* (sessionID) {
+        const row = yield* db
+          .select({ id: SessionTable.id })
+          .from(SessionTable)
+          .where(and(eq(SessionTable.id, sessionID), isNotNull(SessionTable.time_suspended)))
+          .get()
+          .pipe(Effect.orDie)
+        return row !== undefined
       }),
       claim: Effect.fn("SessionStore.claim")(function* (sessionID) {
         // The null guard makes re-claiming a still-claimed Session a zero-row

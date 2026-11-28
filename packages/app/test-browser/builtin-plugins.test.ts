@@ -16,6 +16,7 @@ const product = [
   "microsoft-office",
   "sources",
   "goal",
+  "loginom-gui",
 ]
 
 const app = await import("@/runtime/plugin/builtins")

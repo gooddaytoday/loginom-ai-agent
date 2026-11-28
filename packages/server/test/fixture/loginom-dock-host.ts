@@ -16,6 +16,7 @@ export function scriptedHost(
   options: {
     catalog?: (generation: number) => Tool[]
     call?: (request: Record<string, unknown>) => unknown
+    interrupt?: () => void
     acquire?: () => string | undefined
     tools?: () => string | undefined
     /** Runs start with a browser runtime, as after `dock_prepare`. */
@@ -30,7 +31,7 @@ export function scriptedHost(
   const log: Request[] = []
   const send = (data: unknown) => listeners.forEach((listener) => listener({ data }))
 
-  const handle = (request: Request & { id: string }) => {
+  const handle = async (request: Request & { id: string }) => {
     log.push({ method: request.method, input: request.input })
     const reply = (result: unknown) => send({ id: request.id, result, generation: state.generation })
     const fail = (error: string) => send({ id: request.id, error })
@@ -43,6 +44,7 @@ export function scriptedHost(
     }
     const run = runs.get(input.run)
     if (!run) return fail("LOGINOM_RUN_INVALID")
+    if (request.method === "interrupt") options.interrupt?.()
     if (request.method === "release" || request.method === "interrupt") return reply(true)
     if (request.method === "scope") {
       const mode = input.mode
@@ -100,7 +102,7 @@ export function scriptedHost(
       if (input.name === "dock_prepare") run.prepared = true
       try {
         return reply(
-          options.call?.(input) ?? { content: [{ type: "text", text: JSON.stringify({ called: input.name }) }] },
+          (await options.call?.(input)) ?? { content: [{ type: "text", text: JSON.stringify({ called: input.name }) }] },
         )
       } catch (error) {
         return fail(error instanceof Error ? error.message : String(error))

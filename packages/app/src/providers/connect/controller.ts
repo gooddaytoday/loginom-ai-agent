@@ -443,15 +443,7 @@ export function createProviderDialogController(options: {
     }
 
     void serverSDK.api.integration.oauth.connect(input).then(
-      (response) => {
-        if (!isConsole || platform.platform !== "desktop")
-          return result({ type: "oauth.started", attempt: effect.attempt, authorization: response.data })
-        const url = new URL(response.data.url)
-        url.searchParams.set("client_id", "opencode-desktop")
-        // Lets the Console return link focus the window that started the sign-in.
-        url.searchParams.set("return_window", platform.windowID)
-        result({ type: "oauth.started", attempt: effect.attempt, authorization: { ...response.data, url: url.href } })
-      },
+      (response) => result({ type: "oauth.started", attempt: effect.attempt, authorization: response.data }),
       (error) =>
         failed(isConsole ? language.t("provider.connect.console.startFailed") : formatServerError(error, language.t)),
     )
