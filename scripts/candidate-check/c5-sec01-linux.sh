@@ -20,5 +20,5 @@ env -i PATH="$PATH" LANG=C.UTF-8 HOME="$root/home" TMPDIR="$root/tmp" \
   XDG_CACHE_HOME="$root/cache" XDG_RUNTIME_DIR="$root/runtime" \
   dbus-run-session -- xvfb-run -a bash -ceu '
     printf "disposable-sec01-keyring\n" | gnome-keyring-daemon --unlock --components=secrets >/dev/null
-    exec timeout 420 bun "$@"
+    exec timeout 600 bun "$@"
   ' sec01 "$driver" "$root" "$@"

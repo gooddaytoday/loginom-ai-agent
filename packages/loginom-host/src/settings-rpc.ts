@@ -42,6 +42,7 @@ export const Issue = Schema.Literals([
   "changed",
   "expired",
   "saveFailed",
+  "secretServiceUnavailable",
 ])
 export type Issue = typeof Issue.Type
 

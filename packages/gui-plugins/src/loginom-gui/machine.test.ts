@@ -106,6 +106,18 @@ test("unavailable, changed targets and disposal ignore late completions", () => 
   expect(transition(disposed, result).state).toBe(disposed)
 })
 
+test("the form displays the secure storage issue on startup and after Save", () => {
+  const result = { ok: false, issue: "secretServiceUnavailable" } as const
+  const loading = transition(initial, { type: "target", available: true }).state
+  const failed = transition(loading, { type: "status", attempt: loading.attempt, now: 2000, result }).state
+  expect(view(failed)).toMatchObject({ issue: result.issue, retry: true })
+
+  const checking = transition(form(), { type: "submit", submit: "save", now: 1000 }).state
+  const saving = transition(checking, { type: "checked", attempt: checking.attempt, result: validation }).state
+  const refused = transition(saving, { type: "saved", attempt: saving.attempt, now: 2000, result }).state
+  expect(view(refused)).toMatchObject({ issue: result.issue, busy: false, connected: undefined })
+})
+
 test("the saved password can only be reused for its own Loginom address and user", () => {
   const stored = form({ ...fresh, generation: 1, state: "ready", hasPassword: true })
   expect(check(stored).effects).toMatchObject([{ type: "check", input: { password: { operation: "preserve" } } }])

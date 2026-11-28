@@ -6,6 +6,7 @@ export type CliSecrets = {
 }
 export type ProtectedSecrets = { encrypted: string } | Secrets | CliSecrets
 export type CredentialCodec = {
+  readonly retireDesktopSecrets?: boolean
   encode(value: Secrets): ProtectedSecrets | Promise<ProtectedSecrets>
   decode(value: ProtectedSecrets): Secrets | Promise<Secrets>
 }

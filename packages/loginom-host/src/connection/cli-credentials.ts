@@ -11,6 +11,7 @@ export function cliCredentials(
 ): CredentialCodec {
   if (!["linux", "win32", "darwin"].includes(platform)) throw new Error("LOGINOM_CREDENTIAL_PLATFORM_UNSUPPORTED")
   return {
+    retireDesktopSecrets: platform === "linux" && paths?.desktop === true,
     async encode(value: Secrets): Promise<ProtectedSecrets> {
       if (platform === "darwin" && paths) {
         const { cliKeychain } = await import("./cli-keychain")

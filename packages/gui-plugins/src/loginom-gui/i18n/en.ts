@@ -59,6 +59,8 @@ export default {
   changed: "The connection changed. Reload it before trying again.",
   expired: "The check expired. Check the connection again.",
   saveFailed: "The service did not confirm the save. Reload it to check what was saved.",
+  secretServiceUnavailable:
+    "Secure password storage is unavailable. Install secret-tool (Ubuntu/Debian: sudo apt install libsecret-tools; Fedora: sudo dnf install libsecret), unlock your session’s keyring, then restart Loginom AI Agent.",
   "catalog.title": "Catalog",
   "catalog.description": "Skills and tools included in Loginom AI Agent.",
   "catalog.sections": "Catalog sections",
