@@ -235,7 +235,9 @@ export function createWslServersController(options: WslServersControllerOptions)
 
     // Starts at launch have no caller to answer.
     startConfiguredServers() {
-      published.state.servers.forEach((item) => dispatch({ type: "start", id: item.config.id, attempt: randomUUID() }))
+      for (const { config } of published.state.servers) {
+        if (config.autostart) dispatch({ type: "start", id: config.id, attempt: randomUUID() })
+      }
     },
 
     probeRuntime() {
@@ -265,7 +267,7 @@ export function createWslServersController(options: WslServersControllerOptions)
     },
 
     async addServer(distro: string): Promise<WslServerConfig> {
-      const config: WslServerConfig = { id: wslServerIdForDistro(distro), distro }
+      const config: WslServerConfig = { id: wslServerIdForDistro(distro), distro, autostart: true }
       await request((attempt) => ({ type: "add", config, attempt }))
 
       return config

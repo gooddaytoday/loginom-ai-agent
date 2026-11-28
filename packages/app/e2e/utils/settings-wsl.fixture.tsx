@@ -25,6 +25,7 @@ export function mount(input: {
   mode: "failed" | "stopped" | "ready"
   locale: "en" | "ru"
   wsl?: string | null
+  cli?: string | null
   restart?: string | null
   path?: string | null
   ssh?: string | null
@@ -131,10 +132,10 @@ export function mount(input: {
           ),
           Ubuntu: {
             distro: "Ubuntu",
-            resolvedPath: "/usr/bin/loginom-ai-agent-cli",
-            version: "old",
+            resolvedPath: input.cli === "missing" ? null : "/usr/bin/loginom-ai-agent-cli",
+            version: input.cli === "missing" ? null : "old",
             expectedVersion: "current",
-            matchesDesktop: false,
+            matchesDesktop: input.cli === "missing" ? null : false,
             error: null,
           },
         },
@@ -171,7 +172,14 @@ export function mount(input: {
         setStore("state", (state) => ({
           opencodeChecks: {
             ...state.opencodeChecks,
-            [name]: { ...state.opencodeChecks[name]!, version: "current", matchesDesktop: true },
+            [name]: {
+              distro: name,
+              resolvedPath: "/usr/bin/loginom-ai-agent-cli",
+              version: "current",
+              expectedVersion: "current",
+              matchesDesktop: true,
+              error: null,
+            },
           },
         }))
         endpoint.url = input.restart ?? endpoint.url

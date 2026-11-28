@@ -5,8 +5,8 @@ name: Loginom release candidate
 # the manifest, proves the G5 resource checks go red when a file is missing, and writes SHA256SUMS.txt.
 #
 # Candidate: workflow_dispatch on any ref, or a push to oc2-migration that touches this workflow or the release scripts.
-# Release: a push of a v* tag (the tag must be v<version of packages/desktop/package.json>). Neither mode creates a
-# release, signs the update feed or mirrors to S3: that is stage G, a separate owner command. No secrets are used.
+# Release: a push of a v* tag (the tag must be v<version of packages/desktop/package.json>).
+# The release environment signs WSL metadata for tags only. Stage G handles Desktop feed signing and publication.
 #
 # The version of the candidate is the Desktop package version, so the Debian package, the macOS bundle and the
 # manifest agree; the channel is dev, as in the platform workflows.
@@ -247,6 +247,46 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: loginom-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/candidate/*
+          if-no-files-found: error
+          retention-days: 14
+
+  sign-wsl:
+    name: Sign WSL release metadata
+    if: github.repository == 'gooddaytoday/loginom-ai-agent' && github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [plan, collect]
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-bun
+        with:
+          install-flags: --ignore-scripts
+      - name: Install locked client dependencies
+        working-directory: packages/loginom-runtime/client
+        run: npm ci --ignore-scripts --omit=dev --no-audit --fund=false --workspaces=false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: loginom-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/candidate
+      - name: Sign WSL archive checksum
+        env:
+          LOGINOM_UPDATES_SIGNING_KEY: ${{ secrets.LOGINOM_UPDATES_SIGNING_KEY }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          if [ -z "${LOGINOM_UPDATES_SIGNING_KEY:-}" ]; then
+            echo "::error::Missing required environment secret LOGINOM_UPDATES_SIGNING_KEY"
+            exit 1
+          fi
+          bun script/update-feed.ts sign-wsl --assets "$RUNNER_TEMP/candidate" --version "$VERSION"
+      - name: Regenerate SHA256SUMS.txt including the signature
+        run: bun packages/desktop/scripts/release/sums.ts "$RUNNER_TEMP/candidate"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: loginom-signed-${{ github.sha }}
           path: ${{ runner.temp }}/candidate/*
           if-no-files-found: error
           retention-days: 14

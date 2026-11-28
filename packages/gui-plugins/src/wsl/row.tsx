@@ -2,10 +2,12 @@ import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Menu } from "@opencode/ui/menu"
+import { showToast } from "@opencode/ui/toast"
 import { createMemo, Show } from "solid-js"
 import { usePlugin, type IpcClient, type ServerRow } from "@opencode/plugin/gui"
 import type { Wsl, WslServersState } from "./contract"
 import { wslRowView } from "./row-view"
+import { wslCliPath } from "./product-cli-path"
 
 export default function WslRow(props: {
   row: ServerRow
@@ -17,10 +19,16 @@ export default function WslRow(props: {
   const plugin = usePlugin()
   const view = createMemo(() => wslRowView(props.state(), props.distro))
 
+  const copySetup = () =>
+    props.run(async () => {
+      await navigator.clipboard.writeText(`"${wslCliPath}" loginom setup`)
+      showToast({ variant: "success", title: plugin.t("server.setupCopied") })
+    })
+
   return (
     <Show when={props.api()}>
       {(api) => (
-        <div class="settings-servers-row">
+        <div class="settings-servers-row flex-wrap">
           <div class="settings-servers-lead">
             <props.row.Indicator health={props.row.health()} />
             <div class="settings-servers-copy">
@@ -69,6 +77,14 @@ export default function WslRow(props: {
               </Menu.Portal>
             </Menu>
           </div>
+          <Show when={view().installed}>
+            <div class="flex w-full flex-wrap items-center gap-x-2 gap-y-1 pl-5 text-xs text-v2-text-text-muted">
+              <span>{plugin.t("server.setupHint")}</span>
+              <Button variant="ghost-muted" size="small" onClick={copySetup}>
+                {plugin.t("server.copySetup")}
+              </Button>
+            </div>
+          </Show>
         </div>
       )}
     </Show>

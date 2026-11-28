@@ -12,6 +12,8 @@ const Distro = Schema.Struct({ distro: Schema.NonEmptyString })
 
 const Id = Schema.Struct({ id: Schema.NonEmptyString })
 
+const Autostart = Schema.Struct({ autostart: Schema.Literal(true) })
+
 const Saved = Schema.Struct({ servers: Schema.Array(Schema.Unknown) })
 
 const setup: Plugin.MainSetup = (ctx) => {
@@ -45,10 +47,17 @@ const setup: Plugin.MainSetup = (ctx) => {
         const distro = record.value.distro
         const id = Schema.decodeUnknownOption(Id)(value)
 
-        return [{ id: Option.isSome(id) ? id.value.id : wslServerIdForDistro(distro), distro }]
+        return [{
+          id: Option.isSome(id) ? id.value.id : wslServerIdForDistro(distro),
+          distro,
+          ...(Schema.is(Autostart)(value) ? { autostart: true } : {}),
+        }]
       }),
     writeServers: (servers) => saved.set({ servers }),
-    installCli: (distro, build) => installProductCli(runtime, distro, build.version, t, ctx.signal),
+    installCli: (distro, build) =>
+      installProductCli(runtime, distro, build.version, t, ctx.signal, (code) =>
+        log("error", "WSL CLI installation", { distro, code }),
+      ),
     spawnSidecar: (distro, signal) => {
       log("info", "spawning wsl sidecar", { distro })
 
@@ -78,7 +87,8 @@ const setup: Plugin.MainSetup = (ctx) => {
   ctx.onCleanup(controller.subscribe(() => provider.changed()))
   // Finalizers run in reverse: the servers stop before the state stops being published.
   ctx.onCleanup(() => controller.stopServers())
-  // В-101: saved 0.4 distros stay stopped until the user starts them.
+  // В-101: imported 0.4 entries have no autostart flag and stay stopped.
+  controller.startConfiguredServers()
 }
 
 export default setup

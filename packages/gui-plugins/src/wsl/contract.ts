@@ -1,7 +1,11 @@
 import { Schema } from "effect"
 import { Ipc } from "@opencode/plugin/gui"
 
-export const WslServerConfig = Schema.Struct({ id: Schema.String, distro: Schema.String })
+export const WslServerConfig = Schema.Struct({
+  id: Schema.String,
+  distro: Schema.String,
+  autostart: Schema.optionalKey(Schema.Boolean),
+})
 
 export type WslServerConfig = typeof WslServerConfig.Type
 

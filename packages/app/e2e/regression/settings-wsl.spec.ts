@@ -36,11 +36,40 @@ test("desktop settings offer WSL while SSH and pairing stay hidden", async ({ pa
   await expect(page.getByRole("menuitem", { name: "Добавить сервер WSL" })).toBeVisible()
   await expect(page.getByRole("menuitem", { name: /SSH/ })).toHaveCount(0)
 
-  await page.keyboard.press("Escape")
+  await settings.getByRole("button", { name: "Добавить сервер", exact: true }).click()
   await settings
     .getByRole("region", { name: "Ubuntu", exact: true })
     .getByRole("button", { name: "Дополнительные опции" })
     .click()
   await page.getByRole("menuitem", { name: "Запустить сервер" }).click()
   await expect(page.getByLabel("WSL actions")).toHaveText("start:wsl:Ubuntu")
+})
+
+
+test("a narrow WSL row offers a runnable Loginom setup command after installing the CLI", async ({ page, context }) => {
+  await page.setViewportSize({ width: 500, height: 900 })
+  await context.grantPermissions(["clipboard-read", "clipboard-write"])
+  await mockOpenCodeServer(page, {
+    directory: "/repo",
+    project: project({ id: "proj_no_remote", directory: "/repo", name: "Local project" }),
+    provider: NO_PROVIDER,
+    sessions: [],
+    pageMessages: () => ({ items: [] }),
+  })
+  await page.goto(
+    `/e2e/utils/settings-wsl.html?${new URLSearchParams({ server: SERVER, mode: "stopped", locale: "ru", cli: "missing" })}`,
+  )
+  const settings = page.getByTestId("settings-screen")
+  await settings.getByRole("button", { name: "Предпочтения", exact: true }).click()
+  await page.getByRole("menuitemradio", { name: "Серверы", exact: true }).click()
+  const ubuntu = settings.getByRole("region", { name: "Ubuntu", exact: true })
+  const hint = ubuntu.getByText("Чтобы инструменты Loginom работали в WSL, выполните loginom setup в дистрибутиве")
+  await expect(hint).toHaveCount(0)
+  await ubuntu.getByRole("button", { name: "Установить Loginom AI Agent CLI" }).click()
+  await expect(hint).toBeVisible()
+  await ubuntu.getByRole("button", { name: "Скопировать команду" }).click()
+  await expect(page.getByText("Команда скопирована", { exact: true })).toBeVisible()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    '"$HOME/.local/share/loginom-ai-agent-wsl/current/bin/loginom-ai-agent-cli" loginom setup',
+  )
 })

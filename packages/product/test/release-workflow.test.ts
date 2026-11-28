@@ -86,8 +86,23 @@ describe("loginom-release workflow", () => {
     expect(doc.jobs.collect.steps.map((step: any) => step.with?.pattern).filter(Boolean)).toEqual(["loginom-release-*"])
   })
 
-  test("publishes nothing and carries no secrets", () => {
-    expect(workflow).not.toContain("secrets.")
+  test("signs only verified tag builds in the release environment", () => {
+    const { ["sign-wsl"]: signing, ...candidate } = doc.jobs
+    expect(JSON.stringify(candidate)).not.toContain("secrets.")
+    expect(signing.needs).toEqual(["plan", "collect"])
+    expect(signing.if).toBe(
+      "github.repository == 'gooddaytoday/loginom-ai-agent' && github.event_name == 'push' && github.ref_type == 'tag'",
+    )
+    expect(signing.environment).toBe("release")
+    const [download, sign, sums, upload] = signing.steps.slice(-4)
+    expect(download.with.name).toBe("loginom-candidate-${{ github.sha }}")
+    expect(sign.env.LOGINOM_UPDATES_SIGNING_KEY).toBe("${{ secrets.LOGINOM_UPDATES_SIGNING_KEY }}")
+    expect(sign.run).toContain("script/update-feed.ts sign-wsl")
+    expect(sums.run).toContain("scripts/release/sums.ts")
+    expect(upload.with.name).toBe("loginom-signed-${{ github.sha }}")
+  })
+
+  test("publishes nothing", () => {
     expect(doc.permissions).toEqual({ contents: "read" })
     expect(workflow).not.toMatch(/gh release|contents: write|draft|gh-release/)
   })

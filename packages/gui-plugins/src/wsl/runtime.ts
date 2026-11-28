@@ -308,7 +308,11 @@ export function createWslRuntime(t: MainContext["t"], cli = { discover: discover
 
       const [bash, tools] = await Promise.all([
         runWslSh("command -v bash >/dev/null && printf yes || printf no", name, opts),
-        runWslSh("command -v tar >/dev/null && command -v sha256sum >/dev/null && printf yes || printf no", name, opts),
+        runWslSh(
+          "command -v tar >/dev/null && command -v sha256sum >/dev/null && command -v flock >/dev/null && printf yes || printf no",
+          name,
+          opts,
+        ),
       ])
 
       return {
