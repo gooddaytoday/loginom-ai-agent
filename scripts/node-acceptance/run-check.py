@@ -30,6 +30,7 @@ SCENARIOS = {
     '5-REST': dict(model_timeout=2700),
 }
 D76_STATUS = 'PASS с ограничением платформы D76'
+EVIDENCE_UNMOVED = 'EVIDENCE_UNMOVED'
 MAX_CASE_TURNS = 8
 # Owner decisions 16.11 logreg-{partition,kfold}-csv-by-name: native warm/reopen order differs.
 CSV_COLUMNS_BY_NAME_SCENARIOS = ('logreg-partition-sequential', 'logreg-partition-column', 'logreg-validation-kfold')
@@ -78,10 +79,10 @@ def saved_file_version(receipt):
     version = receipt.get('file_version') if isinstance(receipt, dict) else None
     if not isinstance(version, dict):
         return None
-    mtime, size, sha256 = (version.get(key) for key in ('mtime', 'size', 'sha256'))
-    if (isinstance(mtime, str) and mtime.strip() and type(size) is int and size > 0
-            and isinstance(sha256, str) and re.fullmatch(r'[0-9a-f]{64}', sha256)):
-        return dict(mtime=mtime, size=size, sha256=sha256)
+    mtime, size, digest = (version.get(key) for key in ('mtime', 'size', 'hash'))
+    if (isinstance(mtime, str) and re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z', mtime)
+            and type(size) is int and size > 0 and isinstance(digest, str) and re.fullmatch(r'[0-9a-f]{64}', digest)):
+        return dict(mtime=mtime, size=size, hash=digest)
 
 
 @contextmanager
@@ -1749,6 +1750,8 @@ def summary(report):
             rows.append(f"\nFAIL {r['scenario']}: {r.get('failure_class')}; {r.get('detail')}; "
                         f"журнал: {r.get('location')}; load при отказе: {r.get('failure_load')}; "
                         f"профиль: {r.get('profile')}")
+        if r.get('status') == EVIDENCE_UNMOVED:
+            rows.append(f"\n{EVIDENCE_UNMOVED} {r['scenario']}: {r['live_evidence_error']}; журнал: {r['live_evidence']}")
     failed_edits = [(r['scenario'], turn['case'], edit)
                     for r in report['runs'] for turn in r.get('turns', [])
                     if (edit := turn.get('manual_edit')) and edit.get('failure_category')]
@@ -3633,15 +3636,23 @@ class Runner:
                     **{key: expected[key] for key in ('nodes', 'n18_javascript_step') if key in expected}))
                 if live:
                     version = saved_file_version(live.turn_saved)
-                    write(folder / 'case-port-save-version.json', version)
                     if live.child is not None:
                         live.port_readbacks.append((folder, package, login, build, version))
                         self.current['csv'] = 'pending native port readback'
                         return session, expected, None, None
-                    if version is None:
-                        self.current['csv'] = 'UNKNOWN'
-                        return session, expected, None, None
-                self.case_port_readback(folder, package, login, build)
+                else:
+                    from run_check_live import package_save_states
+                    journals = sorted((event for log in profile.rglob('execution-events.jsonl') for _, event in records(log)
+                                       if event.get('phase') == 'saved_package_state_observed'),
+                                      key=lambda event: event.get('recorded_at', ''))
+                    saves = [save for save in package_save_states(journals, graph_start,
+                             (event['part'] for _, event in events if event.get('type') == 'tool_use'))
+                             if save.get('account') == login['username'] and save.get('package_path') == package]
+                    version = saved_file_version(saves[-1]) if saves else None
+                reason = self.case_port_readback(folder, package, login, build, version=version)
+                if reason:
+                    self.current.update(csv='UNKNOWN', readback_reason=reason)
+                    return session, expected, None, None
             self.current['csv'] = '— (native outputs PASS)'
             return session, expected, None, None
         if only_graph:
@@ -3999,16 +4010,27 @@ class Runner:
             baseline['moved_node_id'] = result['delta']['changed_nodes'][0]['node_id']
         return baseline
 
-    def case_port_readback(self, folder, package, login, build):
+    def case_port_readback(self, folder, package, login, build, *, version):
+        if version is None:
+            return 'CASE_PORT_SAVE_VERSION_UNKNOWN'
         node = build / 'resources/loginom/bin/node'
+        saved = folder / 'case-port-save-version.json'
+        write(saved, dict(path=package, file_version=version))
         with cold_config(folder, login) as config:
             self.phase('case-port-readback', [node, REPO / 'scripts/node-acceptance/cold-check.mjs',
-                '--config', config, '--resources', build / 'resources/loginom', '--saved', package,
+                '--config', config, '--resources', build / 'resources/loginom', '--saved', saved,
                 '--expected', folder / 'case-port-expected.json', '--output', folder / 'case-port-readback'], folder)
         result = folder / 'case-port-readback/result.json'
         verified = read(result)
-        assert verified['status'] == 'PASS' and all(verified['cleanup'].get(key) is True
+        assert verified.get('path') == package and all(verified['cleanup'].get(key) is True
             for key in ('package_closed', 'logged_out')), 'CASE_PORT_READBACK_UNCONFIRMED'
+        if verified['status'] in ('PASS', 'UNKNOWN'):
+            observed = saved_file_version(verified)
+            if observed is None:
+                return 'CASE_PORT_OPENED_FILE_VERSION_UNKNOWN'
+            if observed != version:
+                return 'CASE_PORT_OPENED_FILE_VERSION_CHANGED'
+        assert verified['status'] == 'PASS', 'CASE_PORT_READBACK_UNCONFIRMED'
         assert [match['node']['node_id'] for match in verified['correspondence']] == read(
             folder / 'case-port-expected.json')['case_port_node_ids'], 'CASE_PORT_READBACK_NODE_CHANGED'
         self.phase('case-port-sample-oracle', [node, REPO / 'scripts/node-acceptance/case-ports.mjs',
@@ -4082,11 +4104,20 @@ class Runner:
             if close_error:
                 raise PackageCloseUnconfirmed(close_error)
             cleanup = 'main PASS' if attempts else 'no workspace started'
+        except PackageCloseUnconfirmed as error:
+            self.current['live_cleanup_error'] = str(error)
+            raise
         finally:
             self.current['cleanup'] = cleanup
+            if cleanup == 'FAIL' and self.current.get('csv') == 'pending native port readback':
+                self.current['csv'] = 'UNKNOWN'
             for turn in self.current['turns']:
                 if turn.get('cleanup') == 'pending live shutdown':
                     turn['cleanup'] = cleanup
+                    if cleanup == 'FAIL' and turn['status'] == 'PASS':
+                        turn.update(status='UNKNOWN', failure_class='LIVE_CHAIN_SHUTDOWN_UNCONFIRMED')
+                        if turn.get('csv') == 'pending native port readback':
+                            turn.update(csv='UNKNOWN', readback_reason='CASE_PORT_READBACK_CLOSE_UNCONFIRMED')
             self.closing_live = False
             if not cancellation_pending and getattr(self, 'cancel_requested', False):
                 raise InterruptedError('LIVE_CHAIN_CANCELLED')
@@ -4102,18 +4133,18 @@ class Runner:
                 reason = 'CASE_PORT_SAVE_VERSION_UNKNOWN'
             elif version != final_version:
                 reason = 'CASE_PORT_SAVE_VERSION_CHANGED'
-            if reason:
-                turn.update(csv='UNKNOWN', readback_reason=reason)
-                if turn['status'] == 'PASS':
-                    turn.update(status='UNKNOWN', failure_class=reason)
-            else:
+            if reason is None:
                 try:
-                    self.case_port_readback(stage, package, login, build)
+                    reason = self.case_port_readback(stage, package, login, build, version=version)
                 except Exception as error:
                     turn.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL', csv='FAIL',
                                 failure_class=str(error).split(':')[0] or type(error).__name__)
                     raise
-                turn['csv'] = '— (native outputs PASS)'
+            turn['csv'] = 'UNKNOWN' if reason else '— (native outputs PASS)'
+            if reason:
+                turn['readback_reason'] = reason
+                if turn['status'] == 'PASS':
+                    turn.update(status='UNKNOWN', failure_class=reason)
             if turn is self.current['turns'][-1]:
                 self.current['csv'] = turn['csv']
 
@@ -4137,14 +4168,16 @@ class Runner:
                     else:
                         shutil.rmtree(entry)
 
-        prune(runtime)
         try:
+            prune(runtime)
             runtime.rename(destination)
         except OSError as error:
             # A failed rename leaves the only receipts in place. Remove the rest of the profile.
+            self.current.update(status=EVIDENCE_UNMOVED, status_before_evidence_failure=self.current.get('status'),
+                                live_evidence=str(runtime), live_evidence_error=str(error))
+            self.current.setdefault('failure_class', EVIDENCE_UNMOVED)
             prune(profile)
             destination.rmdir()
-            self.current.update(live_evidence=str(runtime), live_evidence_error=str(error))
         else:
             self.current['live_evidence'] = str(destination)
 
@@ -4217,6 +4250,7 @@ class Runner:
                         r.update(csv='—', save='—', cleanup='—')
                         r.pop('graph', None)
                         r.pop('cli_exit', None)
+                        r.pop('readback_reason', None)
                         stage = folder / turn['case']
                         stage.mkdir()
                         prior = baseline
@@ -4236,6 +4270,10 @@ class Runner:
                                     status='FAIL' if r.get('failure_class') or r.get('cli_exit') else 'PASS')
                         if 'cli_exit' in turn:
                             turn.setdefault('failure_class', turn['cli_exit']['code'])
+                        if r.get('readback_reason'):
+                            turn['readback_reason'] = r['readback_reason']
+                            if turn['status'] == 'PASS':
+                                turn.update(status='UNKNOWN', failure_class=r['readback_reason'])
                         active_turn = None
                         if manual and not r.get('failure_class'):
                             edit_result = turn['manual_edit'] = dict(kind=manual['kind'], status='PENDING',
@@ -4316,7 +4354,7 @@ class Runner:
                         self.failure(r, error, folder)
                     if active_turn is not None:
                         active_turn.update({k: r[k] for k in ('csv', 'save', 'cleanup', 'graph', 'failure_class', 'failure_category', 'cli_exit') if k in r},
-                                           status=r['status'])
+                                           status='UNKNOWN' if isinstance(error, PackageCloseUnconfirmed) else r['status'])
                     if isinstance(error, InterruptedError):
                         raise
                 finally:
@@ -4352,15 +4390,16 @@ class Runner:
                                                 shutil.rmtree(auth_path.parent)
                             except OSError as error:
                                 r['oauth_cleanup_error'] = str(error)
-                                if r['status'] != 'FAIL': self.failure(r, error, folder)
+                                if r['status'] not in ('FAIL', EVIDENCE_UNMOVED): self.failure(r, error, folder)
                             else:
-                                r.pop('profile', None)
+                                if not r.get('live_evidence_error'):
+                                    r.pop('profile', None)
                     if r.get('dataset'):
                         try: self.cleanup_d87(folder, login, build)
                         except Exception as error:
                             # Retain the original model failure if cleanup also fails.
                             r['dataset_cleanup_error'] = str(error)
-                            if r.get('status') != 'FAIL': self.failure(r, error, folder)
+                            if r.get('status') not in ('FAIL', EVIDENCE_UNMOVED): self.failure(r, error, folder)
                 self.save()
         except Exception as error:
             for r in self.report['runs']:
@@ -4395,7 +4434,7 @@ def main():
                 print(summary(report), end='')
                 return 0 if all(r['status'] in ['PASS', D76_STATUS] or (r['status'] == 'NOT_RUN' and r.get('reason') == 'PREPARE_ONLY' and r.get('preparation_only') is True) for r in report['runs']) else 1
             if time.monotonic() >= end:
-                ready = sum(r['status'] in ['PASS', D76_STATUS, 'FAIL', 'UNKNOWN', 'NOT_RUN'] for r in report['runs'])
+                ready = sum(r['status'] in ['PASS', D76_STATUS, 'FAIL', 'UNKNOWN', EVIDENCE_UNMOVED, 'NOT_RUN'] for r in report['runs'])
                 current = next((r['scenario'] for r in report['runs'] if r['status'] == 'PENDING'), report['phase'])
                 print(f"{ready}/{len(report['runs'])} готово, идёт {current}")
                 return 2

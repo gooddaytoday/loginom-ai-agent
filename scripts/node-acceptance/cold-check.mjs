@@ -27,7 +27,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
-import {readColdNativeOutput,coldNativeEligible,performColdNodeAction,runColdExecution as runOwnedColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation,readColdPortWindows,MAX_COLD_WINDOW_ROWS} from './cold-reader-policy.mjs'
+import {readColdNativeOutput,coldNativeEligible,performColdNodeAction,runColdExecution as runOwnedColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation,readColdPortWindows,MAX_COLD_WINDOW_ROWS,verifyColdPackageFile} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -48,7 +48,6 @@ const args = parseArgs({
     'csv-encoding': { type: "string", default: 'UTF-8' },
     'text-export-case': { type: 'string' },
     'exact-port-windows': { type: 'boolean', default: false },
-    'case-port-read-only': { type: 'boolean', default: false },
     'sampling-baseline': { type: 'string' },
   },
   strict: true,
@@ -199,12 +198,22 @@ page = context.pages()[0]
     throw Error("COLD_PACKAGE_PATH_MISMATCH")
   }
   const readOnly=prepared.workflow_ref.navigation_path.some(item=>item.label.endsWith("(только чтение)"));
-  if(readOnly&&!args['case-port-read-only']) {
+  if(readOnly) {
     state.openFailure={status:prepared.status,reason:'PACKAGE_READ_ONLY'}
     throw Error("COLD_PACKAGE_NOT_WRITABLE")
   }
 
   const origin = new URL(config.loginom_url).origin
+  if(Object.hasOwn(saved,'file_version')){
+    const proof=await verifyColdPackageFile({load,execute,expected:saved.file_version,owner:{
+      origin,build:'7.4.2',path:saved.path,tabTid:prepared.workflow_ref.tab_tid,
+      documentId:prepared.document_id,sessionId:session,account:config.workflow_profile.loginom_user,token:randomUUID(),
+    }});
+    state.fileVersion=proof.file;
+    state.fileVersionFailure=proof.reason;
+    await record({phase:'cold_opened_file_version',expected:saved.file_version,observed:proof.file,reason:proof.reason});
+    if(proof.reason)throw Error(proof.reason);
+  }
   const modifiedOptions={sessionId:session,documentId:prepared.document_id,account:config.workflow_profile.loginom_user,
    packagePath:saved.path,loginomUrl:config.loginom_url,loginomBuild:'7.4.2'};
   await recordColdPackageModified({execute,record,makeSavedPackageStateCode,options:modifiedOptions,stage:'after_open'});
@@ -660,9 +669,8 @@ page = context.pages()[0]
       loginomUrl: config.loginom_url,
       loginomBuild: "7.4.2",
       tabTid: prepared.workflow_ref.tab_tid,
-      diagnosticReadOnly: readOnly,
-      diagnosticDiscard: !readOnly,
-      diagnosticWaitForIdle: !readOnly,
+      diagnosticDiscard: true,
+      diagnosticWaitForIdle: true,
     }),
   )
   await writeFile(join(args.output, "cleanup.json"), JSON.stringify(cleanup, null, 2) + "\n")
@@ -677,6 +685,7 @@ page = context.pages()[0]
     status: "PASS",
     phase: "independent_cold_reopen_readback",
     path: saved.path,
+    ...(state.fileVersion?{file_version:state.fileVersion}:{}),
     ...(state.exportObservation?{export_observation:state.exportObservation}:{}),
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
@@ -716,7 +725,7 @@ page = context.pages()[0]
     state.failure=state.failure.split(secret).join('[REDACTED]')
     if(state.openFailure)state.openFailure.reason=String(state.openFailure.reason).split(secret).join('[REDACTED]')
   }
-  if (!state.cancelled) throw error
+  if (!state.cancelled && state.failure!==state.fileVersionFailure) throw error
 } finally {
   // Cold teardown: one native cleanup, then browser, including cancellation.
   try {
@@ -770,8 +779,14 @@ page = context.pages()[0]
         await writeFile(join(args.output,'cleanup.json'),JSON.stringify(state.cleanup,null,2)+'\n')
       })
   }
-  if(state.failure&&!state.cleanupExpired)await writeFile(join(args.output,'result.json'),JSON.stringify({status:'FAIL',
+  if(state.failure&&!state.cleanupExpired){
+   const versionUnconfirmed=state.failure===state.fileVersionFailure;
+   const closeConfirmed=state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true&&state.cleanup.logged_out===true;
+   const status=versionUnconfirmed&&closeConfirmed?'UNKNOWN':'FAIL';
+   if(versionUnconfirmed&&!closeConfirmed)process.exitCode=1;
+   await writeFile(join(args.output,'result.json'),JSON.stringify({status,
    phase:'independent_cold_reopen_readback',path:saved.path,settingsReapplied:false,error:state.failure,
+   ...(state.fileVersion?{file_version:state.fileVersion}:{}),
    ...(state.openFailure?{reason:state.openFailure.reason,open_failure:state.openFailure}:{}),
    ...(state.openDiagnosticUnconfirmed?{open_diagnostic_recorded:false}:{}),
    ...(state.exportObservation?{export_observation:state.exportObservation}:{}),
@@ -780,6 +795,7 @@ page = context.pages()[0]
    cleanup:{status:state.cleanup?.status??'BLOCKED',reason:state.cleanup?.reason??(state.cleanup?.status==='SUCCEEDED'?null:state.cleanup?'CLEANUP_UNCONFIRMED':'CLEANUP_NOT_ADMITTED'),
     package_closed:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true,
     logged_out:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.logged_out===true}},null,2)+'\n')
+  }
   } finally {
     await context?.close()
     clearTimeout(state.cancelTimer)
@@ -792,7 +808,8 @@ async function loadSaved(value) {
   if (value.endsWith(".lgp")) return { path: value }
   const parsed = JSON.parse(await readFile(resolve(value), "utf8"))
   if (typeof parsed === "string" && parsed.endsWith(".lgp")) return { path: parsed }
-  if (parsed && typeof parsed.path === "string") return { path: parsed.path, node: parsed.node }
+  if (parsed && typeof parsed.path === "string") return { path: parsed.path, node: parsed.node,
+    ...(Object.hasOwn(parsed,'file_version')?{file_version:parsed.file_version}:{}) }
   throw Error("SAVED_SHAPE_INVALID")
 }
 

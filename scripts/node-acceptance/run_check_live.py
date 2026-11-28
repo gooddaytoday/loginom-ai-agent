@@ -275,20 +275,27 @@ def json_lines(path):
                 continue  # The writer may be appending its last record.
 
 
-def package_save_states(receipts, since):
-    saved_packages = {}
+def package_save_states(receipts, since, parts):
+    file_reads = {}
+    for part in parts:
+        if part.get('tool') not in ('loginom_dock_action_run', 'loginom_dock_operation_inspect'):
+            continue
+        state = part['state']
+        metadata = (state.get('metadata') or {}).get('loginom')
+        if (state['status'] == 'completed' and isinstance(metadata, dict) and metadata.get('v') == 1
+                and metadata.get('kind') == 'save' and metadata.get('state') == 'settled'
+                and metadata.get('status') == 'SUCCEEDED' and isinstance(metadata.get('operationId'), str)
+                and isinstance(metadata.get('evidence'), list)):
+            file_reads[metadata['operationId']] = metadata['evidence']
     for event in receipts:
-        outcome = event.get('outcome')
-        operation = event.get('operation_id')
-        if (event.get('phase') == 'completed' and operation and isinstance(outcome, dict)
-                and outcome.get('status') == 'SUCCEEDED'
-                and outcome.get('action_key') in ('package.save_checkpoint', 'package.save_as')):
-            saved_packages[operation] = (outcome.get('output') or {}).get('package_ref') or {}
         if event.get('phase') == 'saved_package_state_observed' and event.get('recorded_at', '') >= since:
             state = event['state']
-            package = saved_packages.get(operation, {})
-            version = package.get('file_version') if package.get('path') == state.get('package_path') else None
-            yield dict(state, file_version=version)
+            facts = [fact for fact in file_reads.get(event.get('operation_id'), []) if isinstance(fact, dict)]
+            matching_save = any(fact.get('kind') == 'saved' and fact.get('path') == state.get('package_path')
+                                for fact in facts)
+            versions = [fact.get('file') for fact in facts
+                        if fact.get('kind') == 'savedFileRead' and fact.get('scope') == 'package']
+            yield dict(state, file_version=versions[0] if matching_save and len(versions) == 1 else None)
 
 
 class LiveChain:
@@ -491,7 +498,9 @@ class LiveChain:
         if current_browser:
             receipts = json_lines(current_browser[2] / 'execution-events.jsonl')
             since = datetime.fromtimestamp(submitted, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
-            saved = list(package_save_states(receipts, since))
+            message_ids = {message['id'] for message in assistants}
+            saved = list(package_save_states(receipts, since,
+                         (part for _, _, part in parts if part['messageID'] in message_ids)))
             if saved and all(state.get('account') == self.account and state.get('package_path') == self.package
                              for state in saved):
                 self.saved = self.turn_saved = saved[-1]

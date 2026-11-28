@@ -4,6 +4,29 @@
 // dispatch uses the production reader, including its exactness and cleanup.
 export const MAX_COLD_WINDOW_ROWS = 1000;
 
+export async function verifyColdPackageFile({load,execute,owner,expected}){
+ const unknown={reason:'CASE_PORT_OPENED_FILE_VERSION_UNKNOWN'};
+ try {
+  const {makeSavedPackageGraphCode,makeSavedPackageReleaseCode,readSavedPackageFacts}=
+   await load('client/lib/saved-package-graph.mjs');
+  let native, release;
+  try {
+   native=await execute(makeSavedPackageGraphCode(owner));
+  } finally {
+   release=await execute(makeSavedPackageReleaseCode(owner.token));
+  }
+  if(release?.released!==true)return unknown;
+  const {evidence}=await readSavedPackageFacts({response:{content:[{type:'text',text:JSON.stringify(native)}]}});
+  const file=evidence?.file;
+  if(evidence?.kind!=='savedFileRead'||evidence.scope!=='package'||!file||
+   typeof file.mtime!=='string'||!Number.isSafeInteger(file.size)||file.size<1||!/^[a-f0-9]{64}$/.test(file.hash))return unknown;
+  return {file,reason:['mtime','size','hash'].some(key=>file[key]!==expected?.[key])
+   ?'CASE_PORT_OPENED_FILE_VERSION_CHANGED':null};
+ } catch {
+  return unknown;
+ }
+}
+
 export function readColdNativeOutput(channel,{type,port,execution}){
  return channel.readOutputPort({port,execution,sampleRows:100,requireExactNumbers:true,
   ...(type==='preprocessing.coarse_classes'&&port===1?{typedVariants:true}:{})});

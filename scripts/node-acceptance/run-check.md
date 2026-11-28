@@ -520,7 +520,8 @@ failure, or worker SIGTERM, cleanup removes any remaining copy and the entire
 OAuth profile, including its database and sidecars. For live chains the private
 result directory retains runtime execution journals and cleanup/ACK receipts.
 The runner moves those files within the result filesystem. If the rename fails,
-it retains the receipts at their original path after removing the other profile data.
+it reports EVIDENCE_UNMOVED and records the retained evidence path in
+results.json. The other profile data is removed.
 If the worker is forcibly killed before cleanup (for example with SIGKILL),
 remove that run's OAuth profile manually before sharing any evidence.
 Without `RUN_CHECK_AUTH`, no copy is made and the profile is retained.
@@ -699,14 +700,14 @@ At that boundary, the runner verifies package close, logout and runtime ACK,
 applies the edit in a separate browser, reopens the package to confirm it, and
 resumes the same chat in a new CLI process. For `"output_mode":"ports"`, the
 runner checks native port receipts against the expected graph and values.
-A partial receipt requires a full verified read from the same saved node. After
-CLI shutdown, package close, logout and runtime ACK, the runner compares the
-turn's Save receipt with the segment's last Save receipt. The readback requires
-matching file modification time, size and SHA-256. Missing or changed versions
-leave the turn and the run UNKNOWN when no check has already failed. The reader
-removes the temporary login configuration and closes the browser before any
-manual edit or continuation.
-Current Save receipts contain the package path but can omit the file version.
+A partial receipt requires a verified read from the same saved node. After
+CLI shutdown, package close, logout and runtime ACK, the runner checks the
+turn's v1 savedFileRead version against the segment's last Save receipt. The
+cold reader verifies modification time, size and SHA-256 for the reopened file
+before executing or reading any port. A missing or changed version gives
+UNKNOWN. Without a shutdown ACK, affected turns are UNKNOWN and the cleanup
+error is reported separately. The runner removes the temporary login
+configuration and closes the reader before any manual edit or continuation.
 
 The model and any explicit variant are recorded per run in `results.json`.
 

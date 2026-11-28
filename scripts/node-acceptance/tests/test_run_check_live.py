@@ -231,10 +231,12 @@ class LiveChainTest(unittest.TestCase):
             live.browsers_seen = {live.browser}
             live.remaining_browsers.return_value = set()
             live.turn_log = profile / 'live-turns.jsonl'
-            runner.current = {'turns': [{'cleanup': 'pending live shutdown'}]}
+            runner.current = {'turns': [{'status': 'PASS', 'cleanup': 'pending live shutdown'}]}
             with self.assertRaisesRegex(runner_module['PackageCloseUnconfirmed'], 'LIVE_CHAIN_RUNTIME_ACK_MISSING'):
                 runner.close_live(live)
             self.assertEqual(runner.current['turns'][0]['cleanup'], 'FAIL')
+            self.assertEqual(runner.current['turns'][0]['status'], 'UNKNOWN')
+            self.assertEqual(runner.current['live_cleanup_error'], 'LIVE_CHAIN_RUNTIME_ACK_MISSING')
             ack = attempt.parent / 'runtime-close-current.json'
             ack.write_text(json.dumps({'closed_ack': True, 'exit_code': 0, 'exit_signal': None}))
             runner.current['turns'][0]['cleanup'] = 'pending live shutdown'
@@ -291,7 +293,7 @@ class LiveChainTest(unittest.TestCase):
     def test_failed_first_turn_checks_native_cleanup_and_chromium_without_a_completed_turn(self):
         module = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'run-check.py'))
         runner = module['Runner'].__new__(module['Runner'])
-        runner.current = {'turns': [{'cleanup': 'pending live shutdown'}]}
+        runner.current = {'turns': [{'status': 'FAIL', 'cleanup': 'pending live shutdown'}]}
         with TemporaryDirectory() as directory:
             profile = Path(directory)
             attempt = profile / 'loginom/runtime/attempt'
@@ -369,8 +371,10 @@ class LiveChainTest(unittest.TestCase):
         edit = dict(kind='rename', node=dict(label='Before'), label='After')
         persisted = dict(complete=True, links=[], nodes=[
             dict(ref=dict(node_id='node'), label='After', type='imports.text', position=dict(x=64, y=64))])
-        for acknowledged, version_known in ((True, True), (True, False), (False, True)):
-            with self.subTest(acknowledged=acknowledged, version_known=version_known), TemporaryDirectory() as directory:
+        for acknowledged, version_known, evidence_unmoved in (
+                (True, True, False), (True, False, False), (False, True, False), (True, True, True)):
+            with self.subTest(acknowledged=acknowledged, version_known=version_known,
+                              evidence_unmoved=evidence_unmoved), TemporaryDirectory() as directory:
                 root = Path(directory)
                 pair, cases = root / 'pair', root / 'cases'
                 pair.mkdir()
@@ -394,6 +398,13 @@ class LiveChainTest(unittest.TestCase):
                 runner.report = dict(phase='setup', runs=[dict(scenario='second', status='PENDING')])
                 runner.deadline = time.time() + 60
                 calls, commands = [], []
+                version = dict(mtime='2026-11-28T00:00:00.000Z', size=100, hash='a' * 64) if version_known else None
+                rename = Path.rename
+
+                def move(source, target):
+                    if evidence_unmoved and Path(target).name == 'live-evidence':
+                        raise OSError(errno.ENOSPC, 'No space left')
+                    return rename(source, target)
 
                 def phase(name, command, folder, **kwargs):
                     calls.append(name)
@@ -404,8 +415,10 @@ class LiveChainTest(unittest.TestCase):
                         return
                     if name == 'case-port-readback':
                         self.assertEqual(calls, ['setup', 'first', 'exit', 'case-port-readback'])
+                        saved = json.loads(Path(command[command.index('--saved') + 1]).read_text())
+                        self.assertEqual(saved['file_version'], version)
                         (folder / 'case-port-readback').mkdir()
-                        write(folder / 'case-port-readback/result.json', dict(status='PASS',
+                        write(folder / 'case-port-readback/result.json', dict(status='PASS', path=saved['path'], file_version=version,
                             cleanup=dict(package_closed=True, logged_out=True), correspondence=[dict(node=dict(node_id='node'))]))
                         return
                     if name == 'case-port-sample-oracle':
@@ -438,7 +451,6 @@ class LiveChainTest(unittest.TestCase):
                     live.browsers_seen.add(live.browser)
                     live.saved = dict(document_id='document')
                     if case == 'first':
-                        version = dict(mtime='2026-11-28T00:00:00Z', size=100, sha256='a' * 64) if version_known else None
                         live.saved['file_version'] = version
                         write(stage / 'case-port-expected.json', dict(case_port_node_ids=['node']))
                         live.port_readbacks.append((stage, package, login, build, version))
@@ -460,18 +472,27 @@ class LiveChainTest(unittest.TestCase):
                         write(ack, dict(closed_ack=True, exit_code=0, exit_signal=None))
 
                 with patch.dict(module['daemon_pid'].__globals__, daemon_pid=lambda: 99), \
-                        patch.object(runner, 'build', return_value=root / 'build'), patch.object(runner, 'save'), \
+                        patch.object(Path, 'rename', autospec=True, side_effect=move), \
+                        patch.object(runner, 'build', return_value=root / 'build'), \
+                        patch.object(runner, 'save', side_effect=lambda: write(root / 'results.json', runner.report)), \
                         patch.object(runner, 'phase', side_effect=phase), patch.object(runner, 'model', side_effect=model), \
                         patch.object(LiveChain, 'send', autospec=True, side_effect=send), patch.object(LiveChain, 'pump'), \
                         patch.object(LiveChain, 'wait_for', return_value=b'nonce'), patch('run_check_live.process_alive', return_value=False), \
                         patch('run_check_live.subprocess.Popen', side_effect=spawn):
                     runner.run()
 
-                result = runner.report['runs'][0]
+                result = json.loads((root / 'results.json').read_text())['runs'][0]
                 self.assertNotIn('--session', commands[0])
                 self.assertTrue(auth.is_file())
-                self.assertFalse((root / 'second/profile').exists())
+                profile = root / 'second/profile'
+                self.assertEqual(profile.exists(), evidence_unmoved)
+                self.assertFalse((profile / 'data').exists())
                 evidence = Path(result['live_evidence'])
+                if evidence_unmoved:
+                    self.assertEqual(result['profile'], str(profile))
+                    self.assertEqual(evidence, profile / 'loginom/runtime')
+                    self.assertEqual(result['status_before_evidence_failure'], 'PASS')
+                    self.assertEqual(result['failure_class'], 'EVIDENCE_UNMOVED')
                 self.assertTrue(list(evidence.rglob('execution-events.jsonl')))
                 self.assertTrue(list(evidence.rglob('saved-package-cleanup.json')))
                 self.assertFalse(list(evidence.rglob('auth.json')))
@@ -479,13 +500,15 @@ class LiveChainTest(unittest.TestCase):
                     port_checks = ['case-port-readback', 'case-port-sample-oracle'] if version_known else []
                     self.assertEqual(calls, ['setup', 'first', 'exit', *port_checks, 'manual-edit', 'second', 'exit'])
                     self.assertEqual(commands[1][-2:], ['--session', 'same-chat'])
-                    self.assertEqual(result['status'], 'PASS' if version_known else 'UNKNOWN')
+                    self.assertEqual(result['status'], 'EVIDENCE_UNMOVED' if evidence_unmoved else 'PASS' if version_known else 'UNKNOWN')
                     if not version_known:
                         self.assertEqual(result['failure_class'], 'CASE_PORT_SAVE_VERSION_UNKNOWN')
                     self.assertEqual(result['turns'][0]['manual_edit']['status'], 'PASS')
                 else:
                     self.assertEqual(calls, ['setup', 'first', 'exit'])
-                    self.assertEqual(result['turns'][0]['status'], 'PASS')
+                    self.assertEqual(result['turns'][0]['status'], 'UNKNOWN')
+                    self.assertEqual(result['turns'][0]['csv'], 'UNKNOWN')
+                    self.assertEqual(result['live_cleanup_error'], 'LIVE_CHAIN_RUNTIME_ACK_MISSING')
                     self.assertEqual(result['turns'][0]['manual_edit']['failure_category'], 'product')
                     self.assertEqual(result['turns'][1]['status'], 'NOT_RUN')
 
@@ -495,8 +518,8 @@ class LiveChainTest(unittest.TestCase):
             folder = Path(directory)
             runner = module['Runner'].__new__(module['Runner'])
             runner.current = dict(turns=[dict(case=name, status='PASS') for name in ('first', 'unknown', 'last')])
-            version = dict(mtime='2026-11-28T00:00:00Z', size=100, sha256='a' * 64)
-            older_version = dict(version, sha256='b' * 64)
+            version = dict(mtime='2026-11-28T00:00:00.000Z', size=100, hash='a' * 64)
+            older_version = dict(version, hash='b' * 64)
             arguments = ('/worker/sample.lgp', dict(username='worker'), folder / 'build')
             live = Mock(profile=folder, previous_acks=set(), browsers_seen=set(), saved=dict(file_version=version),
                         turn_log=folder / 'turns.jsonl', port_readbacks=[
@@ -506,29 +529,35 @@ class LiveChainTest(unittest.TestCase):
                         ])
             live.segment_attempts.return_value = []
             live.remaining_browsers.return_value = set()
-            with patch.object(runner, 'case_port_readback') as reader:
+            with patch.object(runner, 'case_port_readback', return_value=None) as reader:
                 runner.close_live(live)
-            reader.assert_called_once_with(folder / 'last', *arguments)
+            reader.assert_called_once_with(folder / 'last', *arguments, version=version)
             first, unknown, last = runner.current['turns']
             self.assertEqual((first['status'], first['failure_class']), ('UNKNOWN', 'CASE_PORT_SAVE_VERSION_CHANGED'))
             self.assertEqual((unknown['status'], unknown['failure_class']), ('UNKNOWN', 'CASE_PORT_SAVE_VERSION_UNKNOWN'))
             self.assertEqual((last['status'], last['csv']), ('PASS', '— (native outputs PASS)'))
 
     def test_save_version_requires_a_successful_receipt_for_this_operation_and_path(self):
-        version = dict(mtime='2026-11-28T00:00:00Z', size=100, sha256='a' * 64)
+        version = dict(mtime='2026-11-28T00:00:00.000Z', size=100, hash='a' * 64)
         path = '/worker/sample.lgp'
-        saved = dict(phase='completed', operation_id='current', outcome=dict(status='SUCCEEDED',
-            action_key='package.save_checkpoint', output=dict(package_ref=dict(path=path, file_version=version))))
+        evidence = [dict(kind='saved', path=path), dict(kind='savedFileRead', scope='package', file=version)]
+        receipt = dict(v=1, kind='save', state='settled', status='SUCCEEDED', operationId='current', evidence=evidence)
         observed = dict(phase='saved_package_state_observed', operation_id='current',
                         recorded_at='2026-11-28T00:01:00Z', state=dict(package_path=path))
         since = '2026-11-28T00:00:30Z'
-        self.assertEqual(list(package_save_states(iter([saved, observed]), since)), [dict(package_path=path, file_version=version)])
-        for evidence in ([], [dict(saved, operation_id='previous')],
-                         [dict(saved, outcome=dict(saved['outcome'], status='FAILED'))]):
-            with self.subTest(evidence=evidence):
-                self.assertEqual(list(package_save_states([*evidence, observed], since)),
-                                 [dict(package_path=path, file_version=None)])
-        self.assertEqual(list(package_save_states([saved, observed], '2026-11-28T00:02:00Z')), [])
+
+        def part(metadata, tool='loginom_dock_action_run'):
+            return dict(tool=tool, state=dict(status='completed', metadata=dict(loginom=metadata)))
+
+        for tool in ('loginom_dock_action_run', 'loginom_dock_operation_inspect'):
+            self.assertEqual(list(package_save_states(iter([observed]), since, [part(receipt, tool)])),
+                             [dict(package_path=path, file_version=version)])
+        for parts in ([], [part(dict(receipt, operationId='previous'))], [part(dict(receipt, status='FAILED'))],
+                      [part(dict(receipt, evidence=[dict(kind='saved', path='/other.lgp'), evidence[1]]))],
+                      [part(dict(receipt, evidence=[evidence[0]]))]):
+            with self.subTest(parts=parts):
+                self.assertEqual(list(package_save_states([observed], since, parts)), [dict(package_path=path, file_version=None)])
+        self.assertEqual(list(package_save_states([observed], '2026-11-28T00:02:00Z', [part(receipt)])), [])
 
     def test_evidence_survives_rename_enospc_and_keeps_only_receipts(self):
         module = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'run-check.py'))
@@ -580,8 +609,36 @@ class LiveChainTest(unittest.TestCase):
                     raise error
 
                 with patch.object(runner, 'phase', side_effect=phase), self.assertRaises(type(error)):
-                    runner.case_port_readback(folder, '/worker/sample.lgp', login, folder / 'build')
-                self.assertEqual(list(folder.iterdir()), [])
+                    runner.case_port_readback(folder, '/worker/sample.lgp', login, folder / 'build',
+                        version=dict(mtime='2026-11-28T00:00:00.000Z', size=100, hash='a' * 64))
+                self.assertEqual([entry.name for entry in folder.iterdir()], ['case-port-save-version.json'])
+
+    def test_port_readback_cannot_promote_path_only_or_changed_file_to_pass(self):
+        module = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'run-check.py'))
+        version = dict(mtime='2026-11-28T00:00:00.000Z', size=100, hash='a' * 64)
+        path = '/worker/sample.lgp'
+        for observed, reason in ((None, 'CASE_PORT_OPENED_FILE_VERSION_UNKNOWN'),
+                                 (dict(version, hash='b' * 64), 'CASE_PORT_OPENED_FILE_VERSION_CHANGED')):
+            with self.subTest(observed=observed), TemporaryDirectory() as directory:
+                folder = Path(directory)
+                runner = module['Runner'].__new__(module['Runner'])
+                login = dict(url='https://example.invalid', username='worker', password='synthetic')
+
+                def phase(name, command, stage):
+                    self.assertEqual(name, 'case-port-readback')
+                    saved = Path(command[command.index('--saved') + 1])
+                    self.assertEqual(module['read'](saved), dict(path=path, file_version=version))
+                    output = stage / 'case-port-readback'
+                    output.mkdir()
+                    module['write'](output / 'result.json', dict(status='PASS', path=path, file_version=observed,
+                        cleanup=dict(package_closed=True, logged_out=True)))
+
+                with patch.object(runner, 'phase', side_effect=phase) as run:
+                    self.assertEqual(runner.case_port_readback(folder, path, login, folder / 'build', version=None),
+                                     'CASE_PORT_SAVE_VERSION_UNKNOWN')
+                    run.assert_not_called()
+                    self.assertEqual(runner.case_port_readback(folder, path, login, folder / 'build', version=version), reason)
+                    run.assert_called_once()
 
     def test_terminal_tool_failure_is_scoped_to_the_completed_turn(self):
         def tool(message):
