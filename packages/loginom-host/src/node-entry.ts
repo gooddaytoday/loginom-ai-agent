@@ -7,6 +7,7 @@ import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
+import { PackageSchemaSession } from "./package-schema"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -135,6 +136,11 @@ async function dispatch(message: unknown) {
     if (message.method === "dashboard.read") {
       const result = await state.host.readDashboard(Schema.decodeUnknownSync(DashboardRead)(input))
       reply({ id: message.id, result })
+      return
+    }
+    if (message.method === "package.schema") {
+      const { sessionID } = Schema.decodeUnknownSync(PackageSchemaSession)(input)
+      reply({ id: message.id, result: await state.host.packageSchema(sessionID) })
       return
     }
     if (!message.method.startsWith("connection.")) {

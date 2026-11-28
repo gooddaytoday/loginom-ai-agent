@@ -16,7 +16,7 @@ export async function readGraph(page, task) {
     .filter(r=>r.state==='completed'&&r.outcome?.status==='SUCCEEDED'&&r.outcome.action_key==='ui.act'&&r.outcome.cleanup_complete===true)
     .map(r=>({context:r.outcome.output?.prepared_node_context,trace:r.outcome.trace}));
   return page.evaluate(({ request, types, origin, build, read_bindings=false, window_blocker_selector,
-    track_link_guids=false, finishes, step_rebaseline=false, reopened }) => {
+    track_link_guids=false, finishes, step_rebaseline=false, snapshot_only=false, snapshot_details=false, reopened }) => {
     const fail = message => { throw new Error(message); };
     const preparation = globalThis.__loginomDockPreparationV1;
     if (location.origin !== origin || globalThis.bg?.app?.Version !== build || preparation?.document !== document
@@ -56,15 +56,58 @@ export async function readGraph(page, task) {
     // Older hosts without this native class still support the graph driver,
     // but cannot enter a bound composite node configuration.
     if (record.nodeTargetWorkflowNode && record.nodeTargetWorkflowNode !== workflowNode) fail('Prepared workflow object changed');
+    const collection = diagram.FNodes?.FCollection;
+    if (!Array.isArray(collection) || collection.length > 200) fail('Graph node bound exceeded');
+    const nodeTypes=Object.values(types);
+    if(snapshot_only){
+      const nativeLinks=diagram.FLinks?.FCollection;
+      if(model.FCreateDraggedNodeStarted!==false||model.FDraggingOverGraph!==false||model.FDraggedNode
+        ||!Array.isArray(nativeLinks)||nativeLinks.length>400)return null;
+      const ports=new Map();
+      const nodes=collection.map(node=>{
+        const nativeLabel=node.FLabel,geometry=node.FCell?.geometry;
+        if(!node.FGuid||nativeLabel?.parent!==node||nativeLabel.FCell?.parent!==node.FCell
+          ||typeof nativeLabel.FRawValue!=='string'||!Number.isFinite(geometry?.x)||!Number.isFinite(geometry?.y))
+          fail('Native snapshot node identity unavailable');
+        const descriptors=[], ordinals=new Map();
+        const body=snapshot_details&&graph.view.getState(node.FCell)?.shape?.node;
+        const tid=body&&containers[0].contains(body)?body.getAttribute('data-tid'):null;
+        for(const group of node.FPorts??[])for(const port of group.FCollection??[]){
+          if(port.parent!==node)continue;
+          ports.set(port,node.FGuid);
+          if(!snapshot_details||!port.FGuid||port.FCell?.parent!==node.FCell||![0,1].includes(port.FType))continue;
+          const direction=port.FType===0?'input':'output';
+          const rendered=graph.view.getState(port.FCell)?.shape?.node;
+          const portTid=rendered&&containers[0].contains(rendered)?rendered.getAttribute('data-tid'):null;
+          const name=tid&&portTid?.startsWith(tid+';')?portTid.slice(tid.length+1):'';
+          const kind=port.FSubType===3?'variables':port.FSubType===4?'control'
+            :/^(Input|Output)_DataTree-/.test(name)?'tree':port.FSubType===1?'data':'service';
+          const key=direction+'/'+kind,index=ordinals.get(key)??0;
+          ordinals.set(key,index+1);
+          descriptors.push({guid:port.FGuid,direction,kind,index,name});
+          if(descriptors.length>100)fail('Graph port bound exceeded');
+        }
+        const boundary=diagram.FIsSubmodel===true&&(diagram.GenericInputNode===node?'input':diagram.GenericOutputNode===node?'output':null);
+        const type=boundary==='output'?'control.supernode_output':nodeTypes.find(t=>t.type!=='control.supernode_output'&&t.icon_class===node.FIconCls)?.type??node.FIconCls;
+        // The step diff ignores viewport-driven movement of the output boundary.
+        const x=!snapshot_details&&boundary==='output'?0:geometry.x;
+        return {guid:node.FGuid,type,label:nativeLabel.FRawValue,position:{x,y:geometry.y},
+          ...(snapshot_details?{ports:descriptors,...(boundary?{boundary_role:boundary}:{})}:{})};
+      });
+      const links=nativeLinks.map(({FSourcePort:output,FTargetPort:input})=>{
+        const source=ports.get(output),target=ports.get(input);
+        if(!source||!target||!output.FGuid||!input.FGuid)fail('Native snapshot link endpoints unavailable');
+        return {source,output:output.FGuid,target,input:input.FGuid};
+      });
+      return {document:request.document_id,workflow:request.workflow_ref.workflow_id,nodes,links};
+    }
     if (workflowNode) record.nodeTargetWorkflowNode=workflowNode;
     const epochs=preparation.nodeTargetDomEpochs??={objects:new WeakMap(),next:0};
     const epoch=e=>{if(!epochs.objects.has(e))epochs.objects.set(e,++epochs.next);return epochs.objects.get(e);};
     const domEpoch=epoch(containers[0]);
     const portIdentities=record.nodeTargetPortIdentities??=new WeakMap();
     const stepPorts=[];
-    const collection = diagram.FNodes?.FCollection;
-    if (!Array.isArray(collection) || collection.length > 200) fail('Graph node bound exceeded');
-    const nodeTypes = Object.values(types), byTid = new Map(),variableByTid=new Map(),connectionPorts = new Map(),nativeBindings=[];
+    const byTid = new Map(),variableByTid=new Map(),connectionPorts = new Map(),nativeBindings=[];
     const nodes = collection.map(n => {
       const dom = graph.view.getState(n.FCell)?.shape?.node, tid = dom?.getAttribute('data-tid');
       if (!tid || !containers[0].contains(dom) || !n.FGuid || !n.FCell?.geometry) fail('Node identity is not rendered');
