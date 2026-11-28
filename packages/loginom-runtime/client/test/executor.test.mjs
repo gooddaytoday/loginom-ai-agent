@@ -12,6 +12,39 @@ import {withStorageIdentity} from '../lib/storage-policy.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
+import {createProtectedOperation} from '../../src/protected-operation.mjs';
+
+test('a lost Save response still reconciles within the inspect wire budget at 200 nodes', async()=>{
+ const page=linkPage(), path='/user/data/packages/large.lgp', marker='private snapshot';
+ const nodes=Array.from({length:200},(_,index)=>({
+  id:'47d76e4d-ec5c-49c9-b31a-'+String(index).padStart(12,'0'),label:marker+' ж'.repeat(130),sorting:false,
+ }));
+ const links=Array.from({length:499},(_,index)=>Array.from({length:4},(_,offset)=>nodes[(index+offset)%nodes.length].id));
+ const graph={nodes,links};
+ let writes=0;
+ const save=page.save.bind(page);
+ page.save=()=>{writes++;save();};
+ const evaluate=page.evaluate.bind(page);
+ page.evaluate=(fn,arg)=>fn.name==='readSaveGraph'?Promise.resolve(graph):evaluate(fn,arg);
+ const runtimeWithLostReply=runtime(page,{execute:async code=>{
+  const result=await page.execute(code);
+  if(result.action_key==='package.save_checkpoint'&&result.status==='SUCCEEDED'&&page.storage.has(path))
+   throw Error('Lost Save response');
+  return result;
+ }});
+ const stopped=await runtimeWithLostReply.run('package.save_checkpoint',{path,conflict_policy:'fail'},{operationId:'large-save'});
+ assert.equal(stopped.status,'AMBIGUOUS');
+ const inspected=await runtimeWithLostReply.inspect({operationId:'large-save'});
+ assert.equal(inspected.output.state,'resolved');
+ assert.equal(inspected.output.outcome.status,'SUCCEEDED');
+ assert.equal(inspected.output.outcome.output.package_ref.path,path);
+ const modelText=JSON.stringify(compactActionResult(inspected));
+ assert.ok(Buffer.byteLength(JSON.stringify(graph))>46000);
+ assert.ok(Buffer.byteLength(modelText)<46000);
+ assert.doesNotMatch(JSON.stringify(inspected), new RegExp(marker));
+ assert.equal(runtimeWithLostReply.savedGraphBefore('large-save')?.nodes.length,200);
+ assert.equal(writes,1);
+});
 
 test('a retained preparation cannot mask a settled node worker using the same ID',async()=>{
  const page=new Page(),receipt={status:'READY',operation_id:'shared'};
@@ -39,11 +72,16 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
  const form=page.app.Application.FInstance.FMainForm,connection=form.FMapTree.FServerConnection;
  connection.FSession={};connection.FRemoteSession={};form.FReconnecting=false;
  if(fault==='retry-restore')page.context.Ext.Msg={cfg:{}};
+ const tracker=createProtectedOperation({pages:()=>[]},'https://loginom.invalid');
+ const updates=[];
+ tracker.subscribe(update=>updates.push(update.active));
  const engine=runtime(page,{getStorageBinding:()=>binding,
+  protectOperation:tracker.begin,
   execute:(code,options)=>page.execute(withStorageIdentity(code,binding,options?.storageSession))});
  const path='/user/data/packages/lost-save.lgp',click=page.click.bind(page),initialPath=page.packagePath;
  let restoring=fault.startsWith('recover-');
  page.click=async item=>{
+  if(item.symbol==='file_dialog.confirm')assert.equal(tracker.snapshot()?.active,true);
   await click(item);
   if(item.symbol==='file_dialog.confirm'&&page.saveWrites===1){
    // The native application has committed Save As; its response is lost and
@@ -76,6 +114,8 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
  page.waitForFunction=async fn=>assert.equal(await page.evaluate(fn),true);
  const stopped=await engine.run(action,{path,conflict_policy:'fail'},{operationId:'lost-save'});
  assert.equal(stopped.status,'AMBIGUOUS',JSON.stringify(stopped));
+ assert.deepEqual(updates,[true]);
+ assert.equal(tracker.snapshot().operationId,'lost-save');
  assert.equal(cancelledRecovery,0,'cleanup must not cancel the native recovery prompt and log out');
  const original=page.context.__loginomDockPreparationV1.receipts.get('prepared'),oldPackage=original.packageNode;
  if(fault==='reopened'){
@@ -91,6 +131,7 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
  if(fault==='retry-restore'){
   const waiting=await engine.inspect({operationId:'lost-save'});
   assert.equal(waiting.output.state,'pending');assert.equal(page.saveWrites,1);
+  assert.deepEqual(updates,[true]);
  }
  if(restoring){
   // The same native Save can update its displayed path before reconnect,
@@ -108,6 +149,7 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
   assert.equal(settled.output.state,'resolved',JSON.stringify({recovery,settled}));
   assert.equal(settled.output.outcome.status,'SUCCEEDED');
   assert.equal(settled.output.outcome.effect_possible,true);assert.equal(page.saveWrites,1);
+  assert.deepEqual(updates,[true,false]);
   return;
  }
  const inspected=await engine.inspect({operationId:'lost-save'});
@@ -117,6 +159,7 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
  if(mismatch||protectedIdentity){
   assert.equal(inspected.output.state,protectedIdentity?'pending':'resolved',JSON.stringify(inspected));
   assert.equal(inspected.output.outcome.status,protectedIdentity?'AMBIGUOUS':'NOT_APPLIED');
+  assert.deepEqual(updates,protectedIdentity?[true]:[true,false]);
   if(mismatch)assert.equal(inspected.output.outcome.error.code,'SAVE_RESULT_MISMATCH');
   assert.equal(original.packageNode,oldPackage);assert.equal(page.saveWrites,1);
   if(mismatch){
@@ -128,12 +171,14 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
    const settled=await engine.inspect({operationId:'lost-save'});
    assert.equal(settled.output.state,'resolved',JSON.stringify(settled));
    assert.equal(settled.output.outcome.status,'SUCCEEDED');assert.equal(page.saveWrites,1);
+   assert.deepEqual(updates,[true,false]);
    assert.equal(prepared.nodeTargetPortIdentities?.get(nativePort)?.tid,portIdentity.tid);
   }
   return;
  }
  assert.equal(inspected.output.state,'resolved',JSON.stringify(inspected));
  assert.equal(inspected.output.outcome.status,'SUCCEEDED');
+ assert.deepEqual(updates,[true,false]);
  assert.equal(inspected.output.outcome.output.package_ref.path,path);
  assert.equal(page.saveWrites,1);assert.equal(restores,fault==='retry-restore'?2:1);
  assert.equal(page.context.__loginomDockPreparationV1.receipts.get('prepared').packageNode,

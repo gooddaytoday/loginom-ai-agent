@@ -16,6 +16,8 @@ import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
 import { observeLoginomReplies, withStepProgress } from "../client/lib/step-progress.mjs"
+import { createProtectedOperation } from "./protected-operation.mjs"
+import { withLoginomMetadata } from "../client/lib/loginom-feed-metadata.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -36,6 +38,7 @@ const state = {
   browserProfile: undefined,
   browserServer: undefined,
   lastLoginomReplyAt: null,
+  protectedOperation: undefined,
   inputs: new Map(),
   owner: undefined,
   uploadDirectory: undefined,
@@ -253,8 +256,23 @@ async function handle(message) {
       )
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
+      const knownSecrets = [input.connection.apiKey, input.connection.password]
+      state.protectedOperation = createProtectedOperation(authenticated.context, new URL(input.connection.url).origin)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+        protectOperation: state.protectedOperation.begin,
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
+        presentNodeReply: async (reply, project) => {
+          const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
+          let result = reply
+          try {
+            const projection = project({ outputFiles, knownSecrets, busy: state.protectedOperation.snapshot() })
+            if (projection) {
+              const { busy, savedPackageGraph, ...receipt } = projection
+              result = withLoginomMetadata(reply, { receipt, busy, savedPackageGraph })
+            }
+          } catch {}
+          return outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result
+        },
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
           state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,
             [input.connection.apiKey, input.connection.password, input.connection.username]) })
@@ -319,6 +337,7 @@ async function handle(message) {
           activeWork: state.bridge.hasActiveWork(),
           unsettledWork: state.bridge.hasUnsettledWork(),
           dispatching: state.controller !== undefined,
+          busy: state.protectedOperation.snapshot() ?? null,
         },
       })
       return
@@ -380,6 +399,9 @@ async function handle(message) {
       throw Error("LOGINOM_REQUEST_INVALID")
     const controller = new AbortController()
     state.controller = controller
+    const unsubscribeBusy = message.input.stepProgress === true
+      ? state.protectedOperation.subscribe(busy => send({ id: message.id, progress: { busy } }))
+      : undefined
     try {
       // Allow the bounded owned read and cleanup to return before the outer IPC
       // deadlines. Other tools retain room for a 60-second dock_node_wait.
@@ -402,7 +424,8 @@ async function handle(message) {
         lastReply: () => state.lastLoginomReplyAt,
         send: message.input.stepProgress === true ? progress => send({ id: message.id, progress }) : undefined,
       }, () => state.bridge.trackedStep(name, args, dispatch, controller.signal))
-      const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
+      const outputFiles = result._meta?.loginom && Array.isArray(result._meta.outputFiles)
+        ? result._meta.outputFiles : await state.session.artifactStore.outputFiles(result.structuredContent)
       send({
         id: message.id,
         result: {
@@ -412,6 +435,7 @@ async function handle(message) {
         },
       })
     } finally {
+      unsubscribeBusy?.()
       state.controller = undefined
     }
   } catch (error) {

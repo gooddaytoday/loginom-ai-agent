@@ -1,11 +1,11 @@
 import { Schema } from "effect"
 
-const ID = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_.:-]{1,128}$/))
+export const StepOperationId = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_.:-]{1,128}$/))
 const Label = Schema.String.check(Schema.isMaxLength(240))
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
-const StepRef = Schema.Struct({ operationId: ID, label: Label })
-const Save = Schema.Struct({ operationId: ID, path: Schema.String, throughStep: StepRef })
-const Step = Schema.Struct({
+const StepRef = Schema.Struct({ operationId: StepOperationId, label: Label })
+const Save = Schema.Struct({ operationId: StepOperationId, path: Schema.String, throughStep: StepRef })
+export const Step = Schema.Struct({
   outcome: Schema.Literals(["completed", "not_applied", "check_required"]),
   retryAvailable: Schema.Boolean,
   reason: Schema.optional(Schema.Literals(["unknown_write", "graph_conflict", "partial_effect"])),
@@ -13,16 +13,9 @@ const Step = Schema.Struct({
   save: Schema.NullOr(Save),
 })
 
-export const StepMetadata = Schema.Struct({
-  v: Schema.Literal(1),
-  operationId: ID,
-  state: Schema.Literal("settled"),
-  step: Step,
-})
-
 export const StepCheckRequest = Schema.Struct({
   sessionID: Schema.NonEmptyString,
-  operationId: ID,
+  operationId: StepOperationId,
 })
 
 export const StepCheckResult = Schema.Union([
@@ -45,28 +38,10 @@ export const StepCheckResult = Schema.Union([
   }),
 ])
 
-export function uncertainStep(operationId: string) {
-  return {
-    isError: true,
-    content: [
-      {
-        type: "text",
-        text: `Check the state of the original Loginom operation before another mutation: ${operationId}`,
-      },
-    ],
-    _meta: {
-      loginomStep: StepMetadata.make({
-        v: 1,
-        operationId,
-        state: "settled",
-        step: {
-          outcome: "check_required",
-          reason: "unknown_write",
-          retryAvailable: false,
-          persistence: "unknown",
-          save: null,
-        },
-      }),
-    },
-  }
-}
+export const unknownWriteStep = {
+  outcome: "check_required",
+  reason: "unknown_write",
+  retryAvailable: false,
+  persistence: "unknown",
+  save: null,
+} as const satisfies typeof Step.Type

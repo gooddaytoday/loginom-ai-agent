@@ -63,7 +63,7 @@ test('manual graph edit after an admitted create retains the new node and stops 
  };
  const result=await f.run();
  assert.equal(result.status,'AMBIGUOUS');
- assert.equal(result.error_code,'NODE_GRAPH_CONFLICT');
+ assert.equal(result.error_code,undefined);
  assert.deepEqual(f.calls,['create']);
  assert.deepEqual(f.graph.nodes.map(node=>node.label),['Edited by hand','Union']);
 });
@@ -97,6 +97,38 @@ for(const uncertain of [-1,0,1])test('variable union first native caption change
  const result=await f.run(r);assert.equal(result.status,uncertain>=0?'AMBIGUOUS':'SUCCEEDED',result.error);
  if(uncertain>=0){await f.run(r);assert.deepEqual(f.calls,Array(uncertain+1).fill('connect'));assert.equal(f.graph.variable_links.length,uncertain+1);}
  else {assert.deepEqual(f.calls,['connect','connect']);assert.equal(f.graph.variable_links.length,2);}
+});
+test('a delayed native Union caption permits the next verified variable link',async()=>{
+ const f=fixture();
+ f.graph.interaction_ready=true;
+ f.graph.foreign_links=[];
+ f.graph.nodes[0].variable_outputs=[{kind:'variables',port:0,port_guid:'source-var'}];
+ f.graph.nodes.push({...structuredClone(f.graph.nodes[0]),ref:ref('right'),label:'Right',
+  variable_outputs:[{kind:'variables',port:0,port_guid:'right-var'}]});
+ f.graph.nodes.push({ref:ref('union'),type:'variables.column_union',label:'Соединение (переменные)',inputs:[],outputs:[],
+  variable_inputs:[0,1].map(port=>({kind:'variables',port,port_guid:'input-'+port})),
+  variable_outputs:[{kind:'variables',port:0,port_guid:'out'}]});
+ const observe=f.adapter.observe;
+ let delayed;
+ f.adapter.observe=async()=>{
+  const previous=delayed;delayed=undefined;
+  return previous??observe();
+ };
+ f.adapter.mutate=async effect=>{
+  const edge=effect.parameters.edge;
+  f.calls.push(effect.kind);
+  (f.graph.variable_links??=[]).push({...edge,source_port_guid:edge.input===0?'source-var':'right-var',target_port_guid:'input-'+edge.input});
+  if(edge.input===0)delayed=structuredClone(f.graph);
+  f.graph.nodes[2].label=edge.input===0?'amount':'amount, enabled';
+  return {status:'SUCCEEDED',cleanup_complete:true,effect_possible:true};
+ };
+ const result=await f.run({document_id:'doc',workflow_ref:workflow,
+  target:{kind:'existing',type:'variables.column_union',ref:ref('union')},inputs:[],
+  variable_inputs:['source','right'].map((id,input)=>({source:ref(id),output:0,input,kind:'variables'}))});
+ assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.equal(result.node.label,'amount, enabled');
+ assert.deepEqual(f.calls,['connect','connect']);
+ assert.equal(f.graph.variable_links.length,2);
 });
 for(const replacement of ['source','output'])test('existing text export refuses '+replacement+' replacement without advising a second export',async()=>{
  const f=fixture();
@@ -584,7 +616,8 @@ test('add_only link ownership is the native GUID recorded at drop',()=>{
 });
 
 for(const fault of ['none','inspect','inspect foreign edit','release','foreign edit','first link changed','explicit label',
- 'resume explicit label','other explicit label','other caption','other receipt','incomplete cleanup','missing rewritten link']){
+ 'resume explicit label','other explicit label','other caption','other receipt','incomplete cleanup','missing rewritten link',
+ 'late caption','late caption foreign edit']){
  test('LAB-2082 second Join input with native caption change: '+fault,async()=>{
   const ref=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
   const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',
@@ -599,7 +632,7 @@ for(const fault of ['none','inspect','inspect foreign edit','release','foreign e
   const r={document_id:'doc',workflow_ref:workflow,target:{kind:'new',type:'transform.join_data',position:{x:400,y:208}},inputs:[
    {source:ref('source'),output:0,input:0},{source:ref('customers'),output:0,input:1},
   ]};
-  const explicitLabel=fault==='explicit label'||fault==='resume explicit label';
+  const explicitLabel=['explicit label','resume explicit label','late caption','late caption foreign edit'].includes(fault);
   if(explicitLabel)r.target.label='Слияние';
   if(fault==='other explicit label')r.target.label='Ручное слияние';
   const tid=(label,caption,input)=>workflow.prefix+`;Graph;${label}|Output_Data-0|${caption}|Input_Data-${input}`;
@@ -627,6 +660,12 @@ for(const fault of ['none','inspect','inspect foreign edit','release','foreign e
    const receipt={action_key:'link.create',operation_id:effect.id,cleanup_complete:true,effect_possible:true};
    if(effect.parameters.edge.input===0)return {...receipt,status:'SUCCEEDED',phase:'verified',
     output:{link_ref:{kind:'link',tid:tid('Заказы','Слияние',0)}}};
+   if(fault.startsWith('late caption')){
+    beforeSecond=structuredClone(graph);
+    target.label='Левое';
+    if(fault==='late caption foreign edit')graph.nodes[0].label='Ручная правка';
+    return {...receipt,status:'SUCCEEDED',phase:'verified'};
+   }
    // Windows 608/588: the original first edge now has a different DOM TID,
    // alongside the second edge. The independent graph keeps the first GUID pair.
    target.label=fault==='other caption'?'Правое':'Левое';
@@ -643,7 +682,14 @@ for(const fault of ['none','inspect','inspect foreign edit','release','foreign e
   };
   const apply=()=>prepareNodeTarget({request:r,operation,adapter,record:async e=>e});
   const result=await apply();
-  if(fault==='none'||fault==='explicit label'){
+  if(fault==='late caption foreign edit'){
+   assert.equal(result.status,'AMBIGUOUS');
+   assert.equal(result.error_code,undefined);
+   assert.equal(graph.nodes[0].label,'Ручная правка');
+   assert.deepEqual(calls,['create','connect','connect']);
+   return;
+  }
+  if(['none','explicit label','late caption'].includes(fault)){
    assert.equal(result.status,'SUCCEEDED',result.error);
    assert.equal(result.node.ref.node_id,'target');
    assert.equal(operation.targetPhase.final_graph.nodes[2].label,explicitLabel?'Слияние':'Левое');

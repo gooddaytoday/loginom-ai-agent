@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {withLoginomMetadata} from '../lib/loginom-feed-metadata.mjs';
 import {createStepRetry} from '../lib/step-retry.mjs';
 
 const apply='dock_node_apply';
@@ -27,8 +28,12 @@ function fixture() {
     const admission=retry.admit(name,args);
     assert.ok(admission.step);
     receipts.set(id,value);
-    const reply=await retry.finish(name,args,{content:[],structuredContent:{operation_id:id,...value}},admission.step,signal);
-    return reply._meta.loginomStep.step;
+    const original=withLoginomMetadata({content:[],structuredContent:{operation_id:id,...value}},
+      {operationId:id,state:'settled',verificationStale:true});
+    const reply=await retry.finish(name,args,original,admission.step,signal);
+    assert.equal(reply._meta.loginom.verificationStale,true);
+    assert.equal(reply._meta.loginom.v,1);
+    return reply._meta.loginom.step;
   };
   return {retry,window,receipts,saves,finish,noWrite:()=>{canProveNoWrite=true;}};
 }
@@ -42,6 +47,7 @@ test('lost write requires a read-only check and positive evidence before a fresh
 
   // The graph looks identical, but the original write is still unconfirmed.
   assert.equal((await f.retry.check('write',signal)).retryAvailable,false);
+  assert.equal(f.retry.admit('dock_node_resume',{operation_id:'write'}).blocked.operationId,'write');
   f.noWrite();
   const checked=await f.retry.check('write',signal);
   assert.equal(checked.state,'observed');
@@ -69,11 +75,17 @@ test('a manual edit is retained and distinguishes a known pre-write conflict fro
 test('a clean refusal can be retried straight away and carries the last confirmed Save cutoff',async()=>{
   const f=fixture();
   const done=await f.finish(apply,'import',{status:'SUCCEEDED',effect_possible:true,cleanup_complete:true});
-  assert.equal(done.persistence,'step_unsaved');
+  assert.equal(done.persistence,'unknown');
   assert.equal(done.save,null);
   f.window.modified=false;
+  const manualSave=await f.retry.check('import',signal);
+  assert.equal(manualSave.window.modified,false);
+  assert.equal(manualSave.step.persistence,'unknown');
+  assert.equal(manualSave.step.save,null);
   f.saves.set('save',{path:'/scenario.lgp'});
-  await f.finish(save,'save',{status:'SUCCEEDED',effect_possible:true,cleanup_complete:true});
+  const saved=await f.finish(save,'save',{status:'SUCCEEDED',effect_possible:true,cleanup_complete:true});
+  assert.equal(saved.persistence,'unknown');
+  assert.equal(saved.save.throughStep.operationId,'import');
   const refused=await f.finish(apply,'refused',{status:'FAILED',effect_possible:false,cleanup_complete:true});
   assert.equal(refused.outcome,'not_applied');
   assert.equal(refused.retryAvailable,true);
@@ -93,4 +105,26 @@ test('a lost reply later confirmed successful cannot be replayed',async()=>{
   assert.equal(checked.window.nodeCount,2);
   assert.equal(checked.retryAvailable,false);
   assert.ok(f.retry.admit(apply,{operation_id:'next'}).step);
+});
+
+test('a completed read opens one continuation only for the reconciled original phase',async()=>{
+  const f=fixture();
+  await f.finish(apply,'write',{status:'AMBIGUOUS',effect_possible:true,cleanup_complete:false});
+  f.receipts.set('write',{status:'AMBIGUOUS',effect_possible:true,cleanup_complete:true,error:{code:'NODE_PHASE_RECOVERED'}});
+  const resume={operation_id:'write'};
+  assert.equal(f.retry.admit('dock_node_resume',resume).blocked.operationId,'write');
+  assert.equal((await f.retry.check('write',signal)).retryAvailable,false);
+  assert.equal(f.retry.admit(apply,{operation_id:'new'}).blocked.operationId,'write');
+  assert.equal(f.retry.admit('dock_node_resume',resume),undefined);
+  assert.equal(f.retry.admit('dock_node_resume',resume).blocked.operationId,'write');
+});
+
+test('a mismatching Save retains the unknown outcome and refuses a new write',async()=>{
+  const f=fixture();
+  const meta=await f.finish(save,'save',{status:'FAILED',effect_possible:false,cleanup_complete:true,
+    error:{code:'SAVE_RESULT_MISMATCH'}});
+  assert.equal(meta.outcome,'check_required');
+  assert.equal(meta.retryAvailable,false);
+  assert.equal((await f.retry.check('save',signal)).retryAvailable,false);
+  assert.equal(f.retry.admit(save,{operation_id:'new',action_key:'package.save_checkpoint'}).blocked.operationId,'save');
 });

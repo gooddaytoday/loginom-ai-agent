@@ -1,10 +1,16 @@
 // Native canvas coordinates and bounded, UI-only viewport navigation.
-export function samePlacementGraph(before,after) {
+export function samePlacementGraph(before,after,contentOnly=false) {
  // Channel serialization can enumerate native workflow/port fields differently.
  // Keep ordered arrays and identities. SVG epochs and the native output
  // boundary's automatic horizontal layout may refresh; its y stays bound.
  const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
- const shape=g=>canonical({...g,nodes:g.nodes.map(({dom_epoch,...node})=>node.type==='control.supernode_output'&&node.boundary_role==='output'&&Number.isFinite(node.position?.x)?{...node,position:{...node.position,x:0}}:node)});
+ const shape=({dom_epoch,interaction_ready,workflow_ref,...graph})=>canonical({
+  ...graph,...(contentOnly?{workflowId:workflow_ref?.workflow_id}:{dom_epoch,interaction_ready,workflow_ref}),
+  nodes:graph.nodes.map(({dom_epoch,locked,...node})=>{
+   const value=contentOnly?node:{...node,locked};
+   return value.type==='control.supernode_output'&&value.boundary_role==='output'&&Number.isFinite(value.position?.x)?{...value,position:{...value.position,x:0}}:value;
+  }),
+ });
  return JSON.stringify(shape(before))===JSON.stringify(shape(after));
 }
 export function nodePlacementViewport(element,nodeId) {

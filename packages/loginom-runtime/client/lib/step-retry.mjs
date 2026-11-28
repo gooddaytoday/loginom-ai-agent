@@ -1,4 +1,5 @@
 import {isDeepStrictEqual} from 'node:util';
+import {withLoginomMetadata} from './loginom-feed-metadata.mjs';
 import {sameDomainGraph} from './node-target.mjs';
 
 const idPattern=/^[A-Za-z0-9_.:-]{1,128}$/;
@@ -19,7 +20,8 @@ function replyReceipt(reply,id) {
     if(value?.operation_id===id)return value;
   }catch{ /* A non-JSON refusal carries no operation receipt. */ }
 }
-const noEffect=receipt=>['NOT_APPLIED','FAILED'].includes(receipt?.status)
+const saveMismatch=receipt=>receipt?.error?.code==='SAVE_RESULT_MISMATCH';
+const noEffect=receipt=>!saveMismatch(receipt)&&['NOT_APPLIED','FAILED'].includes(receipt?.status)
   &&receipt.effect_possible===false&&receipt.cleanup_complete===true;
 
 export function createStepRetry({workspace,observe,receipt,settleUnapplied,busy,unsettled,confirmedSave,label}) {
@@ -30,19 +32,23 @@ export function createStepRetry({workspace,observe,receipt,settleUnapplied,busy,
   const facts=step=>{
     const save=saved?.scope&&sameScope(saved.scope,step.scope)?saved.fact:null;
     const outcome=step.outcome;
-    return {v:1,operationId:step.id,state:'settled',step:{
+    return {operationId:step.id,state:'settled',step:{
       outcome,retryAvailable:outcome==='not_applied',
       ...(step.reason?{reason:step.reason}:{}),
-      persistence:save&&(step.id===save.operationId||step.sequence<=saved.throughSequence)&&outcome==='completed'?'saved_through'
-        :outcome==='not_applied'||outcome==='completed'&&step.modified===true?'step_unsaved':'unknown',
+      persistence:outcome==='not_applied'?'step_unsaved':'unknown',
       save,
     }};
   };
 
   function admit(name,args) {
     if(!stepWriteTool(name,args))return;
-    if(blocked&&!(name==='dock_node_resume'&&args?.operation_id===blocked.id&&blocked.checked))
-      return {blocked:facts(blocked)};
+    if(blocked){
+      if(name!=='dock_node_resume'||args?.operation_id!==blocked.id||!blocked.resumeReceipt
+        ||receipt(blocked.id)!==blocked.resumeReceipt||!sameScope(blocked.scope,workspace()))
+        return {blocked:facts(blocked)};
+      // A verified receipt authorizes one continuation of its original operation.
+      delete blocked.resumeReceipt;
+    }
     const id=args?.operation_id;
     if(typeof id!=='string'||!idPattern.test(id)||steps.has(id)||receipt(id))return;
     const step={id,sequence:++sequence,scope:workspace(),save:name==='dock_action_run',name,
@@ -71,7 +77,7 @@ export function createStepRetry({workspace,observe,receipt,settleUnapplied,busy,
       if(save&&(!saved||step.sequence>saved.sequence)){
         const through=sameScope(step.scope,completed?.scope)&&completed.sequence<step.sequence?completed:step;
         const cutoff=through.id===saved?.fact.operationId?saved.fact.throughStep:{operationId:through.id,label:through.label};
-        saved={scope,sequence:step.sequence,throughSequence:through.sequence,fact:{
+        saved={scope,sequence:step.sequence,fact:{
           operationId:id,path:save.path,throughStep:cutoff,
         }};
       }
@@ -82,10 +88,7 @@ export function createStepRetry({workspace,observe,receipt,settleUnapplied,busy,
         completed=step;
         if(sameScope(step.scope,scope)&&!busy()){
           const state=await observe(scope,signal).catch(()=>null);
-          if(quiet(state)){
-            step.graph=state.graph;
-            step.modified=state.modified;
-          }
+          if(quiet(state))step.graph=state.graph;
         }
       }
     }else if(!step.outcome){
@@ -99,12 +102,12 @@ export function createStepRetry({workspace,observe,receipt,settleUnapplied,busy,
         step.reason='unknown_write';
       }
       if(step.outcome==='check_required'){
-        if(current?.status==='FAILED'&&current.cleanup_complete===true&&!unsettled()&&step.reason!=='graph_conflict')
+        if(current?.status==='FAILED'&&!saveMismatch(current)&&current.cleanup_complete===true&&!unsettled()&&step.reason!=='graph_conflict')
           step.reason='partial_effect';
         else blocked=step;
       }
     }
-    return reply?{...reply,_meta:{...reply._meta,loginomStep:facts(step)}}:reply;
+    return reply?withLoginomMetadata(reply,facts(step)):reply;
   }
 
   async function check(id,signal) {
@@ -121,12 +124,12 @@ export function createStepRetry({workspace,observe,receipt,settleUnapplied,busy,
       if(step.save?confirmedSave(id):current?.status==='SUCCEEDED'&&current.cleanup_complete===true){
         await finish('dock_operation_inspect',{operation_id:id},null,undefined,signal);
       }else if(blocked===step){
-        const clean=!unsettled()&&(step.unapplied||noEffect(current))
-          ||await settleUnapplied(id,second.graph,signal).catch(()=>false);
+        const clean=!saveMismatch(current)&&(!unsettled()&&(step.unapplied||noEffect(current))
+          ||await settleUnapplied(id,second.graph,signal).catch(()=>false));
         if(clean)step.outcome='not_applied';
-        else if(!unsettled()&&current?.status==='FAILED'&&current.cleanup_complete===true)blocked=undefined;
+        else if(current?.error?.code==='NODE_PHASE_RECOVERED'&&current.cleanup_complete===true)
+          step.resumeReceipt=current;
       }
-      step.checked=true;
     }
     if(blocked===step&&step.outcome!=='check_required')blocked=undefined;
     const last=sameScope(scope,completed?.scope)?completed:null;
