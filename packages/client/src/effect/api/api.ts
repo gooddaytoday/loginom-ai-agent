@@ -918,7 +918,8 @@ export type ExperimentalSessionLogOutput =
             | undefined
           readonly data: {
             readonly sessionID: Session.ID
-            readonly reason: "user" | "shutdown" | "superseded" | "inactivity"
+            readonly reason: "user" | "shutdown" | "superseded" | "inactivity" | "restart"
+            readonly lastKnown?: { readonly at: number; readonly stepID?: SessionMessage.ID | undefined } | undefined
           }
         }
       | {
