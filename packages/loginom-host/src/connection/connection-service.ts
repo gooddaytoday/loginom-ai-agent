@@ -55,11 +55,14 @@ export async function connectionService(
   const checks = new Map<AbortController, Promise<void | Loginom.BrowserStatus>>()
   function loadProfile() {
     if (state.loading) return state.loading
-    state.loading = (async () => ({
-      active: await store.read(),
-      pending: await store.pending(),
-      latest: await store.latestGeneration(),
-    }))()
+    state.loading = (async () => {
+      await store.protectDesktopCredentials()
+      return {
+        active: await store.read(),
+        pending: await store.pending(),
+        latest: await store.latestGeneration(),
+      }
+    })()
       .then(
         ({ active, pending, latest }) => {
           if (state.closing) return
@@ -87,9 +90,12 @@ export async function connectionService(
               progress()
             })
         },
-        () => {
+        (error: unknown) => {
           state.phase = "recoverable-error"
-          state.failure = "LOGINOM_STORE_READ_FAILED"
+          state.failure =
+            error instanceof Error && error.message === "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE"
+              ? error.message
+              : "LOGINOM_STORE_READ_FAILED"
         },
       )
       .finally(() => {
@@ -100,7 +106,8 @@ export async function connectionService(
 
   function requireProfile() {
     if (state.closing) throw Error("LOGINOM_HOST_CLOSED")
-    if (state.failure === "LOGINOM_STORE_READ_FAILED") throw Error(state.failure)
+    if (state.failure === "LOGINOM_STORE_READ_FAILED" || state.failure === "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE")
+      throw Error(state.failure)
   }
 
   function observeReadiness(handle: RuntimeHandle) {

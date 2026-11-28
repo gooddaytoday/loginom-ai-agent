@@ -118,7 +118,11 @@ async function dispatch(message: unknown) {
         closeSavedPackageOnShutdown:
           "closeSavedPackageOnShutdown" in input && input.closeSavedPackageOnShutdown === true,
         browserRecovery: "browserRecovery" in input && input.browserRecovery === true,
-        codec: cliCredentials(process.platform, { root: input.root, resources: input.resources }),
+        codec: cliCredentials(process.platform, {
+          root: input.root,
+          resources: input.resources,
+          desktop: process.env.LOGINOM_AI_AGENT_SERVICE_IDENTITY === "desktop",
+        }),
         environment: process.env,
       }
       state.starting = createLoginomHost(options).then(async (host) => {

@@ -277,8 +277,7 @@ test.each(channels)(
   },
 )
 
-// Loginom AI Agent (B4.5b): the 0.4 Debian dependencies; rpm keeps electron-builder's.
-test.each(channels)("Linux $channel packages declare the 0.4 category and depends, rebuild nothing", ({ channel }) => {
+test.each(channels)("Linux $channel packages require the Secret Service client and rebuild nothing", ({ channel }) => {
   const config = load(channel)
   expect(config.linux?.category).toBe("Office")
   expect(config.npmRebuild).toBe(false)
@@ -292,6 +291,7 @@ test.each(channels)("Linux $channel packages declare the 0.4 category and depend
     "libatspi2.0-0",
     "libuuid1",
     "libsecret-1-0",
+    "libsecret-tools",
     "libgbm1",
     "libasound2t64 | libasound2 (>= 1.0.16)",
     "ca-certificates",
@@ -300,6 +300,7 @@ test.each(channels)("Linux $channel packages declare the 0.4 category and depend
     "libvulkan1",
   ])
   expect(config.rpm?.depends).toBeUndefined()
+  expect(config.rpm?.fpm?.join("\n")).toContain("--depends\n/usr/bin/secret-tool")
 })
 
 // Loginom AI Agent (B4.5b): electron-builder writes the launcher and package-type after afterPack with the umask of

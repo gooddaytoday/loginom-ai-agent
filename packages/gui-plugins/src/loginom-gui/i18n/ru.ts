@@ -59,6 +59,8 @@ export default {
   changed: "Подключение изменилось. Обновите его перед новой попыткой.",
   expired: "Срок проверки истёк. Проверьте подключение ещё раз.",
   saveFailed: "Служба не подтвердила сохранение. Обновите подключение, чтобы узнать результат.",
+  secretServiceUnavailable:
+    "Безопасное хранилище паролей недоступно. Установите secret-tool (Ubuntu/Debian: sudo apt install libsecret-tools; Fedora: sudo dnf install libsecret), разблокируйте связку ключей сеанса и перезапустите Loginom AI Agent.",
   "catalog.title": "Каталог",
   "catalog.description": "Навыки и инструменты в поставке Loginom AI Agent.",
   "catalog.sections": "Разделы каталога",

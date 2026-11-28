@@ -39,7 +39,12 @@ export async function launchNodeHost(
 ) {
   if (![input.node, input.entry, input.root, input.resources].every(isAbsolute))
     throw new NodeHostStartupError(new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED"), true)
-  const environment = runtimeEnvironment(input.environment ?? process.env)
+  const source = input.environment ?? process.env
+  const environment = runtimeEnvironment(source)
+  if (process.platform === "linux" && source.LOGINOM_AI_AGENT_SERVICE_IDENTITY === "desktop") {
+    environment.LOGINOM_AI_AGENT_SERVICE_IDENTITY = "desktop"
+    environment.PATH = source.PATH
+  }
   const child = (() => {
     try {
       return fork(input.entry, [], {

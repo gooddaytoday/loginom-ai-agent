@@ -17,6 +17,7 @@ type Request = typeof ServiceHost.connectionSettings.request
 export function connectionSettings(request: Request = ServiceHost.connectionSettings.request) {
   const readStatus = (reply: unknown): Status => {
     const view = Schema.decodeUnknownSync(Loginom.View)(reply)
+    if (view.failure === "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE") throw Error(view.failure)
     return {
       revision: view.revision,
       generation: view.generation,
@@ -76,6 +77,8 @@ function issue(error: unknown, fallback: Issue): Issue {
       return "changed"
     case "LOGINOM_VALIDATION_EXPIRED":
       return "expired"
+    case "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE":
+      return process.platform === "linux" ? "secretServiceUnavailable" : fallback
     default:
       return fallback
   }

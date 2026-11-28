@@ -12,7 +12,8 @@ import { Schema } from "effect"
 type Draft = { url: string; username: string; password: string; noPassword: boolean }
 type Form = { status: Status; draft: Draft }
 type State = { attempt: number } & (
-  | { type: "unavailable" | "loading" | "disposed" }
+  | { type: "loading" | "disposed" }
+  | { type: "unavailable"; issue?: Issue }
   | (Form & { type: "editing"; issue?: Issue })
   | (Form & { type: "checking"; submit: "check" | "save" })
   | (Form & { type: "verified"; validation: Validation })
@@ -144,7 +145,8 @@ export function transition(state: State, event: Event): Transition {
         return keep
       if (!event.result.ok) {
         if (state.type === "saving" && event.result.issue === "saveFailed") return refresh(state, attempt, "saveFailed")
-        if (state.type === "loading") return { state: { type: "unavailable", attempt }, effects: [] }
+        if (state.type === "loading")
+          return { state: { type: "unavailable", attempt, issue: event.result.issue }, effects: [] }
         if (state.type === "applying" && event.now >= state.until)
           return { state: { type: "editing", attempt, status: state.status, draft: state.draft }, effects: [] }
         if ("draft" in state)
@@ -204,7 +206,7 @@ function message(state: State) {
 
 export function view(state: State) {
   const form = "draft" in state ? state : undefined
-  const issue = state.type === "editing" ? state.issue : undefined
+  const issue = state.type === "editing" || state.type === "unavailable" ? state.issue : undefined
   return {
     draft: form?.draft,
     connected: form?.status.state === "ready" && !form.status.failed ? form.status : undefined,
@@ -215,7 +217,8 @@ export function view(state: State) {
       password: issue === "passwordRequired" || issue === "credentialsRejected" ? issue : undefined,
     },
     issue:
-      issue === "unavailable" ||
+      (issue === "unavailable" && state.type !== "unavailable") ||
+      issue === "secretServiceUnavailable" ||
       issue === "changed" ||
       issue === "expired" ||
       issue === "saveFailed" ||

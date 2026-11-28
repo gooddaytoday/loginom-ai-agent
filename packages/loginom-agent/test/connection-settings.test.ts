@@ -58,6 +58,29 @@ test("the settings RPC reports an unavailable service without a transport error"
   expect(await settings.status()).toEqual({ ok: false, issue: "unavailable" })
 })
 
+test.skipIf(process.platform !== "linux")(
+  "Linux settings distinguish a missing password store from a failed save",
+  async () => {
+    const settings = connectionSettings(async (method) => {
+      const failure = "LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE"
+      if (method !== "connection.status") throw Error(failure)
+      return {
+        revision: 0,
+        generation: 0,
+        url: "https://loginom.example/app/",
+        username: "analyst",
+        folder: "/analyst",
+        hasPassword: false,
+        state: "recoverable-error",
+        failure,
+      }
+    })
+    const expected = { ok: false, issue: "secretServiceUnavailable" } as const
+    expect(await settings.status()).toEqual(expected)
+    expect(await settings.save({ revision: 0, validationId: "checked" })).toEqual(expected)
+  },
+)
+
 test("settings reject URL parameters before calling the Host and pass the active check signal", async () => {
   let called: AbortSignal | undefined
   const settings = connectionSettings(async (_method, _input, _timeout, signal) => {

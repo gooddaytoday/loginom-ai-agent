@@ -12,11 +12,12 @@ const RecordSchema = Schema.Struct({
   urlSource: Schema.optional(Schema.Literal("explicit")),
   username: Schema.String,
   secrets: Schema.Union([
+    Schema.Struct({ retired: Schema.Literal(true) }),
     Schema.Struct({ apiKey: Schema.String, password: Schema.String }),
     Schema.Struct({ encrypted: Schema.String }),
     Schema.Struct({
       format: Schema.Literal("loginom-cli-secrets-v1"),
-      protection: Schema.Literals(["plaintext", "dpapi", "keychain"]),
+      protection: Schema.Literals(["plaintext", "dpapi", "keychain", "secret-service"]),
       payload: Schema.String,
     }),
   ]),
@@ -27,6 +28,7 @@ const decode = Schema.decodeUnknownOption(Schema.fromJsonString(RecordSchema))
 const decodeMigration = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ state: Schema.Literals(["resetting", "complete"]) })),
 )
+const abandonedWrite = /\.json\.[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\.tmp$/
 
 // Only the owning host accesses this directory; it is outside renderer stores.
 export function connectionStore(directory: string, codec: CredentialCodec = credentials(process.platform)) {
@@ -161,7 +163,52 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
     if (!Number.isSafeInteger(generation) || generation < 1) throw new Error("LOGINOM_GENERATION_INVALID")
     return join(directory, "generations", `${generation}.json`)
   }
+  async function generations() {
+    const names = await readdir(join(directory, "generations"))
+    return names.filter((name) => /^\d+\.json$/.test(name)).map((name) => join(directory, "generations", name))
+  }
+  async function retireOlderGenerations(active: number, files: string[]) {
+    for (const file of files) {
+      const record = await read(file)
+      if (record && record.generation < active && !("retired" in record.secrets))
+        await write(file, { ...record, secrets: { retired: true } }, true)
+    }
+  }
+  async function protectDesktopCredentials() {
+    if (!codec.retireDesktopSecrets) return
+    const activeFile = join(directory, "connection.json")
+    const pendingFile = join(directory, "pending.json")
+    const files = await generations()
+    const active = await read(activeFile)
+    if (active) await retireOlderGenerations(active.generation, files)
+    const pending = await read(pendingFile)
+    if (active && pending && pending.generation <= active.generation) await clearPending()
+    for (const file of [activeFile, pendingFile, ...files]) {
+      const record = await read(file)
+      if (!record) continue
+      const { secrets } = record
+      if ("format" in secrets && secrets.protection === "plaintext")
+        await write(file, { ...record, secrets: await codec.encode(await codec.decode(secrets)) }, true)
+    }
+    for (const parent of [directory, join(directory, "generations")]) {
+      for (const name of await readdir(parent)) {
+        if (abandonedWrite.test(name)) await rm(join(parent, name), { force: true })
+      }
+    }
+  }
+  async function clearPending() {
+    await protectDirectory()
+    await rm(join(directory, "pending.json"), { force: true })
+    if (process.platform === "win32") return
+    const handle = await open(directory, constants.O_RDONLY)
+    try {
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
+  }
   async function decodeRecord(record: ConnectionRecord): Promise<ActiveConnection> {
+    if ("retired" in record.secrets) throw new Error("LOGINOM_STORE_INVALID")
     return {
       generation: record.generation,
       revision: record.revision,
@@ -173,6 +220,7 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
   }
   return {
     initialize,
+    protectDesktopCredentials,
     async pending(): Promise<ActiveConnection | undefined> {
       const record = await read(join(directory, "pending.json"))
       return record && decodeRecord(record)
@@ -192,20 +240,10 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
         true,
       )
     },
-    async clearPending() {
-      await protectDirectory()
-      await rm(join(directory, "pending.json"), { force: true })
-      if (process.platform === "win32") return
-      const handle = await open(directory, constants.O_RDONLY)
-      try {
-        await handle.sync()
-      } finally {
-        await handle.close()
-      }
-    },
+    clearPending,
     async staged(generation: number) {
       const record = await read(generationPath(generation))
-      return record && decodeRecord(record)
+      return record && !("retired" in record.secrets) ? decodeRecord(record) : undefined
     },
     async latestGeneration() {
       await protectDirectory()
@@ -238,8 +276,10 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
     async activate(generation: number) {
       await initialize()
       const record = await read(generationPath(generation))
-      if (!record || record.generation !== generation) throw new Error("LOGINOM_GENERATION_MISSING")
+      if (!record || record.generation !== generation || "retired" in record.secrets)
+        throw new Error("LOGINOM_GENERATION_MISSING")
       await write(join(directory, "connection.json"), record, true)
+      if (codec.retireDesktopSecrets) await retireOlderGenerations(generation, await generations())
     },
   }
 }

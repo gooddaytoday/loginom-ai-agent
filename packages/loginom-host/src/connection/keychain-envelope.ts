@@ -22,7 +22,12 @@ const secrets = Schema.decodeUnknownOption(
 
 // The key is supplied by Keychain; never persist it beside this envelope.
 // Profile identity is authenticated so ciphertext cannot move to another profile.
-export function sealKeychain(value: Secrets, key: Buffer, profile: string): CliSecrets {
+export function sealKeychain(
+  value: Secrets,
+  key: Buffer,
+  profile: string,
+  protection: "keychain" | "secret-service" = "keychain",
+): CliSecrets {
   if (key.length !== 32 || !/^[a-f0-9]{64}$/.test(profile)) throw Error("LOGINOM_CREDENTIAL_FORMAT_INVALID")
   const plaintext = Buffer.from(JSON.stringify({ apiKey: value.apiKey, password: value.password }), "utf8")
   if (plaintext.length > 1024 * 1024) throw Error("LOGINOM_CREDENTIAL_FORMAT_INVALID")
@@ -32,7 +37,7 @@ export function sealKeychain(value: Secrets, key: Buffer, profile: string): CliS
   const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()])
   return {
     format: "loginom-cli-secrets-v1",
-    protection: "keychain",
+    protection,
     payload: JSON.stringify({
       nonce: nonce.toString("base64"),
       tag: cipher.getAuthTag().toString("base64"),
@@ -41,10 +46,15 @@ export function sealKeychain(value: Secrets, key: Buffer, profile: string): CliS
   }
 }
 
-export function openKeychain(value: CliSecrets, key: Buffer, profile: string): Secrets {
+export function openKeychain(
+  value: CliSecrets,
+  key: Buffer,
+  profile: string,
+  protection: "keychain" | "secret-service" = "keychain",
+): Secrets {
   if (
     value.format !== "loginom-cli-secrets-v1" ||
-    value.protection !== "keychain" ||
+    value.protection !== protection ||
     value.payload.length > 2 * 1024 * 1024 ||
     key.length !== 32 ||
     !/^[a-f0-9]{64}$/.test(profile)

@@ -10,7 +10,7 @@
   - Ubuntu 24.04+ / Debian 13+: `sudo apt install libfuse2t64 libsecret-tools`.
   - Fedora: `sudo dnf install fuse fuse-libs libsecret`.
 
-Для сохранения пароля в обоих форматах в пользовательском сеансе должен работать Secret Service, например GNOME Keyring. При ошибке Desktop [`LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE`](https://github.com/gooddaytoday/loginom-ai-agent/blob/7e2f7e8405bfcda90ec5a53e0a077b499d89d026/packages/loginom-host/src/connection/linux-secret-service.ts#L42-L44) проверьте наличие `secret-tool` и доступность Secret Service.
+Для сохранения пароля в пользовательском сеансе должен работать Secret Service, например GNOME Keyring. Если форма сообщает, что безопасное хранилище недоступно, установите `secret-tool` командой для своей системы, разблокируйте связку ключей сеанса и перезапустите Desktop. При этой ошибке приложение не сохраняет пароль открытым текстом.
 
 AppImage также требует системные библиотеки GTK, NSS, GBM и ALSA. Для ALSA нужна настоящая библиотека: `libasound2t64` на Ubuntu 24.04+/Debian 13+, `libasound2` на Ubuntu 22.04/Debian 12; OSS shim её не заменяет.
 
