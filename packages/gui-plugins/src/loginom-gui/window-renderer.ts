@@ -1,6 +1,7 @@
 import { Command, createKeyed, type Plugin } from "@opencode/plugin/gui"
 import { showToast } from "@opencode/ui/toast"
-import { LoginomWindow, type WindowFeedback } from "./contract"
+import { Schema } from "effect"
+import { LoginomWindow, WindowTarget, type WindowFeedback } from "./contract"
 import type definition from "./index"
 
 const PendingSession = Symbol("pending session")
@@ -27,6 +28,16 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     return current?.pending ? PendingSession : current?.id
   }
 
+  const target = () => {
+    const current = session()
+
+    if (!current || current.pending) return
+
+    const input = { sessionID: current.id, location: current.location }
+
+    if (Schema.is(WindowTarget)(input)) return input
+  }
+
   createKeyed(live, (window) => {
     const track = (id: string | false | null) => void window.track(id, { signal: ctx.signal }).catch(() => undefined)
     createKeyed(sessionKey, (id) => track(id === PendingSession ? false : id), { otherwise: () => track(null) })
@@ -37,17 +48,28 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       id: "show-window",
       title: ctx.t("window.show"),
       section: "session",
-      enabled: !!ipc() && session()?.pending === false,
+      enabled: !!ipc() && !!target(),
       async run() {
-        const current = session()
+        const current = target()
 
-        if (!current || current.pending) return
+        if (!current) return
 
         const result = await ipc()
-          ?.show(current.id, { signal: ctx.signal })
+          ?.show(current, { signal: ctx.signal })
           .catch((): typeof WindowFeedback.Type => ({ focus: "manual" }))
 
-        if (ctx.signal.aborted || session()?.id !== current.id || !result) return
+        const active = target()
+
+        if (
+          ctx.signal.aborted ||
+          !result ||
+          !active ||
+          active.sessionID !== current.sessionID ||
+          active.location.directory !== current.location.directory ||
+          active.location.workspaceID !== current.location.workspaceID
+        )
+          return
+
         const messages = []
 
         if (result.layout) messages.push(ctx.t(`window.${result.layout}`))

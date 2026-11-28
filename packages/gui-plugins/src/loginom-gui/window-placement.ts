@@ -5,7 +5,7 @@ import { initial, pending, same, transition, type Plan, type State, type WindowS
 
 type LayoutFeedback = typeof WindowFeedback.Type.layout
 
-export type PlacementStatus = "placed" | "unchanged" | "layout-unavailable" | "starting" | "no-window"
+export type PlacementStatus = "placed" | "unchanged" | "moved" | "layout-unavailable" | "starting" | "no-window"
 
 type ShowOptions = {
   sessionID: string
@@ -42,6 +42,12 @@ export function windowPlacement() {
 
       if (current) state = transition(state, { type: "observed", current })
 
+      if (placed === "moved") {
+        state = transition(state, { type: "browser-moved" })
+
+        return
+      }
+
       if (placed !== "placed" || plan.kind !== "split") {
         if (pending(state)) return "split-incomplete"
 
@@ -72,5 +78,7 @@ export function windowPlacement() {
 }
 
 export function windowFeedback(focus: typeof Focus.Type, layout: LayoutFeedback): typeof WindowFeedback.Type {
-  return layout === "split-incomplete" || (layout && focus === "focused") ? { focus, layout } : { focus }
+  if (layout === "split-incomplete" || (layout && (focus === "focused" || focus === "manual"))) return { focus, layout }
+
+  return { focus }
 }

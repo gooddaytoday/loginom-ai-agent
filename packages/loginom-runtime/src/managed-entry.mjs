@@ -303,7 +303,11 @@ async function handle(message) {
       return
     }
     if (message.operation === "placeWindow") {
-      if (state.controller || state.bridge.hasActiveWork() || state.windowPlacement === null || state.placingWindow) {
+      if (state.windowPlacement === null) {
+        send({ id: message.id, result: "moved" })
+        return
+      }
+      if (state.controller || state.bridge.hasActiveWork() || state.placingWindow) {
         send({ id: message.id, result: "unchanged" })
         return
       }
@@ -324,7 +328,7 @@ async function handle(message) {
         if (result === "moved") state.windowPlacement = null
         else if (typeof result !== "string") state.windowPlacement = result
         if (state.windowPlacement !== undefined) state.windowAttempt = undefined
-        send({ id: message.id, result: result === "moved" ? "unchanged" : typeof result === "string" ? result : "placed" })
+        send({ id: message.id, result: typeof result === "string" ? result : "placed" })
       } finally {
         state.placingWindow = undefined
       }

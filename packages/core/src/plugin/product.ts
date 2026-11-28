@@ -2,7 +2,7 @@ export * as PluginProduct from "./product.js"
 
 // Fork seam U1 (catalog CAT-07): the Loginom AI Agent product plugin is built in, runs last in `post`, and its ID is
 // guarded against config removals and reserved against packages that claim it.
-import LoginomAgent, { Dashboard } from "@loginom-ai-agent/loginom-agent"
+import LoginomAgent, { Dashboard, registerWindowRpc } from "@loginom-ai-agent/loginom-agent"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { Context, Effect, Layer } from "effect"
 import { Formatter } from "../formatter.js"
@@ -24,6 +24,7 @@ export const plugins: readonly InternalPlugin[] = [
         yield* formatter.transform((editor) => {
           if (dashboard()) editor.list().forEach((name) => editor.remove(name))
         })
+        yield* registerWindowRpc(ctx).pipe(Effect.orDie)
         yield* product.effect(ctx)
       }),
   },

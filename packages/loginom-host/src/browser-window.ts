@@ -16,7 +16,7 @@ export const WindowChat = Schema.Struct({ sessionID: Session })
 export const WindowPlacement = Schema.Struct({ ...WindowChat.fields, bounds: WindowBounds })
 export type WindowPlacement = typeof WindowPlacement.Type
 export const WindowStatus = Schema.Literals(["focused", "no-window", "starting", "taskbar", "manual"])
-export const PlacementStatus = Schema.Literals(["placed", "unchanged", "layout-unavailable", "no-window", "starting"])
+export const PlacementStatus = Schema.Literals(["placed", "unchanged", "moved", "layout-unavailable", "no-window", "starting"])
 export const BrowserPID = Schema.Struct({ pid: Schema.Int.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(0xffffffff)) })
 
 const StartupEndpoint = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({

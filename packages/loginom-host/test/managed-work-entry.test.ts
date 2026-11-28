@@ -55,6 +55,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     }`,
     "runtime/src/connection-check.mjs": `
       import { EventEmitter } from 'node:events';
+      import { readFileSync } from 'node:fs';
       export const loginomAddress = value => value;
       export const loginBrowser = async ({ onContextCreated, onWindowPage }) => {
         const context = Object.assign(new EventEmitter(), { pages: () => [], close: async () => {} });
@@ -65,7 +66,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         let loseReply = true;
         const cdp = {
           async send(method, input) {
-            if (method === 'Browser.getWindowForTarget') return { windowId: 8, bounds };
+            if (method === 'Browser.getWindowForTarget') {
+              const { browserLeft } = JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
+              return { windowId: 8, bounds: browserLeft === undefined ? bounds : { ...bounds, left: browserLeft } };
+            }
             if (method === 'Browser.getWindowBounds') return { bounds };
             if (method === 'Browser.setWindowBounds') {
               if (stall) {
@@ -232,6 +236,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     expect(await runtime.request("placeWindow", windowBounds)).toBe("placed")
     expect(await runtime.request("placeWindow", windowBounds)).toBe("placed")
     expect(await runtime.request("placeWindow", { ...windowBounds, x: 800 })).toBe("unchanged")
+    await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false, browserLeft: 1050 }))
+    expect(await runtime.request("placeWindow", windowBounds)).toBe("moved")
+    expect(await runtime.request("placeWindow", windowBounds)).toBe("moved")
+    expect(await runtime.request("showWindow")).toBe(platform)
   } finally {
     await runtime.close()
     expect(await runtime.exited).toEqual({ code: 0, signal: null })

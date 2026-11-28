@@ -8,11 +8,11 @@ import { productChannel, productSlug } from "@loginom-ai-agent/product"
 import type { Embed, Plugin, ServerEndpoint } from "@opencode/plugin/gui/main"
 import { Schema } from "effect"
 import { app, screen, session, WebContentsView, type BrowserWindow, type Rectangle } from "electron"
-import { DashboardPreview, Focus, LoginomWindow, type WindowFeedback } from "./contract"
+import { DashboardPreview, Focus, LoginomWindow, type WindowFeedback, type WindowTarget } from "./contract"
 import { chromiumBounds, equal } from "./layout"
 import { windowFeedback, windowPlacement } from "./window-placement"
 
-const Placement = Schema.Literals(["placed", "unchanged", "layout-unavailable", "starting", "no-window"])
+const Placement = Schema.Literals(["placed", "unchanged", "moved", "layout-unavailable", "starting", "no-window"])
 
 const ListenerAddress = Schema.Struct({ port: Schema.Number })
 
@@ -20,7 +20,7 @@ const output = Schema.decodeUnknownSync(Schema.Struct({ output: Schema.Unknown }
 
 const chatKey = (id: string) => createHash("sha256").update(id).digest("hex")
 
-type WindowRequest = { sessionID: string; bounds?: Rectangle }
+type WindowRequest = typeof WindowTarget.Type & { bounds?: Rectangle }
 
 async function request<S extends typeof Placement | typeof Focus>(
   endpoint: ServerEndpoint,
@@ -30,7 +30,10 @@ async function request<S extends typeof Placement | typeof Focus>(
   signal: AbortSignal,
 ): Promise<S["Type"] | undefined> {
   try {
-    const response = await fetch(new URL(`/api/rpc/loginom.window/${method}`, endpoint.url), {
+    const url = new URL(`/api/rpc/loginom.window/${method}`, endpoint.url)
+    url.searchParams.set("location[directory]", input.location.directory)
+
+    const response = await fetch(url, {
       method: "POST",
       headers: { ...endpoint.headers, "content-type": "application/json" },
       body: JSON.stringify({ input }),
@@ -94,7 +97,7 @@ const setupWindow: Plugin.MainSetup = (ctx) => {
   const tracked = new Map<number, string | false>()
   const watching = new WeakSet<BrowserWindow>()
   const placements = new WeakMap<BrowserWindow, ReturnType<typeof windowPlacement>>()
-  const showing = new WeakMap<BrowserWindow, { sessionID: string; result: Promise<typeof WindowFeedback.Type> }>()
+  const showing = new WeakMap<BrowserWindow, { target: string; result: Promise<typeof WindowFeedback.Type> }>()
 
   function placementFor(window: BrowserWindow) {
     const current = placements.get(window) ?? windowPlacement()
@@ -197,15 +200,17 @@ const setupWindow: Plugin.MainSetup = (ctx) => {
       if (session === null) tracked.delete(window.id)
       else tracked.set(window.id, session === false ? false : chatKey(session))
     },
-    show(sessionID, caller): typeof WindowFeedback.Type | Promise<typeof WindowFeedback.Type> {
+    show(input, caller): typeof WindowFeedback.Type | Promise<typeof WindowFeedback.Type> {
+      const { sessionID, location } = input
       const endpoint = ctx.serverEndpoints.get("sidecar")
       const window = ctx.windows.get(caller.window)
       const chat = chatKey(sessionID)
 
       if (!endpoint?.sameMachine || !window || tracked.get(window.id) !== chat) return { focus: "no-window" }
       const pending = showing.get(window)
+      const target = JSON.stringify([sessionID, location.directory, location.workspaceID])
 
-      if (pending) return pending.sessionID === sessionID ? pending.result : { focus: "manual" }
+      if (pending) return pending.target === target ? pending.result : { focus: "manual" }
 
       const result = (async () => {
         const layout = supported()
@@ -219,7 +224,7 @@ const setupWindow: Plugin.MainSetup = (ctx) => {
                 request(
                   endpoint,
                   "place",
-                  { sessionID, bounds: toChromium(plan.browser, plan.target) },
+                  { ...input, bounds: toChromium(plan.browser, plan.target) },
                   Placement,
                   caller.signal,
                 ),
@@ -227,12 +232,12 @@ const setupWindow: Plugin.MainSetup = (ctx) => {
             })
           : "layout-unavailable"
 
-        const focus = (await request(endpoint, "show", { sessionID }, Focus, caller.signal)) ?? "manual"
+        const focus = (await request(endpoint, "show", input, Focus, caller.signal)) ?? "manual"
 
         return windowFeedback(focus, layout)
       })().finally(() => showing.delete(window))
 
-      showing.set(window, { sessionID, result })
+      showing.set(window, { target, result })
 
       return result
     },

@@ -16,6 +16,7 @@ export type State =
 type Event =
   | { type: "observed"; current: WindowSnapshot; sessionID?: string }
   | { type: "browser-placed"; sessionID: string; plan: Split }
+  | { type: "browser-moved" }
   | { type: "restore-started" }
   | { type: "resized"; current: WindowSnapshot }
 
@@ -67,6 +68,8 @@ export function transition(state: State, event: Event): State {
       if (state.type !== "tracking") return state
 
       return { type: "split", sessionID: event.sessionID, plan: event.plan, baseline: state.baseline }
+    case "browser-moved":
+      return "sessionID" in state ? { type: "tracking", baseline: state.baseline } : state
     case "restore-started":
       return state.type === "split" ? { ...state, type: "restoring" } : state
     case "resized":

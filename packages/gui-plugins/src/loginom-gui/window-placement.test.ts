@@ -66,13 +66,13 @@ test.each([false, true])(
 test("does not complete a split after the user has moved one of the windows", async () => {
   const placement = windowPlacement()
   let desktop = full
-  let browserMoved = false
+  let browserStatus: "placed" | "unchanged" | "moved" = "placed"
 
   const options: Parameters<typeof placement.show>[0] = {
     sessionID: "conversation",
     current: () => desktop,
     async place() {
-      return browserMoved ? "unchanged" : "placed"
+      return browserStatus
     },
     async resize(bounds) {
       desktop = { ...desktop, app: bounds, maximized: false }
@@ -82,14 +82,22 @@ test("does not complete a split after the user has moved one of the windows", as
   }
 
   expect(await placement.show({ ...options, resize: async () => false })).toBe("split-incomplete")
-  browserMoved = true
+  browserStatus = "unchanged"
   expect(await placement.show(options)).toBe("split-incomplete")
+  browserStatus = "moved"
+  expect(await placement.show(options)).toBeUndefined()
+  expect(await placement.show(options)).toBeUndefined()
   expect(desktop.app).toEqual(area)
 
   desktop = { ...full, app: { ...restored, x: 120 }, maximized: false }
-  browserMoved = false
+  browserStatus = "placed"
   expect(await placement.show(options)).toBeUndefined()
   expect(desktop.app).toEqual({ ...restored, x: 120 })
+})
+
+test("preserves both instructions when placement and focus are unavailable", () => {
+  expect(windowFeedback("manual", "layout-unavailable")).toEqual({ focus: "manual", layout: "layout-unavailable" })
+  expect(windowFeedback("no-window", "layout-unavailable")).toEqual({ focus: "no-window" })
 })
 
 test("does not resize Desktop on retry after the user restores it while Chromium is placing", async () => {
