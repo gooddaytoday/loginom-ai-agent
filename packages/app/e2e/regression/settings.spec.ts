@@ -55,6 +55,7 @@ function open(page: Page, input: Partial<WorkspaceInput> = {}) {
 const loginomPassword = "fixture-wrong-password"
 
 for (const [issue, text, address] of [
+  ["knowledgeAuthFailed", "The knowledge service rejected its access key.", loginomAddress],
   [
     "loginUnavailable",
     "The Loginom sign-in page is unavailable. Check the address and network.",

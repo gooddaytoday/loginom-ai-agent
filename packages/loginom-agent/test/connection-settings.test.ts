@@ -38,6 +38,7 @@ const input = {
 } satisfies Candidate
 
 test.each([
+  ["LOGINOM_KNOWLEDGE_AUTH_FAILED", "knowledgeAuthFailed"],
   ["LOGINOM_LOGIN_UNAVAILABLE", "loginUnavailable"],
   ["LOGINOM_LOGIN_REJECTED", "credentialsRejected"],
 ] satisfies [string, Issue][])(

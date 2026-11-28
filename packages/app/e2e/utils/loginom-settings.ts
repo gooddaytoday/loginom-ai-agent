@@ -12,7 +12,7 @@ export async function openLoginomSettings(page: Page, onRpc: MockServerConfig["o
   return page.getByRole("tabpanel", { name: "Loginom", exact: true }).locator("form")
 }
 
-export function loginomSettingsFixture(issue?: "loginUnavailable" | "credentialsRejected") {
+export function loginomSettingsFixture(issue?: "knowledgeAuthFailed" | "loginUnavailable" | "credentialsRejected") {
   const checks: unknown[] = []
   const saves: unknown[] = []
   const status = {
