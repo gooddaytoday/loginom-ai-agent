@@ -333,7 +333,15 @@ export async function createBridge(config, session, { browserTransport: managedB
     // T4 for saves: a confirmed Save whose package state could not be read. The
     // runtime rereads path and dirty state itself after the model's browser work.
     const saveRecoveries = new Map();
-    const readPackageState = createPackageStateReader(session.metadata, config.loginomUrl);
+    const readPackageState = createPackageStateReader(session.metadata, config.loginomUrl, {
+      isPreparationBound(preparation) {
+        // Keep the old preparation available for recovery. Its receipt belongs
+        // to the package before Save, until another preparation binds the page.
+        const previous = reopenedSave?.preparation;
+        return !previous || previous.operation_id !== preparation.operation_id
+          || previous.state?.document_id !== preparation.state?.document_id;
+      },
+    });
     const readSavedState = async save => {
       const prepared = session.metadata.workspacePreparation?.state;
       const options = { sessionId: session.metadata.sessionId, documentId: prepared?.document_id,

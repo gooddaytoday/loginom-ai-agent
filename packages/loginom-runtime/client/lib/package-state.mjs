@@ -57,7 +57,7 @@ export async function readPackageState({ origin, build, documentId, operationId,
   return { open: true, path: before.path, modified, packageId: preparation.packageStateIdentity.id };
 }
 
-export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
+export function createPackageStateReader(metadata, loginomUrl, { now = Date.now, isPreparationBound = () => true } = {}) {
   const origin = loginomUrl && new URL(loginomUrl).origin;
   const browserPending = Symbol('browser read pending');
   let evaluation;
@@ -67,7 +67,8 @@ export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
     const lastSave = lastConfirmedSave ? { path: lastConfirmedSave.path, confirmedAt: lastConfirmedSave.confirmedAt } : null;
     const preparation = metadata.workspacePreparation;
     const prepared = preparation?.state;
-    const stillPrepared = () => !!prepared && metadata.workspaceReady === true && metadata.workspacePreparation === preparation;
+    const stillPrepared = () => !!prepared && metadata.workspaceReady === true
+      && metadata.workspacePreparation === preparation && isPreparationBound(preparation);
     const cachedSnapshot = () => ({
       ...lastConfirmed.snapshot,
       lastSave,

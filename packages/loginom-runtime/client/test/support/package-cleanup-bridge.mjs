@@ -669,6 +669,33 @@ test('verified reopened Save keeps its successful receipt when workspace binding
  try{
   const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
   await client.callTool({name:'dock_prepare',arguments:{}});
+  const originalOperation = session.metadata.workspacePreparation.operation_id;
+  const document = {};
+  const originalPackage = {PackageFileName:secondPath,Package:{}};
+  const savedPackage = {PackageFileName:path,Package:{}};
+  const nativeSession = {IsPackageModified:async proxy=>proxy===originalPackage.Package};
+  const connection = {Connected:true,UserName:'test-2',Session:nativeSession};
+  const snapshot = busy => bridge.packageState({pages:()=>[{
+    url:()=> 'http://loginom.invalid/app',
+    evaluate:(read,input)=>{
+      // The old receipt can still find the original package in the inventory.
+      const packageNode = input.operationId===originalOperation ? originalPackage : savedPackage;
+      const receipt = {phase:'verified',request:JSON.stringify({session:'own-session'}),
+        packageNode,stepSession:{connection,nativeSession}};
+      const FMapTree = {FServerConnection:connection,PackageNodes:{Count:2,Items:i=>[originalPackage,savedPackage][i]}};
+      return vm.runInNewContext(`(${read})(input)`, {
+        document,input,setTimeout,clearTimeout,location:{origin:'http://loginom.invalid'},
+        bg:{app:{Version:target.loginom_build,Application:{FInstance:{FMainForm:{FMapTree}}}}},
+        __loginomDockPreparationV1:{document,id:'own-doc',receipts:new Map([[input.operationId,receipt]])},
+      });
+    },
+  }]},busy);
+  if(action==='package.save_as'){
+    const before = await snapshot(false);
+    assert.equal(before.path,secondPath);
+    assert.equal(before.modified,true);
+    assert.equal(before.lastSave,null);
+  }
   const reply=await client.callTool({name:'dock_action_run',arguments:{action_key:action,parameters:{path},operation_id:'own-save'}});
   assert.notEqual(reply.isError,true,JSON.stringify(reply));
   const parts=reply.content.filter(c=>c.type==='text'&&c.text.startsWith('{')).map(c=>JSON.parse(c.text));
@@ -684,9 +711,23 @@ test('verified reopened Save keeps its successful receipt when workspace binding
    assert.equal(advice.next_step.tool,'dock_prepare');assert.equal(advice.next_step.arguments.intent,'existing_workflow');
    assert.equal(advice.next_step.arguments.workflow_ref.document_id,'own-doc');
    assert.equal(advice.next_step.arguments.workflow_ref.tab_tid,f.activeTab);
+   if(action==='package.save_as'){
+    const busy = await snapshot(true);
+    assert.equal(busy.lastSave?.path,path);
+    assert.ok(Number.isFinite(busy.lastSave?.confirmedAt));
+    assert.deepEqual(busy,{open:null,path:null,modified:null,modifiedDetectedAt:null,
+      lastSave:busy.lastSave,staleForSeconds:null});
+    assert.deepEqual(await snapshot(false),busy);
+   }
    f.bindingError=false;f.rebind={};
    const prepared=await client.callTool({name:advice.next_step.tool,arguments:advice.next_step.arguments});
    assert.notEqual(prepared.isError,true,JSON.stringify(prepared));assert.equal(f.saves,1);
+  }
+  if(action==='package.save_as'){
+   const rebound = await snapshot(false);
+   assert.equal(rebound.path,path);
+   assert.equal(rebound.modified,false);
+   assert.equal(rebound.lastSave?.path,path);
   }
  }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
 });

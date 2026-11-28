@@ -44,7 +44,7 @@ function fixture() {
     },
   };
   const page = { url: () => origin, evaluate: (read, input) => runInNewContext(`(${read})(input)`, { ...globals, input, setTimeout, clearTimeout }) };
-  const read = createPackageStateReader(metadata, origin, () => data.time);
+  const read = createPackageStateReader(metadata, origin, { now: () => data.time });
   const snapshot = (save, busy) => read({ pages: () => [page] }, save, busy);
   const stepRefresh = (tabTid = 'owned', packageNode = owned) => {
     const { phase, request, stepSession } = receipt;
