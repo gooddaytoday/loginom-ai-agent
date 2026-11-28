@@ -389,11 +389,14 @@ test.each(
       type === "session.status"
         ? { type, id: "event-1", created: 1, data: { sessionID: session.id, status: { type: "idle" } } }
         : { type, id: "event-1", created: 1, location: session.location, data: request }
+
     listeners.forEach((listener) => listener(event))
     const notifyAfterLock = await delivery.promise
 
     if (change === "tab closed") tabs.store = []
+
     if (change === "muted") muted.value = true
+
     if (change === "disabled") preferences[type === "session.status" ? "turnFinished" : "decision"] = false
 
     await notifyAfterLock()
