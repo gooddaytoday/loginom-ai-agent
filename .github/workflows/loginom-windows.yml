@@ -64,7 +64,7 @@ jobs:
 
   # loginom-ai-agent-pty.exe for the CLIs. The reusable workflow builds only the target asked for here.
   pty:
-    if: ${{ !inputs.updater-fixtures && !inputs.con08-fixture && (github.event_name != 'pull_request' || startsWith(github.head_ref, 'v040-batch-') || contains(fromJSON('["dev","loginom"]'), github.base_ref)) }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.con08-fixture) || (!inputs.updater-fixtures && (github.event_name != 'pull_request' || startsWith(github.head_ref, 'v040-batch-') || contains(fromJSON('["dev","loginom"]'), github.base_ref))) }}
     uses: ./.github/workflows/loginom-pty.yml
     with:
       targets: '["x86_64-pc-windows-msvc"]'
@@ -414,6 +414,7 @@ jobs:
           retention-days: 7
 
   con08-fixture:
+    needs: pty
     if: github.event_name == 'workflow_dispatch' && inputs.con08-fixture
     runs-on: windows-2022
     timeout-minutes: 90
@@ -429,13 +430,19 @@ jobs:
         with:
           bun-version-file: package.json
       - uses: ./.github/actions/setup-loginom-inputs
+      - name: Download pty
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: loginom-ai-agent-pty-x86_64-pc-windows-msvc
+          path: ${{ runner.temp }}/pty
       - name: Build and verify the isolated CON-08 installer
         shell: pwsh
         env:
           LOGINOM_AI_AGENT_CON08_TEST_BUILD: "1"
         run: |
           $output = Join-Path $env:RUNNER_TEMP 'con08'
-          & ./script/build-windows.ps1 -Product Desktop -OutputDirectory $output -NodeSource $env:LOGINOM_AI_AGENT_NODE_SOURCE -BrowserSource $env:LOGINOM_AI_AGENT_BROWSER_SOURCE -Channel dev
+          $pty = Join-Path $env:RUNNER_TEMP 'pty/loginom-ai-agent-pty.exe'
+          & ./script/build-windows.ps1 -PtyBinary $pty -Product Desktop -OutputDirectory $output -NodeSource $env:LOGINOM_AI_AGENT_NODE_SOURCE -BrowserSource $env:LOGINOM_AI_AGENT_BROWSER_SOURCE -Channel dev
           $hostBundle = Join-Path $output 'desktop/win-unpacked/resources/loginom/host/node-host.mjs'
           if (-not (Select-String -LiteralPath $hostBundle -Pattern 'con08-fault' -SimpleMatch -Quiet)) { throw 'CON-08 fixture missing' }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

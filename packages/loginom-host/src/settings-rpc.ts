@@ -5,6 +5,7 @@ import { Loginom } from "./loginom"
 export const Status = Loginom.View.mapFields((fields) => ({
   ...Struct.pick(fields, ["revision", "generation", "url", "username", "folder", "hasPassword", "state"]),
   failed: Schema.Boolean,
+  pendingCleanupFailed: Schema.optionalKey(Schema.Literal(true)),
 }))
 export const Address = Schema.String.check(
   Schema.makeFilter((value) => {

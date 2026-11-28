@@ -10,6 +10,7 @@ const RecordSchema = Schema.Struct({
   revision: Schema.Number,
   url: Schema.String,
   urlSource: Schema.optional(Schema.Literal("explicit")),
+  activationStarted: Schema.optional(Schema.Literal(true)),
   username: Schema.String,
   secrets: Schema.Union([
     Schema.Struct({ apiKey: Schema.String, password: Schema.String }),
@@ -22,7 +23,7 @@ const RecordSchema = Schema.Struct({
   ]),
 })
 export type ConnectionRecord = typeof RecordSchema.Type
-export type ActiveConnection = Omit<ConnectionRecord, "secrets"> & { apiKey: string; password: string }
+export type ActiveConnection = Omit<ConnectionRecord, "secrets" | "activationStarted"> & { apiKey: string; password: string }
 const decode = Schema.decodeUnknownOption(Schema.fromJsonString(RecordSchema))
 const decodeMigration = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ state: Schema.Literals(["resetting", "complete"]) })),
@@ -30,6 +31,7 @@ const decodeMigration = Schema.decodeUnknownOption(
 
 // Only the owning host accesses this directory; it is outside renderer stores.
 export function connectionStore(directory: string, codec: CredentialCodec = credentials(process.platform)) {
+  const pendingPath = join(directory, "pending.json")
   let initialized: Promise<void> | undefined
   async function protectDirectory() {
     await mkdir(directory, { recursive: true, mode: 0o700 })
@@ -123,20 +125,19 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
     if (migration && Option.isNone(migration)) throw new Error("LOGINOM_STORE_INVALID")
     if (migration && Option.isSome(migration) && migration.value.state === "complete") return
     const active = join(directory, "connection.json")
-    const pending = join(directory, "pending.json")
     function foreign(record: ConnectionRecord | undefined) {
       if (!record) return false
       if (!URL.canParse(record.url)) throw new Error("LOGINOM_STORE_INVALID")
       return new URL(record.url).hostname !== "app.loginom.ai"
     }
-    if (migration || foreign(await read(active)) || foreign(await read(pending))) {
+    if (migration || foreign(await read(active)) || foreign(await read(pendingPath))) {
       // Persist the intent first: an interrupted reset must finish removing
       // old secrets, even if its active pointer has already been removed.
       await write(marker, { state: "resetting" }, true)
       const generations = join(directory, "generations")
       const files = [
         active,
-        pending,
+        pendingPath,
         ...(await readdir(generations))
           .filter((name) => /^\d+\.json$/.test(name))
           .map((name) => join(generations, name)),
@@ -174,13 +175,23 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
   return {
     initialize,
     async pending(): Promise<ActiveConnection | undefined> {
-      const record = await read(join(directory, "pending.json"))
+      const record = await read(pendingPath)
       return record && decodeRecord(record)
+    },
+    async pendingForStartup() {
+      const record = await read(pendingPath)
+      if (record?.activationStarted) return "interrupted" as const
+      return record && decodeRecord(record)
+    },
+    async setPendingActivation(started: boolean) {
+      const record = await read(pendingPath)
+      if (!record) throw Error("LOGINOM_STORE_WRITE_FAILED")
+      await write(pendingPath, { ...record, activationStarted: started ? true : undefined }, true)
     },
     async savePending(value: ActiveConnection) {
       await initialize()
       await write(
-        join(directory, "pending.json"),
+        pendingPath,
         {
           generation: value.generation,
           revision: value.revision,
@@ -194,7 +205,7 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
     },
     async clearPending() {
       await protectDirectory()
-      await rm(join(directory, "pending.json"), { force: true })
+      await rm(pendingPath, { force: true })
       if (process.platform === "win32") return
       const handle = await open(directory, constants.O_RDONLY)
       try {

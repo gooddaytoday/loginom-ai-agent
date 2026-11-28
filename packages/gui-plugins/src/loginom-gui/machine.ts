@@ -197,6 +197,7 @@ function message(state: State) {
   if (state.type === "applying") return state.status.state === "pending" ? "pending" : "starting"
   if (state.type === "verified") return "verified"
   if (!("status" in state)) return
+  if (state.status.pendingCleanupFailed) return "pendingCleanupFailed"
   if (state.status.failed) return "activationFailed"
   if (waiting(state.status)) return "applicationPaused"
   if (state.status.state !== "ready") return "disconnected"

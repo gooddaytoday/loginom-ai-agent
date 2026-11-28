@@ -8,6 +8,7 @@ import { cliCredentials } from "../src/connection/cli-credentials"
 import { connectionStore } from "../src/connection/connection-store"
 import { hostError } from "../src/errors"
 import { launchNodeHost } from "../src/node-client"
+import { transport } from "../src/transport"
 import { stageHeldKnowledge } from "./fixtures/knowledge"
 
 const directory = await mkdtemp(join(tmpdir(), "connection-switch-"))
@@ -131,7 +132,7 @@ async function openRun(owner: Owner, run: string) {
 async function readHelp(owner: Owner, run: string, generation: number) {
   const response = Promise.withResolvers<unknown>()
   await expect(
-    owner.request(
+    transport(owner.port).request(
       "call",
       { run, name: "read", userMessage: "Read Help", args: { uri: "fixture.md" } },
       5000,

@@ -49,6 +49,7 @@ export default {
   unavailable: "The Loginom service could not be reached. Try again.",
   serviceUnavailable: "Loginom service unavailable",
   activationFailed: "The service could not apply the connection. Check the settings and try again.",
+  pendingCleanupFailed: "Pending settings could not be deleted. The service will retry deletion on the next start.",
   invalidAddress: "Enter a Loginom address starting with http:// or https://, without credentials or URL parameters.",
   invalidUsername: "Check the Loginom username.",
   passwordRequired: "Enter a password or select “No password required”.",

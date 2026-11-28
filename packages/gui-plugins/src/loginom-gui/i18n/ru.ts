@@ -49,6 +49,7 @@ export default {
   unavailable: "Связь со службой Loginom прервалась. Попробуйте ещё раз.",
   serviceUnavailable: "Служба Loginom недоступна",
   activationFailed: "Служба не применила подключение. Проверьте настройки и попробуйте снова.",
+  pendingCleanupFailed: "Отложенные настройки не удалены. Служба повторит удаление при следующем запуске.",
   invalidAddress: "Введите адрес Loginom, начиная с http:// или https://, без учётных данных и параметров URL.",
   invalidUsername: "Проверьте имя пользователя Loginom.",
   passwordRequired: "Введите пароль или отметьте «Пароль не нужен».",

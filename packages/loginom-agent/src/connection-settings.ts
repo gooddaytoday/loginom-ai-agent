@@ -26,6 +26,7 @@ export function connectionSettings(request: Request = ServiceHost.connectionSett
       hasPassword: view.hasPassword,
       state: view.state,
       failed: !!view.failure || view.state === "recoverable-error",
+      ...(view.failure === "LOGINOM_PENDING_CLEAR_FAILED" ? { pendingCleanupFailed: true } : {}),
     }
   }
   const status = async (method: "connection.status" | "connection.settings.save", input: unknown) => {

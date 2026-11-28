@@ -51,8 +51,8 @@ async function fixture(codec: CredentialCodec) {
     async marker() {
       return readFile(join(directory, "v040-migration.json"), "utf8")
     },
-    async start() {
-      const service = await connectionService(connectionStore(directory, codec), runtime)
+    async start(profileStore = connectionStore(directory, codec)) {
+      const service = await connectionService(profileStore, runtime)
       services.push(service)
       await service.settled()
       return service
@@ -247,6 +247,58 @@ for (const [name, codec] of [
       expect(await f.store.read()).toMatchObject({ url: original.url, urlSource: "explicit", apiKey: "", password: original.password })
       expect(await f.store.latestGeneration()).toBe(2)
       expect(await f.store.pending()).toBeUndefined()
+    } finally { await f.close() }
+  })
+
+  test(`${name}: retries deleting rejected pending settings on startup without preparing them again`, async () => {
+    const f = await fixture(codec)
+    const replacementUrl = "https://replacement.example/app/"
+    const prepare = f.runtime.prepare
+    const blockedStore = () => ({
+      ...connectionStore(f.directory, codec),
+      async clearPending() { throw Error("EPERM") },
+    })
+    try {
+      await f.store.stage(original)
+      await f.store.activate(1)
+      const first = await f.start(blockedStore())
+      f.runtime.prepare = async (candidate) => {
+        f.prepared.push(candidate.url)
+        throw Error("LOGINOM_RUNTIME_TIMEOUT")
+      }
+      const input = {
+        revision: 1, url: replacementUrl, username: "replacement-user",
+        password: { operation: "replace" as const, value: "replacement-password" },
+      }
+      const validation = await first.api.check(input)
+      await first.api.save({ revision: 1, validationId: validation.validationId })
+      await first.settled()
+      expect(await first.api.status()).toMatchObject({
+        generation: 1, state: "ready", failure: "LOGINOM_PENDING_CLEAR_FAILED",
+      })
+      expect(await f.store.pending()).toMatchObject({ url: replacementUrl })
+      expect(first.acquire("on-original")?.generation).toBe(1)
+      await first.close()
+
+      f.runtime.prepare = prepare
+      const retriedWithFailure = await f.start(blockedStore())
+      expect(await retriedWithFailure.api.status()).toMatchObject({
+        generation: 1, state: "ready", failure: "LOGINOM_PENDING_CLEAR_FAILED",
+      })
+      expect(await f.store.pending()).toMatchObject({ url: replacementUrl })
+      await retriedWithFailure.close()
+
+      const restarted = await f.start()
+      expect(await restarted.api.status()).toMatchObject({ generation: 1, state: "ready", url: original.url })
+      expect(await restarted.api.status()).not.toHaveProperty("failure")
+      expect(f.prepared).toEqual([original.url, replacementUrl, original.url, original.url])
+      expect(await f.store.read()).toEqual(original)
+      expect(await f.store.pending()).toBeUndefined()
+
+      const retry = await restarted.api.check(input)
+      await restarted.api.save({ revision: 1, validationId: retry.validationId })
+      await restarted.settled()
+      expect(await f.store.read()).toMatchObject({ generation: 2, url: replacementUrl })
     } finally { await f.close() }
   })
 

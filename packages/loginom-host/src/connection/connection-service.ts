@@ -62,21 +62,23 @@ export async function connectionService(
   const switching = new AbortController()
   function loadProfile() {
     if (state.loading) return state.loading
-    state.loading = (async () => ({
-      active: await store.read(),
-      pending: await store.pending(),
-      latest: await store.latestGeneration(),
-    }))()
+    state.loading = (async () => {
+      const active = await store.read()
+      const saved = await store.pendingForStartup()
+      const latest = await store.latestGeneration()
+      if (saved === "interrupted") return { active, latest, failure: await discardPending() }
+      return { active, latest, pending: saved }
+    })()
       .then(
-        ({ active, pending, latest }) => {
+        ({ active, pending, latest, failure }) => {
           if (state.closing) return
-          state.failure = undefined
+          state.failure = failure
           state.active = active
           state.setupRequired = active ? undefined : true
           state.pending = pending && pending.generation > (active?.generation ?? 0) ? pending : undefined
           state.revision = state.pending?.revision ?? active?.revision ?? 0
           state.generation = Math.max(active?.generation ?? 0, pending?.generation ?? 0, latest)
-          state.phase = active ? "starting" : "unconfigured"
+          state.phase = active ? "starting" : failure ? "recoverable-error" : "unconfigured"
           if (!active) return progress()
           state.applying = runtime
             .prepare(active)
@@ -127,7 +129,7 @@ export async function connectionService(
       () => {
         if (state.closing || state.handle !== handle) return
         state.readiness = "recoverable-error"
-        state.failure = "LOGINOM_RUNTIME_START_FAILED"
+        state.failure ??= "LOGINOM_RUNTIME_START_FAILED"
         state.phase = state.pending ? "pending" : "recoverable-error"
       },
     )
@@ -160,12 +162,17 @@ export async function connectionService(
       ...(state.failure ? { failure: state.failure } : {}),
     }
   }
-  async function failPending(failure: string) {
-    // A rejected replacement requires a new save, even after the Host restarts.
-    state.failure = await store.clearPending().then(
-      () => failure,
-      () => "LOGINOM_STORE_WRITE_FAILED",
+  function discardPending() {
+    return store.clearPending().then(
+      () => undefined,
+      () => "LOGINOM_PENDING_CLEAR_FAILED" as const,
     )
+  }
+  async function failPending(failure: string) {
+    finishPending(await discardPending() ?? failure)
+  }
+  function finishPending(failure: string) {
+    state.failure = failure
     state.pending = undefined
     state.pendingBrowser = undefined
     state.phase = state.handle ? state.readiness : "recoverable-error"
@@ -178,6 +185,19 @@ export async function connectionService(
     const candidate = state.pending
     state.phase = "starting"
     state.applying = (async () => {
+      // Persist the attempt before starting it. If deletion fails or the Host is
+      // interrupted, startup can discard this record while keeping queued saves.
+      try {
+        await store.setPendingActivation(true)
+      } catch {
+        finishPending("LOGINOM_STORE_WRITE_FAILED")
+        return
+      }
+      const resumeOnStartup = () => store.setPendingActivation(false).catch(() => undefined)
+      if (state.closing) {
+        await resumeOnStartup()
+        return
+      }
       const signal = state.active ? switching.signal : undefined
       let prepared: RuntimeHandle | undefined
       try {
@@ -196,7 +216,8 @@ export async function connectionService(
         const cancelled =
           signal?.aborted && (error === signal.reason || (error instanceof Error && error.cause === signal.reason))
         await prepared?.close().catch(() => undefined)
-        if (!cancelled)
+        if (cancelled) await resumeOnStartup()
+        else
           await failPending(
             error instanceof Error && error.message === "LOGINOM_RUNTIME_TIMEOUT"
               ? error.message
@@ -209,6 +230,7 @@ export async function connectionService(
       void next.ready?.catch(() => undefined)
       if (state.closing || state.pending !== candidate) {
         await next.close().catch(() => undefined)
+        await resumeOnStartup()
         return
       }
       const committed = await store

@@ -30,6 +30,24 @@ test("the settings RPC emits only the display status, even for a migrated addres
   })
 })
 
+test("settings distinguish failed cleanup of pending changes while the original connection is ready", async () => {
+  const settings = connectionSettings(async () => ({
+    revision: 2,
+    generation: 1,
+    url: "https://loginom.example/app/",
+    username: "analyst",
+    folder: "/analyst",
+    hasPassword: true,
+    state: "ready",
+    failure: "LOGINOM_PENDING_CLEAR_FAILED",
+  }))
+  const result = await settings.status()
+  const validated = await ConnectionSettingsRpc.methods.status.output["~standard"].validate(result)
+  expect(validated).toMatchObject({
+    value: { ok: true, value: { generation: 1, failed: true, pendingCleanupFailed: true } },
+  })
+})
+
 test("Loginom credential rejection and malformed input do not echo secrets", async () => {
   const input = {
     revision: 0,
