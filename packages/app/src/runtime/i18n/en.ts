@@ -75,6 +75,7 @@ export const dict = {
   "command.session.search": "Search sessions",
   "sidebar.search": "Search",
   "sidebar.search.placeholder": "Title, project, or words from your prompt",
+  "sidebar.search.promptUnavailable": "Prompt text search is currently unavailable.",
   "sidebar.search.conversations": "Conversations",
   "sidebar.search.recent": "Recent conversations",
   "command.session.previous": "Previous session",

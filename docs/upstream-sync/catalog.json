@@ -206,7 +206,11 @@
       "paths": [
         "packages/schema/src/session.ts", "packages/core/src/session/store.ts", "packages/core/test/session-list.test.ts",
         "packages/protocol/openapi.json", "packages/client/src/effect/api/api.ts", "packages/client/src/effect/generated/client.ts"
-      ]
+      ],
+      "notes": {
+        "packages/app/src/shell/commands/session-search.tsx": "Keeps successful search results when a field fails. The palette displays an inline prompt search status (CAT-10).",
+        "packages/app/e2e/regression/home.spec.ts": "Covers title and project matches during a prompt search failure and clears the status after recovery."
+      }
     },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
