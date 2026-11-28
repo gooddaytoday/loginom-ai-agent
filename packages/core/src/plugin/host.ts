@@ -4,6 +4,7 @@ import { Plugin } from "@opencode/plugin/effect"
 import type { IntegrationMethodRegistration } from "@opencode/plugin/effect/integration"
 import { EventManifest } from "@opencode/schema/event-manifest"
 import type { Event } from "@opencode/schema/event"
+import type { SessionMessage } from "@opencode/schema/session-message"
 import { ServerConfig } from "@opencode/schema/mcp"
 import { App } from "../app.js"
 import { Effect, Schema, Stream } from "effect"
@@ -619,6 +620,30 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: Pick<Interfa
           .pipe(Effect.map((interrupted) => ({ interrupted }))),
       wait: (input) => sessions.wait(input.sessionID),
       context: (input) => sessions.context(input.sessionID),
+      turnMessages: Effect.fn(function* ({
+        sessionID,
+        promptID,
+      }: Parameters<Plugin.Context["session"]["turnMessages"]>[0]) {
+        const prompt = yield* sessions.message({ sessionID, messageID: promptID })
+        if (prompt?.type !== "user") return []
+        const turn: SessionMessage.Info[] = [prompt]
+        let anchor = prompt.id
+        const limit = 64
+        while (true) {
+          const page = yield* sessions.messages({
+            sessionID,
+            limit,
+            order: "asc",
+            cursor: { id: anchor, direction: "next" },
+          })
+          for (const message of page) {
+            if (message.type === "user") return turn
+            turn.push(message)
+            anchor = message.id
+          }
+          if (page.length < limit) return turn
+        }
+      }),
       instructions: {
         entry: {
           list: Effect.fn(function* (input) {

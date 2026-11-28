@@ -7,6 +7,7 @@ import {Client as AgentClient} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import * as executor from '../../lib/executor.mjs';
 import * as workspace from '../../lib/workspace.mjs';
+import {withLoginomMetadata} from '../../lib/loginom-feed-metadata.mjs';
 import {createBundledSkillFixture} from './bundled-skill-fixture.mjs';
 import {createActionCatalogFixture} from './action-catalog-fixture.mjs';
 
@@ -47,7 +48,7 @@ mock.module(new URL('../../lib/workspace.mjs',import.meta.url).href,{namedExport
 mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports:{...executor,createActionRuntime:()=>({
   tools:executor.executorTools,describe:()=>({actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){},hasUnsettledWork:()=>false,hasActiveWork:()=>false,async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
   run:async(key,parameters,{operationId})=>{
-    f.saved={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path}}};
+    f.saved={status:'SUCCEEDED',action_key:key,operation_id:operationId,output:{package_ref:{path:parameters.path,active_identity:parameters.path}}};
     return f.lost?{...f.saved,status:'AMBIGUOUS',output:{}}:f.saved;
   },
   inspect:async({operationId})=>({status:'SUCCEEDED',action_key:'operation.inspect',operation_id:operationId,
@@ -104,17 +105,30 @@ test('inspection of an ambiguous Save delivers the original saved-package follow
     artifactStore:{list:()=>[],async releaseUploads(){}}};
   const bridge=await createBridge({resources:resources.resources,actionManifestUri:f.catalog.manifestUri,actionManifestSha256:f.catalog.manifestSha256,
     mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
-    loginomUrl:'http://loginom.invalid/app',replayBootstrap:false,replayLoginUser:null,browserRecovery:true},session,{browserTransport:new ExternalTransport()});
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:false,replayLoginUser:null,browserRecovery:true},session,{
+    browserTransport:new ExternalTransport(),presentNodeReply:(reply,project)=>withLoginomMetadata(reply,{receipt:project({})})});
   const client=new AgentClient({name:'reconciled-save',version:'1'});
   try{
     const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
     await client.callTool({name:'dock_prepare',arguments:{}});
-    await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path,conflict_policy:'replace'},operation_id:'own-save'}});
+    const saved=await client.callTool({name:'dock_action_run',arguments:{action_key:'package.save_checkpoint',parameters:{path,conflict_policy:'replace'},operation_id:'own-save'}});
     const inspected=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'own-save'}});
     const blocks=inspected.content.map(c=>{try{return JSON.parse(c.text);}catch{return {};}});
     assert.equal(blocks[0].action_key,'operation.inspect');
     const state=blocks.find(v=>v.kind==='dock_saved_package_state');
     assert.equal(state?.save_operation_id,'own-save',JSON.stringify(inspected));
     assert.equal(state.package_path,path);assert.equal(state.modified,false);assert.equal(f.stateReads,2);
+    const original=saved._meta?.loginom, confirmed=inspected._meta?.loginom;
+    assert.equal(original?.operationId,'own-save');
+    assert.equal(original.status,'AMBIGUOUS');
+    assert.equal(original.evidence,undefined);
+    assert.equal(confirmed.operationId,original.operationId);
+    assert.deepEqual(confirmed.evidence,[{kind:'saved',path}]);
+    const {confirmedSequence,...admission}=confirmed.receiptWindow;
+    assert.deepEqual(original.verificationRequest,{kind:'save',...admission});
+    assert.ok(confirmedSequence>admission.startSequence);
+    f.saved={...f.saved,operation_id:'unadmitted-save'};
+    const unadmitted=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'unadmitted-save'}});
+    assert.equal(unadmitted._meta?.loginom,undefined);
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
 });

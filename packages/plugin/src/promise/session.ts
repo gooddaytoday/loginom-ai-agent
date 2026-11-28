@@ -236,4 +236,8 @@ export type SessionDomain = Pick<
 > &
   Pick<ExperimentalSessionApi, "wait" | "instructions"> & {
     readonly hook: ModelHooks<SessionHooks>
+    readonly turnMessages: (input: {
+      sessionID: Session.ID
+      promptID: SessionMessage.ID
+    }) => Promise<readonly SessionMessage.Info[]>
   }
