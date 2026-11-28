@@ -2,6 +2,9 @@ import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { SessionMessageAssistant, SessionMessageInfo, ShellInfo } from "@opencode/client/promise"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
 import { createTwoFilesPatch } from "diff"
+import { Schema } from "effect"
+import { hostErrorText } from "../../../loginom-host/src/errors"
+import receipts from "../fixtures/loginom-feed-receipts.json" with { type: "json" }
 import { readSessionDraftText } from "../utils/drafts"
 import { holdRoute } from "../utils/app"
 import {
@@ -33,6 +36,7 @@ import {
 } from "../utils/timeline"
 
 const detailed = timelinePresets[2].value
+const loginomSaveReceipt = Schema.decodeUnknownSync(Schema.MutableJson)(receipts.save)
 
 const user = { id: "msg_user", type: "user", text: "Run it", time: { created: 1 } } satisfies SessionMessageInfo
 
@@ -3401,4 +3405,282 @@ function summaryDiff(index: number) {
     status: "modified" as const,
     patch: `@@ -1 +1 @@\n-export const value = ${index}\n+export const value = ${index + 1}`,
   }
+}
+
+for (const width of [1280, 390]) {
+  test(`Loginom shows live, completed and failed steps in both detail modes at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    const now = receipts.waiting.startedAt + 12000
+    await page.clock.setFixedTime(now)
+
+    await setupTimeline(page, {
+      locale: "ru",
+      viewport: { width, height: 900 },
+      settings: { newTimeline: width === 1280 },
+      messages: [
+        userMessage([userText("Собери и сохрани ABC-анализ.")]),
+        assistantMessage(
+          [
+            toolPart(
+              "prt_loginom_import",
+              "loginom_dock_node_wait",
+              "completed",
+              {},
+              {
+                title: "MODEL_GENERATED_TITLE",
+                output: "MODEL_GENERATED_RESULT",
+                metadata: {
+                  loginom: width === 1280 ? receipts.output : receipts.node,
+                },
+              },
+            ),
+            toolPart(
+              "prt_loginom_save",
+              "loginom_dock_action_run",
+              "completed",
+              {},
+              {
+                metadata: { loginom: loginomSaveReceipt },
+              },
+            ),
+            toolPart(
+              "prt_loginom_failure",
+              "loginom_dock_node_wait",
+              "error",
+              {},
+              {
+                error: "RAW_TOOL_FAILURE",
+                metadata: {
+                  loginom: receipts.failure,
+                  loginomStep: receipts.reading,
+                },
+              },
+            ),
+            toolPart(
+              "prt_loginom_legacy_failure",
+              "loginom_dock_node_wait",
+              "error",
+              {},
+              {
+                error: "Loginom connection closed",
+              },
+            ),
+            toolPart(
+              "prt_loginom_live",
+              "loginom_dock_node_apply",
+              "running",
+              {},
+              {
+                metadata: { loginomStep: receipts.waiting },
+              },
+            ),
+          ],
+          { completed: false },
+        ),
+      ],
+    })
+
+    const brief = page.getByRole("button", { name: "Кратко", exact: true })
+    const full = page.getByRole("button", { name: "Подробно", exact: true })
+    const imported = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_import")}"]`)
+    const running = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_live")}"]`)
+    const failure = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_failure")}"]`)
+    const saved = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_save")}"]`)
+    const legacyFailure = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_legacy_failure")}"]`)
+
+    const details = imported.getByText("Выход 1 · строк: 2400, столбцов: 1", { exact: true })
+    const more = imported.getByLabel("Показать детали шага", { exact: true })
+
+    const legacyReason = legacyFailure.getByText("Loginom connection closed")
+
+    await expect(brief).toHaveAttribute("aria-pressed", "true")
+    await expect(imported.getByText("Прочитал таблицу", { exact: true })).toBeVisible()
+    await expect(saved.getByText("Сохранил «ABC-анализ.lgp» в /user", { exact: true })).toBeVisible()
+    await expect(legacyFailure.getByText("Шаг Loginom", { exact: true })).toBeVisible()
+
+    if (width === 1280) {
+      const disclosure = legacyFailure.locator('[data-slot="collapsible-trigger"]')
+      await disclosure.click()
+      await expect(legacyReason).toBeVisible()
+      await disclosure.click()
+    } else {
+      await expect(legacyReason).toBeVisible()
+    }
+
+    await expect(running.getByText("Жду Loginom 12 с", { exact: true })).toBeVisible()
+    await expect(running.locator('[data-component="spinner"]')).toBeVisible()
+    await expect(
+      failure.getByText(
+        "Не удалось выполнить узел в Loginom · NODE_EXECUTION_FAILED — Loginom не ответил · попытка 1",
+        {
+          exact: true,
+        },
+      ),
+    ).toBeVisible()
+    await expect(failure.locator('[data-component="spinner"]')).toHaveCount(0)
+    await expect(more).toHaveText("…")
+    await expect(details).toBeHidden()
+    await page.screenshot({
+      path: testInfo.outputPath(`loginom-${width}-compact.png`),
+      animations: "disabled",
+    })
+
+    await more.click()
+    await expect(details).toBeVisible()
+    await more.click()
+    await expect(details).toBeHidden()
+
+    await full.click()
+    await expect(full).toHaveAttribute("aria-pressed", "true")
+    await expect(details).toBeVisible()
+    await expect(more).toHaveCount(0)
+    await expect(failure.getByText("Поле 7 из 8")).toHaveCount(0)
+    await expect(page.getByText(/MODEL_GENERATED|RAW_TOOL_FAILURE/)).toHaveCount(0)
+    await expect
+      .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("settings.v3") ?? "{}").general?.timelineDetail))
+      .toEqual(timelinePresets[1].value)
+    await page.screenshot({
+      path: testInfo.outputPath(`loginom-${width}-detailed.png`),
+      animations: "disabled",
+    })
+  })
+}
+
+test("Loginom updates the current step when live progress arrives", async ({ page }) => {
+  await page.clock.setFixedTime(receipts.configuring.startedAt + 12000)
+
+  const timeline = await setupTimeline(page, {
+    locale: "ru",
+    messages: [userMessage(), assistantMessage([], { completed: false })],
+  })
+
+  await expect(page.getByRole("button", { name: "Остановить", exact: true })).toBeVisible()
+
+  const id = "prt_loginom_progress"
+  const name = "loginom_dock_node_apply"
+  const progress = page.locator(`[data-timeline-part-id="${id}"]`)
+
+  await timeline.send(partUpdated(toolPart(id, name, "streaming", {})))
+  await expect(progress.getByText("Работаю в Loginom…", { exact: true })).toBeVisible()
+
+  await timeline.send(
+    partUpdated(toolPart(id, name, "running", {}, { metadata: { loginomStep: receipts.configuring } })),
+  )
+  await expect(progress.getByText("Собираю сценарий в Loginom… · Идёт 12 с", { exact: true })).toBeVisible()
+})
+
+for (const width of [1280, 390]) {
+  test(`Loginom shows protection, delay and failure details at ${width}px`, async ({ page }, testInfo) => {
+    const now = 1700000200000
+    const tool = "loginom_dock_node_wait"
+    await page.clock.setFixedTime(now)
+
+    const timeline = await setupTimeline(page, {
+      locale: "ru",
+      viewport: { width, height: 900 },
+      settings: { newTimeline: width === 1280 },
+      messages: [
+        userMessage([userText("Проверь и запусти сценарий продаж.")]),
+        assistantMessage(
+          [
+            toolPart("prt_node_failure", tool, "error", {}, {
+              metadata: { loginom: receipts.nativeNodeFailure },
+            }),
+            toolPart("prt_launch_message", tool, "error", {}, {
+              metadata: { loginom: receipts.nativeLaunchMessage },
+            }),
+            toolPart("prt_host_failure", tool, "error", {}, {
+              error: hostErrorText(new Error("LOGINOM_CALL_BUSY")),
+            }),
+            toolPart("prt_unbound_failure", tool, "error", {}, {
+              metadata: { loginom: receipts.nativeFailureWithoutNode },
+            }),
+          ],
+          { completed: false },
+        ),
+      ],
+    })
+
+    const warning = page.getByText("Агент работает в окне Loginom — не меняйте схему до конца шага", { exact: true })
+    const delay = page.getByText("Loginom отвечает дольше обычного", { exact: true })
+    await expect(page.getByText("Узел не выполнился: В источнике отсутствует столбец «Дата»")).toBeVisible()
+    await expect(page.getByText("Loginom сообщил после запуска: Нет доступа к источнику")).toBeVisible()
+    await expect(page.getByText("Хост Loginom уже выполняет другой запрос", { exact: true })).toBeVisible()
+    await expect(page.getByText("Узел не выполнился: Поле «Выручка» не найдено")).toBeVisible()
+    await expect(page.getByText("Показать на схеме", { exact: true })).toHaveCount(0)
+    await expect(page.getByText("LOGINOM_CALL_BUSY")).toHaveCount(0)
+
+    const id = "prt_protected_step"
+
+    await timeline.send(
+      partUpdated(toolPart(id, tool, "running", {}, { metadata: { loginom: { busy: receipts.busyStart } } })),
+    )
+    await expect(warning).toBeVisible()
+    await expect(delay).toHaveCount(0)
+
+    await timeline.send(
+      partUpdated(
+        toolPart(
+          id,
+          tool,
+          "running",
+          {},
+          {
+            metadata: { loginom: { busy: receipts.busyStart }, loginomStep: receipts.stalled },
+          },
+        ),
+      ),
+    )
+    await expect(page.getByText("Выполняю шаг в Loginom… · Идёт 2 мин 2 с")).toBeVisible()
+    await expect(delay).toBeVisible()
+    await page.clock.setFixedTime(now + 2000)
+    await expect(page.getByText("Выполняю шаг в Loginom… · Идёт 2 мин 4 с")).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath(`loginom-protection-${width}.png`), animations: "disabled" })
+
+    await timeline.send(
+      partUpdated(
+        toolPart(
+          id,
+          tool,
+          "running",
+          {},
+          {
+            metadata: {
+              loginom: { busy: receipts.busyEnd },
+              loginomStep: receipts.resumed,
+            },
+          },
+        ),
+      ),
+    )
+    await expect(warning).toHaveCount(0)
+    await expect(delay).toHaveCount(0)
+    await expect(page.getByText("Выполняю шаг в Loginom… · Идёт 2 мин 4 с")).toBeVisible()
+
+    await timeline.send(
+      partUpdated(
+        toolPart(
+          id,
+          tool,
+          "error",
+          {},
+          {
+            metadata: {
+              loginom: receipts.graphConflict,
+              loginomStep: receipts.stalled,
+            },
+          },
+        ),
+      ),
+    )
+    await expect(
+      page.getByText(/Не удалось сверить состояние схемы Loginom/),
+    ).toBeVisible()
+    await expect(page.getByText(/Вы изменили схему/)).toHaveCount(0)
+    await expect(warning).toHaveCount(0)
+    await expect(delay).toHaveCount(0)
+    await expect(page.getByText(/Выполняю шаг в Loginom… · Идёт/)).toHaveCount(0)
+    await page.screenshot({ path: testInfo.outputPath(`loginom-failures-${width}.png`), animations: "disabled" })
+  })
 }

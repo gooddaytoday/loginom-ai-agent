@@ -94,6 +94,10 @@ Read [You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-a
   - Make a state change that may suspend inside `startTransition`, so the current content stays until the next is ready.
 - Return stable objects from `Panel.list` and reactive contributions, so the host never remounts a trigger or a panel.
 - Never add work to timeline rows. The session header slot is the only timeline surface, besides `CodeBlock` and `CodeBlockAction` content: the host renders it only for a complete fenced block of a language a plugin lists, and blocks of other languages cost a set lookup.
+- Built-in tool renderers can target an owned tool namespace with a `*` suffix. Use `handlesFailure(metadata, error)` for
+  failures explained by validated receipt facts or recognized error codes. Render localized copy for a recognized code.
+- Use `BuiltinSlot` with `session.header.mobile` for narrow-header controls and `builtinContext(ctx).timeline` for the
+  shared persisted preset. The host restricts both to built-ins. Document new host seams in the README and catalog.
 
 ## Localization
 

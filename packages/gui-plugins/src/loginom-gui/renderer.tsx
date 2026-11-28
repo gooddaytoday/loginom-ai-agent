@@ -8,11 +8,14 @@ import { DashboardLink } from "./contract"
 import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
 import { registerStartScreen } from "./start-screen"
+import setupSteps from "./step-renderer"
 
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   registerStartScreen(ctx)
+  setupSteps(ctx)
+
   const Catalog = lazy(() => import("./catalog-page"))
 
   ctx.add(Page, {

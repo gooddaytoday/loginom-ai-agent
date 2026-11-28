@@ -1209,7 +1209,12 @@ export function useToolDisplayRenderer(
     )
   })
 
-  return { render, title: () => item()?.title }
+  return {
+    render,
+    title: () => item()?.title,
+    standardError: (metadata: ToolProps["metadata"], error: string | undefined) =>
+      error && item()?.handlesFailure?.(metadata ?? {}, error) !== true ? error : undefined,
+  }
 }
 
 export function FileTool(props: ToolProps & { title: string; count: number; children?: JSX.Element }) {
@@ -1424,7 +1429,7 @@ export function ToolDisplay(
               </>
             )}
           </Match>
-          <Match when={error()}>
+          <Match when={renderer.standardError(props.metadata, error())}>
             {(error) => {
               const cleaned = error().replace("Error: ", "")
 
