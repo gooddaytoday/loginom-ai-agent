@@ -51,23 +51,29 @@ function systemNotificationDescription(title: string | undefined, fallback: stri
     // Conversation titles can contain literal percent signs.
   }
 
-  // Titles can come from user input or from a model. Keep credential-like text out of OS notification history.
+  // Check the entire title before extracting a filename. A credential marker can occur inside a path or a word.
+  if (/пароль|password|pwd|passwd|token|токен|ключ|key|secret|api|authorization|cookie/i.test(text)) return fallback
+
+  // Credential formats that do not need a label.
   if (
-    /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bbearer\s+[\w./+=-]{8,}|\b[a-z][\w+.-]*:\/\/[^/\s]*@/i.test(text) ||
-    /(?:\b(?:[a-z0-9]+_)*(?:api[ _-]?key|access[ _-]?key|password|passwd|(?:client[ _-]?)?secret|(?:(?:access|refresh|auth)[ _-]?)?token|authorization|cookie)|пароль|токен|секретный ключ)["']?\s*[:=]\s*\S/i.test(text) ||
+    /\bbearer\s+[\w./+=-]{8,}|\b[a-z][\w+.-]*:\/\/[^/\s]*@/i.test(text) ||
     /\b(?:sk-|gh[pousr]_|github_pat_|glpat-|xox[baprs]-|AIza|AKIA)[\w-]{12,}|\beyJ[\w-]+\.[\w-]+\.[\w-]+/.test(text)
   ) {
     return fallback
   }
 
-  const url = text.match(/\b(?:file|https?):\/\/[^\s"'`]+/i)?.[0]
-  const quotedPath = text.match(/(["'`])([^"'`]*[\\/][^"'`]+)\1/)?.[2]
-  const barePath = /^(?:[a-z]:[\\/]|\\{2}|~?\/)/i.test(text) ? text : text.match(/[^\s"'`]*[\\/][^\s"'`]+/)?.[0]
-  const path = url ? (URL.parse(url)?.pathname ?? "/") : (quotedPath ?? barePath)
+  const quotedPath = text.match(/(["'`])((?:[a-z]:[^"'`]+|[^"'`]*[\\/][^"'`]*))\1/i)?.[2]
+
+  const barePath = /^(?:[a-z]:[\\/]|[\\/]|~\/)/i.test(text)
+    ? text
+    : text.match(/\b[a-z]:[^\s"'`()<>[\]{},;]+|[^\s"'`()<>[\]{},;]*[\\/][^\s"'`()<>[\]{},;]*/i)?.[0]
+
+  const path = quotedPath ?? barePath
 
   if (path === undefined) return original
 
-  const filename = getFilename(parsePathLineSuffix(path).path).trim()
+  const pathname = /^[a-z][\w+.-]*:\/\//i.test(path) ? (URL.parse(path)?.pathname ?? "") : path.replace(/^[a-z]:/i, "")
+  const filename = getFilename(parsePathLineSuffix(pathname).path).trim()
 
   return filename && !/^(?:\.{1,2}|[a-z]:)$/i.test(filename) ? filename : fallback
 }

@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, expect, mock, setSystemTime, test, vi } from "bu
 import { createEffect, createRoot } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { OpenCodeEvent } from "@opencode/client/promise"
+import { dict as ru } from "@/runtime/i18n/ru"
 import type { ServerConnection } from "@/runtime/server/registry"
 import { ServerScope } from "@/runtime/server/scope"
 import type { Tab } from "@/shell/tabs/tabs"
@@ -80,7 +81,9 @@ beforeAll(async () => {
   }))
   mock.module("@/runtime/i18n/language", () => ({
     ...real.language,
-    useLanguage: () => ({ t: (key: string) => key }),
+    useLanguage: () => ({
+      t: (key: string) => (key === "notification.session.fallbackDescription" ? ru[key] : key),
+    }),
   }))
   mock.module("@/settings/model", () => ({
     ...real.settings,
@@ -324,19 +327,29 @@ test.each([
 })
 
 const systemNotificationCases = [
-  { title: undefined, expected: "notification.session.fallbackDescription", change: undefined },
+  { title: undefined, expected: "Разговор", change: undefined },
   { title: "Test session", expected: "Test session", change: undefined },
   { title: 'Review "/home/user/private/Quarterly report.xlsx"', expected: "Quarterly report.xlsx", change: undefined },
   { title: String.raw`C:\Projects\Private\Monthly report.xlsx`, expected: "Monthly report.xlsx", change: undefined },
   { title: "Check ./private/report.csv before sending", expected: "report.csv", change: undefined },
-  { title: "Check password=fixture-only", expected: "notification.session.fallbackDescription", change: undefined },
+  { title: "D:review-fixture.lgp", expected: "review-fixture.lgp", change: undefined },
+  { title: "Review (D:review-fixture.lgp) before sending", expected: "review-fixture.lgp", change: undefined },
+  { title: 'Review "D:Quarterly report.lgp" before sending', expected: "Quarterly report.lgp", change: undefined },
+  { title: String.raw`Compare private\report.csv before release`, expected: "report.csv", change: undefined },
+  { title: "Пароль — fixture-only", expected: "Разговор", change: undefined },
+  { title: "Check PWD|fixture-only", expected: "Разговор", change: undefined },
+  { title: "fixture-only (ключ)", expected: "Разговор", change: undefined },
+  { title: "Fix /private/key/report.csv", expected: "Разговор", change: undefined },
+  { title: "Secret fixture-only", expected: "Разговор", change: undefined },
+  { title: "Evaluate egressApiFixture", expected: "Разговор", change: undefined },
+  { title: "Check password=fixture-only", expected: "Разговор", change: undefined },
   {
     title: `Review ${["ghp", "exampleFixtureValue1234567890"].join("_")}`,
-    expected: "notification.session.fallbackDescription",
+    expected: "Разговор",
     change: undefined,
   },
-  { title: "Проверить пароль: пример", expected: "notification.session.fallbackDescription", change: undefined },
-  { title: "SDK_TOKEN=fixture-only", expected: "notification.session.fallbackDescription", change: undefined },
+  { title: "Проверить пароль: пример", expected: "Разговор", change: undefined },
+  { title: "SDK_TOKEN=fixture-only", expected: "Разговор", change: undefined },
   { title: "Basic project setup", expected: "Basic project setup", change: undefined },
   { title: "Test session", expected: undefined, change: "tab closed" },
   { title: "Test session", expected: undefined, change: "muted" },
