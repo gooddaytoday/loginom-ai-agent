@@ -73,6 +73,10 @@ export const dict = {
 
   "command.session.new": "New session",
   "command.session.search": "Search sessions",
+  "sidebar.search": "Search",
+  "sidebar.search.placeholder": "Title, project, or words from your prompt",
+  "sidebar.search.conversations": "Conversations",
+  "sidebar.search.recent": "Recent conversations",
   "command.session.previous": "Previous session",
   "command.session.next": "Next session",
   "command.session.previous.unseen": "Previous unread session",
