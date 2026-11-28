@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import type { FolderListing } from "@loginom-ai-agent/loginom-host/package-folder"
+import type { FolderReadResult } from "@loginom-ai-agent/loginom-host/package-folder"
 import type { RpcHandlers } from "@opencode/plugin/promise/rpc"
 import { ServiceHost } from "./host"
 import type { Definition, Search } from "./package-list-contract"
@@ -9,7 +9,7 @@ type Continuation = {
   folder: string
   text: string
   generation: number
-  pages: readonly FolderListing[]
+  read: FolderReadResult
   index: number
   expires: number
 }
@@ -21,6 +21,11 @@ function readError(cause: unknown) {
   if (isCode(cause, "LOGINOM_SESSION_LIMIT")) return ["session_limit", ru.sessionLimit] as const
   if (isCode(cause, "LOGINOM_CONFIG_REQUIRED")) return ["not_connected", ru.notConnected] as const
   if (isCode(cause, "LOGINOM_RECOVERY_REQUIRED")) return ["recovering", ru.recovering] as const
+  if (isCode(cause, "LOGINOM_CONNECTION_NOT_READY")) return ["connecting", ru.connecting] as const
+  if (isCode(cause, "LOGINOM_RUNTIME_START_FAILED") || isCode(cause, "LOGINOM_STORE_READ_FAILED"))
+    return ["connection_failed", ru.connectionFailed] as const
+  if (isCode(cause, "LOGINOM_LOGOUT_UNCONFIRMED") || isCode(cause, "LOGINOM_RUNTIME_CLEANUP_FAILED"))
+    return ["unavailable", ru.cleanupFailed] as const
   if (isCode(cause, "LOGINOM_PACKAGE_FOLDER_CANCELLED")) return ["cancelled", ru.cancelled] as const
   return ["unavailable", ru.unavailable] as const
 }
@@ -31,7 +36,7 @@ export function packageListHandlers(host = ServiceHost.packageFolders): RpcHandl
   return {
     async list({ folder }, { signal, error }) {
       try {
-        const [listing] = await host.read({ folder, generation: await host.generation() }, signal)
+        const { listings: [listing] } = await host.read({ folder, generation: await host.generation() }, signal)
         if (!listing) throw Error("LOGINOM_REPLY_INVALID")
         return listing
       } catch (cause) {
@@ -51,21 +56,22 @@ export function packageListHandlers(host = ServiceHost.packageFolders): RpcHandl
         const generation = await host.generation()
         signal.throwIfAborted()
         if (continuation && continuation.generation !== generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
-        const pages = continuation?.pages ?? await host.read({ folder, generation, ...(recursive ? { query: text } : {}) }, signal)
+        const read = continuation?.read ?? await host.read({ folder, generation, ...(recursive ? { query: text } : {}) }, signal)
         signal.throwIfAborted()
         const index = continuation?.index ?? 0
-        const result = pages[index]
+        const result = read.listings[index]
         if (!result) throw Error("LOGINOM_REPLY_INVALID")
         const entries = result.entries.filter((entry) => entry.kind === "package").filter((entry) => normalize(entry.name).includes(query))
-        if (index + 1 >= pages.length) return { folder: result.folder, entries, slow: result.slow }
+        const page = { folder: result.folder, entries, slow: result.slow, ...(read.truncated ? { truncated: true as const } : {}) }
+        if (index + 1 >= read.listings.length) return page
 
         const next = randomUUID()
-        continuations.set(next, { folder, text: query, generation, pages, index: index + 1, expires: Date.now() + 5 * 60_000 })
+        continuations.set(next, { folder, text: query, generation, read, index: index + 1, expires: Date.now() + 5 * 60_000 })
         if (continuations.size > 64) {
           const oldest = continuations.keys().next().value
           if (oldest) continuations.delete(oldest)
         }
-        return { folder: result.folder, entries, slow: result.slow, cursor: next }
+        return { ...page, cursor: next }
       } catch (cause) {
         signal.throwIfAborted()
         if (continuation && isCode(cause, "LOGINOM_GENERATION_UNAVAILABLE")) return error("search_expired", ru.searchExpired)

@@ -6,6 +6,8 @@ const errors = {
   session_limit: Schema.toStandardSchemaV1(Schema.Undefined),
   not_connected: Schema.toStandardSchemaV1(Schema.Undefined),
   recovering: Schema.toStandardSchemaV1(Schema.Undefined),
+  connecting: Schema.toStandardSchemaV1(Schema.Undefined),
+  connection_failed: Schema.toStandardSchemaV1(Schema.Undefined),
   cancelled: Schema.toStandardSchemaV1(Schema.Undefined),
   unavailable: Schema.toStandardSchemaV1(Schema.Undefined),
 }
@@ -34,6 +36,8 @@ export const Definition = Rpc.define({
           folder: Folder,
           entries: Schema.Array(Package),
           slow: Schema.Boolean,
+          // True on every page if the traversal reached its limit.
+          truncated: Schema.optional(Schema.Literal(true)),
           cursor: Schema.optional(Schema.String),
         }),
       ),

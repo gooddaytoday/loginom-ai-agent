@@ -15,6 +15,7 @@ import { loginBrowser, loginomAddress, reauthenticateReloadedPage } from "./conn
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
+import { observeLoginomReplies, withStepProgress } from "../client/lib/step-progress.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -34,6 +35,7 @@ const state = {
   browser: undefined,
   browserProfile: undefined,
   browserServer: undefined,
+  lastLoginomReplyAt: null,
   inputs: new Map(),
   owner: undefined,
   uploadDirectory: undefined,
@@ -145,7 +147,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
+      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache, validationLogout } = validateStartInput(input)
       const packageReader = input.packageFolder === undefined ? undefined : await import("./package-folder.mjs")
       if (input.packageQuery !== undefined && (!packageReader || typeof input.packageQuery !== "string" || input.packageQuery.length > 1024))
         throw Error("LOGINOM_START_INVALID")
@@ -199,30 +201,35 @@ async function handle(message) {
           clientRevision: resources.manifestHash, actionManifestDigest: resources.manifest.actionManifestSha256 } }),
       }
       if (input.validation === true) {
-        await loginBrowser(login)
+        await loginBrowser({ ...login, validationLogout })
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
       if (packageReader) {
         const owner = { origin: new URL(input.connection.url).origin, username: input.connection.username }
-        const { listings, readMs } = await packageReader.withPackageFolderSession({
-          login: () => loginBrowser({ ...login, keepOpen: true, reportSessionLimit: true,
-            logoutOnLoginFailure: (page, required) => packageReader.logoutPackageSession(page, { ...owner, required }, startupPhase) }),
-          folder: input.packageFolder,
-          query: input.packageQuery,
-          ...owner,
-          signal: state.startupController.signal,
-          onPhase: startupPhase,
-        })
+        const { readResult, readMs } = await loginBrowser({ ...login, validationLogout: true, reportSessionLimit: true,
+          readAuthenticated: async (page, readDeadline) => {
+            const started = performance.now()
+            const readResult = await packageReader.readPackageFolders(page, {
+              folder: input.packageFolder, query: input.packageQuery, ...owner,
+              signal: state.startupController.signal, deadline: readDeadline,
+            })
+            return { readResult, readMs: Math.round(performance.now() - started) }
+          } })
         await startupPhase({ phase: "packages.read", status: "ready", duration_ms: readMs })
-        send({ id: message.id, result: { listings, protocol: 1, generation: input.generation } })
+        send({ id: message.id, result: { ...readResult, protocol: 1, generation: input.generation } })
         return
       }
       // Connection validation and package listing do not load the executor.
       const { createSession } = await import("../client/lib/session.mjs")
       const { createBridge } = await import("../client/lib/bridge.mjs")
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),
-        onContextCreated: context => { state.browser = context } })
+        onContextCreated: context => {
+          state.browser = context
+          observeLoginomReplies(context, new URL(input.connection.url).origin, () => {
+            state.lastLoginomReplyAt = Date.now()
+          })
+        } })
       state.browser = authenticated.context
       state.owner.origin = new URL(input.connection.url).origin
       const config = {
@@ -385,13 +392,18 @@ async function handle(message) {
         signal: controller.signal,
         timeout: runtimeCallTimeout(message.input.name, message.input.arguments),
       }
-      const result = message.input.packageArtifact !== undefined
+      const result = await withStepProgress({
+        name: message.input.name,
+        signal: controller.signal,
+        lastReply: () => state.lastLoginomReplyAt,
+        send: message.input.stepProgress === true ? progress => send({ id: message.id, progress }) : undefined,
+      }, async () => message.input.packageArtifact !== undefined
         ? await state.bridge.prepareLocalPackage(message.input.arguments, message.input.packageArtifact, {
             signal: AbortSignal.any([controller.signal, AbortSignal.timeout(options.timeout)]),
           })
         : message.input.scanReceipt !== undefined
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
-          : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options)
+          : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options))
       const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
       send({
         id: message.id,

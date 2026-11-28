@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { runInNewContext } from "node:vm"
-import { logoutPackageSession, withPackageFolderSession } from "../src/package-folder.mjs"
+import { readPackageFolders } from "../src/package-folder.mjs"
 
 const origin = "https://stand.example.test"
 const folder = "/user"
@@ -60,11 +60,6 @@ function fixture() {
       FMapTree: { FServerConnection: connection },
       Items: { Workspace: { getActiveTab: () => ({ Controller: { FController: activeForm } }) } },
     },
-    async LogOut() {
-      events.push(["logout"])
-      this.FServerConnection = null
-      this.FMainForm = null
-    },
   }
   const evaluate = (fn, input) => runInNewContext(`(${fn})(input)`, {
     Date, input, location: new URL(origin),
@@ -91,19 +86,19 @@ function fixture() {
       return { dispose: async () => {} }
     },
   }
-  const login = async () => ({
-    context: { pages: () => [page], close: async () => { events.push(["close browser"]) } },
-  })
-  return { events, fileList, released, form, app, page, read: (signal, path = folder, query) => withPackageFolderSession({
-    login, folder: path, query, origin, username, signal,
-  }) }
+  return {
+    events, fileList, released, form,
+    read: (signal, path = folder, query, deadline) => readPackageFolders(page, {
+      folder: path, query, origin, username, signal, deadline,
+    }),
+  }
 }
 
 test("FileInfoList returns folders first, packages newest first and no native fields", async () => {
   const f = fixture()
   const { listings: [listing] } = await f.read()
   assert.deepEqual(listing, { folder, entries: expected, slow: false })
-  assert.deepEqual(f.events, [["directories", "/user/"], ["packages", "/user/", "*.lgp"], ["logout"], ["close browser"]])
+  assert.deepEqual(f.events, [["directories", "/user/"], ["packages", "/user/", "*.lgp"]])
   assert.equal(f.released.length, 2)
 })
 
@@ -114,7 +109,7 @@ for (const [failure, reply] of [
   const f = fixture()
   f.fileList.GetFileInfoItemsEx = reply
   assert.deepEqual((await f.read()).listings[0], { folder, entries: expected, slow: true })
-  assert.deepEqual(f.events, [["directories", "/user/"], ["open Files"], ["navigate in Files", "/user/"], ["logout"], ["close browser"]])
+  assert.deepEqual(f.events, [["directories", "/user/"], ["open Files"], ["navigate in Files", "/user/"]])
 })
 
 test("empty shared folder is a valid response", async () => {
@@ -124,7 +119,7 @@ test("empty shared folder is a valid response", async () => {
   assert.deepEqual((await f.read(undefined, "/common")).listings[0], { folder: "/common", entries: [], slow: false })
 })
 
-test("canceling a pending folder read still logs out and closes the browser", async () => {
+test("canceling a pending folder read rejects instead of publishing a partial result", async () => {
   const f = fixture()
   const active = Promise.withResolvers()
   const controller = new AbortController()
@@ -133,7 +128,7 @@ test("canceling a pending folder read still logs out and closes the browser", as
   await active.promise
   controller.abort(Error("cancelled"))
   await assert.rejects(result, { message: "cancelled" })
-  assert.deepEqual(f.events, [["logout"], ["close browser"]])
+  assert.deepEqual(f.events, [])
 })
 
 test("a Files window for a different folder does not become a successful empty result", async () => {
@@ -141,29 +136,30 @@ test("a Files window for a different folder does not become a successful empty r
   f.fileList.GetDirectoryItems = () => null
   f.form.SetCurrentDirLockWrapper = async () => {}
   await assert.rejects(f.read(), { message: "LOGINOM_PACKAGE_FOLDER_UNAVAILABLE" })
-  assert.deepEqual(f.events, [["open Files"], ["logout"], ["close browser"]])
+  assert.deepEqual(f.events, [["open Files"]])
 })
 
+for (const [size, readCount, truncated] of [[30, 31, false], [120, 40, true]]) {
+  test(`recursive search returns ${readCount} pages on a tree with ${size} child folders`, async () => {
+    const f = fixture()
+    const folders = Array.from({ length: size }, (_, i) => `Folder ${String(i).padStart(3, "0")}`)
+    f.fileList.GetDirectoryItems = path => {
+      f.events.push(["directories", path])
+      return path === "/user/" ? folders.map(FileName => ({ FileName, Attributes: 4 })) : []
+    }
+    const result = await f.read(undefined, "/user", "ПРОД")
+    assert.equal(result.truncated, truncated)
+    assert.deepEqual(result.listings.map(page => page.folder), ["/user", ...folders.slice(0, readCount - 1).map(name => `/user/${name}`)])
+    assert.deepEqual(result.listings.map(page => page.entries.map(entry => entry.name)), result.listings.map(() => [newer.FileName]))
+    assert.equal(f.events.filter(([event]) => event === "directories").length, readCount)
+  })
+}
 
-test("one authenticated session reads all 30 child folders and then logs out", async () => {
+test("a slow child returns the completed pages before the startup deadline", async () => {
   const f = fixture()
-  const folders = Array.from({ length: 30 }, (_, i) => `Folder ${String(i).padStart(2, "0")}`)
-  f.fileList.GetDirectoryItems = path => {
-    f.events.push(["directories", path])
-    return path === "/user/" ? folders.map(FileName => ({ FileName, Attributes: 4 })) : []
-  }
-  const { listings } = await f.read(undefined, "/user", "ПРОД")
-  assert.deepEqual(listings.map(page => page.folder), ["/user", ...folders.map(name => `/user/${name}`)])
-  assert.deepEqual(listings.map(page => page.entries.map(entry => entry.name)), listings.map(() => [newer.FileName]))
-  assert.equal(f.events.filter(([event]) => event === "directories").length, 31)
-  assert.deepEqual(f.events.filter(([event]) => event === "logout" || event === "close browser"), [["logout"], ["close browser"]])
-})
-
-
-test("logout after web authentication uses the owned connection before the workspace renders", async () => {
-  const f = fixture()
-  f.app.FMainForm = null
-  await logoutPackageSession(f.page, { origin, username, required: false })
-  assert.deepEqual(f.events, [["logout"]])
-  assert.equal(f.app.FServerConnection, null)
+  f.fileList.GetDirectoryItems = path => path === "/user/" ? [{ FileName: "child" }] : new Promise(() => {})
+  const { listings, truncated } = await f.read(undefined, "/user", "ПРОД", Date.now() + 100)
+  assert.equal(truncated, true)
+  assert.deepEqual(listings.map(page => page.folder), ["/user"])
+  assert.deepEqual(listings[0].entries.map(entry => entry.name), [newer.FileName])
 })

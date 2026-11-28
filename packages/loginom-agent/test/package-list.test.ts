@@ -49,7 +49,10 @@ function fixture() {
       requests.push(input)
       const result = table.get(input.folder)
       if (!result) throw Error("private host error")
-      return input.query === undefined ? [result] : [...table.values()].map(page => ({ ...page, entries: page.entries.filter(entry => entry.kind === "package") }))
+      const listings = input.query === undefined ? [result] : [...table.values()].map(page => ({
+        ...page, entries: page.entries.filter(entry => entry.kind === "package"),
+      }))
+      return { listings, truncated: false }
     },
   }
   return { rpc: packageListHandlers(host), host, table, requests }
@@ -85,6 +88,24 @@ test("recursive search filters pages and reuses one host read for every cursor",
   expect(f.requests).toEqual([{ folder: "/user", generation: 11 }, { folder: "/user", generation: 11, query: input.text }])
 })
 
+test("every cursor page shows that the result is partial", async () => {
+  const f = fixture()
+  const read = f.host.read
+  f.host.read = async (input, signal) => ({ ...await read(input, signal), truncated: true })
+  const input = { folder: "/user", text: "", recursive: true }
+  const first = await f.rpc.search(input, call())
+  expect(first).toMatchObject({ truncated: true })
+  if (!("cursor" in first) || !first.cursor) throw Error("Expected cursor")
+  const second = await f.rpc.search({ ...input, cursor: first.cursor }, call())
+  expect(second).toMatchObject({ truncated: true })
+  if (!("cursor" in second) || !second.cursor) throw Error("Expected cursor")
+  expect(await f.rpc.search({ ...input, cursor: second.cursor }, call())).toEqual({
+    folder: "/user/two", entries: [pkg("Годовые продажи.lgp", "/user/two/Годовые продажи.lgp")],
+    slow: false, truncated: true,
+  })
+  expect(f.requests).toHaveLength(1)
+})
+
 test("canceling a recursive search aborts the host read", async () => {
   const f = fixture()
   const input = { folder: "/user", text: "", recursive: true }
@@ -116,7 +137,13 @@ test("a session limit produces the approved client message", async () => {
   })
 })
 
-for (const [code, type] of [["LOGINOM_CONFIG_REQUIRED", "not_connected"], ["LOGINOM_RECOVERY_REQUIRED", "recovering"]]) {
+for (const [code, type] of [
+  ["LOGINOM_CONFIG_REQUIRED", "not_connected"],
+  ["LOGINOM_RECOVERY_REQUIRED", "recovering"],
+  ["LOGINOM_CONNECTION_NOT_READY", "connecting"],
+  ["LOGINOM_RUNTIME_START_FAILED", "connection_failed"],
+  ["LOGINOM_STORE_READ_FAILED", "connection_failed"],
+]) {
   test(`list and search expose ${type} separately`, async () => {
     const f = fixture()
     f.host.generation = async () => { throw Error(code) }

@@ -2,7 +2,7 @@ import { createRequire } from "node:module"
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
-import { browserLaunch } from "../client/lib/browser-launch.mjs"
+import { browserLaunch, prepareBrowserProfile } from "../client/lib/browser-launch.mjs"
 import { createRedactor } from "../client/lib/redact.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 import { connectionTimelineScript } from "../client/lib/connection-recovery.mjs"
@@ -164,7 +164,7 @@ function trackPageNetwork(page) {
 
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
-export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reload, signal, onSubmit, reportSessionLimit = false } = {}) {
+export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reload, signal, sameOrigin = false, onSubmit, reportSessionLimit = false } = {}) {
   const started = performance.now()
   let phase = "goto", phaseStarted = started, original
   const emit = async event => { try { await onPhase?.(event) } catch { /* Diagnostics cannot change login. */ } }
@@ -245,6 +245,8 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     }
     await network.close()
     phase = "form"; phaseStarted = performance.now()
+    if (sameOrigin && new URL(page.url()).origin !== new URL(candidate.url).origin)
+      throw Error("LOGINOM_LOGIN_UNAVAILABLE")
     let alreadyAuthenticated = false
     if (reload) {
       const fresh = await observeReloadedLoginPage(page, candidate.url, reload)
@@ -429,7 +431,7 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
 }
 
 export async function loginBrowser({ browserPath, profile, candidate, httpCachePath, headless = false, keepOpen = false, signal, onContextCreated, downloadsPath,
-  deadline = Date.now() + 150_000, onRetry, onPhase, reportSessionLimit = false, logoutOnLoginFailure }) {
+  deadline = Date.now() + 150_000, onRetry, onPhase, validationLogout = false, readAuthenticated, reportSessionLimit = false }) {
   signal?.throwIfAborted()
   const phase = onPhase ?? (async () => {})
   const dependenciesStarted = performance.now()
@@ -439,7 +441,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
   const launch = browserLaunch(headless)
   const profileStarted = performance.now()
   await phase({ phase: "browser.profile", status: "starting" })
-  await mkdir(profile, { recursive: true, mode: 0o700 })
+  await prepareBrowserProfile(profile)
   if (httpCachePath && !keepOpen) await mkdir(httpCachePath, { recursive: true, mode: 0o700 })
   await phase({ phase: "browser.profile", status: "ready", duration_ms: Math.round(performance.now() - profileStarted), http_cache: !!httpCachePath && !keepOpen })
   signal?.throwIfAborted()
@@ -500,10 +502,11 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
   await phase({ phase: "browser.cdp", status: "ready", attempt: attempt + 1 })
   const closing = { promise: undefined }
   const close = () => closing.promise ??= context.close()
-  let submitted = false, authenticated = false, page
+  let submitted = false
+  const loginDeadline = readAuthenticated ? deadline - 10_000 : deadline
   // After submission the browser owns a possibly admitted server session.
   // Drain the login response and let the guarded logout run before closing it.
-  const cancel = () => { if (!submitted && !authenticated) void close().catch(() => undefined) }
+  const cancel = () => { if (!submitted) void close().catch(() => undefined) }
   signal?.addEventListener("abort", cancel, { once: true })
   const timer = setTimeout(cancel, Math.max(1, deadline - Date.now()))
   try {
@@ -523,18 +526,25 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
     if (onContextCreated) await onContextCreated(context)
     const loginStarted = performance.now()
     await phase({ phase: "login", status: "starting", attempt: attempt + 1 })
-    page = context.pages()[0] ?? (await context.newPage())
-    const result = await loginPage(page, candidate, { deadline, themeState, onThemeReload: record, onPhase: phase, reportSessionLimit,
-      ...(logoutOnLoginFailure ? { signal, onSubmit: () => { submitted = true } } : {}) })
-      .then(async result => {
-        authenticated = Boolean(logoutOnLoginFailure)
+    const page = context.pages()[0] ?? (await context.newPage())
+    let rejected = false, result
+    try {
+      try {
+        result = await loginPage(page, candidate, { deadline: loginDeadline, themeState, onThemeReload: record, onPhase: phase,
+          sameOrigin: validationLogout, reportSessionLimit,
+          ...(validationLogout ? { signal, onSubmit: () => { submitted = true } } : {}) })
+        if (validationLogout) submitted = true
         await phase({ phase: "login", status: "ready", attempt: attempt + 1, duration_ms: Math.round(performance.now() - loginStarted) })
-        return result
-      }, async error => {
+      } catch (error) {
+        rejected = ["LOGINOM_LOGIN_REJECTED", "LOGINOM_SESSION_LIMIT", "LOGINOM_ACCOUNT_MISMATCH"].includes(error?.message)
         await phase({ phase: "login", status: "failed", attempt: attempt + 1, duration_ms: Math.round(performance.now() - loginStarted) })
         throw error
-      })
-    signal?.throwIfAborted()
+      }
+      signal?.throwIfAborted()
+      if (readAuthenticated) result = await readAuthenticated(page, loginDeadline)
+    } finally {
+      if (validationLogout && submitted && !rejected) await logoutValidation(page, candidate, deadline, phase)
+    }
     if (!keepOpen) {
       await close()
       return result
@@ -542,25 +552,46 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
     // MCP receives this same live context through its public contextGetter API.
     return { ...result, context }
   } catch (error) {
-    try {
-      if (logoutOnLoginFailure && (submitted || authenticated)) {
-        const rejected = error?.message === "LOGINOM_LOGIN_REJECTED" || error?.message === "LOGINOM_SESSION_LIMIT"
-        await logoutOnLoginFailure(page, authenticated || !rejected)
-      }
-    } finally {
-      await close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED", error?.cause?.login ? { cause: error.cause } : undefined) })
-    }
+    await close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED", error?.cause?.login ? { cause: error.cause } : undefined) })
+    if (error?.message === "LOGINOM_LOGOUT_UNCONFIRMED") throw error
     signal?.throwIfAborted()
     // Only a classified transient login failure may retry, after confirmed close.
-    if (attempt === 0 && !themeState.failed && error?.message === "LOGINOM_LOGIN_UNAVAILABLE" && Date.now() < deadline) {
+    if (attempt === 0 && !themeState.failed && error?.message === "LOGINOM_LOGIN_UNAVAILABLE" && Date.now() < loginDeadline) {
       await record({ phase: "login_retry", attempt: 2, reason: error.message, login: error.cause?.login ?? null })
       continue
     }
-    if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED", "LOGINOM_FOCUS_SETUP_FAILED", "LOGINOM_SESSION_LIMIT"].includes(error?.message)) throw error
+    if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED", "LOGINOM_FOCUS_SETUP_FAILED", "LOGINOM_SESSION_LIMIT", "LOGINOM_PACKAGE_FOLDER_UNAVAILABLE"].includes(error?.message)) throw error
     throw Error("LOGINOM_LOGIN_UNAVAILABLE", error?.cause?.login ? { cause: error.cause } : undefined)
   } finally {
     clearTimeout(timer)
     signal?.removeEventListener("abort", cancel)
   }
+  }
+}
+
+// This context belongs to a check or a folder read and has never opened a package.
+async function logoutValidation(page, candidate, deadline, onPhase) {
+  const started = performance.now()
+  const at = tid => page.locator(`[data-tid="${tid}"]`)
+  const logoutDeadline = Math.min(Date.now() + 10_000, deadline)
+  const timeout = () => {
+    const left = logoutDeadline - Date.now()
+    if (left <= 0) throw Error("LOGINOM_LOGOUT_UNCONFIRMED")
+    return left
+  }
+  try {
+    if (new URL(page.url()).origin !== new URL(candidate.url).origin) throw Error("LOGINOM_LOGOUT_UNCONFIRMED")
+    const avatar = at("MF;cntMain;tlbMainToolbar;btnAvatar")
+    const owner = await page.waitForFunction(({ origin, username }) => location.origin === origin
+      && globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName === username,
+    { origin: new URL(candidate.url).origin, username: candidate.username }, { timeout: timeout() })
+    await owner.dispose()
+    await avatar.click({ timeout: timeout() })
+    await at("MF;AppMenuForm;btnLogOut").click({ timeout: timeout() })
+    await at("LoginForm;Login;edtUsername").waitFor({ state: "visible", timeout: timeout() })
+    await avatar.waitFor({ state: "hidden", timeout: timeout() })
+    await onPhase({ phase: "login.logout", status: "ready", duration_ms: Math.round(performance.now() - started) })
+  } catch {
+    throw Error("LOGINOM_LOGOUT_UNCONFIRMED")
   }
 }

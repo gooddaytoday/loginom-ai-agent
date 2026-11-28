@@ -17,7 +17,7 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
-import { decodeFolderListings, type FolderListing, ReadFolder } from "./package-folder"
+import { decodeFolderListings, type FolderReadResult, packageConnectionError, ReadFolder } from "./package-folder"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -370,6 +370,7 @@ export async function createLoginomHost(options: {
     signal?: AbortSignal,
     deadline?: number,
     validationHttpCache = false,
+    validationLogout = false,
   ) {
     const validation = purpose === "validation"
     const packageFolder = typeof purpose === "object" ? purpose.packageFolder : undefined
@@ -470,6 +471,7 @@ export async function createLoginomHost(options: {
         packageFolder,
         packageQuery: typeof purpose === "object" ? purpose.packageQuery : undefined,
         validationHttpCache: httpCache,
+        validationLogout,
         // CLI supplies its explicit browser policy for background launches too.
         headless: packageFolder !== undefined || (purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true)),
         closeSavedPackageOnShutdown: !validation && packageFolder === undefined && options.closeSavedPackageOnShutdown === true,
@@ -496,7 +498,7 @@ export async function createLoginomHost(options: {
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
     {
-      async check(connection, signal) {
+      async check(connection, signal, settings) {
         signal?.throwIfAborted()
         const chat = randomUUID()
         // An overlapping check keeps its independent fresh cache; no queue or new deadline.
@@ -528,7 +530,7 @@ export async function createLoginomHost(options: {
             await knowledge.close()
           }
           signal?.throwIfAborted()
-          const child = await launch(connection, chat, "validation", signal, undefined, httpCache).catch((error: unknown) => {
+          const child = await launch(connection, chat, "validation", signal, undefined, httpCache, settings).catch((error: unknown) => {
             if (error instanceof Error && Schema.is(Loginom.BrowserFailure)(error.message))
               return { state: "failed" as const, failure: error.message }
             throw error
@@ -639,17 +641,18 @@ export async function createLoginomHost(options: {
     }
   }
   const packageState = join(root, "package-list")
-  let packageRead: { controller: AbortController; pending: Promise<readonly FolderListing[]> } | undefined
-  let packageCleanupFailed = false
+  let packageRead: { controller: AbortController; pending: Promise<FolderReadResult> } | undefined
   async function retainPackageFailures() {
     const recent = 10
     const files = await readdir(packageState)
-    const failures = await Promise.all(files.filter(name => /^login-failure-[0-9a-f-]+\.json$/.test(name)).map(async name => {
-      const path = join(packageState, name)
-      return { path, time: (await stat(path)).mtimeMs }
-    }))
-    failures.sort((a, b) => b.time - a.time)
-    await Promise.all(failures.slice(recent).map(({ path }) => rm(path, { force: true })))
+    for (const pattern of [/^login-failure-[0-9a-f-]+\.json$/, /^runtime-close-\d+-[0-9a-f-]+\.json$/]) {
+      const snapshots = await Promise.all(files.filter(name => pattern.test(name)).map(async name => {
+        const path = join(packageState, name)
+        return { path, time: (await stat(path)).mtimeMs }
+      }))
+      snapshots.sort((a, b) => b.time - a.time)
+      await Promise.all(snapshots.slice(recent).map(({ path }) => rm(path, { force: true })))
+    }
     const log = join(packageState, "startup-failures.jsonl")
     if (!files.includes("startup-failures.jsonl")) return
     const lines = (await readFile(log, "utf8")).trimEnd().split("\n")
@@ -661,14 +664,10 @@ export async function createLoginomHost(options: {
   }
   async function performFolderRead(input: ReadFolder, signal: AbortSignal) {
     signal.throwIfAborted()
-    if (packageCleanupFailed) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
     const chat = randomUUID()
     const lease = service.acquire(chat)
     if (!lease) {
-      const { state } = await service.api.status()
-      if (state === "unconfigured") throw Error("LOGINOM_CONFIG_REQUIRED")
-      if (state === "recoverable-error") throw Error("LOGINOM_RECOVERY_REQUIRED")
-      throw Error("LOGINOM_CONNECTION_NOT_READY")
+      throw Error(packageConnectionError(await service.api.status()) ?? "LOGINOM_CONNECTION_NOT_READY")
     }
     let cleanupConfirmed = true
     try {
@@ -679,10 +678,13 @@ export async function createLoginomHost(options: {
       await runtime.close()
       cleanupConfirmed = true
       signal.throwIfAborted()
-      return decodeFolderListings("listings" in runtime.ready ? runtime.ready.listings : undefined, input)
+      return decodeFolderListings({
+        listings: "listings" in runtime.ready ? runtime.ready.listings : undefined,
+        truncated: "truncated" in runtime.ready ? runtime.ready.truncated : undefined,
+      }, input)
     } catch (error) {
       if (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED") cleanupConfirmed = false
-      if (!cleanupConfirmed) packageCleanupFailed = shutdown.failed = true
+      if (!cleanupConfirmed) shutdown.failed = true
       throw error
     } finally {
       lease.release()

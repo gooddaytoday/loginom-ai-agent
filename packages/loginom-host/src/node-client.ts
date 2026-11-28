@@ -101,15 +101,10 @@ export async function launchNodeHost(
     start() {},
   }
   const client = transport(port)
-  let packageReads = 0
-  async function request(...args: Parameters<typeof client.request>) {
-    if (args[0] !== "packages.list") return client.request(...args)
-    packageReads++
-    try {
-      return await client.request(...args)
-    } finally {
-      packageReads--
-    }
+  let pickerUsed = false
+  function request(method: string, input: unknown, timeout?: number, signal?: AbortSignal) {
+    if (method === "packages.list") pickerUsed = true
+    return client.request(method, input, timeout, undefined, undefined, signal)
   }
   function waitForExit(timeout: number) {
     return new Promise<Awaited<typeof exited> | undefined>((resolve) => {
@@ -123,9 +118,8 @@ export async function launchNodeHost(
   function close() {
     if (state.closing) return state.closing
     state.closing = (async () => {
-      // Saved-package cleanup and an in-flight picker login may need the longer
-      // graceful budget, without consuming the TERM/KILL observation allowance.
-      const longerCleanup = input.closeSavedPackageOnShutdown === true || packageReads > 0
+      // A cancelled picker request can settle before its worker finishes logout.
+      const longerCleanup = input.closeSavedPackageOnShutdown === true || pickerUsed
       const deadline = Date.now() + (timing.teardown ?? (longerCleanup ? 90_000 : 60_000))
       const gracefulDeadline = Math.min(
         deadline,

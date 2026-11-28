@@ -10,7 +10,7 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { join } from "node:path"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom-host/dashboard"
-import { decodeFolderListings, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
+import { decodeFolderListings, packageConnectionError, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
 import { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { Option, Schema } from "effect"
@@ -19,7 +19,7 @@ export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
 export type Connection = {
   port: Port
   close(): Promise<void>
-  request?: (method: string, input: unknown) => Promise<unknown>
+  request?: (method: string, input: unknown, timeout?: number, signal?: AbortSignal) => Promise<unknown>
 }
 
 type Started = {
@@ -37,7 +37,12 @@ const decodeRecord = Schema.decodeUnknownOption(
 const decodeStatus = Schema.decodeUnknownOption(
   Schema.Struct({ generation: Schema.Number, recoveries: Schema.optional(Schema.Array(Schema.String)) }),
 )
-const decodeView = Schema.decodeUnknownOption(Schema.Struct({ url: Schema.String, generation: Schema.Number, state: Schema.optional(Schema.String) }))
+const decodeView = Schema.decodeUnknownOption(Schema.Struct({
+  url: Schema.String,
+  generation: Schema.Number,
+  state: Schema.optional(Schema.String),
+  failure: Schema.optional(Schema.String),
+}))
 const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSource), { onExcessProperty: "error" })
 
 /**
@@ -48,7 +53,11 @@ const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSo
  * The Node host comes from `resources` and starts in the background, so the server does not wait for its handshake.
  * `connect` replaces it in tests. A file system failure here only leaves the server without leases, never stops it.
  */
-export async function start(input: { data: string; resources?: string; connect?: () => Promise<Connection> }) {
+export async function start(input: {
+  data: string
+  resources?: string
+  connect?: () => Promise<Connection>
+}) {
   if (state.current && !state.current.closing) throw Error("LOGINOM_HOST_ALREADY_STARTED")
   await state.current?.closing
   const root = join(input.data, "loginom")
@@ -69,7 +78,11 @@ export async function start(input: { data: string; resources?: string; connect?:
       }),
   ).then((sessions) => sessions.flat())
   const connect = input.connect ?? (input.resources ? nodeHost(root, input.resources) : undefined)
-  const current: Started = { directory, ready: Promise.resolve(undefined), held: new Map() }
+  const current: Started = {
+    directory,
+    ready: Promise.resolve(undefined),
+    held: new Map(),
+  }
   current.ready = (connect?.() ?? Promise.resolve(undefined)).then(
     (connection) => {
       if (connection && current.closing) return connection.close().then(() => undefined)
@@ -129,6 +142,18 @@ export const dashboard = {
   },
 }
 
+export const connectionSettings = {
+  request,
+  holdTurn() {
+    const id = randomUUID()
+    const held = request("connection.settings.turn", { id, active: true }).catch(() => undefined)
+    return async () => {
+      await held
+      await request("connection.settings.turn", { id, active: false }).catch(() => undefined)
+    }
+  },
+}
+
 async function connectionView() {
   const view = Option.getOrUndefined(decodeView(await request("connection.status", {})))
   if (!view) throw new Error("LOGINOM_REPLY_INVALID")
@@ -138,35 +163,21 @@ async function connectionView() {
 export const packageFolders = {
   async generation() {
     const view = await connectionView()
-    if (view.state === "unconfigured") throw Error("LOGINOM_CONFIG_REQUIRED")
-    if (view.state === "recoverable-error") throw Error("LOGINOM_RECOVERY_REQUIRED")
+    const reason = packageConnectionError(view)
+    if (reason) throw Error(reason)
     return view.generation
   },
   async read(input: ReadFolder, signal: AbortSignal) {
     signal.throwIfAborted()
-    const current = state.current
-    const connection = await current?.ready
-    signal.throwIfAborted()
-    if (!connection?.request || current?.closing) throw Error("LOGINOM_HOST_NOT_READY")
-    const { request } = connection
-    const requestId = randomUUID()
-    const cancel = () => { void request("packages.cancel", { requestId }).catch(() => undefined) }
-    signal.addEventListener("abort", cancel, { once: true })
-    try {
-      const result = await request("packages.list", { ...input, requestId })
-      signal.throwIfAborted()
-      return decodeFolderListings(result, input)
-    } finally {
-      signal.removeEventListener("abort", cancel)
-    }
+    return decodeFolderListings(await request("packages.list", input, undefined, signal), input)
   },
 }
 
-async function request(method: string, input: unknown) {
+async function request(method: string, input: unknown, timeout?: number, signal?: AbortSignal) {
   const current = state.current
   const connection = await current?.ready
   if (!connection?.request || current?.closing) throw new Error("LOGINOM_HOST_NOT_READY")
-  return connection.request(method, input)
+  return connection.request(method, input, timeout, signal)
 }
 
 /** Releases every lease still held, disconnects and closes the Host. Idempotent: soft stop (B2.3b) may call it first. */

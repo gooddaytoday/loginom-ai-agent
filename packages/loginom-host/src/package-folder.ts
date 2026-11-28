@@ -27,17 +27,28 @@ export const ReadFolder = Schema.Struct({
 })
 export type ReadFolder = typeof ReadFolder.Type
 
-const decodeListings = Schema.decodeUnknownOption(Schema.Array(FolderListing), { onExcessProperty: "error" })
+const FolderReadResult = Schema.Struct({ listings: Schema.Array(FolderListing), truncated: Schema.Boolean })
+export type FolderReadResult = typeof FolderReadResult.Type
+
+const decodeListings = Schema.decodeUnknownOption(FolderReadResult, { onExcessProperty: "error" })
 export function decodeFolderListings(value: unknown, { folder, query }: ReadFolder) {
   const result = decodeListings(value)
-  if (Option.isNone(result) || result.value[0]?.folder !== folder || (query === undefined && result.value.length !== 1))
+  if (Option.isNone(result) || result.value.listings[0]?.folder !== folder ||
+    (query === undefined && (result.value.listings.length !== 1 || result.value.truncated)))
     throw Error("LOGINOM_REPLY_INVALID")
   const seen = new Set<string>()
-  for (const page of result.value) {
+  for (const page of result.value.listings) {
     if (seen.has(page.folder) || (page.folder !== folder && !page.folder.startsWith(folder + "/")) ||
       page.entries.some((entry) => entry.name.includes("/") || entry.path !== page.folder + "/" + entry.name ||
         (query !== undefined && entry.kind !== "package"))) throw Error("LOGINOM_REPLY_INVALID")
     seen.add(page.folder)
   }
   return result.value
+}
+
+export function packageConnectionError({ state, failure }: { state?: string; failure?: string }) {
+  if (failure === "LOGINOM_RUNTIME_START_FAILED" || failure === "LOGINOM_STORE_READ_FAILED") return failure
+  if (state === "unconfigured") return "LOGINOM_CONFIG_REQUIRED"
+  if (state === "recoverable-error") return "LOGINOM_RECOVERY_REQUIRED"
+  if (state === "starting" || state === "pending") return "LOGINOM_CONNECTION_NOT_READY"
 }

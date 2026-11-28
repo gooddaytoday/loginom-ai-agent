@@ -150,52 +150,34 @@ async function readPackageFolder(page, input, signal) {
   }
 }
 
-export async function logoutPackageSession(page, { origin, username, required }, onPhase) {
-  const started = performance.now()
-  try {
-    const loggedOut = await bounded(() => page.evaluate(async ({ origin, username, required }) => {
-      const app = globalThis.bg?.app?.Application?.FInstance
-      const connection = app?.FServerConnection ?? app?.FMainForm?.FMapTree?.FServerConnection
-      if (location.origin !== origin) return false
-      if (connection?.Connected !== true) return required ? false : null
-      if (connection.UserName !== username) return false
-      await app.LogOut()
-      return !app.FServerConnection && !app.FMainForm
-    }, { origin, username, required }), 6000)
-    if (loggedOut === false) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-    if (loggedOut) await onPhase?.({ phase: "packages.logout", status: "ready", duration_ms: Math.round(performance.now() - started) })
-  } catch {
-    throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-  }
-}
+const maxSearchFolders = 40
+const maxSearchMs = 60_000
 
-export async function withPackageFolderSession({ login, folder, query, origin, username, signal, onPhase }) {
-  const { context } = await login()
-  const page = context.pages()[0]
-  try {
-    const started = performance.now()
-    const listings = []
-    const pending = [folder]
-    const normalize = text => text.normalize("NFC").toLocaleLowerCase("ru")
-    const match = query === undefined ? undefined : normalize(query.trim())
-    while (pending.length) {
-      signal?.throwIfAborted()
-      const current = pending.pop()
-      const listing = await readPackageFolder(page, { folder: current, origin, username }, signal)
-      if (match === undefined) listings.push(listing)
-      else {
-        const directories = listing.entries.filter(entry => entry.kind === "folder")
-        for (const directory of directories.reverse()) pending.push(directory.path)
-        listings.push({ ...listing, entries: listing.entries.filter(entry =>
-          entry.kind === "package" && normalize(entry.name).includes(match)) })
-      }
-    }
-    return { listings, readMs: Math.round(performance.now() - started) }
-  } finally {
+export async function readPackageFolders(page, { folder, query, origin, username, signal, deadline = Infinity }) {
+  const remaining = Math.max(1, Math.min(maxSearchMs, deadline - Date.now()))
+  const budget = AbortSignal.timeout(remaining)
+  const reading = signal ? AbortSignal.any([signal, budget]) : budget
+  if (query === undefined) {
+    return { listings: [await readPackageFolder(page, { folder, origin, username }, reading)], truncated: false }
+  }
+  const listings = []
+  const pending = [folder]
+  const normalize = text => text.normalize("NFC").toLocaleLowerCase("ru")
+  const match = normalize(query.trim())
+  while (pending.length && listings.length < maxSearchFolders) {
+    const current = pending.pop()
     try {
-      await logoutPackageSession(page, { origin, username, required: true }, onPhase)
-    } finally {
-      await context.close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED") })
+      const listing = await readPackageFolder(page, { folder: current, origin, username }, reading)
+      for (const entry of listing.entries.filter(entry => entry.kind === "folder").reverse()) pending.push(entry.path)
+      listings.push({ ...listing, entries: listing.entries.filter(entry =>
+        entry.kind === "package" && normalize(entry.name).includes(match)) })
+    } catch (error) {
+      signal?.throwIfAborted()
+      if (!budget.aborted || error !== budget.reason) throw error
+      if (!listings.length) listings.push({ folder, entries: [], slow: false })
+      return { listings, truncated: true }
     }
   }
+  signal?.throwIfAborted()
+  return { listings, truncated: pending.length > 0 }
 }
