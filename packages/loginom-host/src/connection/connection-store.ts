@@ -221,8 +221,10 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
         true,
       )
     },
-    async clearPending() {
+    async clearPending(options?: { forgetDiscard: true }) {
       await protectDirectory()
+      // Cancelling a new save must not bring back an older failure for the same active generation.
+      if (options?.forgetDiscard) await rm(discardPath, { force: true })
       await rm(pendingPath, { force: true })
       if (process.platform === "win32") return
       const handle = await open(directory, constants.O_RDONLY)

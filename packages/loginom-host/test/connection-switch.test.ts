@@ -209,6 +209,7 @@ test.each([
         generation: 1,
         revision: 1,
         url: original.url,
+        failure: "LOGINOM_PENDING_NOT_APPLIED",
       })
       expect(await f.store.read()).toEqual(original)
       expect(await openRun(owner, "after-restart")).toEqual({ generation: 1 })

@@ -424,6 +424,52 @@ for (const [name, codec] of [
     } finally { await f.close() }
   })
 
+  test(`${name}: a change rejected on startup stays visible after the next restart`, async () => {
+    const f = await fixture(codec)
+    try {
+      await f.store.stage(original)
+      await f.store.activate(1)
+      const input = {
+        revision: 1,
+        url: "https://replacement.example/app/",
+        username: "replacement-user",
+        password: { operation: "empty" as const },
+      }
+      const first = await f.start()
+      expect(first.acquire("draining")?.generation).toBe(1)
+      const validation = await first.api.check(input)
+      expect(await first.api.save({ revision: 1, validationId: validation.validationId })).toMatchObject({
+        generation: 1,
+        state: "pending",
+      })
+      await first.close()
+
+      const prepare = f.runtime.prepare
+      f.runtime.prepare = (candidate) =>
+        candidate.url === input.url ? Promise.reject(Error("LOGINOM_RUNTIME_TIMEOUT")) : prepare(candidate)
+      const rejected = await f.start()
+      const ready = { generation: 1, state: "ready", url: original.url }
+      expect(await rejected.api.status()).toMatchObject({ ...ready, failure: "LOGINOM_RUNTIME_TIMEOUT" })
+      expect(await f.store.pending()).toBeUndefined()
+      await rejected.close()
+
+      f.runtime.prepare = prepare
+      const reopened = await f.start()
+      expect(await reopened.api.status()).toMatchObject({ ...ready, failure: "LOGINOM_PENDING_NOT_APPLIED" })
+      expect(reopened.acquire("draining")?.generation).toBe(1)
+      const retry = await reopened.api.check(input)
+      expect(await reopened.api.save({ revision: 1, validationId: retry.validationId })).not.toHaveProperty("failure")
+      expect(await reopened.api.cancelPending({ revision: 2 })).toMatchObject(ready)
+      await reopened.close()
+
+      const afterCancel = await f.start()
+      expect(await afterCancel.api.status()).toMatchObject(ready)
+      expect(await afterCancel.api.status()).not.toHaveProperty("failure")
+    } finally {
+      await f.close()
+    }
+  })
+
   test(`${name}: retries deleting rejected pending settings on startup without preparing them again`, async () => {
     const f = await fixture(codec)
     const replacementUrl = "https://replacement.example/app/"

@@ -136,19 +136,18 @@ test("status prints the saved connection and recovery work instead of a new Host
   const starting = { ...base, state: "starting" as const }
   expect(statusView(starting)).toEqual({ ...starting, state: "configured" })
   expect(statusView({ ...base, state: "ready" }).state).toBe("ready")
-  const configured =
-    "Подключение настроено: https://app.loginom.ai/app/, пользователь worker. " +
-    "Незавершённых операций нет. Проверить соединение — `loginom check`."
+  const identity = "Подключение настроено: https://app.loginom.ai/app/, пользователь worker."
+  const configured = identity + " Незавершённых операций нет. Проверить соединение — `loginom check`."
   expect(statusText(statusView(starting))).toBe(configured)
   expect(statusText(statusView({ ...base, state: "ready" }))).toBe(configured)
   expect(statusText(statusView({ ...starting, failure: "LOGINOM_PENDING_NOT_APPLIED" }))).toBe(
-    configured + "\nНовые параметры не применены. Сохраните их снова через `loginom setup`.",
+    identity + "\nНовые параметры не применены. Сохраните их снова через `loginom setup`.",
   )
   expect(statusText(statusView({ ...starting, failure: "LOGINOM_PENDING_RESUME_FAILED" }))).toBe(
-    configured + "\nНе удалось применить отложенные настройки при запуске. Проверьте права на запись профиля.",
+    identity + "\nНе удалось применить отложенные настройки при запуске. Проверьте права на запись профиля.",
   )
   expect(statusText(statusView({ ...starting, failure: "LOGINOM_PENDING_CLEAR_FAILED" }))).toBe(
-    configured + "\nНе удалось удалить отложенные настройки. Служба повторит очистку при следующем запуске.",
+    identity + "\nНе удалось удалить отложенные настройки. Служба повторит очистку при следующем запуске.",
   )
   const pending = statusView({ ...base, revision: 2, state: "pending" })
   expect(pending.state).toBe("pending")
@@ -175,6 +174,27 @@ test("status prints the saved connection and recovery work instead of a new Host
     "Подключение настроено: https://app.loginom.ai/app/, пользователь worker.\n" +
       "Ошибка подключения: LOGINOM_RUNTIME_START_FAILED. Проверить соединение — `loginom check`, настроить заново — `loginom setup`.",
   )
+})
+
+test.each([
+  ["LOGINOM_RUNTIME_START_FAILED", "Не удалось запустить новое подключение"],
+  ["LOGINOM_RUNTIME_TIMEOUT", "Истекло время ожидания готовности нового подключения"],
+  ["LOGINOM_STORE_WRITE_FAILED", "Не удалось завершить запись новых параметров"],
+])("status prints %s alongside the working connection", (failure, message) => {
+  const text = LoginomManagement.statusText({
+    revision: 2,
+    generation: 1,
+    state: "ready",
+    failure,
+    url: "https://app.loginom.ai/app/",
+    username: "worker",
+    folder: "/worker",
+    hasPassword: true,
+  })
+  expect(text).toContain("Подключение настроено: https://app.loginom.ai/app/, пользователь worker.")
+  expect(text).toContain(message)
+  expect(text).toContain("`loginom setup`")
+  expect(text).not.toContain("Незавершённых операций нет")
 })
 
 // The fixture resources carry Linux's Node and no Keychain helper.

@@ -200,7 +200,7 @@ export async function connectionService(
     }
   }
   async function failPending(candidate: ActiveConnection, failure: string) {
-    state.failure = (await discardPending()) ?? failure
+    state.failure = (await discardPending(state.active?.generation ?? 0)) ?? failure
     state.pending = undefined
     state.pendingBrowser = undefined
     state.phase = state.handle ? state.readiness : "recoverable-error"
@@ -468,7 +468,7 @@ export async function connectionService(
       if (!state.pending) return view()
       state.writing = true
       try {
-        await store.clearPending()
+        await store.clearPending({ forgetDiscard: true })
       } finally {
         state.writing = false
       }

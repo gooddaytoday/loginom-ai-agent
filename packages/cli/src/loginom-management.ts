@@ -233,11 +233,23 @@ const pendingFailureMessages = new Map([
     "LOGINOM_PENDING_CLEAR_FAILED",
     "Не удалось удалить отложенные настройки. Служба повторит очистку при следующем запуске.",
   ],
+  [
+    "LOGINOM_RUNTIME_TIMEOUT",
+    "Истекло время ожидания готовности нового подключения. Новые параметры не применены. Сохраните их снова через `loginom setup`.",
+  ],
+  [
+    "LOGINOM_STORE_WRITE_FAILED",
+    "Не удалось завершить запись новых параметров. Проверьте права на запись профиля и при необходимости повторите `loginom setup`.",
+  ],
 ])
 
 export function statusText(current: ReturnType<typeof statusView>) {
   const count = current.recoveries?.length ?? 0
-  const clean = current.state !== "recoverable-error" && !count
+  const pendingFailure =
+    current.state === "ready" && current.failure === "LOGINOM_RUNTIME_START_FAILED"
+      ? "Не удалось запустить новое подключение. Новые параметры не применены. Сохраните их снова через `loginom setup`."
+      : current.failure && pendingFailureMessages.get(current.failure)
+  const clean = current.state !== "recoverable-error" && !count && !pendingFailure
   const lines = [
     current.generation
       ? `Подключение настроено: ${current.url}, пользователь ${current.username}.` +
@@ -246,7 +258,6 @@ export function statusText(current: ReturnType<typeof statusView>) {
   ]
   if (current.state === "pending")
     lines.push("Сохранённое изменение подключения ещё не применено; отменить его — `loginom cancel-pending`.")
-  const pendingFailure = current.failure && pendingFailureMessages.get(current.failure)
   if (pendingFailure) lines.push(pendingFailure)
   if (count) {
     const word =
