@@ -954,6 +954,8 @@ export const dict = {
   "provider.disconnect.toast.failed.description": "Не удалось отключить {{provider}}.",
   "toast.migration.failed.title": "Не удалось перенести данные",
   "command.session.background": "Перейти на задний план",
+  "settings.group.work": "Работа",
+  "settings.group.application": "Приложение",
   "settings.tab.preferences": "Общие",
   "settings.tab.notifications": "Уведомления",
   "settings.tab.projects": "Проекты",
@@ -1179,7 +1181,7 @@ export const dict = {
   "settings.plugins.part.tui": "Интерфейс терминала",
   "settings.plugins.parts.note":
     "Переключатели скрывают только интерфейс расширения. Чтобы отключить серверную часть, добавьте «-<id>» в список plugins файла loginom-ai-agent.json. Чтобы отключить часть для терминала, добавьте её идентификатор с префиксом «-» в список plugins файла cli.json.",
-  "settings.tab.about": "О нас",
+  "settings.tab.about": "Справка",
   "settings.about.version": "Версия {{version}}",
   "settings.about.devVersion": "разработка",
   "settings.about.copyVersionFailed": "Не удалось скопировать номер версии",

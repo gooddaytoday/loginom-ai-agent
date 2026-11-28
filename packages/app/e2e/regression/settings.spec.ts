@@ -127,11 +127,11 @@ test("Loginom sends preserve, replace and passwordless operations through the se
   expect(fixture.saves).toEqual([{ input: { revision: 7, validationId: "fixture-validation" } }])
 })
 
-async function openProject(page: Page, name = "Settings demo") {
+async function openProject(page: Page) {
   const settings = page.getByTestId("settings-screen")
-  await settings.getByRole("tab", { name: "Projects", exact: true }).click()
-  await settings.getByRole("button", { name, exact: true }).click()
-  await expect(settings.getByRole("button", { name: "Back to projects", exact: true })).toBeVisible()
+  await settings.getByRole("combobox", { name: "Search", exact: true }).fill("Settings demo")
+  await settings.getByRole("option", { name: /^Settings demo,/ }).click()
+  await expect(settings.getByRole("button", { name: "Back to settings", exact: true })).toBeVisible()
 }
 
 const patched = (page: Page) =>
@@ -342,6 +342,51 @@ test("a settings page survives refresh", async ({ page }) => {
   await page.reload()
   await expect(appearance).toHaveAttribute("aria-selected", "true")
   await expect(page).toHaveURL("/settings?tab=appearance")
+})
+
+test("settings group GUI plugin pages in order on desktop and in the narrow menu", async ({ page }) => {
+  await mockWorkspace(page, {
+    name: "Settings demo",
+    directory,
+    provider: NO_PROVIDER,
+    sessions: [],
+    seed: { locale: "ru" },
+  })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`/e2e/utils/settings-wsl.html?${new URLSearchParams({ server: SERVER, "grouped-settings": "1" })}`)
+  const settings = page.getByTestId("settings-screen")
+  const tabs = settings.getByRole("tab")
+  const work = ["Loginom", "Провайдеры", "Модели", "Инструкции"]
+  const application = ["Общие", "Горячие клавиши", "Справка", "Диагностика", "Внешний вид", "Уведомления", "Сервер"]
+
+  await expect(settings.getByText("Работа", { exact: true })).toBeVisible()
+  await expect(settings.getByText("Приложение", { exact: true })).toBeVisible()
+  await expect(tabs).toHaveText([...work, ...application])
+  await settings.getByRole("tab", { name: "Инструкции", exact: true }).click()
+  await expect(settings.getByRole("heading", { name: "Инструкции", exact: true })).toBeVisible()
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  const picker = settings.getByRole("button", { name: "Инструкции", exact: true })
+  await picker.click()
+  const menu = page.getByRole("menu")
+  await expect(menu.getByRole("group", { name: "Работа", exact: true }).getByRole("menuitemradio")).toHaveText(work)
+  await expect(menu.getByRole("group", { name: "Приложение", exact: true }).getByRole("menuitemradio")).toHaveText(
+    application,
+  )
+  await menu.getByRole("menuitemradio", { name: "Диагностика", exact: true }).click()
+  await expect(menu).toBeHidden()
+  await expect(settings.getByRole("button", { name: "Диагностика", exact: true })).toBeVisible()
+  await expect(settings.getByRole("heading", { name: "Диагностика", exact: true })).toBeVisible()
+})
+
+test("hidden settings are unavailable from a direct link", async ({ page }) => {
+  await mockWorkspace(page, { name: "Settings demo", directory, provider: NO_PROVIDER, sessions: [] })
+  await page.goto("/settings?tab=extensions&subtab=mcps")
+  const settings = page.getByTestId("settings-screen")
+  await expect(settings.getByRole("tab", { name: "General", exact: true })).toHaveAttribute("aria-selected", "true")
+  await expect(settings.getByRole("heading", { name: "General", exact: true, level: 2 })).toBeVisible()
+  await expect(settings.locator('[data-action="settings-auto-accept-permissions"]')).toHaveCount(0)
+  await expect(settings.getByRole("tab", { name: "Extensions", exact: true })).toHaveCount(0)
 })
 
 // The Arabic dictionary chunks: built (`_assets/ar-<hash>.js`) and dev (`.../i18n/ar.ts`), for the app and the UI.
@@ -688,7 +733,7 @@ test("single-server settings expose scoped pages without a server picker", async
   await expect(settings.getByRole("tab", { name: "Server", exact: true })).toBeVisible()
   await expect(settings.getByRole("tab", { name: "Servers", exact: true })).toHaveCount(0)
 
-  for (const name of ["Projects", "Worktrees", "Providers", "Models", "Extensions"]) {
+  for (const name of ["Providers", "Models"]) {
     await settings.getByRole("tab", { name, exact: true }).click()
     await expect(settings.getByRole("tab", { name, exact: true })).toHaveAttribute("aria-selected", "true")
     await expect(settings.locator('[data-action="settings-server-select"]')).toHaveCount(0)
@@ -758,9 +803,7 @@ for (const server of [
   // Nothing answers on this server.
   { name: "Offline box", url: "http://127.0.0.1:4099" },
 ]) {
-  test(`a project route on an unavailable server falls back to its Projects page (${server.name})`, async ({
-    page,
-  }) => {
+  test(`a project route on an unavailable server falls back to the Servers page (${server.name})`, async ({ page }) => {
     const remote = "/remote/settings-demo"
     await mockWorkspace(page, {
       name: "Settings demo",
@@ -778,18 +821,18 @@ for (const server of [
       `/settings?server=${encodeURIComponent(server.url)}&project=${encodeURIComponent(remote)}&tab=general`,
     )
     const settings = page.getByTestId("settings-screen")
-    await expect(settings.getByRole("status").filter({ hasText: `Can't reach ${server.name}` })).toBeVisible()
-    await expect(settings.getByRole("heading", { name: "Projects", exact: true })).toBeVisible()
+    await expect(settings.getByRole("heading", { name: "Servers", exact: true })).toBeVisible()
     await expect(page).toHaveURL(
       (url) =>
         url.searchParams.get("server") === server.url &&
-        url.searchParams.get("tab") === "projects" &&
+        url.searchParams.get("tab") === "servers" &&
         !url.searchParams.has("project"),
     )
   })
 }
 
 test("project list menus rename, edit, add, and stay inside the scrollport", async ({ page }) => {
+  test.skip(true, "C1.2 hides this settings page")
   const projects = ["rebase", "dinocms", "opencode", "Playground"].map((name, index) =>
     project({ id: `project-${index}`, directory: `/projects/${name}`, name }),
   )
@@ -907,6 +950,7 @@ test("project list menus rename, edit, add, and stay inside the scrollport", asy
 test("a project rename that hangs keeps its field focused, and Escape cancels it without leaving settings", async ({
   page,
 }) => {
+  test.skip(true, "C1.2 hides this settings page")
   const { settings } = await open(page)
   const hold = await holdRoute(page, (url) => url.pathname === `/api/project/${projectID}`, { method: "PATCH" })
   await settings.getByRole("tab", { name: "Projects", exact: true }).click()
@@ -932,7 +976,8 @@ test("project settings open as a nested view that keeps its route", async ({ pag
   const { settings } = await open(page)
   await openProject(page)
   await expect(settings.getByRole("tab", { name: "General", exact: true })).toBeVisible()
-  await expect(settings.getByRole("tab", { name: "Extensions", exact: true })).toBeVisible()
+  await expect(settings.getByRole("tab", { name: "Extensions", exact: true })).toHaveCount(0)
+  await expect(settings.getByRole("tab", { name: "Worktrees", exact: true })).toHaveCount(0)
   await expect(settings.getByRole("tab", { name: "Scripts", exact: true })).toHaveCount(0)
   const menu = page.getByRole("menu")
   await settings.locator(".settings-tab-header").getByRole("button", { name: "More options", exact: true }).click()
@@ -941,23 +986,20 @@ test("project settings open as a nested view that keeps its route", async ({ pag
   await expect.poll(() => menu.evaluate((element) => element.contains(document.activeElement))).toBe(true)
   await page.keyboard.press("Escape")
   await expect(menu).toBeHidden()
-  await expect(settings.getByRole("button", { name: "Back to projects", exact: true })).toBeVisible()
-
-  await settings.getByRole("tab", { name: "Worktrees", exact: true }).click()
-  await expect(settings.getByRole("heading", { name: "Worktrees", exact: true })).toBeVisible()
+  await expect(settings.getByRole("button", { name: "Back to settings", exact: true })).toBeVisible()
 
   const route = (url: URL) =>
     url.pathname === "/settings" &&
     url.searchParams.get("server") === SERVER &&
     url.searchParams.get("project") === directory &&
-    url.searchParams.get("tab") === "workspaces"
+    !url.searchParams.has("tab")
 
   await expect(page).toHaveURL(route)
   await page.reload()
-  await expect(settings.getByRole("heading", { name: "Worktrees", exact: true })).toBeVisible()
+  await expect(settings.getByRole("heading", { name: "Settings demo", exact: true })).toBeVisible()
   await expect(page).toHaveURL(route)
   await page.keyboard.press("Escape")
-  await expect(settings.getByRole("heading", { name: "Projects", exact: true })).toBeVisible()
+  await expect(settings.getByRole("heading", { name: "General", exact: true, level: 2 })).toBeVisible()
 })
 
 // The desktop app reopens its last settings URL on launch, so a crash on this page would repeat on every restart.
@@ -971,31 +1013,15 @@ test("a project whose folder is gone opens its settings with a notice", async ({
   })
   await mockMissingLocation(page, directory)
 
-  const plugins = page.waitForResponse((response) => {
-    const url = new URL(response.url())
-
-    return url.pathname === "/api/plugin" && url.searchParams.get("location[directory]") === directory
-  })
-
-  await page.goto(
-    `/settings?server=${encodeURIComponent(SERVER)}&project=${encodeURIComponent(directory)}&tab=extensions`,
-  )
-  expect((await plugins).status()).toBe(404)
+  await page.goto(`/settings?server=${encodeURIComponent(SERVER)}&project=${encodeURIComponent(directory)}&tab=general`)
   const settings = page.getByTestId("settings-screen")
   const notice = settings.getByRole("status").filter({ hasText: "Project folder not found" })
-  await expect(notice).toContainText(directory)
-  await settings.getByRole("tab", { name: "Plugins", exact: true }).click()
-
-  await expect(
-    settings.getByRole("tabpanel", { name: "Plugins", exact: true }).getByText("No plugins yet", { exact: true }),
-  ).toBeVisible()
-
-  await settings.getByRole("tab", { name: "General", exact: true }).click()
   await expect(settings.getByRole("textbox", { name: "Project name", exact: true })).toBeVisible()
   await expect(notice).toContainText(directory)
 })
 
 test("a project plugin list that fails to load offers Retry instead of an empty list", async ({ page }) => {
+  test.skip(true, "C1.2 hides this settings page")
   const { settings } = await open(page)
   await openProject(page)
   const lists = { failing: true }
@@ -1035,6 +1061,7 @@ test("project extensions link Console MCPs and skills and offer sign-in as the s
   page,
   context,
 }) => {
+  test.skip(true, "C1.2 hides this settings page")
   const consoleUrl = CONSOLE_URL
   await context.route("https://opencode.ai/console/**", (route) => route.fulfill({ body: "Console" }))
 
@@ -1107,6 +1134,7 @@ test("project extensions link Console MCPs and skills and offer sign-in as the s
 })
 
 test("a Console skill links to Console's home when no Console MCP names the workspace", async ({ page, context }) => {
+  test.skip(true, "C1.2 hides this settings page")
   await context.route(`${CONSOLE_URL}**`, (route) => route.fulfill({ body: "Console" }))
 
   const { settings } = await open(page, {
@@ -1173,8 +1201,8 @@ for (const field of [
     await expect.poll(() => hold.requests.map((request) => request.postDataJSON())).toEqual(field.patches)
     await expect(settings.locator('[aria-busy="true"]')).toHaveCount(0)
 
-    await settings.getByRole("tab", { name: "Worktrees", exact: true }).click()
-    await settings.getByRole("tab", { name: "General", exact: true }).click()
+    await settings.getByRole("button", { name: "Back to settings", exact: true }).click()
+    await openProject(page)
 
     if (field.name === "color") {
       await expect(settings.getByRole("button", { name: "Select orange color", exact: true })).toHaveAttribute(
@@ -1331,6 +1359,7 @@ test("the new session shortcut waits for a shortcut recording, then leaves setti
 })
 
 test("single extension rows stay aligned when switching tabs", async ({ page }) => {
+  test.skip(true, "C1.2 hides this settings page")
   const { settings } = await open(page, {
     mcp: [{ name: "demo-mcp", status: { status: "connected" } }],
     plugins: [{ id: "demo-plugin", source: { type: "package", target: "demo-plugin" } }],
@@ -1359,6 +1388,7 @@ test("single extension rows stay aligned when switching tabs", async ({ page }) 
 
 test.describe("pages open before slow data", () => {
   test("worktrees", async ({ page }) => {
+    test.skip(true, "C1.2 hides this settings page")
     const { settings } = await open(page)
     const inventory = await holdRoute(page, (url) => url.pathname === "/api/worktree", { method: "GET" })
 
@@ -1382,13 +1412,14 @@ test.describe("pages open before slow data", () => {
     sessions.release()
 
     const refresh = await holdRoute(page, (url) => url.pathname === "/api/worktree", { method: "GET" })
-    await settings.getByRole("tab", { name: "Preferences", exact: true }).click()
+    await settings.getByRole("tab", { name: "General", exact: true }).click()
     await settings.getByRole("tab", { name: "Worktrees", exact: true }).click()
     await expect(settings.getByText("Workspace 1 session", { exact: true })).toBeVisible()
     refresh.release()
   })
 
   test("extensions", async ({ page }) => {
+    test.skip(true, "C1.2 hides this settings page")
     const { settings } = await open(page, {
       mcp: [{ name: "demo-mcp", status: { status: "connected" } }],
       skills: [
@@ -1413,6 +1444,7 @@ test.describe("pages open before slow data", () => {
   })
 
   test("extensions show MCP status dots with sign-in, error, and switch controls", async ({ page, context }) => {
+    test.skip(true, "C1.2 hides this settings page")
     const error = "Connection closed: MCP server process exited with code 1"
     const signIns: string[] = []
     await context.route("https://auth.example.test/**", (route) => route.fulfill({ body: "Sign in" }))
@@ -1467,6 +1499,7 @@ test.describe("pages open before slow data", () => {
   })
 
   test("extensions list Console MCPs and skills with local ones", async ({ page, context }) => {
+    test.skip(true, "C1.2 hides this settings page")
     await context.route("https://opencode.ai/console/**", (route) => route.fulfill({ body: "Console" }))
     const consoleUrl = CONSOLE_URL
 
@@ -1573,7 +1606,7 @@ test.describe("pages open before slow data", () => {
         () => false,
       )
 
-    await settings.getByRole("tab", { name: "About", exact: true }).click()
+    await settings.getByRole("tab", { name: "Help", exact: true }).click()
     const about = settings.locator(".settings-about-content")
     await expect(about.getByText("Loginom AI Agent", { exact: true })).toBeVisible()
     await expect(about.getByText("Loginom AI Agent — desktop assistant for Loginom workflows")).toBeVisible()
@@ -1610,17 +1643,18 @@ test("the version's Copied tooltip closes when another settings page opens", asy
   await context.grantPermissions(["clipboard-read", "clipboard-write"])
   const { settings } = await open(page)
   await page.route(contributors, (route) => route.abort("failed"))
-  await settings.getByRole("tab", { name: "About", exact: true }).click()
+  await settings.getByRole("tab", { name: "Help", exact: true }).click()
   await settings.getByRole("button", { name: "Copy", exact: true }).click()
   const tooltip = page.getByRole("tooltip")
   await expect(tooltip).toHaveText("Copied")
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toMatch(/^Version /)
 
-  await settings.getByRole("tab", { name: "Preferences", exact: true }).click()
+  await settings.getByRole("tab", { name: "General", exact: true }).click()
   await expect(tooltip).toBeHidden()
 })
 
 test("worktrees follow inventory events, wait for session counts, and delete by project", async ({ page }) => {
+  test.skip(true, "C1.2 hides this settings page")
   const empty = `${directory}/empty-workspace`
   const discovered = `${directory}/discovered-workspace`
 
@@ -1702,6 +1736,7 @@ test("worktrees follow inventory events, wait for session counts, and delete by 
 })
 
 test("a failed worktree delete restores its row, and the next confirmation still deletes it", async ({ page }) => {
+  test.skip(true, "C1.2 hides this settings page")
   const inventory: WorktreeDirectory[] = [
     { directory },
     ...sandboxes.map((item) => ({ directory: item, strategy: "git" })),
@@ -1753,6 +1788,7 @@ test("a failed worktree delete restores its row, and the next confirmation still
 })
 
 test("a failed worktree check offers Retry, and the passing retry enables Delete", async ({ page }) => {
+  test.skip(true, "C1.2 hides this settings page")
   const inventory: WorktreeDirectory[] = [
     { directory },
     ...sandboxes.map((item) => ({ directory: item, strategy: "git" })),
@@ -1803,6 +1839,7 @@ test.describe("worktrees prefetch", () => {
 
   for (const interaction of ["hover", "focus"] as const) {
     test(`project Worktrees ${interaction} prefetches only its inventory and reuses the request`, async ({ page }) => {
+      test.skip(true, "C1.2 hides this settings page")
       const { settings } = await open(page)
       await page.route(
         (url) => url.pathname === "/api/project",
@@ -1850,6 +1887,7 @@ test.describe("worktrees prefetch", () => {
   }
 
   test("server Worktrees hover only prefetches metadata", async ({ page }) => {
+    test.skip(true, "C1.2 hides this settings page")
     const { settings } = await open(page)
 
     const calls = { projects: 0, worktrees: new Array<string>(), refreshes: new Array<string>() }
@@ -1911,6 +1949,7 @@ const lsp: ConfigEntry[] = [
 
 for (const row of ["configured", "disabled", "failure"] as const) {
   test(`project LSPs: ${row}`, async ({ page }) => {
+    test.skip(true, "C1.2 hides this settings page")
     const { settings } = await open(page)
     await openProject(page)
     await settings.getByRole("tab", { name: "Extensions", exact: true }).click()
@@ -2087,7 +2126,7 @@ for (const width of [1280, 480]) {
     const settings = page.getByTestId("settings-screen")
 
     if (width === 480) {
-      await settings.getByRole("button", { name: "Preferences", exact: true }).click()
+      await settings.getByRole("button", { name: "General", exact: true }).click()
       await page.getByRole("menuitemradio", { name: "Providers", exact: true }).click()
     } else {
       await settings.getByRole("tab", { name: "Providers", exact: true }).click()
@@ -3018,25 +3057,13 @@ for (const viewport of [
       await page.mouse.wheel(0, 200)
       await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
       const top = await scroller.evaluate((element) => element.scrollTop)
-      await settings.getByRole("tab", { name: "Preferences", exact: true }).hover()
+      await settings.getByRole("tab", { name: "General", exact: true }).hover()
       await page.mouse.wheel(0, 200)
       await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(top)
       await expect(settings.getByRole("button", { name: "Back to app" })).toBeInViewport()
     }
 
-    const pages = [
-      "Preferences",
-      "Appearance",
-      "Notifications",
-      "Shortcuts",
-      "Projects",
-      "Worktrees",
-      "Providers",
-      "Models",
-      "Extensions",
-      "Server",
-      "About",
-    ]
+    const pages = ["General", "Appearance", "Notifications", "Shortcuts", "Providers", "Models", "Server", "Help"]
 
     for (const [index, name] of pages.entries()) {
       if (viewport.width >= 816) await settings.getByRole("tab", { name, exact: true }).click()
@@ -3046,20 +3073,16 @@ for (const viewport of [
         await page.getByRole("menuitemradio", { name, exact: true }).click()
       }
 
-      if (name === "About") await expect(panel.getByText("Released under MIT AND AGPL-3.0-only")).toBeVisible()
+      if (name === "Help") await expect(panel.getByText("Released under MIT AND AGPL-3.0-only")).toBeVisible()
 
-      if (name !== "About")
+      if (name !== "Help")
         await expect(
-          panel.getByRole("heading", { name: name === "Shortcuts" ? "Keyboard shortcuts" : name, exact: true }),
+          panel.getByRole("heading", {
+            name: name === "Shortcuts" ? "Keyboard shortcuts" : name,
+            exact: true,
+            level: 2,
+          }),
         ).toBeVisible()
-
-      if (name === "Worktrees") {
-        const last = settings.getByText("Workspace 12 session", { exact: true })
-        await last.scrollIntoViewIfNeeded()
-        await expect(last).toBeInViewport()
-
-        if (!viewport.bottom) await expect(settings.getByRole("button", { name: "Back to app" })).toBeInViewport()
-      }
 
       await panel.hover()
       await page.mouse.wheel(0, 10000)

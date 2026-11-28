@@ -124,7 +124,7 @@ export const { use: useSettingsSurface, provider: SettingsSurfaceProvider } = cr
         return
       }
 
-      show({ type: "root", tab: "projects", server: current.server })
+      show({ type: "root", tab: "general", server: current.server })
     }
 
     const stop = () => {

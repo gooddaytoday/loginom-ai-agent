@@ -1,5 +1,6 @@
 import { createMemo } from "solid-js"
 import { SettingsPage } from "@opencode/plugin/gui"
+import { isReservedSettingsTab } from "@/settings/route"
 import { usePluginHost } from "./host"
 
 /** The settings pages plugins contribute. */
@@ -7,7 +8,7 @@ export function createSettingsPages() {
   const host = usePluginHost()
   const items = createMemo(() => host.items(SettingsPage))
 
-  const pages = createMemo(() => items().filter((item) => !item.value.page))
+  const pages = createMemo(() => items().filter((item) => !item.value.page && !isReservedSettingsTab(item.value.id)))
   const tabs = createMemo<ReadonlySet<string>>(() => new Set(pages().map((item) => item.value.id)))
 
   return {

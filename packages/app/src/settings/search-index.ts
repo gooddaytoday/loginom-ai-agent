@@ -3,7 +3,8 @@ import type { useLanguage } from "@/runtime/i18n/language"
 import type { LocalProject } from "@/shell/state/layout"
 import { displayName } from "@opencode/ui/project-avatar"
 import { clientSettings, projectSettings, serverSettings } from "./search-catalog"
-import { pageIcons, pageLabels } from "./pages"
+import { pageIcons, pageLabels, showDefaultPermissionSetting } from "./pages"
+import { isReservedSettingsTab, isVisibleSettingsTab } from "./route"
 import type { SettingsSearchResult } from "./search-results"
 import type { SettingsPluginTab, SettingsHostView, SettingsServerTab, SettingsView } from "./surface"
 
@@ -38,6 +39,9 @@ export function settingsSearchIndex(input: {
     project?: string,
     projectName?: string,
   ) => {
+    if (!isVisibleSettingsTab(view.tab)) return
+    if (!showDefaultPermissionSetting && view.target === "settings-auto-accept-permissions") return
+
     const page =
       !server && view.tab === "general" && view.target
         ? `${input.translate(pageLabels.general)} / ${input.translate(entry.section ?? "settings.general.section.general")}`
@@ -117,6 +121,8 @@ export function settingsSearchIndex(input: {
         ),
       )
     }
+
+    if (isReservedSettingsTab(setting.id)) return
 
     // SAFETY: a SettingsPage without a host page is a plugin tab under its id, as `createSettingsPages().tabs` lists.
     const tab = setting.id as SettingsPluginTab

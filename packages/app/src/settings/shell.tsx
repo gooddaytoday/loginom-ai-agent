@@ -32,16 +32,9 @@ import { SettingsProjectGeneral } from "./workspaces/project"
 import { ProjectSettingsExtensions } from "./workspaces/project-extensions"
 import { useSettingsSurface } from "./surface"
 import { settingsViewRedirect } from "./route"
-import { pageIcons, pageLabels } from "./pages"
+import { pageIcons, settingsPageGroups } from "./pages"
 import { PluginSettingsPages } from "@/runtime/plugin/settings-page-view"
 import "@/settings/settings.css"
-
-const rootClientTabs = [
-  { value: "general", icon: pageIcons.general, label: "settings.tab.preferences" },
-  { value: "appearance", icon: pageIcons.appearance, label: "settings.general.section.appearance" },
-  { value: "notifications", icon: pageIcons.notifications, label: "settings.tab.notifications" },
-  { value: "shortcuts", icon: pageIcons.shortcuts, label: "settings.tab.shortcuts" },
-] as const
 
 const serverTabs = [
   { value: "providers", icon: pageIcons.providers, label: "settings.providers.title" },
@@ -59,12 +52,6 @@ const serverPages = {
   projects: { title: "settings.projects.title", description: "settings.projects.description" },
   workspaces: { title: "settings.tab.workspaces", description: "settings.workspaces.description" },
 } as const
-
-const experimentalTab = [
-  { value: "experimental", icon: pageIcons.experimental, label: "settings.tab.experimental" },
-] as const
-
-const aboutTab = [{ value: "about", icon: pageIcons.about, label: "settings.tab.about" }] as const
 
 const nestedProjectTabs = [
   { value: "general", icon: pageIcons.projects, label: "settings.general.section.general" },
@@ -198,41 +185,15 @@ function RootSettings() {
 
   const addServer = () => void dialog.push(() => <DialogServer mode="add" onSave={selectServer} />)
 
-  const pluginTabs = (group?: "about") =>
-    surface.plugins
-      .pages()
-      .filter((item) => item.value.group === group)
-      .map((item) => ({ value: item.value.id, icon: item.value.icon ?? pageIcons.extensions, label: item.value.title }))
-
-  const groups = createMemo<SettingsNavGroup[]>(() => [
-    {
-      items: serverTabs.map((item) => ({
-        ...item,
-        label: language.t(item.label),
-        onPrefetch: item.value === "workspaces" ? prefetchWorkspaces : undefined,
-      })),
-    },
-    {
-      items: [
-        ...rootClientTabs.map((item) => ({ ...item, label: language.t(item.label) })),
-        ...pluginTabs(),
-        {
-          value: "servers",
-          icon: pageIcons.servers,
-          label: language.t(multiple() ? "settings.tab.servers" : pageLabels.servers),
-        },
-      ],
-    },
-    {
-      items: [
-        ...pluginTabs("about"),
-        ...(experimentalSettingsAvailable
-          ? experimentalTab.map((item) => ({ ...item, label: language.t(item.label) }))
-          : []),
-        ...aboutTab.map((item) => ({ ...item, label: language.t(item.label) })),
-      ],
-    },
-  ])
+  const groups = createMemo(() =>
+    settingsPageGroups({
+      translate: language.t,
+      multipleServers: multiple(),
+      pages: surface.plugins.pages().map((item) => item.value),
+      experimentalAvailable: experimentalSettingsAvailable,
+      prefetchWorkspaces,
+    }),
+  )
 
   const change = (value: string) => {
     if (value === "workspaces") setState("worktreeFilterReset", (current) => current + 1)

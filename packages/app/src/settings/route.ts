@@ -73,6 +73,12 @@ const subtabs: Record<NonNullable<SettingsView["subtab"]>, true> = {
   lsps: true,
 }
 
+const hiddenTabs = new Set<string>(["projects", "workspaces", "extensions", "experimental"])
+
+export function isVisibleSettingsTab(tab: string) {
+  return !hiddenTabs.has(tab === "plugins" ? "extensions" : tab)
+}
+
 export function parseSettingsView(
   search: string,
   transient?: SettingsTransientView,
@@ -80,6 +86,8 @@ export function parseSettingsView(
 ): SettingsView {
   const params = new URLSearchParams(search)
   const tab = params.get("tab") ?? "general"
+  if (!isVisibleSettingsTab(tab)) return { type: "root", tab: "general", ...transient }
+
   const server = params.get("server") ?? undefined
   const project = params.get("project")
   const subtab = params.get("subtab")
@@ -136,19 +144,23 @@ export function settingsViewRedirect(input: {
 
   if (view.type === "root") return server ? undefined : { ...view, server: undefined }
 
-  if (!server) return { type: "root", tab: "projects" }
+  if (!server) return { type: "root", tab: "general" }
 
-  // A signed-out or unreachable server has no project to show; its Projects page shows why and offers a retry.
-  if (!canHoldProjectRoute(server.availability)) return { type: "root", tab: "projects", server: server.key }
+  // A signed-out or unreachable server has no project to show; the Servers page shows why and offers a retry.
+  if (!canHoldProjectRoute(server.availability)) return { type: "root", tab: "servers", server: server.key }
 }
 
 export function isRootTab(value: string): value is SettingsRootTab {
   return Object.hasOwn(rootTabs, value)
 }
 
-/** Host tabs win over a plugin page with the same id. */
+/** Host tabs and the legacy Plugins route win over a plugin page with the same id. */
+export function isReservedSettingsTab(value: string) {
+  return isRootTab(value) || value === "plugins"
+}
+
 export function isPluginTab(value: string, tabs: ReadonlySet<string>): value is SettingsPluginTab {
-  return !isRootTab(value) && tabs.has(value)
+  return !isReservedSettingsTab(value) && tabs.has(value)
 }
 
 export function isProjectTab(value: string): value is SettingsProjectTab {

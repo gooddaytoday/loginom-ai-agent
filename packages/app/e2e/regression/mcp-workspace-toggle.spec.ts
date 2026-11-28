@@ -94,6 +94,7 @@ async function open(
 }
 
 test("settings shows and toggles the MCP of the session it was opened from", async ({ page }) => {
+  test.skip(true, "C1.2 hides the Extensions page")
   const actions: Parameters<NonNullable<MockServerConfig["onMcpAction"]>>[0][] = []
 
   const view = await open(page, {

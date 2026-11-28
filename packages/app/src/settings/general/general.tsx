@@ -16,6 +16,7 @@ import {
 import { formatKeybind } from "@/shell/commands/command"
 import { SettingsList } from "@/settings/list"
 import { SettingsRow } from "@/settings/row"
+import { showDefaultPermissionSetting } from "../pages"
 import { createShellOptions } from "./behavior"
 import { createOptimisticSetting, type ShellSettingsController } from "./controllers"
 import { InterfaceModeSetting } from "./interface-mode"
@@ -255,7 +256,9 @@ export const SettingsGeneral: Component = () => {
         <LanguageSetting />
 
         <WorkspaceDestinationSetting />
-        <AutoApprovePermissionsSetting />
+        <Show when={showDefaultPermissionSetting}>
+          <AutoApprovePermissionsSetting />
+        </Show>
 
         <SettingsRow
           title={language.t("settings.general.row.showCustomAgents.title")}

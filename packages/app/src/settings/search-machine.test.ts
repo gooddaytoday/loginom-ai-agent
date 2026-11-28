@@ -13,7 +13,7 @@ import type { SettingsView } from "./route"
 
 const appearance: SettingsView = { type: "root", tab: "appearance" }
 
-const projects: SettingsView = { type: "root", tab: "projects", server: "local" }
+const models: SettingsView = { type: "root", tab: "models", server: "local" }
 
 const project: SettingsView = { type: "project", server: "local", project: "/repo", tab: "general" }
 
@@ -38,12 +38,12 @@ function routed(view: SettingsView, activation: number): SettingsView {
 describe("settings search machine", () => {
   test("a page reached from an opened result through the page itself keeps its own way back", () => {
     const opened = run([
-      { type: "input.changed", query: "Projects", view: appearance },
-      { type: "result.opened", id: "projects", destination: projects },
-      { type: "view.synced", view: routed(projects, 1) },
+      { type: "input.changed", query: "Models", view: appearance },
+      { type: "result.opened", id: "models", destination: models },
+      { type: "view.synced", view: routed(models, 1) },
     ])
 
-    // A project card on the Projects page opens the project without a search activation.
+    // A project can open from the app without a search activation.
     const next = run([{ type: "view.synced", view: project }], opened.state)
 
     expect(next.state.status).toBe("browsing")
@@ -149,7 +149,7 @@ describe("settings search machine", () => {
     const done = run([{ type: "reveal.timed-out", activation: 1 }], highlighted.state)
     expect(done.state).toMatchObject({ status: "opened", selected: "font", reveal: { phase: "done" } })
 
-    // Later views with the same activation, such as a subtab change, do not reveal again.
+    // Later views with the same activation do not reveal again.
     expect(transitionSettingsSearch(done.state, { type: "view.synced", view: routed(appearance, 1) }).state).toBe(
       done.state,
     )
@@ -185,10 +185,10 @@ describe("settings search machine", () => {
     const next = transitionSettingsSearch(seeking.state, {
       type: "result.opened",
       id: "two",
-      destination: projects,
+      destination: models,
     })
 
-    expect(next.effects).toEqual([{ type: "reveal.cancel" }, { type: "navigate", view: routed(projects, 2) }])
+    expect(next.effects).toEqual([{ type: "reveal.cancel" }, { type: "navigate", view: routed(models, 2) }])
   })
 
   test("closing Settings or unmounting the screen stops a running reveal", () => {

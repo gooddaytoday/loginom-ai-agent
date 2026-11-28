@@ -188,6 +188,18 @@
       "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
     {
+      "id": "CAT-18",
+      "title": "Settings groups and page visibility (C1.2)",
+      "paths": [
+        "packages/app/src/settings/pages.ts", "packages/app/src/settings/route*.ts",
+        "packages/app/src/settings/surface.tsx", "packages/app/src/settings/shell.tsx",
+        "packages/app/src/settings/navigation.tsx", "packages/app/src/settings/general/general.tsx",
+        "packages/app/src/settings/search-index.ts", "packages/app/src/settings/search-results.test.ts",
+        "packages/app/src/settings/search-machine.test.ts",
+        "packages/app/src/runtime/plugin/settings-pages.ts", "packages/plugin/src/gui/registries.ts"
+      ]
+    },
+    {
       "id": "CAT-10",
       "title": "Web app, UI kit, session UI and Loginom localization",
       "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],

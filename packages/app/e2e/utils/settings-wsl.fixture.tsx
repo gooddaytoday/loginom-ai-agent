@@ -16,6 +16,24 @@ type FixtureInput = { id?: string; name?: string; target?: string; prompt?: stri
 /** A main-side method: SSH `start` answers with the state revision, the others with nothing. */
 type FixtureMethod = (input: FixtureInput) => number | void
 
+const settingsGui = `
+const { Plugin, SettingsPage } = require("@opencode/plugin/gui")
+exports.default = Plugin.define({
+  setup(ctx) {
+    for (const [id, group, order, title] of [
+      ["fixture-instructions", "work", 40, "Инструкции"],
+      ["fixture-diagnostics", "application", 40, "Диагностика"],
+    ]) {
+      ctx.add(SettingsPage, { id, group, order, title, render() {
+        const heading = document.createElement("h2")
+        heading.textContent = title
+        return heading
+      } })
+    }
+  },
+})
+`
+
 // A desktop window. `wsl` is the Ubuntu server's endpoint (default `server`); updating OpenCode restarts it on `restart`
 // (default `wsl`). `ssh` adds a saved SSH server `box`, ready on that endpoint with password `ssh-1`; each connect
 // brings up a new remote server with the next password (`ssh-2`, ...). `storage=async` stores in localStorage behind
@@ -35,6 +53,7 @@ export function mount(input: {
   busy?: string | null
   /** Enables the updater Ipc; check and install reject with this message, which may be empty. */
   updater?: string | null
+  groupedSettings?: boolean
 }) {
   const root = document.getElementById("root")
 
@@ -259,7 +278,12 @@ export function mount(input: {
       capture: async () => undefined,
       runMenubarItem: () => undefined,
       configure: () => undefined,
-      pluginGuis: async () => ({ plugins: [], reserved: [] }),
+      pluginGuis: async () => ({
+        plugins: input.groupedSettings
+          ? [{ id: "fixture-settings", revision: "1", code: settingsGui, options: {} }]
+          : [],
+        reserved: [],
+      }),
       manager: {
         list: async () => [],
         enable: async () => undefined,
@@ -304,8 +328,8 @@ export function mount(input: {
 
     return (
       <PlatformProvider value={platform}>
-        <AppBaseProviders locale="en">
-          <div>
+        <AppBaseProviders locale={input.groupedSettings ? "ru" : "en"}>
+          <div hidden={input.groupedSettings}>
             <output aria-label="WSL actions">{store.calls.join(",")}</output>
             {/* The WSL plugin's main side going away, as on a reload or failure, and coming back. */}
             <label>

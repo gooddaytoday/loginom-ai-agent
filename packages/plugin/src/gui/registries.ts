@@ -402,10 +402,18 @@ export interface SettingsPage {
    */
   readonly section?: "general"
   /**
-   * The nav group of a page. Omit it to list the page after the app's own pages, such as Shortcuts.
-   * - `about`: below About, in its group, for pages about the app itself such as release notes.
+   * The nav group of a page. Omit it for the Application group.
+   * - `work`: providers, models and other work settings.
+   * - `application`: general preferences, shortcuts and help.
+   * - `about`: legacy placement beside Help in the Application group.
    */
-  readonly group?: "about"
+  readonly group?: "work" | "application" | "about"
+  /**
+   * Order within the group, lowest first. Work anchors Providers at 20 and Models at 30.
+   * Application anchors General at 10, Shortcuts at 20 and Help at 30.
+   * Omit it for default placement in registration order.
+   */
+  readonly order?: number
   /** Nav label of a page; search shows it as the section of every entry, except rows placed in a host `section`. */
   readonly title: string
   /** The page's nav icon. */

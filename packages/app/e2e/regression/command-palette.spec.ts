@@ -42,7 +42,7 @@ test("home commands do not wait for session search", async ({ page }) => {
   await expect(dialog.getByRole("option", { name: /^Open settings/ })).toHaveAttribute("aria-selected", "true")
   await input.press("Enter")
   await expect(page).toHaveURL("/settings")
-  await expect(page.getByTestId("settings-screen").getByRole("tab", { name: "Preferences", exact: true })).toBeVisible()
+  await expect(page.getByTestId("settings-screen").getByRole("tab", { name: "General", exact: true })).toBeVisible()
   release.resolve()
 })
 
@@ -87,7 +87,7 @@ test("opens from the Settings page and finds another setting", async ({ page }) 
   await page.keyboard.press("ControlOrMeta+,")
   await expect(page).toHaveURL("/settings")
   const screen = page.getByTestId("settings-screen")
-  await expect(screen.getByRole("tab", { name: "Preferences", exact: true })).toBeVisible()
+  await expect(screen.getByRole("tab", { name: "General", exact: true })).toBeVisible()
 
   await page.keyboard.press("ControlOrMeta+K")
   const dialog = page.getByRole("dialog")
