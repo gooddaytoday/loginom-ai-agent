@@ -3,7 +3,7 @@ import type { SessionID } from "@opencode/schema/session-id"
 import { Option, Schema } from "effect"
 
 export const packageAccessRpc = {
-  id: "loginom.package",
+  id: "loginom.package-access",
   methods: {
     recheck: {
       input: Schema.toStandardSchemaV1(PackageRecheck),
