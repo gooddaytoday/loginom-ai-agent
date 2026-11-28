@@ -462,6 +462,44 @@ describe("SessionExecution lifecycle", () => {
     }),
   )
 
+  it.effect("leaves the failed outcome visible when a recorded wake has only queued work left", () =>
+    Effect.gen(function* () {
+      const database = yield* Database.Service
+      const store = yield* SessionStore.Service
+      const sessionID = Session.ID.make("ses_failed_with_queue")
+      yield* seedSessions(database, [sessionID])
+      const draining = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      const failure = new AIError({
+        reason: new TransportError({ message: "Disconnected", transport: "http", operation: "request" }),
+      })
+      let drains = 0
+      const context = yield* buildExecution(yield* Scope.fork(yield* Effect.scope), () =>
+        Effect.suspend(() =>
+          ++drains === 1
+            ? Deferred.succeed(draining, undefined).pipe(
+                Effect.andThen(Deferred.await(release)),
+                Effect.andThen(Effect.fail(failure)),
+              )
+            : Effect.void,
+        ),
+      )
+      const execution = Context.get(context, SessionExecution.Service)
+      const running = yield* execution.resume(sessionID).pipe(Effect.forkChild)
+      yield* Deferred.await(draining)
+      yield* execution.wake(sessionID)
+      yield* seedInbox(database, sessionID, ["queue"])
+      yield* execution.wake(sessionID, "queue")
+      yield* Deferred.succeed(release, undefined)
+      expect(yield* Fiber.join(running).pipe(Effect.flip)).toBe(failure)
+      yield* execution.awaitIdle(sessionID)
+
+      expect(drains).toBe(1)
+      expect((yield* store.get(sessionID))?.outcome).toBe("failed")
+      expect(yield* SessionInbox.list(database.db, sessionID)).toMatchObject([{ delivery: "queue" }])
+    }),
+  )
+
   it.effect("counts every resume durably and never consumes the claim it recovers", () =>
     Effect.gen(function* () {
       const database = yield* Database.Service
