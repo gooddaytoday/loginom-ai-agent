@@ -2,7 +2,7 @@ export * as Project from "./project.js"
 
 import { Cache, Context, Duration, Effect, Layer, Schedule, Schema, Scope } from "effect"
 import { ChildProcess } from "effect/process"
-import { and, asc, desc, eq, gte, isNotNull, isNull, lt, lte, ne, notExists, sql } from "drizzle-orm"
+import { and, asc, desc, eq, gte, isNotNull, isNull, lt, lte, ne, notExists, or, sql } from "drizzle-orm"
 import path from "path"
 import { AbsolutePath } from "./schema.js"
 import { Bus } from "./bus.js"
@@ -97,7 +97,7 @@ export interface ActivateOptions {
 export interface Interface {
   readonly list: (input?: ListInput) => Effect.Effect<ReadonlyArray<Info>>
   readonly register: (input: ProjectContract.RegisterInput) => Effect.Effect<Info, RegistrationError>
-  readonly forget: (id: ID) => Effect.Effect<void>
+  readonly forget: (id: ID, options?: { includeVisible?: boolean }) => Effect.Effect<void>
   readonly update: (input: UpdateInput) => Effect.Effect<Info, NotFoundError>
   /** Records Project activity for recency ordering, at most once per minute per Project. */
   readonly activate: (projectID: ID, options?: ActivateOptions) => Effect.Effect<void>
@@ -536,8 +536,12 @@ const layer = Layer.effect(
       return project
     })
 
-    const forget = Effect.fn("Project.forget")(function* (id: ID) {
-      const filter = and(eq(ProjectTable.id, id), eq(ProjectTable.hidden, true))
+    const forget = Effect.fn("Project.forget")(function* (id: ID, options?: { includeVisible?: boolean }) {
+      const filter = and(
+        eq(ProjectTable.id, id),
+        ne(ProjectTable.id, ID.global),
+        or(eq(ProjectTable.hidden, true), options?.includeVisible ? isNull(ProjectTable.vcs) : undefined),
+      )
       const row = yield* db
         .select({ directory: ProjectTable.worktree })
         .from(ProjectTable)

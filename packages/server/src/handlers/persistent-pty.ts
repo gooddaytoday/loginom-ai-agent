@@ -46,7 +46,7 @@ export const PersistentPtyHandler = HttpApiBuilder.group(Api, "server.experiment
         ),
       )
       .handle("project.experimental.forget", (ctx) =>
-        Project.Service.use((project) => project.forget(ctx.params.projectID)).pipe(
+        Project.Service.use((project) => project.forget(ctx.params.projectID, ctx.query)).pipe(
           Effect.as(HttpApiSchema.NoContent.make()),
         ),
       )

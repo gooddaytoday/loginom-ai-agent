@@ -695,6 +695,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement; width: n
                   fallback={
                     <MobileDrawer
                       open={selectMobileTabsOpen(mobileTabsState())}
+                      side={managedConnection() ? "left" : "bottom"}
                       onOpenChange={(open) => dispatchMobileTabs({ type: "drawer.changed", open })}
                       onContentPresentChange={(present) => dispatchMobileTabs({ type: "content.present", present })}
                     >

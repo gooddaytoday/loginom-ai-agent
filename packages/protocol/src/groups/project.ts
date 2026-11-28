@@ -72,13 +72,14 @@ export const ExperimentalProjectEndpoints = [
   ),
   HttpApiEndpoint.delete("project.experimental.forget", `${experimental}/:projectID`, {
     params: { projectID: Project.ID },
+    query: Schema.Struct({ includeVisible: BooleanFromString.pipe(Schema.optional) }),
     success: HttpApiSchema.NoContent,
   }).annotateMerge(
     OpenApi.annotations({
       identifier: "experimental.project.forget",
-      summary: "Forget a missing hidden project without sessions",
+      summary: "Forget a missing project without sessions",
       description:
-        "Forget a hidden project with no directory or sessions. Experimental: may change without compatibility guarantees.",
+        "Forget a hidden project with no directory or sessions. Set includeVisible=true to also allow non-VCS visible projects. Experimental: may change without compatibility guarantees.",
     }),
   ),
 ] as const

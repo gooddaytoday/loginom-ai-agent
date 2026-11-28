@@ -1,4 +1,5 @@
 import { Predicate } from "effect"
+import { ClientError, isSessionNotFoundError } from "@opencode/client/promise"
 import { base64Encode } from "@opencode/util/encode"
 import { Session } from "@opencode/schema/session"
 import { createMemo, createSignal, onCleanup, startTransition, untrack } from "solid-js"
@@ -20,6 +21,7 @@ import { useTabs } from "@/shell/tabs/tabs"
 import { createWorktree } from "@/workspaces/create"
 import { showToast } from "@/shell/notifications/toast"
 import type { DraftMcpControls } from "./mcp"
+import { failedSessionCreate } from "./session-create-outcome"
 import {
   createNewSessionStartState,
   isNewSessionStartActive,
@@ -153,6 +155,7 @@ export function createNewSessionComposerAdapter(props: {
           let timer: ReturnType<typeof setTimeout> | undefined
           let prepared: Awaited<ReturnType<NonNullable<typeof prepare>>> | undefined
           let creating: Promise<unknown> | undefined
+          let preserveWorkspace = false
 
           const finish = async (keep: boolean) => {
             const workspace = prepared
@@ -160,7 +163,7 @@ export function createNewSessionComposerAdapter(props: {
 
             if (workspace && !keep) await creating
 
-            await workspace?.finish(keep).catch(() => undefined)
+            await workspace?.finish(keep || preserveWorkspace).catch(() => undefined)
           }
 
           const end = () => {
@@ -252,11 +255,26 @@ export function createNewSessionComposerAdapter(props: {
                 .request.then(
                   async () => {
                     // The attempt ended first, so the prompt was never sent and the Session is still empty.
-                    if (ended.signal.aborted) await data.session.remove(effect.sessionID).catch(() => undefined)
+                    if (ended.signal.aborted) {
+                      await data.session.remove(effect.sessionID).catch(() => {
+                        preserveWorkspace = true
+                      })
+                    }
 
                     return { type: "session.created", attempt } as const
                   },
-                  (error) => ({ type: "session.failed", attempt, message: errorMessage(language, error) }) as const,
+                  async (error) => {
+                    if (prepare) {
+                      const recognized = error instanceof ClientError || isSessionNotFoundError(error) ? error : undefined
+                      const outcome = await failedSessionCreate(serverSDK.api.session, effect.sessionID, recognized)
+
+                      preserveWorkspace = outcome.type !== "missing"
+
+                      if (outcome.type === "created") data.session.remember(outcome.session)
+                    }
+
+                    return { type: "session.failed", attempt, message: errorMessage(language, error) } as const
+                  },
                 )
 
               creating = creation

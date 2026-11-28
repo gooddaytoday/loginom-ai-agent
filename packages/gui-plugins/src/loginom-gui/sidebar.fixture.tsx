@@ -21,6 +21,7 @@ export function mountSidebar(mode: "retry" | "timeout" = "retry") {
 
   render(() => {
     const [refresh, setRefresh] = createSignal(false)
+    const [loaded, setLoaded] = createSignal(items.slice(-1))
     const refreshRows = () => setRefresh(true)
     document.addEventListener("sidebar-refresh", refreshRows)
     onCleanup(() => document.removeEventListener("sidebar-refresh", refreshRows))
@@ -33,11 +34,19 @@ export function mountSidebar(mode: "retry" | "timeout" = "retry") {
             id: "reports",
             directory: "/reports",
             title: "Отчёты",
-            conversations: refresh() ? items.map((item) => ({ ...item })) : items,
+            conversations: refresh() ? loaded().map((item) => ({ ...item })) : loaded(),
           },
           { id: "other", directory: "/other", title: "Другой проект", conversations: [] },
         ]}
         conversations={[{ id: "loose", title: "Разговор без проекта", created: 0, active: false, activity: "running" }]}
+        onLoadProjectSessions={async (id, limit) => {
+          if (id !== "reports") return false
+
+          const page = items.slice(-limit)
+          setLoaded(page)
+
+          return page.length < items.length
+        }}
         onCreate={async (name) => {
           if (mode === "timeout") return new Promise<void>(() => {})
 

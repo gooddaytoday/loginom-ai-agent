@@ -1754,9 +1754,10 @@ const EndpointExperimentalProjectRegister =
 const EndpointExperimentalProjectForget =
   (raw: RawClient["server.experimental"]) => (input: ExperimentalProjectForgetInput) =>
     preserveEffect<ExperimentalProjectForgetOutput>()(
-      raw["project.experimental.forget"]({ params: { projectID: input["projectID"] } }).pipe(
-        Effect.mapError(mapClientError),
-      ),
+      raw["project.experimental.forget"]({
+        params: { projectID: input["projectID"] },
+        query: { includeVisible: input["includeVisible"] },
+      }).pipe(Effect.mapError(mapClientError)),
     )
 
 const adaptGroupExperimental = (raw: RawClient["server.experimental"]) => ({

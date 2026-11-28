@@ -20,6 +20,7 @@ export function buildHomeSessionRecords(input: {
   projectDirectories: () => string[] | undefined
   projects: () => LocalProject[]
   resolveProject?: (session: SessionInfo) => LocalProject | undefined
+  hiddenProject?: (projectID: string) => boolean
 }) {
   const selected = input.projectDirectories()
   const directories = selected ? new Set(selected.map(pathKey)) : undefined
@@ -37,7 +38,7 @@ export function buildHomeSessionRecords(input: {
           worktree: session.location.directory,
         }
 
-      return { session, project, projectName: displayName(project) }
+      return { session, project, projectName: input.hiddenProject?.(session.projectID) ? "" : displayName(project) }
     })
 }
 

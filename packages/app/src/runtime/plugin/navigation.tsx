@@ -1,4 +1,5 @@
-import { createEffect, createMemo, onCleanup, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js"
+import type { SessionInfo } from "@opencode/client/promise"
 import { useQuery } from "@tanstack/solid-query"
 import { displayName } from "@opencode/ui/project-avatar"
 import { ShellNavigation, type NavigationSession } from "@opencode/plugin/gui/builtin"
@@ -65,7 +66,7 @@ export function hiddenWorkspace(ctx: ServerCtx | undefined, directory: string | 
   return project ? project.experimental?.hidden === true : undefined
 }
 
-export async function forgetNavigationWorkspace(ctx: ServerCtx, directory: string) {
+export async function forgetNavigationWorkspace(ctx: ServerCtx, directory: string, hiddenOnly = true) {
   const signal = AbortSignal.timeout(10_000)
   const key = pathKey(directory)
   const matches = (project: { canonical: string }) => pathKey(project.canonical) === key
@@ -74,10 +75,15 @@ export async function forgetNavigationWorkspace(ctx: ServerCtx, directory: strin
     ctx.data.project.list({ includeHidden: true }).find(matches) ??
     (await ctx.sdk.api.experimental.project.list({ signal })).find(matches)
 
-  if (!project?.experimental?.hidden) return
+  if (!project || (hiddenOnly && !project.experimental?.hidden)) return
 
-  await ctx.sdk.api.experimental.project.forget({ projectID: project.id }, { signal })
-  ctx.data.project.forget(project.id)
+  await ctx.sdk.api.experimental.project.forget(
+    { projectID: project.id, includeVisible: hiddenOnly ? undefined : true },
+    { signal },
+  )
+  const remaining = await ctx.sdk.api.experimental.project.list({ signal })
+
+  if (!remaining.some((item) => item.id === project.id)) ctx.data.project.forget(project.id)
 }
 
 export async function registerNavigationWorkspace(ctx: ServerCtx, input: { directory: string; hidden: boolean }) {
@@ -118,6 +124,7 @@ export function PluginNavigation(props: { connection: ServerConnection.Sidecar; 
   const actions = createProjectSessionActions()
   const key = () => ServerConnection.key(props.connection)
   const ctx = () => global.serverCtx(key())
+  const [projectSessions, setProjectSessions] = createSignal(new Map<string, SessionInfo[]>())
 
   const query = useQuery(() => ({
     ...homeSessionsQuery(props.connection, ctx()),
@@ -136,7 +143,9 @@ export function PluginNavigation(props: { connection: ServerConnection.Sidecar; 
 
     if (!current) return []
 
-    return current.data.session.apply(mergeSidebarSessions(query.data?.() ?? [], current.data.session.known()))
+    const fetched = [...(query.data?.() ?? []), ...[...projectSessions().values()].flat()]
+
+    return current.data.session.apply(mergeSidebarSessions(fetched, current.data.session.known()))
   })
 
   if (!props.onNavigate) onCleanup(() => setSidebarConversationActivity(undefined))
@@ -192,6 +201,21 @@ export function PluginNavigation(props: { connection: ServerConnection.Sidecar; 
                   },
                 }))
               },
+              async loadProjectSessions(project, limit, signal) {
+                const current = ctx()
+
+                if (!current) return false
+
+                const page = await current.sdk.api.session.list(
+                  { project, limit, parentID: null, archived: false, order: "desc" },
+                  { signal },
+                )
+
+                signal.throwIfAborted()
+                setProjectSessions((previous) => new Map(previous).set(project, page.data))
+
+                return !!page.cursor.next
+              },
               async projectNames(signal) {
                 const projects = await ctx()?.sdk.api.project.list(undefined, { signal })
 
@@ -204,15 +228,22 @@ export function PluginNavigation(props: { connection: ServerConnection.Sidecar; 
 
                 if (!current) throw new Error(language.t("common.requestFailed"))
 
-                const project = await current.sdk.api.experimental.project.register(
-                  { directory: input.directory, name: input.name },
-                  { signal: input.signal },
-                )
+                input.signal.throwIfAborted()
+
+                const project = await current.sdk.api.experimental.project.register({
+                  directory: input.directory,
+                  name: input.name,
+                })
 
                 input.signal.throwIfAborted()
                 current.sync.project.update(project)
                 current.projects.touch(project.canonical)
                 openProject(project.canonical)
+              },
+              async forgetProject(directory) {
+                const current = ctx()
+
+                if (current) await forgetNavigationWorkspace(current, directory, false)
               },
               openProject,
               openNewSession(directory) {

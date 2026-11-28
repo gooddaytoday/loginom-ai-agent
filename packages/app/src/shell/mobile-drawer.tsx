@@ -12,6 +12,7 @@ export function MobileDrawer(
     returnFocus?: () => HTMLElement | undefined
     onFinalFocus?: (event: Event) => void
     closeOnOutsideFocus?: boolean
+    side?: "bottom" | "left"
   }>,
 ) {
   return (
@@ -19,7 +20,7 @@ export function MobileDrawer(
       open={props.open}
       onOpenChange={props.onOpenChange}
       onContentPresentChange={props.onContentPresentChange}
-      side="bottom"
+      side={props.side ?? "bottom"}
       initialFocusEl={props.initialFocus?.()}
       finalFocusEl={props.returnFocus?.()}
       onFinalFocus={props.onFinalFocus}

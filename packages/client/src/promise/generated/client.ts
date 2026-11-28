@@ -1757,6 +1757,7 @@ export function make(options: ClientOptions) {
             {
               method: "DELETE",
               path: `/api/experimental/project/${encodeURIComponent(input.projectID)}`,
+              query: { includeVisible: input["includeVisible"] },
               successStatus: 204,
               declaredStatuses: [400, 401],
               empty: true,

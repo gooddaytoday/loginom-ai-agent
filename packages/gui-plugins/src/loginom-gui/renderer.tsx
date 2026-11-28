@@ -70,6 +70,7 @@ function Navigation(props: {
       conversations={loose()}
       text={props.text}
       onCreate={props.create}
+      onLoadProjectSessions={props.input.loadProjectSessions}
       onOpenProject={props.input.openProject}
       onNewInProject={props.input.openNewSession}
       onOpenConversation={props.input.openSession}
@@ -136,6 +137,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
                 return input.createProject({ directory, name, signal })
               },
               folders.finish,
+              input.forgetProject,
             )
 
             void project.finish(true)

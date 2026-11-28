@@ -262,6 +262,15 @@ export interface ShellNavigationInput {
   /** Top-level conversations on this server. */
   readonly sessions: readonly NavigationSession[]
   /**
+   * Load the newest conversations for one project independently of the shared inventory.
+   *
+   * @param projectID - The project's ID.
+   * @param limit - Maximum number of conversations to add to the inventory.
+   * @param signal - Cancels the request when this view no longer needs it.
+   * @returns Whether more conversations are available on the server.
+   */
+  loadProjectSessions(projectID: string, limit: number, signal: AbortSignal): Promise<boolean>
+  /**
    * Display names of all visible projects on the server, even if not used on this client.
    *
    * @param signal - Cancels the lookup when the user leaves or it times out.
@@ -280,6 +289,12 @@ export interface ShellNavigationInput {
     /** Cancels the action before opening the project. */
     signal: AbortSignal
   }): Promise<void>
+  /**
+   * Roll back metadata for a newly created project after removing its empty directory.
+   *
+   * @param directory - The removed project directory.
+   */
+  forgetProject(directory: string): Promise<void>
   /**
    * Open an existing project's page.
    *

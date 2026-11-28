@@ -13726,6 +13726,15 @@
               "$ref": "#/components/schemas/Project.ID"
             },
             "required": true
+          },
+          {
+            "name": "includeVisible",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "required": false
           }
         ],
         "security": [],
@@ -13754,8 +13763,8 @@
             }
           }
         },
-        "description": "Forget a hidden project with no directory or sessions. Experimental: may change without compatibility guarantees.",
-        "summary": "Forget a missing hidden project without sessions"
+        "description": "Forget a hidden project with no directory or sessions. Set includeVisible=true to also allow non-VCS visible projects. Experimental: may change without compatibility guarantees.",
+        "summary": "Forget a missing project without sessions"
       }
     },
     "/api/shell": {

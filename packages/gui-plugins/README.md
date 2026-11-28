@@ -340,7 +340,8 @@ to the displayed repository or worktree instead of adding a second menu item.
 
 `ShellNavigation` replaces the local Desktop sidecar's conversation navigation. Register it with
 `ctx.add(ShellNavigation, navigation)` from `@opencode/plugin/gui/builtin`; the host rejects external registrations.
-Its render input supplies the live project and session inventory plus navigation actions. The draft policy chooses
+Its render input supplies live inventories, on-demand project history, and navigation actions. A cancelled project
+creation can forget its metadata after removing the newly allocated empty folder. The draft policy chooses
 an empty private directory when the user is not in a project, honors the host's timeout signal, and discards that
 directory when a draft is closed or promoted. An explicit project directory is never removed by the policy.
 

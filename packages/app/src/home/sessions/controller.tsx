@@ -78,6 +78,13 @@ export function createHomeSessionsController(home: HomeController) {
   const queryClient = useQueryClient()
   const global = useGlobal()
 
+  createEffect(() => {
+    const ctx = home.server.focusedContext()
+
+    if (home.server.focused()?.type === "sidecar" && ctx?.sdk.connection.status() === "connected")
+      void ctx.data.project.sync({ includeHidden: true }).catch(() => undefined)
+  })
+
   const projectDirectories = createMemo(() => {
     const selected = home.selection.value().directory
 
@@ -292,6 +299,7 @@ export function createHomeSessionsController(home: HomeController) {
       projectDirectories,
       projects: home.project.list,
       resolveProject: (session) => home.server.focusedContext()?.projects.forSession(session),
+      hiddenProject: (id) => !!home.server.focusedContext()?.data.project.get(id)?.experimental?.hidden,
     }),
   )
 
@@ -556,6 +564,7 @@ export function createHomeSessionsController(home: HomeController) {
           projectDirectories,
           projects: home.project.list,
           resolveProject: ctx.projects.forSession,
+          hiddenProject: (id) => !!ctx.data.project.get(id)?.experimental?.hidden,
         })[0]
       },
       create: home.project.openNewSession,

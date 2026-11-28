@@ -4824,7 +4824,10 @@ export type ExperimentalProjectRegisterInput = {
 
 export type ExperimentalProjectRegisterOutput = Project
 
-export type ExperimentalProjectForgetInput = { readonly projectID: string }
+export type ExperimentalProjectForgetInput = {
+  readonly projectID: string
+  readonly includeVisible?: boolean | undefined
+}
 
 export type ExperimentalProjectForgetOutput = void
 

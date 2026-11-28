@@ -2572,7 +2572,10 @@ export type ExperimentalProjectRegisterOperation<E = never> = (
   input: ExperimentalProjectRegisterInput,
 ) => Effect.Effect<ExperimentalProjectRegisterOutput, E>
 
-export type ExperimentalProjectForgetInput = { readonly projectID: Project.ID }
+export type ExperimentalProjectForgetInput = {
+  readonly projectID: Project.ID
+  readonly includeVisible?: boolean | undefined
+}
 export type ExperimentalProjectForgetOutput = void
 export type ExperimentalProjectForgetOperation<E = never> = (
   input: ExperimentalProjectForgetInput,

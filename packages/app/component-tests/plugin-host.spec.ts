@@ -349,42 +349,41 @@ story("Escape closes the top dialog while a dialog below it plays its exit anima
   expect(result).toEqual(["below"])
 })
 
-story(
-  "a dialog closes itself while the dialog above it exits, and a double close never reaches below",
-  async ({ page }) => {
-    const result = await page.evaluate(async (fixture) => {
-      const { mountPluginHost, until, useDialog } = await import(fixture)
-      const host = mountPluginHost()
-      const shown = () => ["base", "middle", "top"].filter((value) => document.body.textContent?.includes(value))
-      const own = { close: () => {} }
-      host.load((ctx: Context) => {
-        ctx.dialogs.open(() => Object.assign(document.createElement("p"), { textContent: "base" }))
-        // A Cancel button inside the middle dialog: a plain close() from its own layer.
-        ctx.dialogs.open(() => {
-          const dialog = useDialog()
-          own.close = () => dialog.close()
+story("a dialog closes itself while the dialog above it exits, and a double close never reaches below", async ({
+  page,
+}) => {
+  const result = await page.evaluate(async (fixture) => {
+    const { mountPluginHost, until, useDialog } = await import(fixture)
+    const host = mountPluginHost()
+    const shown = () => ["base", "middle", "top"].filter((value) => document.body.textContent?.includes(value))
+    const own = { close: () => {} }
+    host.load((ctx: Context) => {
+      ctx.dialogs.open(() => Object.assign(document.createElement("p"), { textContent: "base" }))
+      // A Cancel button inside the middle dialog: a plain close() from its own layer.
+      ctx.dialogs.open(() => {
+        const dialog = useDialog()
+        own.close = () => dialog.close()
 
-          return Object.assign(document.createElement("p"), { textContent: "middle" })
-        })
-        ctx.dialogs.open(() => Object.assign(document.createElement("p"), { textContent: "top" }))
-      }, 0)
-      await until(() => shown().length === 3)
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
-      // In the same tick, while the top dialog is still playing its exit animation; twice, as a double click would.
-      own.close()
-      own.close()
-      await until(() => shown().length === 1)
-      // Past every exit animation, so a close that reached the base dialog would have removed it by now.
-      await new Promise((resolve) => setTimeout(resolve, 300))
-      const outcome = shown()
-      host.unmount()
+        return Object.assign(document.createElement("p"), { textContent: "middle" })
+      })
+      ctx.dialogs.open(() => Object.assign(document.createElement("p"), { textContent: "top" }))
+    }, 0)
+    await until(() => shown().length === 3)
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+    // In the same tick, while the top dialog is still playing its exit animation; twice, as a double click would.
+    own.close()
+    own.close()
+    await until(() => shown().length === 1)
+    // Past every exit animation, so a close that reached the base dialog would have removed it by now.
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    const outcome = shown()
+    host.unmount()
 
-      return outcome
-    }, fixture)
+    return outcome
+  }, fixture)
 
-    expect(result).toEqual(["base"])
-  },
-)
+  expect(result).toEqual(["base"])
+})
 
 story("a dialog pushed in the same tick as a reload never mounts", async ({ page }) => {
   const shown = await page.evaluate(async (fixture) => {
@@ -1080,6 +1079,7 @@ story(
 story("the new-session slot renders nothing without a plugin", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
     const { mountPlugins, BuiltinSlot, until } = await import(fixture)
+
     const host = mountPlugins({
       definitions: [
         {
@@ -1090,16 +1090,19 @@ story("the new-session slot renders nothing without a plugin", async ({ page }) 
         },
       ],
     })
+
     try {
       const heading = () => host.container.querySelector('[data-testid="draft-heading"]')
       await until(() => heading()?.textContent === "Draft heading")
       host.define([])
       await until(() => heading()?.textContent === "")
+
       return { elements: heading()?.childElementCount, errors: host.escaped() }
     } finally {
       host.unmount()
     }
   }, fixture)
+
   expect(result).toEqual({ elements: 0, errors: [] })
 })
 
@@ -1912,122 +1915,121 @@ story(
   },
 )
 
-story(
-  "a theme preview survives a system light/dark flip and a plugin theme arriving, and is never saved",
-  async ({ page }) => {
-    await page.emulateMedia({ colorScheme: "dark" })
+story("a theme preview survives a system light/dark flip and a plugin theme arriving, and is never saved", async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: "dark" })
 
-    const host: JSHandle<ThemesHost> = await page.evaluateHandle(async (fixture) => {
-      const { mountThemes, Theme } = await import(fixture)
-      // The frame's own provider saved its scheme; this window follows the system.
-      localStorage.setItem("opencode-color-scheme", "system")
-      localStorage.removeItem("opencode-theme-id")
-      localStorage.removeItem("opencode-theme-css-light")
-      localStorage.removeItem("opencode-theme-css-dark")
+  const host: JSHandle<ThemesHost> = await page.evaluateHandle(async (fixture) => {
+    const { mountThemes, Theme } = await import(fixture)
+    // The frame's own provider saved its scheme; this window follows the system.
+    localStorage.setItem("opencode-color-scheme", "system")
+    localStorage.removeItem("opencode-theme-id")
+    localStorage.removeItem("opencode-theme-css-light")
+    localStorage.removeItem("opencode-theme-css-dark")
 
-      const variant = {
-        palette: {
-          neutral: "#101418",
-          ink: "#e6edf3",
-          primary: "#009fff",
-          success: "#3fb950",
-          warning: "#d29922",
-          error: "#f85149",
-          info: "#a371f7",
-        },
-      }
-
-      const host: ThemesHost = mountThemes({
-        definitions: [
-          {
-            id: "acme",
-            windowEntry: async () => ({
-              default: (ctx: Context) =>
-                void ctx.add(Theme, {
-                  $schema: "https://opencode.ai/desktop-theme.json",
-                  name: "Midnight",
-                  id: "midnight",
-                  light: variant,
-                  dark: variant,
-                }),
-            }),
-          },
-        ],
-      })
-
-      host.previewScheme("light")
-
-      return host
-    }, fixture)
-
-    const read = () =>
-      host.evaluate((host) => ({
-        theme: document.documentElement.dataset.theme,
-        shown: document.documentElement.dataset.colorScheme,
-        mode: host.mode(),
-        scheme: localStorage.getItem("opencode-color-scheme"),
-        id: localStorage.getItem("opencode-theme-id"),
-        cached: [localStorage.getItem("opencode-theme-css-light"), localStorage.getItem("opencode-theme-css-dark")].map(
-          (css) => css !== null,
-        ),
-      }))
-
-    // A media change reaches the provider's listener before one added after it.
-    const flip = async (colorScheme: "light" | "dark") => {
-      const changed = await page.evaluateHandle(() => ({
-        done: new Promise<void>((resolve) =>
-          matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => resolve(), { once: true }),
-        ),
-      }))
-
-      await page.emulateMedia({ colorScheme })
-      await changed.evaluate((changed) => changed.done)
+    const variant = {
+      palette: {
+        neutral: "#101418",
+        ink: "#e6edf3",
+        primary: "#009fff",
+        success: "#3fb950",
+        warning: "#d29922",
+        error: "#f85149",
+        info: "#a371f7",
+      },
     }
 
-    // The plugin's theme arrives while the preview is up.
-    await expect.poll(() => host.evaluate((host) => host.status("acme"))).toBe("active")
-    const previewed = await read()
-
-    await flip("light")
-    await flip("dark")
-    const flipped = await read()
-
-    await host.evaluate((host) => host.preview("acme:midnight"))
-    const midnight = await read()
-
-    await host.evaluate((host) => host.cancel())
-    const cancelled = await read()
-
-    await host.evaluate((host) => {
-      host.preview("acme:midnight")
-      host.commit()
+    const host: ThemesHost = mountThemes({
+      definitions: [
+        {
+          id: "acme",
+          windowEntry: async () => ({
+            default: (ctx: Context) =>
+              void ctx.add(Theme, {
+                $schema: "https://opencode.ai/desktop-theme.json",
+                name: "Midnight",
+                id: "midnight",
+                light: variant,
+                dark: variant,
+              }),
+          }),
+        },
+      ],
     })
-    const committed = await read()
-    await host.evaluate((host) => host.unmount())
 
-    expect({ previewed, flipped, midnight, cancelled, committed }).toEqual({
-      previewed: { theme: "oc-2", shown: "light", mode: "light", scheme: "system", id: null, cached: [false, false] },
-      flipped: { theme: "oc-2", shown: "light", mode: "light", scheme: "system", id: null, cached: [false, false] },
-      midnight: {
-        theme: "acme:midnight",
-        shown: "light",
-        mode: "light",
-        scheme: "system",
-        id: null,
-        cached: [false, false],
-      },
-      cancelled: { theme: "oc-2", shown: "dark", mode: "dark", scheme: "system", id: null, cached: [false, false] },
-      committed: {
-        theme: "acme:midnight",
-        shown: "dark",
-        mode: "dark",
-        scheme: "system",
-        id: "acme:midnight",
-        cached: [true, true],
-      },
-    })
-  },
-)
+    host.previewScheme("light")
+
+    return host
+  }, fixture)
+
+  const read = () =>
+    host.evaluate((host) => ({
+      theme: document.documentElement.dataset.theme,
+      shown: document.documentElement.dataset.colorScheme,
+      mode: host.mode(),
+      scheme: localStorage.getItem("opencode-color-scheme"),
+      id: localStorage.getItem("opencode-theme-id"),
+      cached: [localStorage.getItem("opencode-theme-css-light"), localStorage.getItem("opencode-theme-css-dark")].map(
+        (css) => css !== null,
+      ),
+    }))
+
+  // A media change reaches the provider's listener before one added after it.
+  const flip = async (colorScheme: "light" | "dark") => {
+    const changed = await page.evaluateHandle(() => ({
+      done: new Promise<void>((resolve) =>
+        matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => resolve(), { once: true }),
+      ),
+    }))
+
+    await page.emulateMedia({ colorScheme })
+    await changed.evaluate((changed) => changed.done)
+  }
+
+  // The plugin's theme arrives while the preview is up.
+  await expect.poll(() => host.evaluate((host) => host.status("acme"))).toBe("active")
+  const previewed = await read()
+
+  await flip("light")
+  await flip("dark")
+  const flipped = await read()
+
+  await host.evaluate((host) => host.preview("acme:midnight"))
+  const midnight = await read()
+
+  await host.evaluate((host) => host.cancel())
+  const cancelled = await read()
+
+  await host.evaluate((host) => {
+    host.preview("acme:midnight")
+    host.commit()
+  })
+  const committed = await read()
+  await host.evaluate((host) => host.unmount())
+
+  expect({ previewed, flipped, midnight, cancelled, committed }).toEqual({
+    previewed: { theme: "oc-2", shown: "light", mode: "light", scheme: "system", id: null, cached: [false, false] },
+    flipped: { theme: "oc-2", shown: "light", mode: "light", scheme: "system", id: null, cached: [false, false] },
+    midnight: {
+      theme: "acme:midnight",
+      shown: "light",
+      mode: "light",
+      scheme: "system",
+      id: null,
+      cached: [false, false],
+    },
+    cancelled: { theme: "oc-2", shown: "dark", mode: "dark", scheme: "system", id: null, cached: [false, false] },
+    committed: {
+      theme: "acme:midnight",
+      shown: "dark",
+      mode: "dark",
+      scheme: "system",
+      id: "acme:midnight",
+      cached: [true, true],
+    },
+  })
+})
 
 story("a selected plugin theme that never returns shows the default theme once plugins settle", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {

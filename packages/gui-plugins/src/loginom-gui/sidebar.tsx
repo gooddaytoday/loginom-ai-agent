@@ -1,10 +1,11 @@
 import { Button } from "@opencode/ui/button"
+import { createKeyed } from "@opencode/plugin/gui"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Predicate } from "effect"
 import { For, Show, createMemo, createSignal, onCleanup, type Accessor, type JSX } from "solid-js"
 import en from "./i18n/en"
-import { transitionProjectForm, type ProjectForm } from "./machine"
+import { projectConversationLimit, transitionProjectConversations, transitionProjectForm, type ProjectForm } from "./machine"
 
 export type SidebarActivity = "input" | "running" | "idle"
 
@@ -24,8 +25,6 @@ export type SidebarProject = {
 }
 
 export type SidebarText = (key: keyof typeof en) => string
-
-const pageSize = 6
 
 const row =
   "flex min-w-0 min-h-7 w-full items-center gap-2 rounded-md px-2 text-start text-sm hover:bg-v2-overlay-simple-overlay-hover focus-visible:bg-v2-overlay-simple-overlay-hover"
@@ -65,15 +64,20 @@ export function ConversationSidebar(props: {
   conversations: readonly SidebarConversation[]
   text: SidebarText
   onCreate(name: string, signal: AbortSignal): Promise<void>
+  onLoadProjectSessions(id: string, limit: number, signal: AbortSignal): Promise<boolean>
   onOpenProject(directory: string): void
   onNewInProject(directory: string): void
   onOpenConversation(id: string): void
 }) {
   const [expanded, setExpanded] = createSignal(new Map<string, number>())
   const [form, setForm] = createSignal<ProjectForm>({ type: "closed" })
+
   let attempt: AbortController | undefined
-  const expand = (id: string, limit: number) => setExpanded((current) => new Map(current).set(id, limit))
-  const open = (id: string) => expand(id, expanded().get(id) || pageSize)
+
+  const expand = (input: Parameters<typeof transitionProjectConversations>[1]) =>
+    setExpanded((current) => transitionProjectConversations(current, input))
+
+  const open = (id: string) => expand({ type: "open", id })
 
   const send = (event: Parameters<typeof transitionProjectForm>[1]) =>
     setForm((state) => transitionProjectForm(state, event))
@@ -217,10 +221,26 @@ export function ConversationSidebar(props: {
           {(id) => (
             <Show when={projects().get(id)}>
               {(project) => {
-                const limit = () =>
-                  expanded().get(id) ?? (project().conversations.some((item) => item.active) ? pageSize : 0)
+                const active = () => project().conversations.some((item) => item.active)
+                const limit = createMemo(() => projectConversationLimit(expanded(), id, active()))
+                const [page, setPage] = createSignal<{ loading: boolean; more: boolean }>({ loading: false, more: false })
 
                 const ordered = createMemo(() => newest(project().conversations).slice(0, limit()))
+
+                createKeyed(() => limit() || undefined, (count) => {
+                  const controller = new AbortController()
+                  onCleanup(() => controller.abort())
+                  setPage((previous) => ({ ...previous, loading: true }))
+
+                  void props.onLoadProjectSessions(id, count, controller.signal).then(
+                    (more) => {
+                      if (!controller.signal.aborted) setPage({ loading: false, more })
+                    },
+                    () => {
+                      if (!controller.signal.aborted) setPage((previous) => ({ ...previous, loading: false }))
+                    },
+                  )
+                })
 
                 return (
                   <div>
@@ -229,7 +249,7 @@ export function ConversationSidebar(props: {
                         type="button"
                         class={row}
                         aria-expanded={limit() > 0}
-                        onClick={() => expand(id, limit() ? 0 : pageSize)}
+                        onClick={() => expand({ type: "toggle", id, active: active() })}
                       >
                         <Icon name="folder" size="small" class="shrink-0" />
                         <span class="min-w-0 flex-1 truncate" dir="auto">
@@ -266,12 +286,13 @@ export function ConversationSidebar(props: {
                     </div>
                     <Show when={limit() > 0}>
                       {conversations(ordered, id)}
-                      <Show when={project().conversations.length > limit()}>
+                      <Show when={page().more || project().conversations.length > limit()}>
                         <Button
                           variant="ghost-muted"
                           size="small"
                           class="ms-5"
-                          onClick={() => expand(id, limit() + pageSize)}
+                          disabled={page().loading}
+                          onClick={() => expand({ type: "more", id, active: active() })}
                         >
                           {props.text("showMoreConversations")}
                         </Button>
