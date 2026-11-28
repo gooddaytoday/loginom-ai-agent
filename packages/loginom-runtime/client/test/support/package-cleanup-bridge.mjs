@@ -536,8 +536,9 @@ for(const action_key of ['package.save_checkpoint','package.save_as'])
    assert.equal(operationId,saved.operation_id);
    assert.equal(report.saveOperationId,saved.operation_id);
    assert.equal(report.packagePath,path);
+   assert.equal(report.renameAttribution,'unconfirmed');
    assert.deepEqual(report.savedLabels,[{nodeId:'770a65bc-5ea0-47f2-80f8-ab900e5e43c2',label:'По убыванию выручки'}]);
-   assert.ok(response.content.some(block=>block.text.includes('«Сортировка» → «По убыванию выручки»')));
+   assert.ok(response.content.some(block=>block.text.includes('В сохранённом пакете имя узла отличается: «Сортировка» → «По убыванию выручки»')));
    const replay=await client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'},operation_id:saved.operation_id}});
    assert.deepEqual(replay._meta.loginom.savedPackageGraph,report);
    const inspected=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:saved.operation_id}});

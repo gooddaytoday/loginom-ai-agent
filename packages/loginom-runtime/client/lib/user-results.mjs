@@ -210,7 +210,7 @@ function projectSavedPackageGraph(graph, knownSecrets) {
   const packagePath = text(graph.package_path).toWellFormed();
   const identity = {saveOperationId:graph.save_operation_id, packagePath};
   if (graph.status === 'unavailable') return {status:'unavailable', ...identity};
-  const result = {status:'compared', ...identity, scope:'active_workflow', renameAttribution:graph.rename_attribution,
+  const result = {status:'compared', ...identity, scope:'active_workflow', renameAttribution:'unconfirmed',
     changes:[], savedLabels:[], uncheckedSorting:[], truncated:true};
   const safe = value => Array.isArray(value) ? value.map(safe) : text(value).toWellFormed();
   const append = (target, value) => {

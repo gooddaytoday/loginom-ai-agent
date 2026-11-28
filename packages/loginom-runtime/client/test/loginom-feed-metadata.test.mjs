@@ -234,7 +234,7 @@ test('saved package graph shares v1 with busy, redacts labels and fits its own b
   const save={action_key:'package.save_checkpoint',operation_id:operationId,status:'SUCCEEDED', output:{package_ref:{path:packagePath}}};
   const busy={version:1,windowId:'09a4db75-00cf-4ee0-912d-c252afbaba0f',operationId,active:false};
   const saved_labels=Array.from({length:200},(_,index)=>({node_id:'node-'+index,label:index===199?'Левое':'credential-example'+'Ж'.repeat(200)}));
-  const savedPackageGraph={status:'compared',package_path:packagePath,save_operation_id:operationId,rename_attribution:'observed_during_save',
+  const savedPackageGraph={status:'compared',package_path:packagePath,save_operation_id:operationId,
     unchecked_sorting:[],saved_labels,changes:[{kind:'node_renamed',node_id:'node-199',before:'Слияние',saved:'Левое',
       observed_before_save:'Слияние',repair:{label:'Попросить исправить',prompt:'Проверить узел node-199'}}]};
   const metadata=loginomFeedMetadata(reply,{tool:'dock_action_run',save,busy,savedPackageGraph,knownSecrets:['credential-example']});

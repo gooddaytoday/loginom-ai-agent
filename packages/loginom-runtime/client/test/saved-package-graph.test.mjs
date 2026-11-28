@@ -26,7 +26,7 @@ async function compare({label='Слияние', fixedOrder=true, linked=true, gr
     </WorkFlow></Unit>`));
   const base64 = Buffer.from(await archive.close()).toString('base64');
   const bytes = parseSavedPackageBytes({content:[{type:'text', text:`### Result\n${JSON.stringify({base64})}\n### Ran Playwright code`}]});
-  return {status:'compared', rename_attribution:'observed_during_save', ...await compareSavedPackageGraph({bytes,before:graph,sorting,intendedLabels})};
+  return {status:'compared', ...await compareSavedPackageGraph({bytes,before:graph,sorting,intendedLabels})};
 }
 
 test('a saved rename follows the node GUID and offers a request, not a mutation', async () => {
@@ -37,7 +37,7 @@ test('a saved rename follows the node GUID and offers a request, not a mutation'
   assert.equal(change.kind, 'node_renamed');
   assert.equal(change.repair.label, 'Попросить исправить');
   assert.match(change.repair.prompt, new RegExp(join));
-  assert.match(savedGraphMessage(report), /Loginom переименовал узел «Слияние» → «Левое»/);
+  assert.match(savedGraphMessage(report), /В сохранённом пакете имя узла отличается: «Слияние» → «Левое»/);
 });
 
 test('an earlier rename differs from agent intent without attributing it to Save', async () => {
@@ -45,7 +45,7 @@ test('an earlier rename differs from agent intent without attributing it to Save
   const report = await compare({graph,label:'Левое',intendedLabels:new Map([[join,'Слияние']])});
   assert.equal(report.changes[0].before, 'Слияние');
   assert.equal(report.changes[0].saved, 'Левое');
-  assert.doesNotMatch(savedGraphMessage(report), /Loginom переименовал/);
+  assert.match(savedGraphMessage(report), /В сохранённом пакете имя узла отличается: «Слияние» → «Левое»/);
 });
 
 test('saved autosync falls back to input order, exposing a lost custom output order', async () => {
@@ -71,7 +71,7 @@ test('an unverified archive cannot be reported as an unchanged graph', async () 
   assert.match(savedGraphMessage({status:'unavailable'}), /Пакет сохранён, но/);
 });
 
-test('saved-file read closes only its own Files tab, even if read or workflow return fails', async () => {
+test('saved-file read releases the file for the next Save and closes only its own Files tab', async () => {
   const origin='https://loginom.invalid', path='/account/saved.lgp', tabTid='fixture-workflow';
   const browser=await chromium.launch({chromiumSandbox:true, executablePath:process.env.LOGINOM_DOCK_TEST_BROWSER, args:['--no-proxy-server']});
   try {
@@ -79,7 +79,7 @@ test('saved-file read closes only its own Files tab, even if read or workflow re
     await page.route('**/*',route=>route.fulfill({contentType:'text/html',body:
       '<div data-tid="fixture-workflow" class="x-tab-active">Workflow</div><button data-tid="MF;cntMain;tlbMainToolbar;btnFilestorage">Files</button>'}));
     const execute=Function('return '+makeSavedPackageGraphCode({origin,path,tabTid,build:'7.4.2',documentId:'doc',sessionId:'session',account:'account'}))();
-    for (const scenario of ['success','read failed','return failed','read stalled','existing']) {
+    for (const scenario of ['success','read failed','return failed','read stalled','open stalled','existing']) {
       await page.goto(origin);
       await page.evaluate(({scenario,path,tabTid})=>{
         const workflow=document.querySelector('[data-tid="'+tabTid+'"]');
@@ -90,23 +90,33 @@ test('saved-file read closes only its own Files tab, even if read or workflow re
         filesTab.dataset.tid='fixture-files';
         filesTab.innerHTML='Files <button data-ref="closeEl">Close</button>';
         const files={Controller:{FController:new FileStorageForm()},tab:{el:{dom:filesTab}}};
-        let active=card, release, disposed=0;
+        let active=card, finishOpening, locked=false, readStarted=false;
         const cards=[card];
         const mount=()=>{if(!cards.includes(files)){cards.push(files);document.body.append(filesTab);}};
         if(scenario==='existing')mount();
-        filesTab.querySelector('button').onclick=()=>{cards.splice(cards.indexOf(files),1);filesTab.remove();active=card;release?.();};
+        filesTab.querySelector('button').onclick=()=>{cards.splice(cards.indexOf(files),1);filesTab.remove();active=card;};
         workflow.onclick=()=>{if(scenario!=='return failed')active=card;};
         document.querySelector('[data-tid$="btnFilestorage"]').onclick=()=>{mount();active=files;};
         class FileDownloader {
           constructor(name,dir){this.FullFilename=dir+name;}
           GetFileSize(){return 1;}
-          GetFileStream(){return {ReadBuffer(chunk){
-            if(scenario==='read failed')throw Error('Read refused');
-            if(scenario==='read stalled')return new Promise(resolve=>{release=resolve;});
-            chunk[0]=42;
-          }};}
-          Dispose(){disposed++;this.IsDisposed=true;}
-          IsStreamReleased(){return this.IsDisposed;}
+          async GetFileStream(){
+            if(scenario==='open stalled')await new Promise(resolve=>{finishOpening=resolve;});
+            locked=true;
+            this.stream={ReadBuffer(chunk){
+              readStarted=true;
+              if(scenario==='read failed')throw Error('Read refused');
+              if(scenario==='read stalled')return new Promise(()=>{});
+              chunk[0]=42;
+            }};
+            return this.stream;
+          }
+          Dispose(){
+            if(this.IsDisposed)return;
+            this.IsDisposed=true;
+            if(this.stream){locked=false;this.stream=null;}
+          }
+          IsStreamReleased(){return !this.stream;}
         }
         const FMapTree={FServerConnection:{Connected:true,UserName:'account',Session:{}},PackageNodes:{Count:1,Items:()=>pack}};
         const Workspace={getActiveTab:()=>active,items:{items:cards}};
@@ -114,12 +124,15 @@ test('saved-file read closes only its own Files tab, even if read or workflow re
           TBGFileOpenMode:{fomRead:0},filestorage:{FileDownloader}};
         globalThis.__loginomDockPreparationV1={document,id:'doc',receipts:new Map([['save',
           {phase:'verified',packageNode:pack,request:'{"session":"session"}'}]])};
-        globalThis.observedTabs=()=>({active:active===card?'workflow':'files', files:cards.includes(files), disposed});
+        globalThis.observedTabs=()=>({active:active===card?'workflow':'files',files:cards.includes(files),readStarted});
+        globalThis.trySave=()=>locked?'locked':'saved';
+        globalThis.finishOpening=()=>{finishOpening();};
       },{scenario,path,tabTid});
-      if (scenario.endsWith('failed') || scenario==='read stalled') await assert.rejects(execute(page), /Read refused|Timeout|timed out/);
+      if (scenario.endsWith('failed') || scenario.endsWith('stalled')) await assert.rejects(execute(page), /Read refused|Timeout|timed out/);
       else assert.deepEqual(await execute(page), {base64:'Kg=='});
-      await page.waitForFunction(()=>globalThis.observedTabs().disposed===1);
-      assert.deepEqual(await page.evaluate(()=>globalThis.observedTabs()),{active:'workflow',files:scenario==='existing',disposed:1},scenario);
+      if(scenario==='open stalled')await page.evaluate(()=>globalThis.finishOpening());
+      assert.equal(await page.evaluate(()=>globalThis.trySave()),'saved',scenario);
+      assert.deepEqual(await page.evaluate(()=>globalThis.observedTabs()),{active:'workflow',files:scenario==='existing',readStarted:scenario!=='open stalled'},scenario);
     }
   } finally { await browser.close(); }
 });

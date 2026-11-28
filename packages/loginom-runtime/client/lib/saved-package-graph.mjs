@@ -62,7 +62,7 @@ async function inSavedFileTab(page, options) {
     return {verify, workspace, card, isFiles, inventory, openedFiles, path: options.path, limit: options.limit};
   }, options);
   const tab = page.locator('[data-tid='+JSON.stringify(options.tabTid)+']');
-  let files, readTimer, attempted = false;
+  let files, attempted = false;
   try {
     if (await tab.count() !== 1 || !await tab.evaluate((element, owner) =>
       owner.card.tab?.el?.dom === element && element.classList.contains('x-tab-active'), owner))
@@ -74,7 +74,7 @@ async function inSavedFileTab(page, options) {
       const card = owner.workspace.getActiveTab(), controller = card?.Controller?.FController;
       return controller?.constructor?.name === 'FileStorageForm' && controller.FFileStorage ? card : null;
     }, owner, {timeout: 2500});
-    const read = page.evaluate(async ({owner, files}) => {
+    return await page.evaluate(async ({owner, files}) => {
       const verify = () => {
         owner.verify();
         if (owner.workspace.getActiveTab() !== files) throw Error('Saved package Files tab changed');
@@ -83,33 +83,45 @@ async function inSavedFileTab(page, options) {
       const name = owner.path.split('/').at(-1), dir = owner.path.slice(0, -name.length);
       if (bg.TBGFileOpenMode.fomRead !== 0) throw Error('Native read-only mode changed');
       const downloader = new bg.filestorage.FileDownloader(name, dir, files.Controller.FController.FFileStorage);
+      let readTimer, cleanupTimer, opening, stream;
+      const deadline = new Promise((_, reject) => {
+        readTimer = setTimeout(() => reject(Error('Saved package read timed out')), 9000);
+      });
+      const dispose = async acquired => {
+        await downloader.Dispose();
+        if (!downloader.IsDisposed || (acquired && !downloader.IsStreamReleased())) throw Error('Saved package stream did not close');
+      };
       try {
         if (downloader.FullFilename !== owner.path) throw Error('Native saved path differs');
-        const size = await downloader.GetFileSize();
+        const size = await Promise.race([downloader.GetFileSize(), deadline]);
         if (!Number.isSafeInteger(size) || size < 1 || size > owner.limit) throw Error('Saved package size outside bound');
         verify();
-        const stream = await downloader.GetFileStream();
+        opening = Promise.resolve(downloader.GetFileStream()).finally(() => { opening = undefined; });
+        stream = await Promise.race([opening, deadline]);
         if (downloader.FShareDenyNone) throw Error('Saved package does not have an exclusive read');
         const bytes = new Uint8Array(size);
         for (let offset = 0; offset < size; offset += 16384) {
           verify();
           const chunk = new Uint8Array(Math.min(16384, size-offset));
-          await stream.ReadBuffer(chunk);
+          await Promise.race([stream.ReadBuffer(chunk), deadline]);
           bytes.set(chunk, offset);
         }
         verify();
         return {base64:bytes.toBase64()};
       } finally {
-        await downloader.Dispose();
-        if (!downloader.IsStreamReleased() || !downloader.IsDisposed) throw Error('Saved package stream did not close');
+        clearTimeout(readTimer);
+        if (opening) {
+          void opening.then(dispose, () => dispose()).catch(() => {});
+        } else {
+          const cleanupDeadline = new Promise((_, reject) => {
+            cleanupTimer = setTimeout(() => reject(Error('Saved package stream cleanup timed out')), 2500);
+          });
+          try { await Promise.race([dispose(stream), cleanupDeadline]); }
+          finally { clearTimeout(cleanupTimer); }
+        }
       }
     }, {owner, files});
-    const deadline = new Promise((_, reject) => {
-      readTimer = setTimeout(() => reject(Error('Saved package read timed out')), 9000);
-    });
-    return await Promise.race([read, deadline]);
   } finally {
-    clearTimeout(readTimer);
     try {
       if (attempted) {
         const opened = await owner.evaluateHandle((owner, files) => {
@@ -261,10 +273,8 @@ export function savedGraphMessage(report) {
   const renames = report.changes.filter(change => change.kind === 'node_renamed');
   const order = report.changes.some(change => change.kind.startsWith('sorting_'));
   const links = report.changes.some(change => change.kind.startsWith('link_'));
-  return [...renames.slice(0, 3).map(rename => (report.rename_attribution === 'observed_during_save' && rename.before === rename.observed_before_save
-      ? 'Loginom переименовал узел' : 'В сохранённом пакете имя узла отличается')
-      + ` «${label(rename.before)}» → «${label(rename.saved)}».`),
-    renames.length > 3 && `Другие переименования: ${renames.length - 3}.`,
+  return [...renames.slice(0, 3).map(rename => `В сохранённом пакете имя узла отличается: «${label(rename.before)}» → «${label(rename.saved)}».`),
+    renames.length > 3 && `Другие отличия в именах: ${renames.length - 3}.`,
     order && 'В сохранённом пакете изменился порядок полей «Сортировки».',
     links && 'В сохранённом пакете изменились связи.',
     !renames.length && !order && !links && (report.changes.length ? 'Сохранённый граф отличается.' : 'В проверенной части сохранённого графа расхождений нет.'),
