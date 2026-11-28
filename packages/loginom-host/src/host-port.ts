@@ -689,7 +689,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             {
               id: data.id,
               result:
-                manualEdits.length && body && typeof body === "object"
+                manualEdits && body && typeof body === "object"
                   ? {
                       ...body,
                       _meta: { ...(meta && typeof meta === "object" ? meta : {}), loginomManualEdits: manualEdits },

@@ -152,6 +152,20 @@ test("actual managed entry reads live bridge work and dispatching over private I
       recoveryPending: false,
       activeWork: false,
     })
+    await Bun.write(
+      work,
+      JSON.stringify({
+        activeWork: false,
+        unsettledWork: true,
+        graph: { document: "doc", workflow: "wf", nodes: [], links: [] },
+      }),
+    )
+    expect(await runtime.request("call", { name: "fixture", arguments: {} })).toEqual({
+      result: { content: [] },
+      recoveryPending: true,
+      activeWork: false,
+    })
+    await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false }))
     const call = runtime
       .request("call", { name: "fixture", arguments: { hold: true } })
       .catch((error: unknown) => error)
@@ -248,7 +262,12 @@ test("actual managed entry reads live bridge work and dispatching over private I
           ? { content: [] }
           : {
               content: [],
-              _meta: { loginomManualEdits: [{ kind: "node_renamed", guid: "import", from: "Импорт", to: "Продажи" }] },
+              _meta: {
+                loginomManualEdits: {
+                  edits: [{ kind: "node_renamed", guid: "import", from: "Импорт", to: "Продажи" }],
+                  omitted: 0,
+                },
+              },
             },
       )
       await turn.tools()

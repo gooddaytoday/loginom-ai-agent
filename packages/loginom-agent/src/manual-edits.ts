@@ -12,12 +12,12 @@ const caption = (text: string) => {
   return `«${chars.length > 30 ? chars.slice(0, 29).join("") + "…" : clean}»`
 }
 
-export function manualEditNotice(value: unknown, operationId: string, state: "running" | "settled") {
-  if (!Array.isArray(value) || !value.length) return
+export function manualEditNotice(value: unknown, operationId: string | undefined, state: "running" | "settled") {
+  if (value === undefined) return
   const result = decode(value)
   if (result._tag === "None") return
   const manualEdits = result.value
-  const phrases = manualEdits.slice(0, 3).map((edit) => {
+  const phrases = manualEdits.edits.slice(0, 3).map((edit) => {
     switch (edit.kind) {
       case "node_added":
         return `добавили ${caption(edit.node.label)}`
@@ -33,9 +33,11 @@ export function manualEditNotice(value: unknown, operationId: string, state: "ru
         return `удалили связь ${caption(edit.sourceLabel)} → ${caption(edit.targetLabel)}`
     }
   })
-  if (manualEdits.length > phrases.length) phrases.push(`ещё ${manualEdits.length - phrases.length}`)
+  const remaining = manualEdits.omitted + manualEdits.edits.length - phrases.length
+  if (remaining) phrases.push(phrases.length ? `ещё ${remaining}` : `изменений: ${remaining}`)
+  if (!phrases.length) return
   return {
-    loginom: { v: 1, operationId, state, manualEdits, verificationStale: true },
+    loginom: operationId ? { v: 1, operationId, state, manualEdits, verificationStale: true } : undefined,
     text: `Учёл ваши правки в Loginom: ${phrases.join(", ")}.`,
   }
 }

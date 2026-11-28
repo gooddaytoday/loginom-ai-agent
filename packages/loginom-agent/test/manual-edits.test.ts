@@ -9,21 +9,22 @@ test("manual edits invalidate prior verification and keep the model notice conci
     sourceLabel: "Импорт",
     targetLabel: "Группировка",
   }
-  expect(manualEditNotice([rename, removeLink], "call", "settled")).toEqual({
+  const changes = { edits: [rename, removeLink], omitted: 0 }
+  expect(manualEditNotice(changes, "operation", "settled")).toEqual({
     text: "Учёл ваши правки в Loginom: переименовали «Импорт» → «Продажи», удалили связь «Импорт» → «Группировка».",
     loginom: {
       v: 1,
-      operationId: "call",
+      operationId: "operation",
       state: "settled",
-      manualEdits: [rename, removeLink],
+      manualEdits: changes,
       verificationStale: true,
     },
   })
-  const edits = Array.from({ length: 20 }, () => ({ ...rename, to: "a\nb".repeat(1000) }))
-  const notice = manualEditNotice(edits, "call", "running")
-  expect(notice?.loginom.manualEdits).toEqual(edits)
+  const edits = Array.from({ length: 20 }, () => ({ ...rename, to: "a\nb".repeat(30) }))
+  const notice = manualEditNotice({ edits, omitted: 10 }, undefined, "running")
+  expect(notice?.loginom).toBeUndefined()
   expect(notice?.text.length).toBeLessThan(320)
   expect(notice?.text).not.toContain("\n")
-  expect(notice?.text).toEndWith("ещё 17.")
-  expect(manualEditNotice([], "call", "settled")).toBeUndefined()
+  expect(notice?.text).toEndWith("ещё 27.")
+  expect(manualEditNotice({ edits: [], omitted: 0 }, "operation", "settled")).toBeUndefined()
 })

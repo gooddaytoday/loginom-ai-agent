@@ -375,12 +375,13 @@ async function handle(message) {
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
           : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options)
       const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
-      const graphAfter = await snapshot()
+      const recoveryPending = state.bridge.hasUnsettledWork()
+      const graphAfter = recoveryPending ? null : await snapshot()
       send({
         id: message.id,
         result: {
           result: outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result,
-          recoveryPending: state.bridge.hasUnsettledWork(),
+          recoveryPending,
           activeWork: state.bridge.hasActiveWork(),
           ...(graphBefore ? { graphBefore } : {}),
           ...(graphAfter ? { graphAfter } : {}),
