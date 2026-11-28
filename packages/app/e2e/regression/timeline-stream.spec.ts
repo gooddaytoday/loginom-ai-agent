@@ -932,7 +932,8 @@ test.describe("Working", () => {
 
     await timeline.send(status("retry"))
     const retry = page.locator('[data-timeline-row="Retry"]')
-    await expect(retry).toContainText("Rate limited")
+    // C3.4 (#1465) replaces the raw provider text with the product retry line.
+    await expect(retry).toContainText("Model busy — retrying")
     await expect(working).toHaveCount(0)
     await expect(page.locator('[data-timeline-row="Thinking"]')).toHaveCount(0)
 
