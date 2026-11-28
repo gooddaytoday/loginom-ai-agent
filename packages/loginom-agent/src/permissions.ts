@@ -17,13 +17,13 @@
 //   applies in its `permission.evaluate` hook after every rule and before the product's. The product never lifts it
 //   (`settle`), refuses the conversation grant for a kind it touches, and tells the model who denied (`refusal`).
 import { setTimeout } from "node:timers/promises"
-import { permissionTable, settingRules, wildcard, type Kind } from "@loginom-ai-agent/product/permissions"
+import { permissionEffect, permissionTable, settingRules, type Kind } from "@loginom-ai-agent/product/permissions"
 import type { Plugin } from "@opencode/plugin"
 import type { ToolContext } from "@opencode/plugin/promise/tool"
 import type { Permission } from "@opencode/schema/permission"
+import { Wildcard } from "@opencode/util/wildcard"
 
 export type { Kind } from "@loginom-ai-agent/product/permissions"
-export { settingEffect } from "@loginom-ai-agent/product/permissions"
 
 /** The kinds as the user sees them in «Настройки → Разрешения». */
 export const kinds: Record<Kind, string> = {
@@ -75,6 +75,10 @@ export function grantable(entry: Entry | undefined, effect = entry?.effect) {
     entry.action !== "external_directory" &&
     effect === "ask"
   )
+}
+
+export function conversationGrantable(entry: Entry | undefined, rules: readonly Permission.Rule[]) {
+  return entry !== undefined && grantable(entry, permissionEffect(entry, rules, Wildcard.match) ?? entry.effect)
 }
 
 type Request = {
@@ -173,17 +177,10 @@ export const policyDeniedText = (entry: Pick<Entry, "action" | "kind">) =>
  * session's; a later rule wins, as in OpenCode's `Permission.evaluate`.
  */
 export function deniedKinds(rules: readonly Permission.Rule[]) {
-  const ignoreCase = process.platform === "win32"
   return (Object.keys(kinds) as Kind[]).filter(
     (kind) =>
       kind !== "terminal" &&
-      settingRules(kind).every(
-        (entry) =>
-          rules.findLast(
-            (rule) =>
-              wildcard(entry.action, rule.action, ignoreCase) && wildcard(entry.resource, rule.resource, ignoreCase),
-          )?.effect === "deny",
-      ),
+      settingRules(kind).every((entry) => permissionEffect(entry, rules, Wildcard.match) === "deny"),
   )
 }
 

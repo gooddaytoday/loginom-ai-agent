@@ -15,6 +15,7 @@ import { define } from "@opencode/plugin/effect/plugin"
 import { Location } from "@opencode/schema/location"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Global } from "@opencode/util/global"
+import { Wildcard } from "@opencode/util/wildcard"
 import { Context, Effect, Fiber, Layer, Schema, type Scope } from "effect"
 import { HttpEffect, HttpRouter, HttpServer } from "effect/http"
 import { LanguageModel, LLMClient, type LLMRequest } from "../../ai/src/effect"
@@ -266,8 +267,8 @@ describe("loginom.product permissions (B2.6a)", () => {
       expect(patches.map((response) => response.status)).toEqual([204, 204])
       const saved = yield* Effect.promise(() => Bun.file(profile).json())
       expect(saved.shell).toBe("bash")
-      expect(settingEffect("read", saved.permissions)).toBe("ask")
-      expect(settingEffect("write", saved.permissions)).toBe("deny")
+      expect(settingEffect("read", saved.permissions, Wildcard.match)).toBe("ask")
+      expect(settingEffect("write", saved.permissions, Wildcard.match)).toBe("deny")
     }),
   )
 
@@ -338,7 +339,9 @@ describe("loginom.product permissions (B2.6a)", () => {
               test.call(`/api/config?${at}`).pipe(
                 Effect.map((response) => {
                   const entry = response.body.find((entry: { profile?: boolean }) => entry.profile)
-                  return entry && settingEffect("save", entry.info.permissions) === effect ? entry.info : undefined
+                  return entry && settingEffect("save", entry.info.permissions, Wildcard.match) === effect
+                    ? entry.info
+                    : undefined
                 }),
               ),
             )
@@ -391,7 +394,7 @@ describe("loginom.product permissions (B2.6a)", () => {
           agents().pipe(
             Effect.map((current) => {
               const build = current.find((agent: { id: string }) => agent.id === "build")
-              return build && settingEffect("write", build.permissions) === "deny" ? true : undefined
+              return build && settingEffect("write", build.permissions, Wildcard.match) === "deny" ? true : undefined
             }),
           ),
         )
@@ -453,7 +456,7 @@ describe("loginom.product permissions (B2.6a)", () => {
           test.call(`/api/agent?${at}`).pipe(
             Effect.map((result) => {
               const build = result.body.data.find((agent: { id: string }) => agent.id === "build")
-              return build && settingEffect("read", build.permissions) === "ask" ? true : undefined
+              return build && settingEffect("read", build.permissions, Wildcard.match) === "ask" ? true : undefined
             }),
           ),
         )
@@ -493,7 +496,7 @@ describe("loginom.product permissions (B2.6a)", () => {
           test.call(`/api/agent?${at}`).pipe(
             Effect.map((result) => {
               const build = result.body.data.find((agent: { id: string }) => agent.id === "build")
-              return build && settingEffect("read", build.permissions) === "ask" ? true : undefined
+              return build && settingEffect("read", build.permissions, Wildcard.match) === "ask" ? true : undefined
             }),
           ),
         )
@@ -505,7 +508,7 @@ describe("loginom.product permissions (B2.6a)", () => {
           test.call(`/api/agent?${at}`).pipe(
             Effect.map((result) => {
               const build = result.body.data.find((agent: { id: string }) => agent.id === "build")
-              return build && settingEffect("export", build.permissions) === "allow" ? true : undefined
+              return build && settingEffect("export", build.permissions, Wildcard.match) === "allow" ? true : undefined
             }),
           ),
         )
@@ -607,6 +610,26 @@ describe("loginom.product permissions (B2.6a)", () => {
         expect((yield* test.conversation(id, first.id)).status).toBe(200)
         expect((yield* test.open(id)).map((item) => item.id)).toEqual([web.id])
         expect(second.effect).toBe("ask")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a read rule that matches on the host can grant conversation reads without granting other asks",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot({
+          permissions: [{ action: process.platform === "win32" ? "READ" : "read", resource: "*", effect: "ask" }],
+        })
+        const session = yield* test.create("read rule")
+        const read = { action: "read", resources: ["inside.txt"], source }
+        const first = yield* test.ask(session, read)
+        expect(first.effect).toBe("ask")
+        expect((yield* test.conversation(session, first.id)).body).toEqual({ output: { kind: "read" } })
+        expect((yield* test.ask(session, read)).effect).toBe("allow")
+        expect(
+          (yield* test.ask(session, { action: "external_directory", resources: ["/elsewhere/*"], source })).effect,
+        ).toBe("ask")
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )

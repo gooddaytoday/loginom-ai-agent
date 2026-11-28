@@ -31,6 +31,8 @@ Dashboard M6 «Эксплуатация и безопасность» — упр
 
 Dashboard M7 «Удобство и качество» — условия и результаты проверки интерфейса Studio, офлайн-комплекта и самостоятельного пользовательского прохода. См. [runbook M7](dashboard-m7.md).
 
+Сценарии 7–10 шлюза C с подставной моделью и хостом Loginom запускаются командой `bun run --cwd packages/app test:e2e:gate:b` после установки Chromium Playwright (`bun run --cwd packages/app playwright install chromium`). Отчёт со снимками 1280 и 390 px находится в `packages/app/e2e/playwright-report/gate-b/index.html`. Рядом с пропущенными шагами в тесте указаны номера карточек или решений продукта.
+
 ## Границы приёмки
 
 | Платформа | Целевой пакет | Где проверяется |

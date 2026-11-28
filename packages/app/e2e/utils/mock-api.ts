@@ -361,7 +361,7 @@ const Group = HttpApiGroup.make("mock")
     HttpApiEndpoint.get("sessionList", "/api/session", {
       query: Query,
       success: Json,
-      error: MockBadRequest.pipe(HttpApiSchema.status(400)),
+      error: [MockBadRequest.pipe(HttpApiSchema.status(400)), MockInternal.pipe(HttpApiSchema.status(500))],
     }),
   )
   .add(HttpApiEndpoint.post("sessionCreate", "/api/session", { payload: JsonPayload, success: Json }))

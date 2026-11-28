@@ -74,6 +74,8 @@
       "title": "Profile permission settings",
       "paths": [
         "packages/core/src/config.ts", "packages/core/src/plugin/plan.ts", "packages/core/test/plugin/plan.test.ts", "packages/schema/src/config.ts",
+        "packages/core/src/util/wildcard.ts", "packages/util/src/wildcard.ts", "packages/core/test/config/config.test.ts",
+        "packages/server/src/handlers/config.ts", "packages/server/test/config.test.ts",
         "packages/protocol/openapi.json",
         "packages/plugin/src/gui/registries.ts", "packages/app/src/settings/shell.tsx",
         "packages/app/src/runtime/plugin/settings-page-view.tsx", "packages/app/e2e/regression/settings.spec.ts",
@@ -126,9 +128,11 @@
     {
       "id": "CAT-13",
       "title": "Product storage root and own background service (U5)",
+      "note": "C5.4: Desktop initialization starts the fork's proxy detection; background-service.ts consumes its environment at spawn.",
       "paths": [
         "packages/util/src/global.ts", "packages/client/src/service-probe.ts", "packages/cli/src/services/service-config.ts",
         "packages/desktop/src/main/service/sidecar-probe.ts", "packages/desktop/src/main/service/background-service.ts",
+        "packages/desktop/src/main/lifecycle/desktop-initialization.ts",
         "packages/desktop/src/main/native/logging.ts", "packages/core/src/config/discovery.ts",
         "packages/process-daemon/src/daemon.rs", "packages/process-daemon/src/daemon/unix.rs", "packages/process-daemon/src/client.rs",
         "packages/server/src/process.ts", "packages/client/src/service-timing.ts", "packages/client/src/promise/service.ts",
@@ -212,7 +216,11 @@
       "paths": [
         "packages/schema/src/session.ts", "packages/core/src/session/store.ts", "packages/core/test/session-list.test.ts",
         "packages/protocol/openapi.json", "packages/client/src/effect/api/api.ts", "packages/client/src/effect/generated/client.ts"
-      ]
+      ],
+      "notes": {
+        "packages/app/src/shell/commands/session-search.tsx": "Keeps successful search results when a field fails. The palette displays an inline prompt search status (CAT-10).",
+        "packages/app/e2e/regression/home.spec.ts": "Covers title and project matches during a prompt search failure and clears the status after recovery."
+      }
     },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }

@@ -16393,6 +16393,10 @@
             "type": "boolean",
             "enum": [true]
           },
+          "permissionCaseInsensitive": {
+            "type": "boolean",
+            "enum": [true]
+          },
           "info": {
             "$ref": "#/components/schemas/Config.InfoEncoded"
           }

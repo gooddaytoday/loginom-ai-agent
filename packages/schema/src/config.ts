@@ -129,6 +129,7 @@ export class Document extends Schema.Class<Document>("Config.Document")({
   type: Schema.Literal("document"),
   path: AbsolutePath.pipe(optional),
   profile: Schema.Literal(true).pipe(optional),
+  permissionCaseInsensitive: Schema.Literal(true).pipe(optional),
   info: Info,
 }) {}
 

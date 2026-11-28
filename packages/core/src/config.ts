@@ -5,6 +5,7 @@ import path from "path"
 import { isDeepStrictEqual } from "node:util"
 import { applyEdits, modify, type ParseError, parse } from "jsonc-parser"
 import { Context, Effect, FiberMap, Layer, Option, PubSub, Ref, Schema, Semaphore, Stream } from "effect"
+import type { PlatformError } from "effect/PlatformError"
 import { Directory, Document, Info, type Patch, type Entry, Event } from "@opencode/schema/config"
 import { Credential } from "./credential.js"
 import { Bus } from "./bus.js"
@@ -493,19 +494,29 @@ export const layer = (options?: Options) =>
         function* (patch: Patch) {
           if (patch.shell === undefined && !patch.permissions?.length && !patch.removePermissions?.length) return
           const candidates = ConfigDiscovery.names.map((name) => path.join(profileDirectory, name))
-          const existing = yield* Effect.filter(candidates, fs.isFile)
+          const existing = yield* Effect.filter(candidates, (file) =>
+            fs.stat(file).pipe(
+              Effect.map((info) => info.type === "File"),
+              Effect.catchIf(profileFileMissing, () => Effect.succeed(false)),
+            ),
+          )
           const fallback = existing.at(-1) ?? path.join(profileDirectory, "loginom-ai-agent.jsonc")
           const permissions = Boolean(patch.permissions?.length || patch.removePermissions?.length)
           const files = permissions && existing.length ? existing : [fallback]
           const documents = yield* Effect.forEach(files, (file) =>
-            fs.readFileStringSafe(file).pipe(Effect.map((text) => ({ file, text: text ?? "{}\n" }))),
+            fs.readFileString(file).pipe(
+              Effect.catchIf(profileFileMissing, () => Effect.succeed("{}\n")),
+              Effect.map((text) => ({ file, text })),
+            ),
           )
           const edits = yield* Effect.try({
             try: () => patchDocuments(documents, patch, permissions),
             catch: (cause) => new FSUtil.FileSystemError({ method: "config.update", cause }),
           })
-          for (const { file, text, updated } of edits)
-            if (text !== updated) yield* fs.writeWithDirs(file, updated.endsWith("\n") ? updated : `${updated}\n`)
+          yield* writeProfileDocuments(
+            fs,
+            edits.filter(({ text, updated }) => text !== updated),
+          )
           if (permissions) yield* reload().pipe(Effect.provide(context))
           else yield* requestReload
         },
@@ -551,6 +562,67 @@ export function configured(options?: Options) {
       AppProcess.node,
     ],
   })
+}
+
+const profileFileMissing = (error: PlatformError) => error.reason._tag === "NotFound"
+
+function writeProfileDocuments(fs: FSUtil.Interface, edits: readonly { file: string; updated: string }[]) {
+  return Effect.scoped(
+    Effect.gen(function* () {
+      const recovery = new Set<string>()
+      const staged = yield* Effect.forEach(edits, (edit) =>
+        Effect.gen(function* () {
+          const destination = yield* fs.resolve(edit.file)
+          const previous = yield* fs.stat(destination).pipe(Effect.catchIf(profileFileMissing, () => Effect.undefined))
+          if (previous) yield* fs.access(destination, { writable: true })
+          const parent = path.dirname(destination)
+          yield* fs.ensureDir(parent)
+          const directory = yield* Effect.acquireRelease(
+            fs.makeTempDirectory({ directory: parent, prefix: ".profile-" }),
+            (directory) =>
+              recovery.has(directory)
+                ? Effect.void
+                : fs
+                    .remove(directory, { recursive: true, force: true })
+                    .pipe(
+                      Effect.catchCause((cause) =>
+                        Effect.logWarning("failed to remove staged profile files", { directory, cause }),
+                      ),
+                    ),
+          )
+          const backup = previous ? path.join(directory, "previous") : undefined
+          if (backup) yield* fs.copyFile(destination, backup)
+          const next = path.join(directory, "next")
+          const content = edit.updated.endsWith("\n") ? edit.updated : `${edit.updated}\n`
+          yield* fs.writeFileString(next, content, { mode: 0o600 })
+          if (previous) yield* fs.chmod(next, previous.mode & 0o777)
+          return { destination, directory, next, backup }
+        }),
+      )
+      const installed: typeof staged = []
+      yield* Effect.forEach(
+        staged,
+        (edit) =>
+          fs.rename(edit.next, edit.destination).pipe(Effect.tap(() => Effect.sync(() => installed.push(edit)))),
+        { discard: true },
+      ).pipe(
+        Effect.onError(() =>
+          Effect.forEach(
+            installed.toReversed(),
+            ({ destination, directory, backup }) =>
+              (backup ? fs.rename(backup, destination) : fs.remove(destination)).pipe(
+                Effect.catchCause((cause) => {
+                  recovery.add(directory)
+                  return Effect.logError("failed to restore profile document", { destination, backup, cause })
+                }),
+              ),
+            { discard: true },
+          ),
+        ),
+        Effect.uninterruptible,
+      )
+    }),
+  )
 }
 
 const isPermissionPair = Schema.is(Schema.Struct({ action: Schema.String, resource: Schema.String }))

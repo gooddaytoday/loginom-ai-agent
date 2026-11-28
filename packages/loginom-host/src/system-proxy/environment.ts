@@ -2,6 +2,8 @@ import { proxyHostPort } from "./address"
 import { mergeNoProxy } from "./bypass"
 import type { SystemProxyResult } from "./types"
 
+export const runtimeNoProxyKey = "LOGINOM_AI_AGENT_RUNTIME_NO_PROXY"
+
 export function buildAppliedEnvironment(input: {
   platform: NodeJS.Platform
   environment: NodeJS.ProcessEnv

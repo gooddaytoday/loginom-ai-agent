@@ -10,6 +10,8 @@ import type { SettingsStore } from "../storage/store"
  */
 type Shared = { json?: string | null }
 
+const pluginKeys = new WeakMap<StateStore, Map<string, Shared>>()
+
 /** One store's decoded copy of the shared JSON, decoded again when another store on the key writes. */
 type Decoded<T> = { value?: { readonly json: string | null; readonly current: T } }
 
@@ -30,14 +32,16 @@ export function createStorage(
 ): BuiltinMainStorage {
   const name = `plugin.${id}`
   // Every store opened on a key shares its entry, so a write through one is what the others read.
-  const keys = new Map<string, Shared>()
+  const keys = pluginKeys.get(state) ?? new Map<string, Shared>()
+  pluginKeys.set(state, keys)
 
   const shared = (key: string) => {
-    const existing = keys.get(key)
+    const storageKey = `${name}\0${key}`
+    const existing = keys.get(storageKey)
 
     if (existing) return existing
     const created: Shared = {}
-    keys.set(key, created)
+    keys.set(storageKey, created)
 
     return created
   }
@@ -54,7 +58,7 @@ export function createStorage(
     if (state.get(name, key) !== null) state.delete(name, key)
     state.flush()
     // The stores open on the key read their `initial` again.
-    const entry = keys.get(key)
+    const entry = keys.get(`${name}\0${key}`)
 
     if (entry) entry.json = null
   }

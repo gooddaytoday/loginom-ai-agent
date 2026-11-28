@@ -2420,6 +2420,7 @@ export type ConfigEntry =
       type: "document"
       path?: AbsolutePath
       profile?: true
+      permissionCaseInsensitive?: true
       info: {
         $schema?: string
         shell?: string

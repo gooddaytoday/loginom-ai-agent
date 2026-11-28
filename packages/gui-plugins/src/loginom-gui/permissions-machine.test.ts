@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { settingRules } from "@loginom-ai-agent/product/permissions"
 import type { ConfigEntry } from "@opencode/client/promise"
 import { initialPermissions, permissionPatch, permissionView, transitionPermissions } from "./permissions-machine"
 
@@ -52,4 +53,29 @@ test("a response from the previous location cannot replace the current settings"
   })
 
   expect(permissionView(current, "write").value).toBe("allow")
+})
+
+test("the reading row uses the server's Windows case-insensitive rules, not the renderer platform", () => {
+  const loading = transitionPermissions(initialPermissions, { type: "load" })
+  const entries = profile([{ action: "READ", resource: "*", effect: "ask" }])
+  const linux = transitionPermissions(loading, { type: "loaded", attempt: loading.attempt, entries })
+
+  const windows = transitionPermissions(loading, {
+    type: "loaded",
+    attempt: loading.attempt,
+    entries: entries.map((entry) => ({ ...entry, permissionCaseInsensitive: true })),
+  })
+
+  expect(permissionView(linux, "read").value).toBe("allow")
+  expect(permissionView(windows, "read").value).toBe("mixed")
+
+  const allAsk = settingRules("read", "ask").map((rule) => ({ ...rule, action: rule.action.toUpperCase() }))
+
+  const windowsAllAsk = transitionPermissions(loading, {
+    type: "loaded",
+    attempt: loading.attempt,
+    entries: profile(allAsk).map((entry) => ({ ...entry, permissionCaseInsensitive: true })),
+  })
+
+  expect(permissionView(windowsAllAsk, "read").value).toBe("ask")
 })

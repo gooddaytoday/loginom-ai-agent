@@ -1,9 +1,10 @@
 import { permissionDefaults, settingEffect, settingRules, type Kind } from "@loginom-ai-agent/product/permissions"
 import type { ConfigEntry, PermissionRuleset } from "@opencode/client/promise"
+import { Wildcard } from "@opencode/util/wildcard"
 
 type Selection = { kind: Kind; effect: (typeof permissionDefaults)[Kind] }
 
-type Settings = { profile: PermissionRuleset; effective: PermissionRuleset }
+type Settings = { profile: PermissionRuleset; effective: PermissionRuleset; ignoreCase: boolean }
 
 type Issue = "permissionsLoadFailed" | "permissionsSaveFailed"
 
@@ -39,11 +40,18 @@ export function transitionPermissions(state: State, event: Event): State {
       if (event.attempt !== state.attempt || (state.type !== "saving" && state.type !== "loading")) return state
       const documents = event.entries.filter((entry) => entry.type === "document")
       const rules = (entries: typeof documents) => entries.flatMap((entry) => entry.info.permissions ?? [])
-      const settings = { profile: rules(documents.filter((entry) => entry.profile)), effective: rules(documents) }
+
+      const settings = {
+        profile: rules(documents.filter((entry) => entry.profile)),
+        effective: rules(documents),
+        ignoreCase: documents.some((entry) => entry.permissionCaseInsensitive === true),
+      }
 
       const overridden =
         state.type === "saving"
-          ? state.selected.filter(({ kind, effect }) => settingEffect(kind, settings.profile) !== effect)
+          ? state.selected.filter(
+              ({ kind, effect }) => resolveSetting(kind, settings.profile, settings.ignoreCase) !== effect,
+            )
           : []
 
       return { type: "ready", attempt: state.attempt, settings, overridden }
@@ -72,10 +80,14 @@ export function permissionPatch(selected: readonly Selection[]) {
   return { permissions, removePermissions }
 }
 
+function resolveSetting(kind: Kind, rules: PermissionRuleset, ignoreCase: boolean) {
+  return settingEffect(kind, rules, (input, pattern) => Wildcard.match(input, pattern, ignoreCase))
+}
+
 export function permissionView(state: State, kind: Kind) {
   const settings = state.type === "ready" || state.type === "saving" ? state.settings : undefined
-  const profile = settingEffect(kind, settings?.profile ?? [])
-  const effective = settingEffect(kind, settings?.effective ?? [])
+  const profile = resolveSetting(kind, settings?.profile ?? [], settings?.ignoreCase ?? false)
+  const effective = resolveSetting(kind, settings?.effective ?? [], settings?.ignoreCase ?? false)
   const selected = state.type === "saving" ? state.selected.find((item) => item.kind === kind) : undefined
   const overridden = state.type === "ready" && state.overridden.some((item) => item.kind === kind)
 

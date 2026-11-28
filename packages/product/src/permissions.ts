@@ -11,6 +11,7 @@ export type Kind = keyof typeof permissionDefaults
 type Effect = "allow" | "ask" | "deny"
 type Rule = { readonly action: string; readonly resource: string; readonly effect: Effect }
 type Entry = Rule & { readonly kind: Kind }
+type Match = (input: string, pattern: string) => boolean
 
 export const permissionTable: readonly Entry[] = [
   ...[
@@ -46,24 +47,16 @@ export function settingRules(kind: Kind, effect: Effect = permissionDefaults[kin
     }))
 }
 
-export function settingEffect(kind: Kind, rules: readonly Rule[]) {
+export function permissionEffect(entry: Rule, rules: readonly Rule[], match: Match) {
+  return rules.findLast((rule) => match(entry.action, rule.action) && match(entry.resource, rule.resource))?.effect
+}
+
+export function settingEffect(kind: Kind, rules: readonly Rule[], match: Match) {
   const effects = new Set(
     settingRules(kind).map((entry) => {
-      const effect =
-        rules.findLast((rule) => wildcard(entry.action, rule.action) && wildcard(entry.resource, rule.resource))
-          ?.effect ?? entry.effect
+      const effect = permissionEffect(entry, rules, match) ?? entry.effect
       return kind === "terminal" && effect === "allow" ? "ask" : effect
     }),
   )
   return effects.size === 1 ? [...effects][0] : "mixed"
-}
-
-export function wildcard(input: string, pattern: string, ignoreCase = false) {
-  const escaped = pattern
-    .replaceAll("\\", "/")
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*/g, ".*")
-    .replace(/\?/g, ".")
-  const tail = escaped.endsWith(" .*") ? escaped.slice(0, -3) + "( .*)?" : escaped
-  return new RegExp("^" + tail + "$", ignoreCase ? "si" : "s").test(input.replaceAll("\\", "/"))
 }

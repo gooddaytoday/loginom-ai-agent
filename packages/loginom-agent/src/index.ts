@@ -22,10 +22,10 @@ import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
 import {
   classify,
+  conversationGrantable,
   declinedText,
   deniedKinds,
   deniedKindsText,
-  grantable,
   isDecline,
   kinds,
   ownRead,
@@ -33,7 +33,6 @@ import {
   refusal,
   refusalMetadata,
   settle,
-  settingEffect,
   table,
   withDefaults,
   type Kind,
@@ -266,8 +265,7 @@ export default Plugin.define({
     const offered = new Map<string, Set<string>>()
     // The product's defaults and settings: the rules of the default agent `build`, which has none of its own (B2.6b2).
     const settings: Permission.Rule[] = []
-    const eligible = (entry: ReturnType<typeof classify>) =>
-      entry !== undefined && settingEffect(entry.kind, settings) === "ask" && grantable(entry, "ask")
+    const eligible = (entry: ReturnType<typeof classify>) => conversationGrantable(entry, settings)
     await ctx.agent.transform((editor) => {
       subagents.clear()
       editor.list().forEach((agent) => {
