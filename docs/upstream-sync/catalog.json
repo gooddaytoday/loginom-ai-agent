@@ -80,7 +80,7 @@
     },
     {
       "id": "CAT-14",
-      "title": "Built-in GUI tool renderers (C3.0, C3.18)",
+      "title": "Built-in GUI tool renderers and timeline controls (C3.0, C3.18)",
       "paths": [
         "packages/app/component-tests/plugin-host.fixture.tsx",
         "packages/app/src/runtime/plugin/host.tsx",
@@ -104,6 +104,8 @@
         "packages/app/src/runtime/plugin/host-apis.tsx",
         "packages/app/src/session/timeline/tool-renderers.tsx",
         "packages/app/component-tests/tool-renderer.fixture.tsx",
+        "packages/app/component-tests/plugin-host.spec.ts",
+        "packages/app/e2e/fixtures/loginom-feed-receipts.json",
         "packages/app/e2e/regression/timeline-stream.spec.ts",
         "packages/app/test-browser/builtin-plugins.test.ts",
         "packages/gui-plugins/src/main.ts",

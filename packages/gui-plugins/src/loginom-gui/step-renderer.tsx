@@ -6,7 +6,7 @@ import { createMemo, createSignal, createUniqueId, For, onCleanup, Show } from "
 import { createKeyed, Slot, usePlugin, type Plugin } from "@opencode/plugin/gui"
 import { builtinContext, BuiltinSlot, ToolRenderer, type ToolRendererProps } from "@opencode/plugin/gui/builtin"
 import type definition from "./index"
-import { decodeFacts, decodeProgress, failureTitle, loginomStepPhrase, stepDetails } from "./step-phrase"
+import { decodeFacts, decodeProgress, failureReason, failureTitle, loginomStepPhrase, stepDetails } from "./step-phrase"
 
 const modes = ["compact", "detailed"] as const
 
@@ -44,7 +44,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       return ctx.t("step.done")
     },
     separate: true,
-    handlesFailure: true,
+    handlesFailure: (metadata) => Boolean(failureReason(ctx, Option.getOrUndefined(decodeFacts(metadata.loginom)))),
     render: (props) => <Step {...props} />,
   })
 }
@@ -91,7 +91,10 @@ function Step(props: ToolRendererProps) {
   const title = () => {
     if (failed()) return failureTitle(ctx, facts())
 
-    if (!running()) return loginomStepPhrase(ctx, outcome(), { pending: props.metadata.loginomPending === true })
+    if (!running())
+      return loginomStepPhrase(ctx, outcome(), {
+        pending: props.metadata.loginomPending === true,
+      })
     const step = progress()
 
     if (!step) return ctx.t("step.running")
