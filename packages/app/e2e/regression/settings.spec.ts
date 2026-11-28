@@ -620,52 +620,55 @@ test("a second page delivers a notification when the first closes the conversati
   expect(firstRecorded.notifications).toEqual([])
 })
 
-test("a second page shows a notification after the first receives a system error", async ({ page, context }) => {
-  const second = await context.newPage()
-  const firstRecorded = await recordNotifications(page, { autoShow: false })
-  const secondRecorded = await recordNotifications(second)
-  const firstEvents = await installSseTransport(page, { server: SERVER })
-  const secondEvents = await installSseTransport(second, { server: SERVER })
+for (const outcome of ["a system error", "a silent transport times out"]) {
+  test(`a second page shows a notification after ${outcome}`, async ({ page, context }) => {
+    const second = await context.newPage()
+    const firstRecorded = await recordNotifications(page, { autoShow: false })
+    const secondRecorded = await recordNotifications(second)
+    const firstEvents = await installSseTransport(page, { server: SERVER })
+    const secondEvents = await installSseTransport(second, { server: SERVER })
 
-  const input = {
-    name: "Shared conversation",
-    seed: { settings: { notifications: { turnFinished: true }, sounds: { agentEnabled: false } } },
-  }
+    const input = {
+      name: "Shared conversation",
+      seed: { settings: { notifications: { turnFinished: true }, sounds: { agentEnabled: false } } },
+    }
 
-  const { session } = await openSession(page, input)
-  await openSession(second, input)
-  await Promise.all([firstEvents.waitForConnection(), secondEvents.waitForConnection()])
+    const { session } = await openSession(page, input)
+    await openSession(second, input)
+    await Promise.all([firstEvents.waitForConnection(), secondEvents.waitForConnection()])
 
-  const idle: OpenCodeEvent = {
-    type: "session.status",
-    id: "evt_shared_conversation_notification_error",
-    created: 1700000001000,
-    data: { sessionID: session.id, status: { type: "idle" } },
-  }
+    const idle: OpenCodeEvent = {
+      type: "session.status",
+      id: "evt_shared_conversation_notification_retry",
+      created: 1700000001000,
+      data: { sessionID: session.id, status: { type: "idle" } },
+    }
 
-  const expected = [{ title: "Turn finished", body: session.title }]
+    const expected = [{ title: "Turn finished", body: session.title }]
 
-  await firstEvents.send(idle)
-  await expect.poll(() => firstRecorded.attempts).toEqual(expected)
+    await firstEvents.send(idle)
+    await expect.poll(() => firstRecorded.attempts).toEqual(expected)
 
-  // Make sure the second page has received the event while the first is still waiting for the OS result.
-  await secondEvents.send(idle)
-  await expect
-    .poll(() =>
-      second.evaluate(
-        async (id) => (await navigator.locks.query()).pending?.some((lock) => lock.name.endsWith(id)),
-        idle.id,
-      ),
-    )
-    .toBe(true)
+    // Make sure the second page has received the event while the first is still waiting for the OS result.
+    await secondEvents.send(idle)
+    await expect
+      .poll(() =>
+        second.evaluate(
+          async (id) => (await navigator.locks.query()).pending?.some((lock) => lock.name.endsWith(id)),
+          idle.id,
+        ),
+      )
+      .toBe(true)
 
-  expect(secondRecorded.attempts).toEqual([])
-  await firstRecorded.failLatest()
+    expect(secondRecorded.attempts).toEqual([])
 
-  await expect.poll(() => secondRecorded.notifications).toEqual(expected)
-  expect(secondRecorded.attempts).toEqual(expected)
-  expect(firstRecorded.notifications).toEqual([])
-})
+    if (outcome === "a system error") await firstRecorded.failLatest()
+
+    await expect.poll(() => secondRecorded.notifications).toEqual(expected)
+    expect(secondRecorded.attempts).toEqual(expected)
+    expect(firstRecorded.notifications).toEqual([])
+  })
+}
 
 for (const locale of ["en", "ar"]) {
   test(`background activity alignment stays physical and persists (${locale})`, async ({ page }) => {

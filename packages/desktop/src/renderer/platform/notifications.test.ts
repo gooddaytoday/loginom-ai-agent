@@ -11,7 +11,7 @@ const events: string[] = []
 class FakeNotification extends EventTarget implements Notification {
   static readonly permission: NotificationPermission = "granted"
 
-  static outcome: "show" | "error" = "show"
+  static outcome: "show" | "error" | "silence" = "show"
 
   static async requestPermission(): Promise<NotificationPermission> {
     return "granted"
@@ -41,6 +41,8 @@ class FakeNotification extends EventTarget implements Notification {
     created.push(this)
 
     const outcome = FakeNotification.outcome
+
+    if (outcome === "silence") return
 
     queueMicrotask(() => {
       const handler = outcome === "show" ? this.onshow : this.onerror
@@ -138,6 +140,24 @@ describe("desktop notifications", () => {
 
     expect(await notify("Response ready")).toBeUndefined()
     expect(created).toHaveLength(1)
+    expect(created[0]?.onclick).toBeNull()
+    expect(created[0]?.onclose).toBeNull()
+    expect(created[0]?.onerror).toBeNull()
+    expect(created[0]?.onshow).toBeNull()
+  })
+
+  test("abandons a notification when the system transport stays silent", async () => {
+    globalThis.Notification = FakeNotification
+    FakeNotification.outcome = "silence"
+
+    const notify = createDesktopNotify({
+      getWindowFocused: async () => false,
+      showWindow: async () => {},
+      setWindowFocus: async () => {},
+    })
+
+    expect(await notify("Response ready")).toBeUndefined()
+    expect(events).toEqual(["created:Response ready:", "notification.close"])
     expect(created[0]?.onclick).toBeNull()
     expect(created[0]?.onclose).toBeNull()
     expect(created[0]?.onerror).toBeNull()
