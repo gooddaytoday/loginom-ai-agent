@@ -1,5 +1,6 @@
 import { documentationPermissions, Runner, waitForRunner } from "@loginom-ai-agent/loginom-host/runner-rpc"
 import type { ServerRef } from "@opencode/plugin/gui"
+import { uuid } from "@opencode/util/uuid"
 import { documentationPrompt, historyResult, type Outcome, type Run } from "./documentation-run"
 import { type State, transition } from "./documentation-machine"
 
@@ -27,7 +28,7 @@ export function documentationDriver(state: () => State, write: (updater: (state:
   }
 
   async function start(target: ServerRef, model: { id: string; providerID: string }, title: string) {
-    const attempt = crypto.randomUUID()
+    const attempt = uuid()
     dispatch({ type: "start", attempt })
 
     if (!preparing(attempt)) return
@@ -35,16 +36,29 @@ export function documentationDriver(state: () => State, write: (updater: (state:
     const form = state().form
     const client = target.client
     const runner = client.rpc(Runner)
+    const cleanup = () => ({ signal: AbortSignal.timeout(requestTimeout) })
+    const finishCopy = (keep: boolean) => runner.finishDocumentation({ runID: attempt, keep }, cleanup())
+    const discardCopy = () => finishCopy(false).then(() => true, () => false)
+    const readiness = request(5_000)
 
-    const prepared = await (async () => {
-      const options = request(5_000)
-      await waitForRunner(() => runner.ready({}, options), options.signal)
+    const ready = await waitForRunner(() => runner.ready({}, readiness), readiness.signal).then(
+      () => true,
+      () => false,
+    )
 
-      if (preparing(attempt)) return runner.prepareDocumentation({ packagePath: form.path.trim() }, request())
-    })().catch(() => undefined)
+    if (!ready || !preparing(attempt)) {
+      finish(attempt, preparing(attempt) ? "failed" : "stopped")
+
+      return
+    }
+
+    const prepared = await runner
+      .prepareDocumentation({ packagePath: form.path.trim(), runID: attempt }, request())
+      .catch(() => undefined)
 
     if (!prepared) {
-      finish(attempt, preparing(attempt) ? "failed" : "stopped")
+      const removed = await discardCopy()
+      finish(attempt, removed ? (preparing(attempt) ? "failed" : "stopped") : "unknown")
 
       return
     }
@@ -99,8 +113,6 @@ export function documentationDriver(state: () => State, write: (updater: (state:
         : "denied"
 
     if (admission === "denied") {
-      const cleanup = () => ({ signal: AbortSignal.timeout(requestTimeout) })
-
       const sessionRemoved =
         !run ||
         (await client.session.remove({ sessionID: run.sessionID }, cleanup()).then(
@@ -108,12 +120,7 @@ export function documentationDriver(state: () => State, write: (updater: (state:
           () => false,
         ))
 
-      const copyRemoved = await runner
-        .finishDocumentation({ directory: prepared.directory, keep: false }, cleanup())
-        .then(
-          () => true,
-          () => false,
-        )
+      const copyRemoved = await discardCopy()
 
       const outcome =
         !sessionRemoved || !copyRemoved || session?.kind === "uncertain"
@@ -127,14 +134,12 @@ export function documentationDriver(state: () => State, write: (updater: (state:
       return
     }
 
-    void runner
-      .finishDocumentation(
-        { directory: prepared.directory, keep: true },
-        { signal: AbortSignal.timeout(requestTimeout) },
-      )
-      .catch(() => undefined)
+    void finishCopy(true).catch(() => undefined)
 
-    if (!run || admission === "uncertain") {
+    const current = state()
+    const stopRequested = current.kind === "preparing" && current.attempt === attempt && current.intent === "stop"
+
+    if (!run || (admission === "uncertain" && !stopRequested)) {
       finish(attempt, "unknown", run)
 
       return
@@ -142,7 +147,8 @@ export function documentationDriver(state: () => State, write: (updater: (state:
 
     dispatch({ type: "admitted", attempt, run })
 
-    if (state().kind === "stopping") void interrupt(target, run, attempt)
+    if (stopRequested) return interrupt(target, run, attempt)
+
     await observe(target, run, attempt, executionTimeout, true)
   }
 
@@ -214,7 +220,7 @@ export function documentationDriver(state: () => State, write: (updater: (state:
 
     if (!target) return
 
-    const attempt = crypto.randomUUID()
+    const attempt = uuid()
     dispatch({ type: "check", attempt })
     void observe(target, current.run, attempt, requestTimeout, false)
   }

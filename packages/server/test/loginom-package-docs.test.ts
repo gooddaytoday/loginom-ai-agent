@@ -341,8 +341,11 @@ describe("package_docs_run (B2.5c)", () => {
             }),
         )
         const test = yield* boot
+        const runner = test.client.rpc(Runner)
+        const origin = { location: { directory: test.dir } }
+        const runID = crypto.randomUUID()
         const prepared = yield* Effect.promise(() =>
-          test.client.rpc(Runner).prepareDocumentation({ packagePath: fixture }, { location: { directory: test.dir } }),
+          runner.prepareDocumentation({ packagePath: fixture, runID }, origin),
         )
         const location = { directory: prepared.directory }
         yield* Effect.promise(() => waitForRunner(() => test.client.rpc(Runner).ready({}, { location })))
@@ -399,16 +402,15 @@ describe("package_docs_run (B2.5c)", () => {
         expect((yield* test.llm.requests()).find((request) => request.tools.some((tool) => tool.name === "package_docs_run"))?.tools)
           .not.toContainEqual(expect.objectContaining({ name: "question" }))
 
-        yield* Effect.promise(() =>
-          test.client.rpc(Runner).finishDocumentation({ directory: prepared.directory, keep: true }, { location: { directory: test.dir } }),
-        )
+        yield* Effect.promise(() => runner.finishDocumentation({ runID, keep: true }, origin))
+        const unusedID = crypto.randomUUID()
         const unused = yield* Effect.promise(() =>
-          test.client.rpc(Runner).prepareDocumentation({ packagePath: fixture }, { location: { directory: test.dir } }),
+          runner.prepareDocumentation({ packagePath: fixture, runID: unusedID }, origin),
         )
-        yield* Effect.promise(() =>
-          test.client.rpc(Runner).finishDocumentation({ directory: unused.directory, keep: false }, { location: { directory: test.dir } }),
-        )
+        yield* Effect.promise(() => runner.finishDocumentation({ runID: unusedID, keep: false }, origin))
+        yield* Effect.promise(() => runner.finishDocumentation({ runID: unusedID, keep: false }, origin))
         expect(yield* Effect.promise(() => fs.stat(unused.directory).then(() => true, () => false))).toBe(false)
+        expect(yield* Effect.promise(() => fs.readFile(copy))).toEqual(yield* Effect.promise(() => fs.readFile(fixture)))
 
         const second = yield* Effect.promise(() =>
           test.client.session.create({

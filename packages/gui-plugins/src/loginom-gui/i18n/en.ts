@@ -62,15 +62,13 @@ export default {
   "docs.cannotBody": "Change the original package, connect to Loginom, open a browser or sites, or run programs.",
   "docs.modelSees": "What the model sees",
   "docs.modelBody":
-    "The model receives the package name and structure, data returned by the generator, action settings, and conversation context.",
+    "The model sees the package name and structure, generator output, action settings, and conversation context.",
   "docs.modelCustom":
-    "The model receives the package name and structure, generator data, action settings, your description, and conversation context.",
+    "The model sees the package name and structure, generator output, action settings, your description, and conversation context.",
   "docs.model": "Model",
   "docs.modelLoading": "Loading models…",
   "docs.chooseModel": "Choose a model",
   "docs.noModel": "No model available",
-  "docs.modelLocation":
-    "Processing depends on the provider settings. The app does not verify the location; data may go to an external service.",
   "docs.prepare": "Prepare a copy of the package",
   "docs.extract": "Read the package structure",
   "docs.draft": "Prepare the draft",

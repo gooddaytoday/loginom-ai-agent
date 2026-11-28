@@ -6,6 +6,8 @@ const standard = Schema.toStandardSchemaV1
 export const Format = Schema.Literals(["pdf", "docx", "md"])
 export type Format = typeof Format.Type
 
+const RunID = Schema.NonEmptyString.check(Schema.isMaxLength(64))
+
 export const documentName = (filename: string, format: Format) => `${filename.slice(0, -4)} — описание.${format}`
 
 export function documentationPermissions(filename: string, formats: readonly Format[]) {
@@ -29,11 +31,11 @@ export const Runner = Rpc.define({
       output: standard(Schema.Struct({})),
     },
     prepareDocumentation: {
-      input: standard(Schema.Struct({ packagePath: Schema.String })),
+      input: standard(Schema.Struct({ packagePath: Schema.String, runID: RunID })),
       output: standard(Schema.Struct({ directory: Schema.String, filename: Schema.String })),
     },
     finishDocumentation: {
-      input: standard(Schema.Struct({ directory: Schema.String, keep: Schema.Boolean })),
+      input: standard(Schema.Struct({ runID: RunID, keep: Schema.Boolean })),
       output: standard(Schema.Struct({})),
     },
     start: {

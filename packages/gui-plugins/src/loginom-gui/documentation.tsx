@@ -205,7 +205,7 @@ export default function Documentation(props: { onChatAction: (action: ChatAction
                   <p>{ctx.t("docs.cannotBody")}</p>
                 </div>
               </div>
-              <div class="rounded-md border border-border-warning-base p-3">
+              <div class="rounded-md border border-border-weak-base p-3">
                 <h2 class="font-semibold">{ctx.t("docs.modelSees")}</h2>
                 <p>{ctx.t(wizard().form.content === "custom" ? "docs.modelCustom" : "docs.modelBody")}</p>
                 <label class="mt-2 flex flex-col gap-2">
@@ -229,7 +229,6 @@ export default function Documentation(props: { onChatAction: (action: ChatAction
                     </For>
                   </select>
                 </label>
-                <p class="mt-2">{ctx.t("docs.modelLocation")}</p>
               </div>
             </Match>
             <Match when={wizard().step === 2}>

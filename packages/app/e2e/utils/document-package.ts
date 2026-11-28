@@ -14,10 +14,20 @@ const model = { id: "test-model", modelID: "test-model", providerID: "test", nam
 
 export async function mockDocumentPackage(
   page: Page,
-  mode: "ready" | "unconfirmed" | "unknown" | "failed" | "stopped" | "timeout" | "cancel-before-start",
+  mode:
+    | "ready"
+    | "unconfirmed"
+    | "unknown"
+    | "failed"
+    | "stopped"
+    | "timeout"
+    | "cancel-before-start"
+    | "lost-admission"
+    | "lost-copy",
 ) {
   await mockWorkspace(page, { name: "Documentation", seed: { locale: "ru" } })
   const admitted = Promise.withResolvers<unknown>()
+  const preparing = Promise.withResolvers<unknown>()
   const stopped = Promise.withResolvers<unknown>()
   const creating = Promise.withResolvers<void>()
   const release = Promise.withResolvers<void>()
@@ -27,9 +37,13 @@ export async function mockDocumentPackage(
   let waitCalls = 0
   await page.route(/\/api\/model(?:\?|$)/, (route) => route.fulfill({ json: { data: [model] } }))
   await page.route(/\/api\/rpc\/loginom\.runner\/ready(?:\?|$)/, (route) => route.fulfill({ json: { output: {} } }))
-  await page.route(/\/api\/rpc\/loginom\.runner\/prepareDocumentation(?:\?|$)/, (route) =>
-    route.fulfill({ json: { output: { directory, filename } } }),
-  )
+  await page.route(/\/api\/rpc\/loginom\.runner\/prepareDocumentation(?:\?|$)/, (route) => {
+    preparing.resolve(route.request().postDataJSON().input.runID)
+
+    if (mode === "lost-copy") return route.abort()
+
+    return route.fulfill({ json: { output: { directory, filename } } })
+  })
   await page.route(/\/api\/session$/, async (route) => {
     if (route.request().method() !== "POST") return route.fallback()
 
@@ -52,8 +66,14 @@ export async function mockDocumentPackage(
 
     return route.fulfill({ json: { output: {} } })
   })
-  await page.route(/\/api\/rpc\/loginom\.runner\/start(?:\?|$)/, (route) => {
+  await page.route(/\/api\/rpc\/loginom\.runner\/start(?:\?|$)/, async (route) => {
     admitted.resolve(route.request().postDataJSON())
+
+    if (mode === "lost-admission") {
+      await release.promise
+
+      return route.abort()
+    }
 
     return route.fulfill({ json: { output: { granted: true } } })
   })
@@ -67,7 +87,7 @@ export async function mockDocumentPackage(
       else waitRelease.resolve()
     }
 
-    if (mode === "stopped") await stopped.promise
+    if (mode === "stopped" || mode === "lost-admission") await stopped.promise
 
     return route.fulfill({ status: 204 })
   })
@@ -81,6 +101,7 @@ export async function mockDocumentPackage(
 
     const outcome = Match.value(mode).pipe(
       Match.when("stopped", () => "interrupted"),
+      Match.when("lost-admission", () => "interrupted"),
       Match.when("failed", () => "failed"),
       Match.orElse(() => "succeeded"),
     )
@@ -115,6 +136,7 @@ export async function mockDocumentPackage(
 
   return {
     admitted: admitted.promise,
+    preparing: preparing.promise,
     stopped: stopped.promise,
     creating: creating.promise,
     release: release.resolve,

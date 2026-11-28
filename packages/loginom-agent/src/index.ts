@@ -507,19 +507,23 @@ export default Plugin.define({
       await binding.fork(event.sessionID)
     })
 
-    const copies = new Map<string, Awaited<ReturnType<typeof prepareDocumentation>>>()
+    const copies = new Map<string, ReturnType<typeof prepareDocumentation>>()
     await ctx.rpc.register(Runner, {
       ready: async () => ({}),
-      prepareDocumentation: async ({ packagePath }, call) => {
-        const copy = await prepareDocumentation(packagePath, undefined, call.signal)
-        copies.set(copy.directory, copy)
+      prepareDocumentation: ({ packagePath, runID }, call) => {
+        if (copies.has(runID)) throw new Error("PACKAGE_DOCS_COPY_ALREADY_REGISTERED")
+        const copy = prepareDocumentation(packagePath, call.signal).catch((error: unknown) => {
+          copies.delete(runID)
+          throw error
+        })
+        copies.set(runID, copy)
         return copy
       },
-      finishDocumentation: async ({ directory, keep }) => {
-        const copy = copies.get(directory)
-        if (!copy) throw new Error("PACKAGE_DOCS_COPY_NOT_OWNED")
+      finishDocumentation: async ({ runID, keep }) => {
+        const copy = await copies.get(runID)?.catch(() => undefined)
+        if (!copy) return {}
         if (!keep) await discardDocumentation(copy)
-        copies.delete(directory)
+        copies.delete(runID)
         return {}
       },
       start: async (input) => {

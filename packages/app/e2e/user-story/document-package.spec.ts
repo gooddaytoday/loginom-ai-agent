@@ -35,11 +35,36 @@ test("stopping before admission removes the unused session and package copy", as
   await expect(page.getByRole("button", { name: "Открыть полный разговор" })).toHaveCount(0)
 })
 
+test("stopping during admission still interrupts the run when the reply is lost", async ({ page }) => {
+  const fixture = await open(page, "lost-admission")
+  await access(page)
+  await page.getByRole("button", { name: "Разрешить и запустить" }).click()
+  await fixture.admitted
+  await page.getByRole("button", { name: "Остановить", exact: true }).click()
+  fixture.release()
+  await expect(page.getByRole("heading", { name: "Запуск остановлен" })).toBeVisible()
+  expect(await fixture.stopped).toBe("false")
+})
+
+test("the wizard can clean a prepared copy without its reply or browser randomUUID", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Crypto.prototype, "randomUUID", { value: undefined })
+  })
+  const fixture = await open(page, "lost-copy")
+  await access(page)
+  await page.getByRole("button", { name: "Разрешить и запустить" }).click()
+  await expect(page.getByRole("heading", { name: "Не удалось" })).toBeVisible()
+  const runID = await fixture.preparing
+  expect(runID).toEqual(expect.stringMatching(/^\S+$/))
+  expect(await fixture.copyFinished).toEqual({ input: { runID, keep: false } })
+})
+
 async function access(page: Page) {
   await expect(page.getByRole("button", { name: "Далее" })).toBeDisabled()
   await page.getByLabel("Локальный пакет (.lgp)").fill(`/fixture/${filename}`)
   await page.getByRole("button", { name: "Далее" }).click()
   await expect(page.getByRole("heading", { name: "Сначала приложение" })).toBeVisible()
+  await expect(page.getByText(/передаются|внешний сервис/i)).toHaveCount(0)
   await page.getByRole("combobox", { name: "Модель" }).selectOption("test/test-model")
 }
 
