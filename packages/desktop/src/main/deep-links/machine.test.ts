@@ -7,11 +7,9 @@ import {
   type DeepLinkState,
 } from "./machine"
 
-const oauth = "loginom-ai-agent://console/authorized?window=a"
+const dashboard = "loginom-ai-agent://dashboard?id=5302e8b4-0430-407d-b7b4-90311c82c851&action=create"
 
-const oauthB = "loginom-ai-agent://console/authorized?window=b"
-
-const project = "opencode://open?project=/repo"
+const otherDashboard = "loginom-ai-agent://dashboard?id=50bf4355-acb7-4bf4-89bf-f0b41d72405c&action=edit"
 
 // Folds events through the machine and keeps the commands of each step.
 function replay(events: readonly DeepLinkEvent[], from = createDeepLinkState()) {
@@ -31,15 +29,24 @@ const ready = (windowID: string, clientID: number): DeepLinkEvent[] => [
 ]
 
 describe("deep link delivery", () => {
+  test("delivers an opaque payload that arrives before the window is ready", () => {
+    const payload = { channel: "example", data: { outcome: "ready" } }
+    const result = replay([{ type: "links.received", urls: [payload] }, ...ready("a", 1)])
+
+    expect(result.commands.at(-1)).toEqual([
+      { type: "links.deliver", windowID: "a", clientID: 1, attempt: 1, urls: [payload] },
+    ])
+  })
+
   test("never hands an acknowledged link to a reloaded or new window", () => {
     const live = replay([
       ...ready("a", 1),
       { type: "window.focused", windowID: "a" },
-      { type: "links.received", urls: [oauth, project] },
+      { type: "links.received", urls: [dashboard] },
     ])
 
     expect(live.commands.at(-1)).toEqual([
-      { type: "links.deliver", windowID: "a", clientID: 1, attempt: 1, urls: [oauth, project] },
+      { type: "links.deliver", windowID: "a", clientID: 1, attempt: 1, urls: [dashboard] },
       { type: "window.focus", windowID: "a" },
     ])
 
@@ -59,47 +66,34 @@ describe("deep link delivery", () => {
   })
 
   test("queues a link until the first window is ready", () => {
-    const result = replay([{ type: "links.received", urls: [project] }, { type: "window.opened", windowID: "a" }])
-    expect(result.commands.flat()).toEqual([])
-    expect(result.state.links).toEqual([{ status: "queued", url: project, target: undefined }])
-
-    expect(transitionDeepLinks(result.state, { type: "window.ready", windowID: "a", clientID: 1 }).commands).toEqual([
-      { type: "links.deliver", windowID: "a", clientID: 1, attempt: 1, urls: [project] },
-    ])
-  })
-
-  test("waits for the window a console return names instead of the focused one", () => {
     const result = replay([
+      { type: "links.received", urls: [dashboard] },
       { type: "window.opened", windowID: "a" },
-      ...ready("b", 2),
-      { type: "window.focused", windowID: "b" },
-      { type: "links.received", urls: [oauth] },
     ])
 
-    expect(result.commands.at(-1)).toEqual([{ type: "window.focus", windowID: "a" }])
+    expect(result.commands.flat()).toEqual([])
 
     expect(transitionDeepLinks(result.state, { type: "window.ready", windowID: "a", clientID: 1 }).commands).toEqual([
-      { type: "links.deliver", windowID: "a", clientID: 1, attempt: 1, urls: [oauth] },
+      { type: "links.deliver", windowID: "a", clientID: 1, attempt: 1, urls: [dashboard] },
     ])
   })
 
-  test("splits one arrival into a batch and attempt per window", () => {
+  test("delivers a batch in arrival order to the focused window", () => {
     const result = replay([
       ...ready("b", 2),
       ...ready("c", 3),
       { type: "window.focused", windowID: "c" },
-      { type: "links.received", urls: [project, oauthB] },
+      { type: "links.received", urls: [dashboard, otherDashboard] },
     ])
 
     expect(result.commands.at(-1)).toEqual([
-      { type: "links.deliver", windowID: "c", clientID: 3, attempt: 1, urls: [project] },
-      { type: "links.deliver", windowID: "b", clientID: 2, attempt: 2, urls: [oauthB] },
-      { type: "window.focus", windowID: "b" },
+      { type: "links.deliver", windowID: "c", clientID: 3, attempt: 1, urls: [dashboard, otherDashboard] },
+      { type: "window.focus", windowID: "c" },
     ])
   })
 
   test("delivers an unacknowledged link again to the next renderer and ignores stale replies", () => {
-    const delivered = replay([...ready("a", 1), { type: "links.received", urls: [project] }])
+    const delivered = replay([...ready("a", 1), { type: "links.received", urls: [dashboard] }])
 
     const reloaded = replay(
       [
@@ -111,7 +105,7 @@ describe("deep link delivery", () => {
 
     expect(reloaded.commands).toEqual([
       [],
-      [{ type: "links.deliver", windowID: "a", clientID: 2, attempt: 2, urls: [project] }],
+      [{ type: "links.deliver", windowID: "a", clientID: 2, attempt: 2, urls: [dashboard] }],
     ])
 
     const stale: DeepLinkEvent[] = [
@@ -129,16 +123,17 @@ describe("deep link delivery", () => {
     })
   })
 
-  test("sends links for a closed window to the focused one, as before", () => {
+  test("delivers queued links to the next window when the focused window closes", () => {
     const result = replay([
       { type: "window.opened", windowID: "a" },
       ...ready("b", 2),
-      { type: "links.received", urls: [oauth] },
+      { type: "window.focused", windowID: "a" },
+      { type: "links.received", urls: [dashboard] },
       { type: "window.closed", windowID: "a" },
     ])
 
     expect(result.commands.at(-1)).toEqual([
-      { type: "links.deliver", windowID: "b", clientID: 2, attempt: 1, urls: [oauth] },
+      { type: "links.deliver", windowID: "b", clientID: 2, attempt: 1, urls: [dashboard] },
     ])
   })
 
@@ -147,13 +142,13 @@ describe("deep link delivery", () => {
       { type: "window.opened", windowID: "a" },
       { type: "window.focused", windowID: "a" },
       ...ready("b", 2),
-      { type: "links.received", urls: [project] },
+      { type: "links.received", urls: [dashboard] },
       { type: "window.focused", windowID: "b" },
     ])
 
     expect(result.commands.at(-2)).toEqual([{ type: "window.focus", windowID: "a" }])
     expect(result.commands.at(-1)).toEqual([
-      { type: "links.deliver", windowID: "b", clientID: 2, attempt: 1, urls: [project] },
+      { type: "links.deliver", windowID: "b", clientID: 2, attempt: 1, urls: [dashboard] },
     ])
   })
 

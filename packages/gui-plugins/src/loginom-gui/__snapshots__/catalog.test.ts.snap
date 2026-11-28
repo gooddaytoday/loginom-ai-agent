@@ -1,0 +1,125 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`loginom-automation: catalog permissions and compatibility against the shipped skill 1`] = `
+{
+  "en": {
+    "can": "Guide the agent as it builds a scenario using the Loginom tools you allow.",
+    "cannot": "Grant access to Loginom or expand tool permissions.",
+    "compatibility": "Loginom 7.4.2 with the managed runtime and Loginom Help.",
+  },
+  "frontmatter": [
+    "name: loginom-automation",
+    "description: >-",
+    "  Создаёт, изменяет и выполняет сценарии Loginom в браузере: строит граф,",
+    "  настраивает узлы, обрабатывает данные и проверяет результаты. Использовать для",
+    "  запросов «построй сценарий», «измени пакет»,",
+    "  «выполни анализ в Loginom», «загрузи файл в Loginom». Документацию по локальному .lgp создаёт",
+    "  package-docs; обычные справочные вопросы используют Help без этого skill.",
+    "  Каждый запрос о сценарии или пакете Loginom начинай с активации этого skill:",
+    "  разрешение действует только на текущий запрос.",
+    "compatibility: Loginom AI Agent Linux Desktop и standalone CLI; Loginom 7.4.2, управляемый runtime user-v1 и справка Loginom Dock.",
+  ],
+  "ru": {
+    "can": "Подсказать агенту, как собрать сценарий с помощью разрешённых инструментов Loginom.",
+    "cannot": "Дать доступ к Loginom или расширить разрешения инструментов.",
+    "compatibility": "Loginom 7.4.2, управляемая среда выполнения и справка Loginom.",
+  },
+  "rules": [
+    "Файлы задания ищи только в рабочем каталоге и по точным путям из задания.",
+    "Не обходи отказ рантайма через Playwright, raw UI, clipboard, DOM/JavaScript или сервер.",
+  ],
+}
+`;
+
+exports[`package-docs: catalog permissions and compatibility against the shipped skill 1`] = `
+{
+  "en": {
+    "can": "Read a local package and create a document with the built-in generator.",
+    "cannot": "Change the package, open a browser or look for packages on a server.",
+    "compatibility": "Requires a local .lgp package, the built-in document generator and Loginom Help.",
+  },
+  "frontmatter": [
+    "name: package-docs",
+    "description: >-",
+    "  Создаёт русскую документацию по локальному пакету Loginom (.lgp):",
+    "  «ИИ Отчет», описание сценария, его модулей, потоков данных, подмоделей",
+    "  и заметок. Вход — локальный путь или приложенный .lgp; результат —",
+    "  PDF, DOCX/Word или Markdown, по умолчанию PDF. Использовать для запросов",
+    "  «напиши документацию», «опиши этот сценарий», «сформируй ИИ Отчет».",
+    "  Пакет не изменяется; браузер и поиск пакета на сервере запрещены.",
+    "  Если известен только серверный путь, сразу запросить локальный .lgp.",
+    "  Справка Loginom из поставки нужна для описания назначения обработчиков.",
+    "compatibility: Loginom AI Agent Linux Desktop и standalone CLI с package_docs_run; локальный .lgp и справка Loginom из поставки. Генератор использует поставляемый Node, без Python, LibreOffice и браузера.",
+    "metadata:",
+    "  loginom-generated: scripts/package-docs.mjs",
+  ],
+  "ru": {
+    "can": "Прочитать локальный пакет и создать документ встроенным генератором.",
+    "cannot": "Изменить пакет, открыть браузер или искать пакеты на сервере.",
+    "compatibility": "Нужны локальный пакет .lgp, встроенный генератор документов и справка Loginom.",
+  },
+  "rules": [
+    "- Не создавать, не изменять и не выполнять \`.lgp\`.",
+    "- Не открывать браузер, не вызывать \`loginom_dock_prepare\` и другие действия",
+    "- Не искать и не скачивать пакет из файлового хранилища Loginom.",
+    "  \`package_docs_run\`. Не заменять его shell, собственным скриптом или браузером.",
+  ],
+}
+`;
+
+exports[`loginom-dashboard: catalog permissions and compatibility against the shipped skill 1`] = `
+{
+  "en": {
+    "can": "Create and edit drafts. Publish or delete a dashboard on your request.",
+    "cannot": "Grant access to dashboard tools or publish without your request.",
+    "compatibility": "Requires the Loginom dashboard tools.",
+  },
+  "frontmatter": [
+    "name: loginom-dashboard",
+    "description: >-",
+    "  Создаёт и правит dashboard Loginom в папке dashboard: черновик на localhost по образцу данных узла,",
+    "  публикация и удаление по явной просьбе пользователя.",
+    "compatibility: Loginom AI Agent Desktop и standalone CLI с инструментами dashboard_draft, dashboard_publish и dashboard_delete.",
+  ],
+  "ru": {
+    "can": "Создать и изменить черновик. Опубликовать или удалить дашборд по вашей просьбе.",
+    "cannot": "Дать доступ к инструментам дашборда или опубликовать его без вашей просьбы.",
+    "compatibility": "Нужны инструменты для дашбордов Loginom.",
+  },
+  "rules": [
+    "2. Вызови \`dashboard_draft\`. Ошибки сборки, типов и самопроверки исправь сам и вызови снова.",
+    "4. Публикуй только после явной просьбы пользователя («Опубликовать»). Вызови \`dashboard_publish\`: пользователь подтвердит узел и пакет. При \`published\` передай сообщение инструмента о том, как увидеть готовую версию в Studio. При \`failed\` объясни причину простыми словами и вернись к черновику: прежняя рабочая версия остаётся доступной.",
+    "- Вызывай \`dashboard_delete\` только по явной просьбе удалить дашборд этого узла. Сам запрос в чате открывает подтверждение. Пользователь проверяет имя узла, полный путь пакета и количество опубликованных версий. Согласие одноразовое. Удаление охватывает также локальный черновик и неопубликованные правки.",
+  ],
+}
+`;
+
+exports[`package-linter: catalog permissions and compatibility against the shipped skill 1`] = `
+{
+  "en": {
+    "can": "Read a local .lgp package and save a report beside it.",
+    "cannot": "Change the scenario or run its calculations.",
+    "compatibility": "Requires a local .lgp package, Python 3.9–3.11 and lxml.",
+  },
+  "frontmatter": [
+    "{",
+    "  "name": "package-linter",",
+    "  "description": "Оценка качества пакета Loginom .lgp, когда нужны оценки структуры, заметок, наименований узлов и переменных, рекомендации и понятный отчёт рядом с исходником. Не предназначен для изменения сценария и вычислений.",",
+    "  "compatibility": "Loginom AI Agent default bash/read/edit/write/skill; separately provisioned Python 3.9-3.11+lxml. Local .lgp file processing in chat; no active-scenario control. Optional read-only Help/diagnostics remain available under ordinary permissions.",",
+    "  "metadata": {",
+    "    "variant": "loginom-ai-agent",",
+    "    "runtime": "external-python-and-lxml-prerequisite"",
+    "  }",
+    "}",
+  ],
+  "ru": {
+    "can": "Прочитать локальный пакет .lgp и сохранить рядом отчёт.",
+    "cannot": "Изменить сценарий или выполнить вычисления в нём.",
+    "compatibility": "Нужны локальный пакет .lgp, Python 3.9–3.11 и lxml.",
+  },
+  "rules": [
+    "Используй обычные builtin bash/read/edit/write/skill с разрешениями среды. До D01 (inspect), чтения .lgp и создания отчёта выполни preflight из обязательного [Product runtime contract](references/product-runtime.md). Пути ниже разрешай от абсолютного skill base directory. Оценка качества — самостоятельная задача package-linter в профиле default. Не активируй package-docs или loginom-automation для оценки качества и её отчёта; управление активным сценарием не нужно. Правила среды выше навыка; при конфликте сообщи о нём.",
+    "Результат — один \`<имя>_lint.md\` рядом с исходником. Python 3.9–3.11 и lxml; другие навыки и сервер не нужны. Используй [фиксированные правила и формулы](references/rubric.md), а при заполнении промежуточного файла — [формат решений](references/assessment.md).",
+  ],
+}
+`;

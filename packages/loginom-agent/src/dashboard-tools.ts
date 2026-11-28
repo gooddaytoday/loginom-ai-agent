@@ -206,6 +206,17 @@ export function dashboardTools(
   }
   return {
     draft,
+    preview: async (snapshotId: string, signal: AbortSignal) => {
+      const { dashboardResources } = await import("@loginom-ai-agent/dashboard/agent/resources")
+      const { previewDashboard } = await import("@loginom-ai-agent/dashboard/agent/draft")
+      return previewDashboard({
+        work: directory,
+        resources: dashboardResources(resources),
+        snapshotId,
+        signal,
+        server: serve,
+      })
+    },
     publish,
     remove,
     close: async () => {
