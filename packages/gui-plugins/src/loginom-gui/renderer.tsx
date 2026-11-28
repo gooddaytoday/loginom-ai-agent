@@ -1,14 +1,23 @@
 import { connectionRequiredTool, type Status } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Product } from "@loginom-ai-agent/product"
+import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
 import { ComposerPill, createKeyed, SettingsPage, type MountedSession, type Plugin } from "@opencode/plugin/gui"
-import { Page as PluginPage, ToolRenderer } from "@opencode/plugin/gui/builtin"
+import { builtinContext, Page as PluginPage, subscribeBuiltinDeepLinks, ToolRenderer } from "@opencode/plugin/gui/builtin"
+import { Option, Schema } from "effect"
 import { lazy, onCleanup, onMount, Show, Suspense } from "solid-js"
+import { unwrap } from "solid-js/store"
+import { DashboardLink } from "./contract"
+import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
+import { registerStartScreen } from "./start-screen"
 import { profileService } from "./target"
+
+const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 const publicAddress = new URL(Product.connection.url).href
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
+  registerStartScreen(ctx)
   const Catalog = lazy(() => import("./catalog-page"))
   ctx.add(PluginPage, {
     id: "catalog",
@@ -33,11 +42,16 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
 
     return (
       status &&
-      !status.deviceOnly &&
       status.url === publicAddress &&
       status.username === Product.connection.username &&
       !status.hasPassword
     )
+  }
+
+  const savedServer = () => {
+    const status = page().status
+
+    if (status && status.generation > 0 && !publicStand()) return status
   }
 
   let settingsOpen = false
@@ -51,7 +65,8 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     | undefined
 
   const refresh = () => {
-    if (!settingsOpen && !document.hidden && client()) dispatch({ type: "refresh", background: true })
+    if (!document.hidden && client() && (!settingsOpen || page().awaitingActivation))
+      dispatch({ type: "refresh", background: true, preserveDraft: settingsOpen })
   }
 
   createKeyed(
@@ -77,7 +92,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     if (page().busy) return
 
     intent = session ? { source: "settings", client: client(), session } : undefined
-    dispatch({ type: "reset", blank: !!session })
+    dispatch({ type: "reset", blank: !!session && !savedServer() })
     ctx.layout.settings("loginom")
   }
 
@@ -108,13 +123,10 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
   }
 
   function connect(card?: { session: MountedSession; latest: () => boolean }) {
-    if (!publicStand() || page().connected || page().busy) return
+    if ((!publicStand() && !savedServer()) || page().connected || page().busy || page().awaitingActivation || page().status?.recoveryPending) return
 
     intent = card ? { ...card, source: "card", client: client() } : { source: "pill", client: client() }
-    dispatch({
-      type: "edit",
-      patch: { url: Product.connection.url, username: Product.connection.username, password: "", noPassword: true },
-    })
+    dispatch({ type: "reset" })
     dispatch({ type: "submit", submit: "save", now: Date.now() })
   }
 
@@ -166,34 +178,48 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
               aria-label={ctx.t("connectTitle")}
             >
               <h3 class="text-14-medium text-text-strong">{ctx.t("connectTitle")}</h3>
-              <Show when={publicStand()}>
-                <p class="text-13-regular text-text-base">{ctx.t("publicStandDescription")}</p>
-              </Show>
-              <div class="flex flex-wrap gap-2">
+              <Show
+                when={!page().status?.recoveryPending}
+                fallback={
+                  <div class="grid justify-items-start gap-2">
+                    <ctx.ui.Button disabled={page().busy} onClick={() => dispatch({ type: "refresh" })}>
+                      {ctx.t("checkStatus")}
+                    </ctx.ui.Button>
+                  </div>
+                }
+              >
                 <Show when={publicStand()}>
+                  <p class="text-13-regular text-text-base">{ctx.t("publicStandDescription")}</p>
+                </Show>
+                <Show when={savedServer()}>
+                  {(status) => <p class="break-all text-13-regular text-text-base">{status().url}</p>}
+                </Show>
+                <div class="flex flex-wrap gap-2">
+                  <Show when={publicStand() || savedServer()}>
+                    <ctx.ui.Button
+                      variant="contrast"
+                      disabled={page().busy || page().awaitingActivation}
+                      onClick={() => {
+                        const session = current()
+
+                        if (props.latest && session && matches(session)) connect({ session, latest: () => props.latest })
+                      }}
+                    >
+                      {ctx.t(page().checking ? "checking" : page().saving ? "saving" : publicStand() ? "connectPublic" : "connect")}
+                    </ctx.ui.Button>
+                  </Show>
                   <ctx.ui.Button
-                    variant="contrast"
-                    disabled={page().busy}
+                    disabled={page().busy || !page().status}
                     onClick={() => {
                       const session = current()
 
-                      if (props.latest && session && matches(session)) connect({ session, latest: () => props.latest })
+                      if (props.latest && session && matches(session)) openSettings(session)
                     }}
                   >
-                    {ctx.t(page().checking ? "checking" : page().saving ? "saving" : "connectPublic")}
+                    {ctx.t(savedServer() ? "editConnection" : "ownServer")}
                   </ctx.ui.Button>
-                </Show>
-                <ctx.ui.Button
-                  disabled={page().busy || !page().status}
-                  onClick={() => {
-                    const session = current()
-
-                    if (props.latest && session && matches(session)) openSettings(session)
-                  }}
-                >
-                  {ctx.t("ownServer")}
-                </ctx.ui.Button>
-              </div>
+                </div>
+              </Show>
               <Show
                 when={
                   page().issue ??
@@ -223,33 +249,110 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
 
       return {
         label: ctx.t("title"),
-        title: page().connected ? ctx.t("title") : `${ctx.t("title")} · ${ctx.t("disconnected")}`,
+        title: ctx.t("title"),
         tone: page().connected ? "success" : "warning",
       }
     },
     menu: (input) => {
       onMount(refresh)
-      const direct = () => !page().connected && publicStand()
+      const direct = () => !page().connected && (publicStand() || savedServer())
 
       return (
         <div class="flex flex-col items-start gap-2 p-2">
           <Show when={page().status?.url}>{(url) => <span class="max-w-full truncate">{url()}</span>}</Show>
           <Show when={page().status?.username}>{(name) => <span>{name()}</span>}</Show>
+          <Show when={!page().connected}><span>{ctx.t("disconnected")}</span></Show>
           <ctx.ui.Button
-            disabled={page().busy}
+            disabled={page().busy || (!!direct() && page().awaitingActivation && !page().status?.recoveryPending)}
             onClick={() => {
               input.close()
 
-              if (direct()) connect()
+              if (page().status?.recoveryPending) dispatch({ type: "refresh" })
+              else if (direct()) connect()
               else openSettings()
             }}
           >
-            {ctx.t(direct() ? "connect" : "connectionSettings")}
+            {ctx.t(page().status?.recoveryPending ? "checkStatus" : direct() ? "connect" : "connectionSettings")}
           </ctx.ui.Button>
         </div>
       )
     },
   })
+
+  if (!ctx.desktop) return
+
+  const Dashboard = lazy(() => import("./dashboard"))
+  const router = builtinContext(ctx).router
+
+  const [store, setStore] = ctx.storage.memory<{ dashboard: DashboardState }>("dashboard", {
+    initial: { dashboard: { nextAttempt: 1 } },
+  })
+
+  const dashboard: DashboardStore = {
+    state: () => store.dashboard,
+    dispatch(event) {
+      const previous = unwrap(store.dashboard)
+      const next = transitionDashboard(previous, event)
+
+      if (next === previous) return
+
+      setStore((draft) => {
+        draft.dashboard = next
+      })
+
+      return next
+    },
+  }
+
+  ctx.add(PluginPage, {
+    id: "dashboard",
+    get title() {
+      return ctx.t("dashboard")
+    },
+    render: () => (
+      <Suspense>
+        <Show
+          when={dashboard.state().current?.link}
+          keyed
+          fallback={
+            <p class="p-4" role="status">
+              {ctx.t("dashboardOpenStudio")}
+            </p>
+          }
+        >
+          {(link) => <Dashboard link={link} dashboard={dashboard} />}
+        </Show>
+      </Suspense>
+    ),
+  })
+
+  onCleanup(subscribeBuiltinDeepLinks(dashboardLinkChannel, (data) => {
+    const decoded = decodeLink(data)
+
+    if (Option.isNone(decoded)) return
+
+    const link = decoded.value
+
+    if ("code" in link) {
+      const issue =
+        link.code === "DASHBOARD_SNAPSHOT_UNAVAILABLE" || link.code === "DASHBOARD_SNAPSHOT_INVALID"
+          ? "dashboardSnapshotGone"
+          : link.code === "LOGINOM_CONFIG_REQUIRED"
+            ? "dashboardConnect"
+            : "dashboardOpenFailed"
+
+      if (router.path().split("?")[0] === `/page/${ctx.id}/dashboard`) {
+        if (dashboard.dispatch({ type: "link.failed", id: link.id, issue })) return
+      }
+
+      ctx.toast.show({ variant: "error", title: ctx.t(issue) })
+
+      return
+    }
+
+    dashboard.dispatch({ type: "link.opened", link })
+    router.openPage("dashboard")
+  }))
 }
 
 export default setup

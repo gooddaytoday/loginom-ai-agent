@@ -17,7 +17,7 @@ type SavedIdentity = Pick<Status, "revision" | "url" | "username" | "hasPassword
 
 type State = { attempt: number } & (
   | { type: "unavailable" | "loading" | "disposed" }
-  | (Form & { type: "editing"; issue?: Issue })
+  | (Form & { type: "editing"; issue?: Issue; submitted?: SavedIdentity })
   | (Form & { type: "checking"; submit: "check" | "save" })
   | (Form & { type: "verified"; validation: Validation })
   | (Form & { type: "saving"; submitted: SavedIdentity })
@@ -28,7 +28,7 @@ type State = { attempt: number } & (
 type Event =
   | { type: "target"; available: boolean }
   | { type: "disposed" }
-  | { type: "refresh"; background?: boolean }
+  | { type: "refresh"; background?: boolean; preserveDraft?: boolean }
   | { type: "reset"; blank?: boolean }
   | { type: "edit"; patch: Partial<Draft> }
   | { type: "submit"; submit: "check" | "save"; now: number }
@@ -73,7 +73,7 @@ function draftCandidate(current: Form): Candidate | { issue: Issue } {
   const url = draft.url.trim()
   const username = draft.username.trim()
 
-  if (!Schema.is(Address)(url)) return { issue: !url && status.deviceOnly ? "deviceAddress" : "invalidAddress" }
+  if (!Schema.is(Address)(url)) return { issue: "invalidAddress" }
 
   if (!username) return { issue: "invalidUsername" }
   const identity = { revision: status.revision, url, username }
@@ -123,16 +123,18 @@ export function transition(state: State, event: Event): Transition {
 
       if (state.type !== "editing") return keep
 
-      return refresh({ ...state, draft: event.background ? form(state.status).draft : state.draft }, attempt, {
+      return refresh(state, attempt, {
         background: event.background,
         issue: event.background ? state.issue : undefined,
+        submitted: state.submitted,
+        edited: event.preserveDraft ?? false,
       })
     case "reset": {
       if (!("draft" in state) || state.type === "saving") return keep
       const draft = event.blank ? { url: "", username: "", password: "", noPassword: false } : form(state.status).draft
 
       if (state.type === "applying" || state.type === "refreshing")
-        return { state: { ...state, draft, edited: true }, effects: [] }
+        return { state: { ...state, draft, edited: true, submitted: undefined }, effects: [] }
 
       return {
         state: { type: "editing", attempt, status: state.status, draft },
@@ -151,13 +153,15 @@ export function transition(state: State, event: Event): Transition {
       if (state.type === "refreshing") return { state: { ...state, draft, edited: true }, effects: [] }
 
       return {
-        state: { type: "editing", attempt, draft, status: state.status },
+        state: { type: "editing", attempt, draft, status: state.status, submitted: state.type === "editing" ? state.submitted : undefined },
         effects: state.type === "checking" ? [{ type: "cancel" }] : [],
       }
     }
 
     case "submit": {
       if (state.type !== "editing" && state.type !== "verified") return keep
+
+      if (state.status.recoveryPending) return keep
 
       if (event.submit === "save" && state.type === "verified" && event.now < state.validation.expiresAt)
         return save(state, state.validation.validationId)
@@ -206,7 +210,7 @@ export function transition(state: State, event: Event): Transition {
 
         if (state.type === "loading") return { state: { type: "unavailable", attempt }, effects: [] }
 
-        if (state.type === "refreshing" && state.background && !state.edited)
+        if (state.type === "refreshing" && state.background && !state.edited && !state.submitted)
           return { state: { type: "unavailable", attempt }, effects: [] }
 
         if (state.type === "applying" && event.result.issue === "unavailable" && state.until - event.now > 1000)
@@ -216,7 +220,7 @@ export function transition(state: State, event: Event): Transition {
           }
 
         if (state.type === "applying" && event.now >= state.until)
-          return { state: { type: "editing", attempt, status: state.status, draft: state.draft }, effects: [] }
+          return { state: { type: "editing", attempt, status: state.status, draft: state.draft, submitted: state.submitted }, effects: [] }
 
         if ("draft" in state)
           return failed(state, state.type === "refreshing" ? (state.issue ?? event.result.issue) : event.result.issue)
@@ -250,20 +254,20 @@ export function transition(state: State, event: Event): Transition {
         const until = state.type === "applying" ? state.until : event.now + applicationWait
         const remaining = until - event.now
 
-        if (remaining > 1000) {
+        if (remaining > 1000 && !(state.type === "refreshing" && state.background)) {
           return {
             state: { type: "applying", attempt, status, draft: pendingDraft, until, edited, submitted },
             effects: [{ type: "status", attempt, delay: 1000, timeout: remaining - 1000 }],
           }
         }
 
-        return { state: { type: "editing", attempt, status, draft: pendingDraft }, effects: [] }
+        return { state: { type: "editing", attempt, status, draft: pendingDraft, submitted }, effects: [] }
       }
 
       const issue = state.type === "refreshing" && !recovered ? state.issue : undefined
 
       return {
-        state: { type: "editing", attempt, status, draft, issue },
+        state: { type: "editing", attempt, status, draft, issue, submitted: status.recoveryPending || (confirmed && status.failed) ? submitted : undefined },
         effects: status.state === "ready" && !status.failed && confirmed ? [{ type: "activated", status }] : [],
       }
     }
@@ -273,7 +277,7 @@ export function transition(state: State, event: Event): Transition {
 function refresh(
   state: Form,
   attempt: number,
-  options: Pick<Extract<State, { type: "refreshing" }>, "issue" | "submitted" | "background">,
+  options: Pick<Extract<State, { type: "refreshing" }>, "issue" | "submitted" | "background"> & { edited?: boolean },
 ): Transition {
   return {
     state: { type: "refreshing", attempt, status: state.status, draft: state.draft, edited: false, ...options },
@@ -281,9 +285,9 @@ function refresh(
   }
 }
 
-function failed(state: Form & { attempt: number }, issue: Issue): Transition {
+function failed(state: Form & { attempt: number; submitted?: SavedIdentity }, issue: Issue): Transition {
   return {
-    state: { type: "editing", attempt: state.attempt, draft: state.draft, status: state.status, issue },
+    state: { type: "editing", attempt: state.attempt, draft: state.draft, status: state.status, issue, submitted: state.submitted },
     effects: [],
   }
 }
@@ -301,6 +305,8 @@ function message(state: State) {
 
   if (!("status" in state)) return
 
+  if (state.status.recoveryPending) return "recoveryPending"
+
   if (state.status.failed) return "activationFailed"
 
   if (waiting(state.status)) return "applicationPaused"
@@ -314,12 +320,12 @@ export function view(state: State) {
 
   return {
     status: form?.status,
-    deviceOnly: form?.status.deviceOnly ?? false,
+    awaitingActivation: "submitted" in state && !!state.submitted,
     draft: form?.draft,
     connected: form?.status.state === "ready" && !form.status.failed ? form.status : undefined,
     message: message(state),
     fieldErrors: {
-      url: issue === "invalidAddress" || issue === "loginUnavailable" || issue === "deviceAddress" ? issue : undefined,
+      url: issue === "invalidAddress" || issue === "loginUnavailable" ? issue : undefined,
       username: issue === "invalidUsername" ? issue : undefined,
       password: issue === "passwordRequired" || issue === "credentialsRejected" ? issue : undefined,
     },
@@ -341,6 +347,6 @@ export function view(state: State) {
     retry:
       state.type === "unavailable" ||
       (state.type === "editing" &&
-        (waiting(state.status) || issue === "unavailable" || issue === "changed" || issue === "saveFailed")),
+        (state.status.recoveryPending || waiting(state.status) || issue === "unavailable" || issue === "changed" || issue === "saveFailed")),
   }
 }

@@ -34,8 +34,7 @@ export default function Page(props: { service: ReturnType<typeof profileService>
                     label={ctx.t("url")}
                     value={draft().url}
                     inputMode="url"
-                    placeholder={page().deviceOnly ? "http://127.0.0.1:8080" : "https://loginom.example.org"}
-                    description={page().deviceOnly && !page().fieldErrors.url ? ctx.t("deviceAddress") : undefined}
+                    placeholder="https://loginom.example.org"
                     disabled={page().readOnly}
                     validationState={page().fieldErrors.url ? "invalid" : "valid"}
                     error={errorText(page().fieldErrors.url)}
@@ -94,12 +93,12 @@ export default function Page(props: { service: ReturnType<typeof profileService>
             <div class="flex flex-wrap gap-2">
               <Show when={page().draft}>
                 <ui.Button
-                  disabled={page().busy}
+                  disabled={page().busy || page().status?.recoveryPending}
                   onClick={() => dispatch({ type: "submit", submit: "check", now: Date.now() })}
                 >
                   {ctx.t(page().checking ? "checking" : "check")}
                 </ui.Button>
-                <ui.Button type="submit" variant="contrast" disabled={page().busy}>
+                <ui.Button type="submit" variant="contrast" disabled={page().busy || page().status?.recoveryPending}>
                   {ctx.t(page().saving ? "saving" : "save")}
                 </ui.Button>
               </Show>

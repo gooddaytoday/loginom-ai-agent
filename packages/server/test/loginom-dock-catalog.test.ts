@@ -314,6 +314,7 @@ describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
         const host = scriptedHost()
         const card = "loginom_connection_required"
         let state: "unconfigured" | "recoverable-error" | "ready" = "unconfigured"
+        let browserFailed = false
         const app = yield* boot({
           ...host,
           connect: async () => ({
@@ -328,10 +329,12 @@ describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
                 folder: "/user",
                 hasPassword: false,
                 state,
+                browser: browserFailed ? { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" } : { state: "verified" },
               }
             },
           }),
         })
+        yield* until(() => Effect.succeed(ServiceHost.connected() || undefined))
         const session = yield* app.create("connect Loginom")
         yield* app.prompt(session, script({ text: "A normal answer" }))
         const [first] = yield* app.requests(session)
@@ -346,6 +349,12 @@ describe("loginom.product Dock catalog (B2.5d, 0.4 toolContributor)", () => {
         ])
 
         state = "ready"
+        browserFailed = true
+        yield* app.prompt(session, script({ tool: card }, { text: "Waiting for browser login" }))
+        const browserRequest = (yield* app.requests(session)).at(-2)
+        expect(browserRequest?.tools.map((tool) => tool.name)).toContain(card)
+
+        browserFailed = false
         yield* app.prompt(session, script({ text: "Ready" }))
         const latest = (yield* app.requests(session)).at(-1)
         expect(latest?.tools.map((tool) => tool.name)).not.toContain(card)

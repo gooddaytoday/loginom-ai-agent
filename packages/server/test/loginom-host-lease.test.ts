@@ -410,7 +410,7 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
             .map((tool) => tool.name)
             .filter((name) => name.startsWith("loginom_") && name !== "loginom_dock_browser_recovery")
             .toSorted()
-        expect(loginom(ordinary)).toEqual(["loginom_dock_diagnostics"])
+        expect(loginom(ordinary)).toEqual(["loginom_connection_required", "loginom_dock_diagnostics"])
 
         const id = yield* test.create("bound")
         yield* grant(id)
@@ -419,7 +419,7 @@ describe("loginom.product Host lease (G3, spike S2)", () => {
           script({ tool: "loginom_dock_prepare", input: { intent: "new_draft" } }, { text: "end" }),
         )
         const [first, answer] = yield* test.requests(id)
-        expect(loginom(first)).toEqual(["loginom_dock_diagnostics", "loginom_dock_prepare"])
+        expect(loginom(first)).toEqual(["loginom_connection_required", "loginom_dock_diagnostics", "loginom_dock_prepare"])
         const result = JSON.stringify(answer.messages)
         expect(result).toContain("LOGINOM_CONFIG_REQUIRED")
         expect(result).not.toContain("LOGINOM_SCOPE_DENIED")

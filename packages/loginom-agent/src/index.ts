@@ -341,10 +341,10 @@ export default Plugin.define({
     const profiles = join(Global.Path.data, "file-profiles")
     const files = await localFiles(ctx, profiles)
     const loginomSettings = connectionSettings()
-    const needsConnection = async () => {
-      if (!ServiceHost.connected()) return false
+    const connectionNeeded = async () => {
+      if (!ServiceHost.connected()) return
       const status = await loginomSettings.status()
-      return status.ok && (status.value.state === "unconfigured" || status.value.failed)
+      if (status.ok && (status.value.state === "unconfigured" || status.value.failed)) return status.value
     }
     const repeats = repeatGuard(async () => (await ctx.tool.list()).find((tool) => tool.id === "question"))
     await ctx.tool.transform((editor) => {
@@ -355,10 +355,12 @@ export default Plugin.define({
         input: { type: "object", properties: {}, additionalProperties: false },
         options: { codemode: false },
         execute: async () => {
-          if (!(await needsConnection())) return { content: "No Loginom setup is required." }
+          const status = await connectionNeeded()
+          if (!status) return { content: "No Loginom setup is required." }
           return {
-            content:
-              "Loginom is not connected. The connection card is visible to the user. End this turn without retrying or opening packages. The application will signal when the user connects.",
+            content: status.recoveryPending
+              ? "Loginom has an incomplete operation to recover. The card lets the user check recovery status. End this turn without retrying, opening packages, or suggesting new connection settings."
+              : "Loginom is not connected. The connection card is visible to the user. End this turn without retrying or opening packages. The application will signal when the user connects.",
             metadata: { connectionRequired: true },
           }
         },
@@ -431,7 +433,7 @@ export default Plugin.define({
       await dock.refresh(event.sessionID, profile(event.sessionID), event.model)
       hide(event)
       if (event.tools[connectionRequiredTool]) {
-        if (await needsConnection()) {
+        if (await connectionNeeded()) {
           event.system.push({
             type: "text",
             text: `Loginom is not connected. If the current user task needs to open or change a Loginom server package, call ${connectionRequiredTool} first to show the connection card, then stop and wait. Answer other requests normally, without showing the card.`,
@@ -558,6 +560,11 @@ export default Plugin.define({
     await ctx.rpc.register(DashboardTarget.rpc, {
       prepare: (value, call) => DashboardTarget.answer(value as { id: string; defer: boolean }, resources, call.signal),
       find: async (value) => ({ found: await DashboardTarget.find((value as { id: string }).id, Dashboard.root()) }),
+      preview: async (value, call) => {
+        if (!Dashboard.isWork(ctx.location.directory)) return {}
+        const url = await drafts.preview((value as { id: string }).id, call.signal)
+        return url ? { url } : {}
+      },
     })
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {

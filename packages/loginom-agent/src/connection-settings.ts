@@ -14,31 +14,19 @@ import { ServiceHost } from "./host"
 
 type Request = typeof ServiceHost.connectionSettings.request
 
-export function connectionSettings(
-  request: Request = ServiceHost.connectionSettings.request,
-  deviceOnly = ServiceHost.connectionSettings.deviceOnly,
-) {
-  const allowed = (url: URL) =>
-    !deviceOnly() ||
-    url.hostname === "localhost" ||
-    url.hostname === "[::1]" ||
-    /^127(?:\.\d{1,3}){3}$/.test(url.hostname)
-
+export function connectionSettings(request: Request = ServiceHost.connectionSettings.request) {
   const readStatus = (reply: unknown): Status => {
     const view = Schema.decodeUnknownSync(Loginom.View)(reply)
-    const url = settingsAddress(view.url)
-    const blocked = !allowed(new URL(url))
-
     return {
       revision: view.revision,
       generation: view.generation,
-      url: blocked ? "" : url,
+      url: settingsAddress(view.url),
       username: view.username,
       folder: view.folder,
-      hasPassword: !blocked && view.hasPassword,
-      state: blocked ? "unconfigured" : view.state,
-      failed: !blocked && (!!view.failure || view.state === "recoverable-error"),
-      deviceOnly: deviceOnly(),
+      hasPassword: view.hasPassword,
+      state: view.state,
+      failed: !!view.failure || view.state === "recoverable-error" || view.browser?.state === "failed",
+      recoveryPending: !!view.recoveries?.length,
     }
   }
   const status = async (method: "connection.status" | "connection.settings.save", input: unknown) => {
@@ -54,7 +42,6 @@ export function connectionSettings(
     async check(candidate: Candidate, context: { signal: AbortSignal }) {
       try {
         if (!Schema.is(Address)(candidate.url)) return { ok: false, issue: "invalidAddress" }
-        if (!allowed(new URL(candidate.url))) return { ok: false, issue: "deviceAddress" }
         const { validationId, expiresAt } = Schema.decodeUnknownSync(Loginom.Validation)(
           await request("connection.settings.check", candidate, 240_000, context.signal),
         )

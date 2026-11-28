@@ -27,6 +27,7 @@ for (const viewport of [
   { width: 390, height: 844 },
 ]) {
   test(`Loginom setup resumes the original session (${viewport.width})`, async ({ page }, testInfo) => {
+    test.setTimeout(90_000)
     await page.setViewportSize(viewport)
     const id = "ses_loginom_setup"
     const request = "Открой пакет из Loginom"
@@ -34,12 +35,14 @@ for (const viewport of [
     const address = own ? "https://loginom.example.test/" : "https://app.loginom.ai/"
     const username = own ? "analyst" : "user"
     const captures: { sessionID: string; body: Schema.Json }[] = []
-    const checks: Schema.Json[] = []
-    const saves: Schema.Json[] = []
+    const checks: unknown[] = []
+    const saves: unknown[] = []
     let prompted = false
     let saved = false
     let ready = false
+    let allowLateReady = false
     let disconnected = false
+    let recoveryPending = false
     let reads = 0
     let readsAtSave = 0
 
@@ -93,8 +96,8 @@ for (const viewport of [
         folder: ready ? `/${username}` : "/user",
         hasPassword: false,
         failed: disconnected,
-        deviceOnly: false,
-        state: disconnected ? "recoverable-error" : ready ? "ready" : saved ? "pending" : "unconfigured",
+        recoveryPending,
+        state: recoveryPending ? "recoverable-error" : ready ? "ready" : saved ? "pending" : "unconfigured",
       },
     })
 
@@ -112,7 +115,7 @@ for (const viewport of [
         if (method === "status") {
           if (++reads === 1) return { unavailable: true }
 
-          if (saved && reads > readsAtSave + 1) ready = true
+          if (saved && (own ? reads > readsAtSave + 1 : allowLateReady)) ready = true
 
           return { output: view() }
         }
@@ -145,12 +148,13 @@ for (const viewport of [
       },
     })
 
-    const pill = page.getByRole("button", { name: "Loginom · Не подключён" })
+    const pill = page.getByRole("button", { name: "Loginom", exact: true })
     const card = page.getByRole("region", { name: "Подключиться к Loginom" })
     await expect(card).toHaveCount(0)
     await pill.click()
     await expect(page.getByText("https://app.loginom.ai/", { exact: true })).toBeVisible()
     await expect(page.getByText("user", { exact: true })).toBeVisible()
+    await expect(page.getByText("Не подключён", { exact: true })).toBeVisible()
     await page.keyboard.press("Escape")
     await editor.fill(request)
     await editor.press("Enter")
@@ -183,6 +187,9 @@ for (const viewport of [
       await expect(page).toHaveURL(new RegExp(id))
     } else {
       await card.getByRole("button", { name: "Подключить публичный стенд" }).click()
+      await expect(card.getByRole("status")).toHaveText(/Подключение ещё не применено/, { timeout: 22_000 })
+      expect(captures).toEqual([])
+      allowLateReady = true
     }
 
     await expect(page.getByText(`Подключено к ${address}`, { exact: true })).toBeVisible()
@@ -200,7 +207,7 @@ for (const viewport of [
     expect(checks).toEqual([
       {
         input: {
-          url: own ? address : "https://app.loginom.ai",
+          url: address,
           username,
           revision: 0,
           password: { operation: "empty" },
@@ -209,7 +216,35 @@ for (const viewport of [
     ])
     expect(saves).toEqual([{ input: { revision: 0, validationId: "fixture-check" } }])
     disconnected = true
-    await expect(pill).toBeVisible({ timeout: 8_000 })
+    recoveryPending = own
+    await expect(card).toBeVisible({ timeout: 8_000 })
+
+    if (own) {
+      const checkStatus = card.getByRole("button", { name: "Проверить состояние" })
+      await expect(checkStatus).toBeVisible()
+      await expect(card.getByRole("button", { name: "Подключить", exact: true })).toHaveCount(0)
+      await expect(card.getByRole("button", { name: "Изменить", exact: true })).toHaveCount(0)
+
+      const statusResponse = page.waitForResponse((response) =>
+        new URL(response.url()).pathname.endsWith("/loginom.connection/status"),
+      )
+
+      await checkStatus.click()
+      await statusResponse
+      await expect(checkStatus).toBeVisible()
+      expect(checks).toHaveLength(1)
+      expect(saves).toHaveLength(1)
+
+      recoveryPending = false
+      await expect(card.getByText(address, { exact: true })).toBeVisible({ timeout: 8_000 })
+      await expect(card.getByRole("button", { name: "Подключить", exact: true })).toBeEnabled()
+      await card.getByRole("button", { name: "Изменить", exact: true }).click()
+      await expect(page.getByRole("textbox", { name: "Адрес", exact: true })).toHaveValue(address)
+      await expect(page.getByRole("textbox", { name: "Пользователь", exact: true })).toHaveValue(username)
+    } else {
+      await pill.click()
+      await expect(page.getByText("Не подключён", { exact: true })).toBeVisible()
+    }
   })
 }
 
@@ -278,7 +313,7 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
                 folder: `/${username}`,
                 hasPassword: false,
                 failed: false,
-                deviceOnly: false,
+                recoveryPending: false,
                 state: revision ? "ready" : "unconfigured",
               },
             },

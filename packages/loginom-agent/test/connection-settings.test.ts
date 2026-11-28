@@ -26,7 +26,7 @@ test("the settings RPC emits only the display status, even for a migrated addres
       hasPassword: true,
       state: "ready",
       failed: false,
-      deviceOnly: false,
+      recoveryPending: false,
     },
   })
 })
@@ -81,32 +81,29 @@ test("settings reject URL parameters before calling the Host and pass the active
   expect(called).toBe(context.signal)
 })
 
-test("the settings RPC hides the public address and blocks a check in device mode", async () => {
-  let requests = 0
-  const settings = connectionSettings(
-    async () => {
-      requests++
-      return {
-        revision: 1,
-        generation: 1,
-        url: "https://app.loginom.ai",
-        username: "user",
-        folder: "/user",
-        hasPassword: true,
-        state: "ready",
-      }
-    },
-    () => true,
-  )
+test("the settings RPC reports a failed browser login without exposing recovery records", async () => {
+  const stored = {
+    revision: 1,
+    generation: 1,
+    url: "https://loginom.example/",
+    username: "user",
+    folder: "/user",
+    hasPassword: true,
+  }
+  let recoveries: string[] = []
+  const settings = connectionSettings(async () => ({
+    ...stored,
+    state: recoveries.length ? "recoverable-error" : "ready",
+    browser: { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" },
+    recoveries,
+  }))
   expect(await settings.status()).toMatchObject({
     ok: true,
-    value: { url: "", state: "unconfigured", deviceOnly: true, hasPassword: false },
+    value: { ...stored, state: "ready", failed: true, recoveryPending: false },
   })
-  expect(
-    await settings.check(
-      { revision: 1, url: "https://app.loginom.ai", username: "user", password: { operation: "empty" } },
-      { signal: new AbortController().signal },
-    ),
-  ).toEqual({ ok: false, issue: "deviceAddress" })
-  expect(requests).toBe(1)
+  recoveries = ["fixture-recovery-id"]
+  expect(await settings.status()).toEqual({
+    ok: true,
+    value: { ...stored, state: "recoverable-error", failed: true, recoveryPending: true },
+  })
 })

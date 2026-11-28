@@ -23,7 +23,6 @@ export type Connection = {
 
 type Started = {
   readonly directory: string
-  readonly deviceOnly: boolean
   ready: Promise<Connection | undefined>
   connected?: boolean
   held: Map<Lease, string>
@@ -51,7 +50,6 @@ const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSo
 export async function start(input: {
   data: string
   resources?: string
-  deviceOnly?: boolean
   connect?: () => Promise<Connection>
 }) {
   if (state.current && !state.current.closing) throw Error("LOGINOM_HOST_ALREADY_STARTED")
@@ -76,7 +74,6 @@ export async function start(input: {
   const connect = input.connect ?? (input.resources ? nodeHost(root, input.resources) : undefined)
   const current: Started = {
     directory,
-    deviceOnly: input.deviceOnly ?? false,
     ready: Promise.resolve(undefined),
     held: new Map(),
   }
@@ -145,7 +142,6 @@ export const dashboard = {
 
 export const connectionSettings = {
   request,
-  deviceOnly: () => state.current?.deviceOnly ?? false,
   holdTurn() {
     const id = randomUUID()
     const held = request("connection.settings.turn", { id, active: true }).catch(() => undefined)

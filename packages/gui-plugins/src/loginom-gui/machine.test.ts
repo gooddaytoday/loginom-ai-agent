@@ -11,7 +11,7 @@ const fresh = {
   state: "unconfigured",
   hasPassword: false,
   failed: false,
-  deviceOnly: false,
+  recoveryPending: false,
 } satisfies Status
 
 function form(status: Status = fresh) {
@@ -184,4 +184,27 @@ test("polling is bounded and keeps edits made while the connection is pending", 
     draft: { username: "next-user" },
   })
   expect(check(paused.state).effects).toMatchObject([{ type: "check", input: { revision: 1, username: "next-user" } }])
+})
+
+test.each([false, true])("a late ready status activates the saved connection unless explicitly reset (%s)", (reset) => {
+  const checking = transition(form(), { type: "submit", submit: "save", now: 1000 }).state
+  const saving = transition(checking, { type: "checked", attempt: checking.attempt, result: validation }).state
+  const pending = { ok: true, value: { ...fresh, revision: 1, state: "pending" } } as const
+  const applying = transition(saving, { type: "saved", attempt: saving.attempt, now: 1000, result: pending }).state
+  const paused = transition(applying, { type: "status", attempt: applying.attempt, now: 16_000, result: pending })
+  expect(view(paused.state)).toMatchObject({ busy: false, awaitingActivation: true })
+  expect(paused.effects).toEqual([])
+
+  const waiting = reset ? transition(paused.state, { type: "reset" }).state : paused.state
+  const refresh = transition(waiting, { type: "refresh", background: true }).state
+
+  const failed = transition(refresh, {
+    type: "status", attempt: refresh.attempt, now: 19_000, result: { ok: false, issue: "unavailable" },
+  }).state
+
+  const retry = transition(failed, { type: "refresh", background: true }).state
+  const ready = { ...fresh, revision: 1, generation: 1, state: "ready" } as const
+  const applied = transition(retry, { type: "status", attempt: retry.attempt, now: 22_000, result: { ok: true, value: ready } })
+  expect(view(applied.state)).toMatchObject({ connected: ready, awaitingActivation: false })
+  expect(applied.effects).toEqual(reset ? [] : [{ type: "activated", status: ready }])
 })

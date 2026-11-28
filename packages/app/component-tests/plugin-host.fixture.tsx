@@ -1,5 +1,7 @@
 import { createMemoryHistory, MemoryRouter, useLocation } from "@solidjs/router"
-import type { PluginInfo, SessionMessageInfo } from "@opencode/client/promise"
+import { OpenCode, type PluginInfo, type SessionMessageInfo } from "@opencode/client/promise"
+import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
+import { builtins } from "@opencode/gui-plugins/renderer"
 import { DialogProvider, useDialog } from "@opencode/ui/context/dialog"
 import { Menu } from "@opencode/ui/menu"
 import { Toast } from "@opencode/ui/toast"
@@ -9,7 +11,7 @@ import {
   type App,
   type Keybinds,
   type MountedSession,
-  type Router,
+  type ServerRef,
   type Servers,
   type SessionScreen,
   type Ipc,
@@ -20,7 +22,7 @@ import {
   type StoreOptions,
   type Workspaces,
 } from "@opencode/plugin/gui"
-import type { BuiltinLayout, BuiltinLocale } from "@opencode/plugin/gui/builtin"
+import { deliverBuiltinDeepLink, type BuiltinLayout, type BuiltinLocale } from "@opencode/plugin/gui/builtin"
 import {
   createComponent,
   createMemo,
@@ -76,6 +78,7 @@ export {
 } from "@opencode/plugin/gui"
 
 export { Schema }
+export { BuiltinSlot } from "@opencode/plugin/gui/builtin"
 
 type PluginHost = ReturnType<typeof usePluginHost>
 
@@ -114,7 +117,7 @@ const locale: BuiltinLocale = { locale: () => "en", direction: () => "ltr", setD
 
 const appearance: Appearance = { font: () => "monospace", mode: () => "light" }
 
-const router: Router = { routing: () => false, path: () => "/" }
+const router = { routing: () => false, path: () => "/", openPage() {} }
 
 const keybinds: Keybinds = { keybind: () => [], keys: (bind) => bind.split("+"), matches: () => false }
 
@@ -247,6 +250,8 @@ export function mountPluginHost(input?: {
 export function mountPlugins(input: {
   definitions: readonly Entry[]
   builtins?: ReadonlySet<string>
+  apiOverrides?: Partial<HostApiFactories>
+  locale?: "en" | "ru"
   surface?: () => JSX.Element
   disabled?: readonly string[]
   bridge?: Bridge
@@ -317,6 +322,9 @@ export function mountPlugins(input: {
           )}
         </Show>
         <PluginSlot at="window.bottom" input={{}} />
+        <div data-testid="draft-heading">
+          <PluginSlot at="session.new.heading" input={{}} />
+        </div>
         {input.surface?.()}
       </Show>
     )
@@ -335,7 +343,7 @@ export function mountPlugins(input: {
         }}
       >
         <PlatformProvider value={platform}>
-          <LanguageProvider locale="en">
+          <LanguageProvider locale={input.locale ?? "en"}>
             <DialogProvider>
               {/* With a bridge, main's plugin manager holds the enable settings, as in a desktop window. */}
               <PluginHostProvider
@@ -343,7 +351,7 @@ export function mountPlugins(input: {
                 builtins={input.builtins}
                 disabled={input.bridge ? undefined : disabled}
                 bridge={input.bridge}
-                apis={fakeApis(storage)}
+                apis={{ ...fakeApis(storage), ...input.apiOverrides }}
                 whenMounted={mounted}
                 ipc={input.ipc}
                 ipcFailed={input.ipcFailed}
@@ -387,6 +395,7 @@ export function mountLoadingPluginPage() {
   history.set({ value: "/page/fixture/overview" })
 
   const settings = Promise.withResolvers<readonly Installed[]>()
+
   const bridge: Bridge = {
     packaged: false,
     call: async () => undefined,
@@ -454,6 +463,136 @@ export function mountPluginPages(options?: Parameters<typeof pagePlugin>[0]) {
   return { disable: () => host.disable([plugin.id]), unmount: host.unmount }
 }
 
+export function mountDashboard(initialLink: typeof Schema.Json.Type) {
+  const definition = builtins.find((entry) => entry.id === "loginom-gui")
+
+  if (!definition) throw new Error("Loginom GUI not installed")
+  const history = createMemoryHistory()
+  const [toast, setToast] = createSignal<string>()
+  const drafts: Parameters<BuiltinLayout["draft"]>[0][] = []
+  const previews: string[] = []
+  const finds: string[] = []
+  const deliver = (data: typeof Schema.Json.Type) => deliverBuiltinDeepLink({ channel: dashboardLinkChannel, data })
+
+  deliver(initialLink)
+
+  const server: ServerRef = {
+    id: "sidecar",
+    name: "Desktop",
+    url: "http://127.0.0.1:3000",
+    builtin: true,
+    local: true,
+    connected: true,
+    compatible: true,
+    get data(): never {
+      throw new Error("Dashboard did not request synced data")
+    },
+    client: OpenCode.make({
+      baseUrl: "http://127.0.0.1:3000",
+      fetch: Object.assign(
+        async (input: RequestInfo | URL) => {
+          const url = new URL(input instanceof Request ? input.url : input)
+
+          if (url.pathname.endsWith("/preview")) {
+            previews.push(url.href)
+
+            if (previews.length === 1) {
+              return new Response('{"_tag":"RpcError","type":"rpc.unavailable","message":"RPC is unavailable"}', {
+                status: 400,
+                headers: { "content-type": "application/json" },
+              })
+            }
+
+            return Response.json({ output: { url: `http://localhost:3000/${"0".repeat(64)}/` } })
+          }
+
+          if (url.pathname.endsWith("/find")) {
+            finds.push(url.href)
+
+            return Response.json({ output: { found: true } })
+          }
+
+          throw new Error(`Unexpected request: ${url.pathname}`)
+        },
+        { preconnect() {} },
+      ),
+    }),
+  }
+
+  const host = mountPlugins({
+    definitions: [definition],
+    builtins: new Set([definition.id]),
+    locale: "ru",
+    ipc: () =>
+      Object.assign(
+        Object.fromEntries<() => Promise<{ id: string } | undefined>>([
+          ["open", async () => ({ id: "preview" })],
+          ["close", async () => undefined],
+        ]),
+        { state: () => undefined, on: () => () => undefined },
+      ),
+    apiOverrides: {
+      desktop: () => ({
+        os: "linux",
+        zoom: () => 1,
+        launch: async () => {},
+        reveal: async () => false,
+        installed: async () => false,
+        forceFocus: async () => {},
+        pick: async () => [],
+      }),
+      router: (plugin) => ({
+        ...router,
+        path: history.get,
+        openPage: (id) => history.set({ value: `/page/${plugin}/${id}`, scroll: false }),
+      }),
+      servers: () => ({ list: () => [server.id], get: (id) => (id === server.id ? server : undefined) }),
+      layout: () => ({ ...layout, draft: (input) => void drafts.push(input) }),
+      toast: () => ({
+        show: (input) => {
+          setToast(input.title)
+
+          return { dismiss() {} }
+        },
+      }),
+      embeds: () => ({
+        capture: async () => undefined,
+        View: (props) => (
+          <div class={props.class}>
+            {props.children}
+            <Show when={props.id}>
+              <div class="h-full rounded-lg border border-v2-border-border-base p-4">
+                <p class="text-16-medium">Заказы за ноябрь</p>
+                <p>Строк в результате: 2</p>
+              </div>
+            </Show>
+          </div>
+        ),
+      }),
+    },
+    surface: () => (
+      <MemoryRouter history={history}>
+        <div class="fixed inset-0 z-50 flex flex-col bg-v2-background-bg-base text-v2-text-text-base">
+          <Show when={toast()}>
+            <p class="m-4" role="alert">
+              {toast()}
+            </p>
+          </Show>
+          <PluginPageRoute />
+        </div>
+      </MemoryRouter>
+    ),
+  })
+
+  return {
+    drafts,
+    previews,
+    finds,
+    unmount: host.unmount,
+    deliver,
+  }
+}
+
 const web: Platform = {
   platform: "web",
   openExternal: () => undefined,
@@ -492,6 +631,7 @@ function standIn(overrides: Partial<Interface>): Interface {
     mode: () => "dark",
     routing: () => false,
     path: () => "/",
+    page() {},
     keybind: () => [],
     matches: () => false,
     servers: () => ["local"],
