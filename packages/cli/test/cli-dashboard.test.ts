@@ -119,17 +119,31 @@ describe.skipIf(process.platform !== "linux")("run --dashboard with the server's
     const asked = (await fixture.host()).length
     const created = await fixture.run(["--dashboard", snapshot.id, "--file", "src/main.tsx", ...args, "Покажи суммы."])
     expect({ code: created.code, stderr: created.stderr }).toEqual({ code: 0, stderr: "" })
-    expect(created.events.find((event) => event.type === "text")?.part.text).toBe("Создаю dashboard.")
+    const answer = created.events.find((event) => event.type === "text")
+    expect(answer?.part.text).toBe("Создаю dashboard.")
     // The server's Host was asked as 0.4's CLI asked its own: the status, readiness, then the latest publication with the
     // captured origin and generation. The server then closes its Host itself, as it is given time to (B6.1-D).
-    expect((await fixture.host()).slice(asked).map((entry) => entry.method)).toEqual([
+    const requests = (await fixture.host()).slice(asked)
+    expect(requests.map((entry) => entry.method)).toEqual([
       "start",
       "connection.status",
       "connection.ready",
       "dashboard.read",
+      "connection.settings.turn",
+      "connection.settings.turn",
       "close",
     ])
-    expect((await fixture.host()).findLast((entry) => entry.method === "dashboard.read")?.input).toEqual({ origin: fixture.studio.origin, generation: 1, binding })
+    const [turnStarted, turnFinished] = requests
+      .filter((entry) => entry.method === "connection.settings.turn")
+      .map((entry) => entry.input)
+    expect(answer?.sessionID).toEqual(expect.any(String))
+    expect(turnStarted).toEqual({ id: expect.any(String), session: answer?.sessionID, active: true })
+    expect(turnFinished).toEqual({ ...(typeof turnStarted === "object" ? turnStarted : {}), active: false })
+    expect(requests.find((entry) => entry.method === "dashboard.read")?.input).toEqual({
+      origin: fixture.studio.origin,
+      generation: 1,
+      binding,
+    })
     const work = path.join(
       fixture.profile,
       "data/dashboards",
@@ -517,6 +531,7 @@ async function dashboardFixture(steps: Step[]) {
       if (m.method === "start") return reply({ protocol: 1, ready: true, pid: process.pid });
       if (m.method === "close") return process.send({ id: m.id, result: { closed: true } }, () => process.exit(0));
       if (m.method === "connection.status") return reply(status());
+      if (m.method === "connection.settings.turn") return reply({});
       if (m.method === "connection.ready") {
         const ready = read(${file("ready")});
         if (ready === "hold") return;
