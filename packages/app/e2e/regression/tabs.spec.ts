@@ -84,7 +84,7 @@ for (const viewport of [
     const workspace = await openSession(page, {
       name: "Packages",
       directory,
-      seed: { locale: "ru" },
+      seed: { locale: "ru", storage: { "opencode.e2e.page-plugin": "packages" } },
       provider: {
         all: [
           {
@@ -218,7 +218,9 @@ for (const viewport of [
       .setInputFiles({ name: "Копия.lgp", mimeType: "application/octet-stream", buffer: Buffer.from("demo") })
     await expect(page.getByRole("heading", { name: "Копия.lgp" })).toBeVisible()
     await expect(page.getByRole("heading", { name: "Архив.lgp" })).toHaveCount(0)
-    await expect(page.getByText("Нет установленных действий с пакетом.")).toHaveCount(0)
+    const packageAction = page.getByRole("button", { name: "Example package action" })
+
+    await expect(packageAction).toHaveCount(0)
     await page.getByRole("button", { name: "С компьютера" }).click()
     const upload = page.getByRole("dialog", { name: "С компьютера" })
     await upload
@@ -249,6 +251,11 @@ for (const viewport of [
     await expect(recentCopy).toBeDisabled()
     statusResponse.resolve()
     await expect(recentCopy).toBeEnabled()
+    await recentCopy.click()
+    const oldPackage = page.getByRole("heading", { name: "Копия.lgp" })
+
+    await expect(oldPackage).toBeVisible()
+    await page.getByRole("button", { name: "Из Loginom" }).click()
     await expect(rows.first()).toBeVisible()
     generation = 2
     await picker.getByRole("button", { name: "Общие папки" }).click()
@@ -259,6 +266,23 @@ for (const viewport of [
     await expect(recents).toHaveCount(0)
     await picker.getByRole("button", { name: "Закрыть" }).click()
     await expect(picker).toBeHidden()
+    await expect(page.getByRole("heading", { name: "Пакеты", exact: true })).toBeVisible()
+    await expect(oldPackage).toHaveCount(0)
+    await expect(page.getByText("Откройте пакет из Loginom или загрузите копию с компьютера.")).toBeVisible()
+    await expect(packageAction).toHaveCount(0)
+
+    await page.getByRole("button", { name: "Из Loginom" }).click()
+    await rows.getByText("Другой аккаунт.lgp").click()
+    await packageAction.click()
+    await expect(page.getByText("Package action 1: /user/Другой аккаунт.lgp")).toBeVisible()
+
+    const actionStatus = Promise.withResolvers<void>()
+    holdStatus = actionStatus.promise
+    generation = 3
+    await packageAction.click()
+    actionStatus.resolve()
+    await expect(packageAction).toHaveCount(0)
+    await expect(page.getByText("Package action 2: /user/Другой аккаунт.lgp")).toHaveCount(0)
 
     status = "error"
     await page.getByRole("button", { name: "Из Loginom" }).click()

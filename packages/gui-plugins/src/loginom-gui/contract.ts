@@ -2,11 +2,15 @@ import { Contract, Ipc } from "@opencode/plugin/gui"
 import { Schema } from "effect"
 import type { Package } from "./package-model"
 
+export type PackageConnectionIdentity = { readonly server: string; readonly key: string; readonly generation: number }
+
 export type PackageInput = { kind: "loginom"; package: Package } | { kind: "file"; file: File }
 
-export type PackageSelection =
-  | Extract<PackageInput, { kind: "file" }>
-  | (Extract<PackageInput, { kind: "loginom" }> & { connection: string })
+export type RemotePackageSelection = Extract<PackageInput, { kind: "loginom" }> & {
+  connection: PackageConnectionIdentity
+}
+
+export type PackageSelection = Extract<PackageInput, { kind: "file" }> | RemotePackageSelection
 
 export type PackageAction = {
   readonly id: string

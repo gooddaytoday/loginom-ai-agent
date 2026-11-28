@@ -1098,6 +1098,7 @@ story(
 story("the new-session slot renders nothing without a plugin", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
     const { mountPlugins, BuiltinSlot, until } = await import(fixture)
+
     const host = mountPlugins({
       definitions: [
         {
@@ -1108,16 +1109,19 @@ story("the new-session slot renders nothing without a plugin", async ({ page }) 
         },
       ],
     })
+
     try {
       const heading = () => host.container.querySelector('[data-testid="draft-heading"]')
       await until(() => heading()?.textContent === "Draft heading")
       host.define([])
       await until(() => heading()?.textContent === "")
+
       return { elements: heading()?.childElementCount, errors: host.escaped() }
     } finally {
       host.unmount()
     }
   }, fixture)
+
   expect(result).toEqual({ elements: 0, errors: [] })
 })
 

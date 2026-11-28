@@ -8,6 +8,7 @@ import { DashboardLink, PackagePicker, type PackageAction, type PackageInput, ty
 import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
 import { remember } from "./package-model"
+import { watchPackageSelection } from "./package-selection"
 import { registerStartScreen } from "./start-screen"
 
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
@@ -23,6 +24,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
   const Picker = lazy(() => import("./package-picker"))
   const Packages = lazy(() => import("./packages-page"))
   const history = ctx.stores.recent
+  const [connectionCheck, setConnectionCheck] = createSignal(0)
   const [selected, setSelected] = createSignal<PackageSelection>()
   const [actions, setActions] = createSignal<readonly PackageAction[]>([])
   const drafts = new WeakMap<object, [Accessor<PackageSelection | undefined>, Setter<PackageSelection | undefined>]>()
@@ -56,6 +58,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
           initialFile={options.file}
           acceptsFile={options.action?.acceptsFile ?? !options.action}
           recent={() => history.value}
+          refreshSelection={() => setConnectionCheck((value) => value + 1)}
           close={dialog.close}
           showPage={options.showPage}
           select={(input) => {
@@ -67,8 +70,8 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
                 }
 
                 const recent = options.action ? { ...usage, action: options.action.title } : usage
-                draft.items = remember(draft.connection === input.connection ? draft.items : [], recent)
-                draft.connection = input.connection
+                draft.items = remember(draft.connection === input.connection.key ? draft.items : [], recent)
+                draft.connection = input.connection.key
               })
             }
 
@@ -106,9 +109,10 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     },
     renderSelection({ draft, openPage }) {
       const [selection, setSelection] = draftPackage(draft)
+      const guard = watchPackageSelection(ctx, selection, () => setSelection(undefined), connectionCheck)
 
       return (
-        <Show when={selection()}>
+        <Show when={guard.visible()}>
           {(item) => {
             const name = () => {
               const input = item()
@@ -138,30 +142,35 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     get title() {
       return ctx.t("packages.title")
     },
-    render: () => (
-      <Suspense>
-        <Packages
-          selected={selected()}
-          actions={actions()}
-          choose={() => open({ select: setSelected })}
-          upload={upload}
-          run={(action, selection) => {
-            const saved = history.value
-            const entry = selection.package
+    render: () => {
+      const guard = watchPackageSelection(ctx, selected, () => setSelected(undefined), connectionCheck)
 
-            if (saved?.connection === selection.connection && saved.items.some((item) => item.package.path === entry.path)) {
-              history.update((draft) => {
-                if (draft.connection === selection.connection) {
-                  draft.items = remember(draft.items, { package: entry, usedAt: Date.now(), action: action.title })
-                }
-              })
-            }
+      return (
+        <Suspense>
+          <Packages
+            selected={guard.visible()}
+            actions={actions()}
+            choose={() => open({ select: setSelected })}
+            upload={upload}
+            run={async (action, selection) => {
+              if (!(await guard.verify(selection)) || selected() !== selection) return
+              const saved = history.value
+              const { package: entry, connection } = selection
 
-            action.run(packageInput(selection))
-          }}
-        />
-      </Suspense>
-    ),
+              if (saved?.connection === connection.key && saved.items.some((item) => item.package.path === entry.path)) {
+                history.update((draft) => {
+                  if (draft.connection === connection.key) {
+                    draft.items = remember(draft.items, { package: entry, usedAt: Date.now(), action: action.title })
+                  }
+                })
+              }
+
+              action.run(packageInput(selection))
+            }}
+          />
+        </Suspense>
+      )
+    },
   })
 
   ctx.add(Page, {

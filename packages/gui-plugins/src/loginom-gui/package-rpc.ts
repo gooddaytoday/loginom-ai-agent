@@ -2,11 +2,16 @@ import { Definition } from "@loginom-ai-agent/loginom-agent/package-list"
 import type { Package as ServerPackage } from "@loginom-ai-agent/loginom-host/package-folder"
 import { UploadRpc } from "@loginom-ai-agent/loginom-host/package-upload"
 import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import type { PackageConnectionIdentity } from "./contract"
 import type { Package, Listing } from "./package-model"
 import { loginomLocation, type LoginomServer } from "./server"
 
 function toPackage(item: typeof ServerPackage.Type, folder: string): Package {
   return { name: item.name, path: item.path, modified: item.modifiedAt, size: item.sizeBytes, folder }
+}
+
+export function samePackageConnection(left: PackageConnectionIdentity, right: PackageConnectionIdentity) {
+  return left.server === right.server && left.key === right.key && left.generation === right.generation
 }
 
 export async function packageConnection(server: LoginomServer, signal: AbortSignal) {
@@ -25,16 +30,22 @@ export async function packageConnection(server: LoginomServer, signal: AbortSign
 
   if (connection.state !== "ready") return
   const { generation } = connection
-  const accountKey = (value: typeof connection) => JSON.stringify([value.url, value.username])
-  const key = accountKey(connection)
+
+  const identify = (value: typeof connection): PackageConnectionIdentity => ({
+    server: server.id,
+    key: JSON.stringify([value.url, value.username]),
+    generation: value.generation,
+  })
+
+  const identity = identify(connection)
   const rpc = client.rpc(Definition)
 
   return {
-    key,
+    identity,
     verify: async (signal: AbortSignal) => {
       const current = await status(signal)
 
-      return current.state === "ready" && current.generation === generation && accountKey(current) === key
+      return current.state === "ready" && samePackageConnection(identify(current), identity)
     },
     list: async (folder: string, signal: AbortSignal): Promise<Listing> => {
       const result = await rpc.list({ folder, generation }, { location, signal })

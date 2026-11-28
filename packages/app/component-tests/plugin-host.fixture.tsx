@@ -59,6 +59,7 @@ import { ExtensionPlugins } from "../src/runtime/plugin/extension-plugins"
 import { SessionPluginPills } from "../src/session/composer/plugin-pills"
 
 export { ComposerAddItem } from "@opencode/plugin/gui/builtin"
+
 import { ui } from "../src/runtime/plugin/ui"
 import { PluginPageNav, PluginPageRoute } from "../src/runtime/plugin/pages"
 import { pagePlugin } from "./page-plugin.fixture"
@@ -80,6 +81,7 @@ export {
 } from "@opencode/plugin/gui"
 
 export { Schema }
+
 export { BuiltinSlot } from "@opencode/plugin/gui/builtin"
 
 type PluginHost = ReturnType<typeof usePluginHost>

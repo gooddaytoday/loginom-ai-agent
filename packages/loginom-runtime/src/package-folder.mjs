@@ -175,8 +175,14 @@ export async function withPackageUploadSession({ login, origin, username, signal
       const path = `/user/${name}`
       const staged = `/user/.loginom-agent-${temporary}.part`
       let moved = false
-      const stream = await storage.CreateFile(staged)
       try {
+        const creating = Promise.resolve(storage.CreateFile(staged)).then(async stream => {
+          if (!cancelled) return stream
+          if (stream && ownsSession()) await ReleaseObject(stream, true)
+          return null
+        })
+        const stream = await Promise.race([creating, stopped])
+        if (!stream) return null
         try {
           for (let offset = 0; offset < bytes.length; offset += 512 * 1024) {
             if (cancelled) return null
@@ -208,7 +214,14 @@ export async function withPackageUploadSession({ login, origin, username, signal
       } finally {
         if (!moved) {
           try {
-            if (!ownsSession() || await storage.DeleteFile(staged) === false) return "cleanup_failed"
+            if (!ownsSession()) return "cleanup_failed"
+            if (await storage.DeleteFile(staged) === false) {
+              const remaining = await storage.GetFileInfo(staged)
+              if (remaining) {
+                await ReleaseObject(remaining, true)
+                return "cleanup_failed"
+              }
+            }
           } catch {
             return "cleanup_failed"
           }

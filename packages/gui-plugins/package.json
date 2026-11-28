@@ -8,6 +8,7 @@
   "exports": {
     "./renderer": "./src/renderer.ts",
     "./main": "./src/main.ts",
+    "./loginom-gui/contract": "./src/loginom-gui/contract.ts",
     "./terminal": "./src/terminal/index.ts",
     "./debug/options": "./src/debug/options.ts"
   },

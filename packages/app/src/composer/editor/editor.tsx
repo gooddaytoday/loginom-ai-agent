@@ -74,6 +74,7 @@ const MobilePanelDrawer = lazy(async () => {
 type ComposerMode = "normal" | "shell"
 
 const COMPOSER_SUGGESTION_MAX_HEIGHT = 320
+
 const COMPOSER_SUGGESTION_GAP = 8
 
 const COMPOSER_SUGGESTION_ROW_HEIGHT = 28
@@ -1291,11 +1292,13 @@ function ComposerEditorPopover(props: {
   const listID = props.id ?? createUniqueId()
   const active = createSelector(() => props.activeID)
   let container: HTMLDivElement | undefined
+
   const [store, setStore] = createStore({
     maxHeight: COMPOSER_SUGGESTION_MAX_HEIGHT,
     spaceAbove: COMPOSER_SUGGESTION_MAX_HEIGHT,
     spaceBelow: 0,
   })
+
   const opensBelow = () => store.spaceAbove < store.maxHeight && store.spaceBelow > store.spaceAbove
 
   const resize = (height: number) =>
@@ -1347,6 +1350,7 @@ function ComposerEditorPopover(props: {
 
     if (!viewport || !(anchor instanceof HTMLElement)) {
       setStore({ spaceAbove: COMPOSER_SUGGESTION_MAX_HEIGHT, spaceBelow: 0 })
+
       return
     }
 

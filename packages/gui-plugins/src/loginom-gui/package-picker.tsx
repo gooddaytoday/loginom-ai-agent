@@ -30,6 +30,7 @@ export default function Picker(props: {
   initialFile?: File
   acceptsFile: boolean
   recent: () => typeof History.Type | undefined
+  refreshSelection: () => void
   select: (selection: PackageSelection) => void
   showPage?: () => void
   close: () => void
@@ -73,7 +74,10 @@ export default function Picker(props: {
 
       return current && { current, attempt: retryStatus() }
     },
-    ({ current }, signal) => packageConnection(current, AbortSignal.any([signal, AbortSignal.timeout(12_000)])),
+    ({ current }, signal) =>
+      packageConnection(current, AbortSignal.any([signal, AbortSignal.timeout(12_000)])).finally(() => {
+        if (!signal.aborted) props.refreshSelection()
+      }),
   )
 
   const connected = () =>
@@ -157,7 +161,7 @@ export default function Picker(props: {
   const recent = createMemo(() => {
     const saved = props.recent()
 
-    if (!saved || (!connection.loading && connected()?.key !== saved.connection)) return []
+    if (!saved || (!connection.loading && connected()?.identity.key !== saved.connection)) return []
 
     return saved.items.filter((item) => matches(item.package.name, query()))
   })
@@ -204,7 +208,7 @@ export default function Picker(props: {
       if (signal.aborted || connected() !== current) return
 
       if (!verified) return setStatusIssue("changed")
-      props.select({ kind: "loginom", package: entry, connection: current.key })
+      props.select({ kind: "loginom", package: entry, connection: current.identity })
     } catch {
       if (!signal.aborted && connected() === current) setStatusIssue("packages.statusFailed")
     } finally {
@@ -256,7 +260,7 @@ export default function Picker(props: {
       if (attempt.signal.aborted) return
       const state = setUpload((previous) => transitionUpload(previous, { type: "saved", attempt, entry }))
 
-      if (state.kind === "uploaded") props.select({ kind: "loginom", package: state.entry, connection: current.key })
+      if (state.kind === "uploaded") props.select({ kind: "loginom", package: state.entry, connection: current.identity })
     } catch (error) {
       if (attempt.signal.aborted) return
       const failure = NameTaken(error) ? "nameTaken" : SessionLimit(error) ? "sessionLimit" : "uploadFailed"

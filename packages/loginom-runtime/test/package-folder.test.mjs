@@ -232,3 +232,34 @@ test("a timed-out WriteBuffer removes its staged file before logout even if the 
   assert.equal(staged.size, 0)
   assert.deepEqual(f.events, [["delete staged file"], ["logout"], ["close browser"]])
 })
+
+for (const stop of ["cancel", "timeout"]) {
+  test(`${stop} removes the staged file even when CreateFile never returns its handle`, async t => {
+    t.mock.timers.enable({ apis: ["setTimeout"] })
+    const f = fixture()
+    const abort = new AbortController()
+    const created = Promise.withResolvers()
+    const staged = new Set()
+    Object.assign(f.storage, {
+      CreateFile(name) {
+        staged.add(name)
+        created.resolve()
+        return new Promise(() => {})
+      },
+      MoveFile() { assert.fail("unconfirmed upload moved its staged file") },
+      DeleteFile(name) { assert.equal(staged.delete(name), true); f.events.push(["delete staged file", name]) },
+    })
+    const pending = assert.rejects(withPackageUploadSession({
+      login: f.login, origin, username, temporary: "no-handle", signal: abort.signal,
+      upload: { name: "Copy.lgp", content: Buffer.from("sample").toString("base64") },
+    }), { message: stop === "cancel" ? "cancelled" : "LOGINOM_PACKAGE_FOLDER_UNAVAILABLE" })
+    await created.promise
+    if (stop === "cancel") abort.abort(Error("cancelled"))
+    else t.mock.timers.tick(60_000)
+    await new Promise(resolve => setImmediate(resolve))
+    t.mock.timers.tick(6_000)
+    await pending
+    assert.deepEqual([...staged], [])
+    assert.deepEqual(f.events, [["delete staged file", "/user/.loginom-agent-no-handle.part"], ["logout"], ["close browser"]])
+  })
+}
