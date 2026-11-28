@@ -60,6 +60,8 @@ export default {
   "network.port.restart": "The new port will take effect after restarting the app.",
   "network.port.pending": "Port {{port}} saved. It will take effect after restarting the app.",
   "network.port.fallback": "Saved port {{port}} is unavailable. The service is using the default port {{current}}.",
+  "network.port.reconciling": "Checking whether the port was saved…",
+  "network.port.error.unconfirmed": "The save could not be confirmed. Check the service status or try again.",
   "network.port.unavailable": "Service port unavailable.",
   "network.port.error.invalid": "Enter a whole number from 1 to {{maximum}}.",
   "network.port.error.occupied": "This port is already in use. Choose another port.",

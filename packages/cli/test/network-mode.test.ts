@@ -106,47 +106,50 @@ test("Windows accepts configured ports only below 0x8000", () => {
   expect(ServiceConfig.maximumPort("linux")).toBe(65_535)
 })
 
-test.skipIf(process.platform !== "win32")(
-  "an occupied saved port falls back to the Desktop default",
-  async () => {
-    const root = await temporary("cli-network-fallback-")
-    const [occupied, fallbackListener] = await Promise.all([listen(), listen()])
-    const saved = boundPort(occupied)
-    const fallback = boundPort(fallbackListener)
-    await close(fallbackListener)
-    const name = "network-test"
-    await Bun.write(path.join(root, "config", `service-${name}.json`), JSON.stringify({ port: saved }))
-    try {
-      await serve(
-        root,
-        async (call, client) => {
-          await active(call, root)
-          expect((await client.rpc(Definition).status({}, { location: { directory: root } })).port).toEqual({
-            current: fallback,
-            saved,
-            fallback: saved,
-            editable: true,
-            maximum: 0x7fff,
-          })
-        },
-        {
-          LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "true",
-          LOGINOM_AI_AGENT_SERVICE_IDENTITY: name,
-          LOGINOM_AI_AGENT_SERVICE_PORT: String(fallback),
-        },
-        ["--service"],
-      )
-    } finally {
-      await close(occupied)
-    }
-  },
-  60_000,
-)
+test.each(["EADDRINUSE", "EACCES"] as const)("a saved Windows port with %s falls back to the Desktop default", async (code) => {
+  const root = await temporary("cli-network-fallback-")
+  const maximum = ServiceConfig.maximumPort("win32")
+  const [candidate, fallbackListener] = await Promise.all([listen(maximum), listen(maximum)])
+  const saved = boundPort(candidate)
+  const fallback = boundPort(fallbackListener)
+  await close(fallbackListener)
+  if (code === "EACCES") await close(candidate)
+  const name = "network-test"
+  await Bun.write(path.join(root, "config", `service-${name}.json`), JSON.stringify({ port: saved }))
+  try {
+    const result = await serve(
+      root,
+      async (call, client) => {
+        await active(call, root)
+        const settings = client.rpc(Definition)
+        const location = { location: { directory: root } }
+        expect((await settings.status({}, location)).port).toEqual({
+          current: fallback,
+          saved,
+          fallback: saved,
+          editable: true,
+          maximum,
+        })
+        expect(await settings.savePort({ port: 0x8000 }, location)).toBe("invalid")
+      },
+      {
+        LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "true",
+        LOGINOM_AI_AGENT_SERVICE_IDENTITY: name,
+        LOGINOM_AI_AGENT_SERVICE_PORT: String(fallback),
+      },
+      ["--service"],
+      { accessDeniedPort: code === "EACCES" ? saved : undefined },
+    )
+    expect(result.requests).toEqual([])
+  } finally {
+    if (candidate.listening) await close(candidate)
+  }
+}, 60_000)
 
-async function listen() {
+async function listen(maximum = ServiceConfig.maximumPort()) {
   for (let attempt = 0; attempt < 20; attempt++) {
     const server = net.createServer()
-    const port = process.platform === "win32" ? 20_000 + Math.floor(Math.random() * 12_000) : 0
+    const port = maximum < 65_535 ? 20_000 + Math.floor(Math.random() * 12_000) : 0
     const success = await new Promise<boolean>((resolve) => {
       server.once("error", () => resolve(false))
       server.listen(port, "127.0.0.1", () => resolve(true))
@@ -382,6 +385,7 @@ async function serve<A>(
   run: (call: Call, client: ReturnType<typeof OpenCode.make>) => Promise<A>,
   overrides: Record<string, string | undefined> = {},
   args = ["--port", "0"],
+  windows?: { accessDeniedPort?: number },
 ) {
   const requests: string[] = []
   const proxy = net.createServer((socket) =>
@@ -392,7 +396,10 @@ async function serve<A>(
   )
   await new Promise<void>((resolve) => proxy.listen(0, "127.0.0.1", resolve))
   const address = `http://127.0.0.1:${(proxy.address() as net.AddressInfo).port}`
-  const child = Bun.spawn([process.execPath, path.join(cli, "src/index.ts"), "serve", ...args], {
+  const command = windows
+    ? [path.join(import.meta.dir, "fixture/network-fallback.ts"), String(windows.accessDeniedPort ?? "")]
+    : [path.join(cli, "src/index.ts"), "serve", ...args]
+  const child = Bun.spawn([process.execPath, ...command], {
     // The CLI entry needs the preload from this package's bunfig.toml.
     cwd: cli,
     env: isolatedEnv(root, {

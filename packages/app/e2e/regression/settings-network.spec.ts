@@ -59,14 +59,14 @@ async function settings(
     }
 
     if (method === "savePort" && Schema.is(PortRequest)(payload)) {
+      if (payload.input.port === 28289) return route.fulfill({ headers, json: { output: "occupied" } })
+      port = { ...port, saved: payload.input.port }
+
       if (stallSave) {
         await stallSave
 
         return route.abort()
       }
-
-      if (payload.input.port === 28289) return route.fulfill({ headers, json: { output: "occupied" } })
-      port = { ...port, saved: payload.input.port }
 
       return route.fulfill({ headers, json: { output: "saved" } })
     }
@@ -139,7 +139,7 @@ test("shows when the service connects directly in the web app", async ({ page })
   await expect(screen.getByText("Без прокси · прямое подключение")).toBeVisible()
 })
 
-test("releases the form after the save request times out", async ({ page }) => {
+test("confirms a saved port using status after the save request times out", async ({ page }) => {
   const stall = Promise.withResolvers<void>()
 
   try {
@@ -150,11 +150,13 @@ test("releases the form after the save request times out", async ({ page }) => {
     await port.fill("28290")
     await save.click()
     await expect(save).toBeDisabled()
-    await expect(screen.getByRole("alert")).toHaveText("Не удалось использовать или сохранить этот порт.", {
+    await expect(screen.getByText("Порт 28290 сохранён. Он вступит в силу после перезапуска приложения.")).toBeVisible({
       timeout: 18_000,
     })
+    await expect(screen.getByRole("alert")).toHaveCount(0)
+    await expect(port).toBeEnabled()
     await expect(port).toHaveValue("28290")
-    await expect(save).toBeEnabled()
+    await expect(save).toBeDisabled()
   } finally {
     stall.resolve()
   }

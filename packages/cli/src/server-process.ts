@@ -38,8 +38,8 @@ export type Options = {
 }
 
 // The process effect lives until server shutdown; tracing it would parent every request to one process-lifetime trace.
-export const run = Effect.fnUntraced(function* (options: Options) {
-  return yield* processEffect(options).pipe(
+export const run = Effect.fnUntraced(function* (options: Options, platform = process.platform) {
+  return yield* processEffect(options, platform).pipe(
     Effect.provide(
       LayerNode.compile(LayerNode.group([Global.node, AppProcess.node]), {
         replacements: [
@@ -53,7 +53,7 @@ export const run = Effect.fnUntraced(function* (options: Options) {
   )
 })
 
-const processEffect = Effect.fnUntraced(function* (options: Options) {
+const processEffect = Effect.fnUntraced(function* (options: Options, platform: NodeJS.Platform) {
   const inherited = process.env.LOGINOM_AI_AGENT_PTY_HANDOFF
   delete process.env.LOGINOM_AI_AGENT_PTY_HANDOFF
   const handoff =
@@ -78,10 +78,10 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       const serviceOptions = options.mode === "service" ? yield* ServiceConfig.options() : undefined
       const config = options.mode === "service" ? yield* ServiceConfig.read() : {}
       const hostname = options.hostname ?? config.hostname ?? "127.0.0.1"
-      const defaultPort = options.mode === "service" ? ServiceConfig.defaultPort() : undefined
+      const defaultPort = options.mode === "service" ? ServiceConfig.defaultPort(LOGINOM_AI_AGENT_CHANNEL, platform) : undefined
       const port = options.port ?? config.port ?? defaultPort
       const fallbackPort =
-        process.platform === "win32" && options.port === undefined && port !== defaultPort ? defaultPort : undefined
+        platform === "win32" && options.port === undefined && port !== defaultPort ? defaultPort : undefined
       const findIncumbent = (candidate: number | undefined) =>
         serviceOptions !== undefined && candidate !== undefined
           ? Service.incumbent(
@@ -115,6 +115,7 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
       const settings = yield* networkSettings({
         editable: options.mode === "service" && options.port === undefined,
         hostname,
+        maximum: ServiceConfig.maximumPort(platform),
         proxy: serviceProxyStatus(process.env, config.env),
       })
       if (network === "device") process.env.LOGINOM_AI_AGENT_DISABLE_FREE_MODELS = "1"
@@ -254,7 +255,7 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
               yield* Effect.logWarning(`Saved service port ${port} is unavailable. Using default port ${fallbackPort}.`)
               return yield* launchManaged(fallbackPort, port)
             })
-            if (port > ServiceConfig.maximumPort()) return yield* fallback
+            if (port > ServiceConfig.maximumPort(platform)) return yield* fallback
             // Give a competing launch time to register before switching to a second listener.
             return yield* launchManaged(port).pipe(Effect.catchIf(portUnavailable, () => fallback))
           })

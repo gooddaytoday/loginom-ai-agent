@@ -7,23 +7,25 @@ import { ServiceConfig } from "./service-config"
 export const networkSettings = Effect.fnUntraced(function* (input: {
   editable: boolean
   hostname: string
+  maximum: number
   proxy: ProxyStatus
 }) {
   const readService = ServiceConfig.read()
   const run = Effect.runPromiseWith(yield* Effect.context<Effect.Services<typeof readService>>())
   const gate = yield* Semaphore.make(1)
-  const maximum = ServiceConfig.maximumPort()
+  const { maximum } = input
   let listening: { current: number; fallback?: number } | undefined
 
-  const status = async (): Promise<Status> => {
+  const status = Effect.gen(function* () {
     const port = listening
     if (!port) return { proxy: input.proxy }
-    const saved = input.editable ? ((await run(readService)).port ?? port.current) : port.current
-    return { proxy: input.proxy, port: { ...port, saved, maximum, editable: input.editable } }
-  }
+    const saved = input.editable ? ((yield* readService).port ?? port.current) : port.current
+    return { proxy: input.proxy, port: { ...port, saved, maximum, editable: input.editable } } satisfies Status
+  })
 
   const handlers: RpcHandlers<typeof Definition> = {
-    status,
+    // After a lost save response, the status read waits for an atomic write already in progress.
+    status: (_, { signal }) => run(gate.withPermit(status), { signal }),
     savePort: ({ port }, { signal }) => {
       if (port > maximum) return Promise.resolve("invalid")
       return run(

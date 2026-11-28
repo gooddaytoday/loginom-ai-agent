@@ -24,7 +24,7 @@ export default function NetworkPage() {
   const form = () => {
     const value = state()
 
-    return value.type === "ready" || value.type === "saving" ? value : undefined
+    return value.type === "ready" || value.type === "saving" || value.type === "reconciling" ? value : undefined
   }
 
   const port = () => form()?.status.port
@@ -43,7 +43,8 @@ export default function NetworkPage() {
     return value.type === "ready" ? value.issue : undefined
   }
 
-  const saving = () => state().type === "saving"
+  const reconciling = () => state().type === "reconciling"
+  const busy = () => state().type === "saving" || reconciling()
   let controller: AbortController | undefined
 
   function dispatch(event: Parameters<typeof transition>[1]) {
@@ -77,7 +78,7 @@ export default function NetworkPage() {
 
       case "save": {
         const result = options && (await rpc?.savePort({ port: command.port }, options).catch(() => undefined))
-        dispatch({ type: "saved", attempt: command.attempt, result: result ?? "unavailable" })
+        dispatch({ type: "saved", attempt: command.attempt, result })
         break
       }
     }
@@ -125,17 +126,17 @@ export default function NetworkPage() {
                     inputmode="numeric"
                     label={ctx.t("network.port.next")}
                     hideLabel
-                    validationState={issue() ? "invalid" : "valid"}
+                    validationState={issue() && issue() !== "unconfirmed" ? "invalid" : "valid"}
                     aria-describedby="loginom-network-port-message"
                     value={form()?.draft ?? ""}
-                    disabled={saving()}
+                    disabled={busy()}
                     onChange={(draft) => dispatch({ type: "edit", draft })}
                   />
                 </div>
                 <ui.Button
                   type="submit"
                   variant="contrast"
-                  disabled={saving() || form()?.draft === String(port()?.saved)}
+                  disabled={busy() || form()?.draft === String(port()?.saved)}
                 >
                   {ctx.t("save")}
                 </ui.Button>
@@ -148,11 +149,13 @@ export default function NetworkPage() {
             <div id="loginom-network-port-message" class="text-11-regular text-v2-text-text-muted">
               <p role="status">
                 {ctx.t(
-                  status().fallback === status().saved
-                    ? "network.port.fallback"
-                    : status().saved === status().current
-                      ? "network.port.restart"
-                      : "network.port.pending",
+                  reconciling()
+                    ? "network.port.reconciling"
+                    : status().fallback === status().saved
+                      ? "network.port.fallback"
+                      : status().saved === status().current
+                        ? "network.port.restart"
+                        : "network.port.pending",
                   {
                     port: status().saved,
                     current: status().current,

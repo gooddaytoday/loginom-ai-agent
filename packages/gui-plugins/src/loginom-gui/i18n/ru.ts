@@ -60,6 +60,8 @@ export default {
   "network.port.restart": "Новый порт вступит в силу после перезапуска приложения.",
   "network.port.pending": "Порт {{port}} сохранён. Он вступит в силу после перезапуска приложения.",
   "network.port.fallback": "Сохранённый порт {{port}} недоступен. Служба использует порт по умолчанию {{current}}.",
+  "network.port.reconciling": "Проверяем, сохранился ли порт…",
+  "network.port.error.unconfirmed": "Сохранение порта не подтверждено. Проверьте состояние службы или повторите попытку.",
   "network.port.unavailable": "Нет данных о порте службы.",
   "network.port.error.invalid": "Введите целое число от 1 до {{maximum}}.",
   "network.port.error.occupied": "Этот порт уже занят. Выберите другой порт.",

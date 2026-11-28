@@ -1,13 +1,13 @@
 import type { SaveResult, Status } from "@loginom-ai-agent/loginom-host/network-settings-rpc"
 
-type Issue = Exclude<SaveResult, "saved">
+type Issue = Exclude<SaveResult, "saved"> | "unconfirmed"
 
 type Form = { status: Status; draft: string }
 
 export type State = { attempt: number } & (
   | { type: "loading" | "unavailable" | "disposed" }
   | ({ type: "ready"; issue?: Issue } & Form)
-  | ({ type: "saving"; port: number } & Form)
+  | ({ type: "saving" | "reconciling"; port: number } & Form)
 )
 
 type Event =
@@ -16,7 +16,7 @@ type Event =
   | { type: "loaded"; attempt: number; status?: Status }
   | { type: "edit"; draft: string }
   | { type: "save" }
-  | { type: "saved"; attempt: number; result: SaveResult }
+  | { type: "saved"; attempt: number; result?: SaveResult }
 
 export type Command =
   | { type: "status"; attempt: number }
@@ -38,12 +38,27 @@ export function transition(state: State, event: Event): Transition {
       return event.available
         ? { state: { type: "loading", attempt: attempt + 1 }, command: { type: "status", attempt: attempt + 1 } }
         : { state: { type: "unavailable", attempt: attempt + 1 }, command: { type: "cancel" } }
-    case "loaded":
-      if (state.type !== "loading" || event.attempt !== attempt) return { state }
+    case "loaded": {
+      if (event.attempt !== attempt) return { state }
+      const { status } = event
+
+      if (state.type === "reconciling") {
+        if (status?.port?.saved === state.port) {
+          return { state: { type: "ready", attempt, status, draft: String(state.port) } }
+        }
+
+        return {
+          state: { type: "ready", attempt, status: status ?? state.status, draft: state.draft, issue: "unconfirmed" },
+        }
+      }
+
+      if (state.type !== "loading") return { state }
 
       return event.status
         ? { state: { type: "ready", attempt, status: event.status, draft: String(event.status.port?.saved ?? "") } }
         : { state: { type: "unavailable", attempt } }
+    }
+
     case "edit":
       return state.type === "ready" ? { state: { ...state, draft: event.draft, issue: undefined } } : { state }
     case "save": {
@@ -64,6 +79,13 @@ export function transition(state: State, event: Event): Transition {
     case "saved": {
       if (state.type !== "saving" || event.attempt !== attempt) return { state }
       const { status, draft } = state
+
+      if (event.result === undefined) {
+        return {
+          state: { ...state, type: "reconciling", attempt: attempt + 1 },
+          command: { type: "status", attempt: attempt + 1 },
+        }
+      }
 
       if (event.result !== "saved") return { state: { type: "ready", attempt, status, draft, issue: event.result } }
 
