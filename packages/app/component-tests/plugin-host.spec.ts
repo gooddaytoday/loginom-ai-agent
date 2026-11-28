@@ -41,6 +41,73 @@ story.beforeEach(async ({ mount }) => {
   await mount("ui-line-comment--editor")
 })
 
+story("only a built-in plugin can add a form to the provider dialog", async ({ page }) => {
+  const [builtin, thirdParty] = await page.evaluate(async (fixture) => {
+    const { canAddProviderSetup } = await import(fixture)
+
+    return [await canAddProviderSetup(true), await canAddProviderSetup(false)]
+  }, fixture)
+
+  expect(builtin).toBe(1)
+  expect(thirdParty).toBe(0)
+})
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  story(`a Studio link opens a dashboard and its edit draft at ${viewport.width}px`, async ({ page }, info) => {
+    await page.setViewportSize(viewport)
+
+    const target = {
+      id: "665afd45-1298-4c90-9086-1dd73ca94902",
+      directory: "/data/dashboards/orders/work",
+      nodeName: "Заказы",
+      action: "edit" as const,
+    }
+
+    const host = await page.evaluateHandle(
+      async ({ fixture, target }) => {
+        const { mountDashboard } = await import(fixture)
+
+        return mountDashboard(target)
+      },
+      { fixture, target },
+    )
+
+    const panel = page.getByRole("region", { name: "Дашборд", exact: true })
+    await expect(panel.getByRole("heading", { name: "Заказы" })).toBeVisible()
+    await expect(panel.getByText("Строк в результате: 2")).toBeVisible()
+    await page.screenshot({ path: info.outputPath(`dashboard-${viewport.width}x${viewport.height}.png`) })
+
+    const expired = /Ссылка из Studio уже использована.*получите новую ссылку/
+
+    await host.evaluate((dashboard) => dashboard.deliver({ id: "other", code: "DASHBOARD_SNAPSHOT_UNAVAILABLE" }))
+    await expect(page.getByRole("alert")).toHaveText(expired)
+    await expect(panel.getByRole("alert")).toHaveCount(0)
+    await host.evaluate((dashboard, id) => dashboard.deliver({ id, code: "DASHBOARD_SNAPSHOT_UNAVAILABLE" }), target.id)
+    await expect(panel.getByRole("alert")).toHaveText(expired)
+    await expect(panel.getByRole("heading", { name: "Заказы" })).toBeVisible()
+    await panel.getByRole("button", { name: "Изменить в чате" }).click()
+    await expect
+      .poll(() => host.evaluate((dashboard) => dashboard.drafts))
+      .toEqual([
+        {
+          server: "sidecar",
+          directory: target.directory,
+          prompt: "Помоги изменить дашборд для узла «Заказы».",
+        },
+      ])
+
+    const locations = await host.evaluate((dashboard) =>
+      [...dashboard.previews, ...dashboard.finds].map((url) => new URL(url).searchParams.get("location[directory]")),
+    )
+
+    expect(locations).toEqual([target.directory, target.directory, target.directory])
+    await host.evaluate((dashboard) => dashboard.unmount())
+  })
+}
+
 story(
   "a plugin page uses its contribution context and becomes unavailable when its plugin is disabled",
   async ({ page }) => {
@@ -104,23 +171,28 @@ story("a restored plugin page shows a loader while waiting for settings and whil
   await host.evaluate((host) => host.unmount())
 })
 
-story("a third-party plugin cannot register a page with a public registry token", async ({ page }) => {
-  const result = await page.evaluate(async (fixture) => {
-    const { mountPluginHost, Registry, until } = await import(fixture)
-    const host = mountPluginHost()
+for (const registry of ["page", "question.renderer"]) {
+  story(`a third-party plugin cannot register ${registry} with a public registry token`, async ({ page }) => {
+    const result = await page.evaluate(async ({ fixture, registry }) => {
+      const { mountPluginHost, Registry, until } = await import(fixture)
+      const host = mountPluginHost()
 
-    try {
-      host.load((ctx: Context) => ctx.add(Registry.define("page"), { id: "overview", title: "Third-party page" }))
-      await until(() => host.status() === "failed" || host.status() === "active")
+      const contribution =
+        registry === "page" ? { id: "overview", title: "Third-party page" } : { matches: () => true, render: () => null }
 
-      return { status: host.status(), pages: host.entries("page") }
-    } finally {
-      host.unmount()
-    }
-  }, fixture)
+      try {
+        host.load((ctx: Context) => ctx.add(Registry.define(registry), contribution))
+        await until(() => host.status() === "failed" || host.status() === "active")
 
-  expect(result).toEqual({ status: "failed", pages: 0 })
-})
+        return { status: host.status(), entries: host.entries(registry) }
+      } finally {
+        host.unmount()
+      }
+    }, { fixture, registry })
+
+    expect(result).toEqual({ status: "failed", entries: 0 })
+  })
+}
 
 story("a third-party plugin cannot register a turn presentation with a public registry token", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {
@@ -1034,6 +1106,36 @@ story(
     expect(result).toEqual({ during: 1, ended: 0, late: 0 })
   },
 )
+
+story("the new-session slot renders nothing without a plugin", async ({ page }) => {
+  const result = await page.evaluate(async (fixture) => {
+    const { mountPlugins, BuiltinSlot, until } = await import(fixture)
+
+    const host = mountPlugins({
+      definitions: [
+        {
+          id: "fixture",
+          windowEntry: async () => ({
+            default: (ctx: Context) => void ctx.add(BuiltinSlot, { at: "session.new.heading", render: () => "Draft heading" }),
+          }),
+        },
+      ],
+    })
+
+    try {
+      const heading = () => host.container.querySelector('[data-testid="draft-heading"]')
+      await until(() => heading()?.textContent === "Draft heading")
+      host.define([])
+      await until(() => heading()?.textContent === "")
+
+      return { elements: heading()?.childElementCount, errors: host.escaped() }
+    } finally {
+      host.unmount()
+    }
+  }, fixture)
+
+  expect(result).toEqual({ elements: 0, errors: [] })
+})
 
 story("a contribution that throws renders nothing and records the error; the others stay", async ({ page }) => {
   const result = await page.evaluate(async (fixture) => {

@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {runInNewContext} from 'node:vm';
 import { validateActionParameters } from '../lib/action-catalog.mjs';
 import { actions, selectors, build, Page, nodeParameters, linkPage, linkParameters, run, runtime } from './support/executor-fixture.mjs';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from '../../tools/loginom-acceptance/javascript-persistence-save.mjs';
@@ -12,6 +14,26 @@ import {withStorageIdentity} from '../lib/storage-policy.mjs';
 import {readPreparedNodeContext} from '../lib/node-context.mjs';
 import {readUserVariablesSnapshot} from '../lib/crosstable-variables.mjs';
 import {makePackageCleanupCode} from '../lib/package-cleanup.mjs';
+import {savedCopyDigest} from '../../src/saved-copy-readback.mjs';
+
+test('an independent readback opens only the exact saved package, in read mode',async()=>{
+ const saved=new Uint8Array([0,255,3]);
+ const target='/fixture/packages/target.lgp';
+ const opened=[];
+ const stream={Size:saved.length,ReadBuffer:async bytes=>bytes.set(saved)};
+ const storage={
+  GetFileInfo:async path=>path===target?{Size:saved.length}:null,
+  OpenFile:async (path,mode)=>{opened.push([path,mode]);return stream;},
+ };
+ const connection={Connected:true,UserName:'fixture',Session:{get_FileStorage:async()=>storage}};
+ const page={evaluate:(read,path)=>runInNewContext(`(${read})(path)`,{path,btoa,ReleaseObject:async()=>{},bg:{
+  TBGFileOpenMode:{fomRead:'read'},app:{Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:connection}}}}},
+ }})};
+ const browser={pages:()=>[page]};
+ assert.equal(await savedCopyDigest(browser,target),createHash('sha256').update(saved).digest('hex'));
+ assert.equal(await savedCopyDigest(browser,'/fixture/packages/other.lgp'),null);
+ assert.deepEqual(opened,[[target,'read']]);
+});
 
 test('a retained preparation cannot mask a settled node worker using the same ID',async()=>{
  const page=new Page(),receipt={status:'READY',operation_id:'shared'};
@@ -120,6 +142,7 @@ test(action+' reconciles a lost Save As response without repeating Save: '+fault
   if(mismatch)assert.equal(inspected.output.outcome.error.code,'SAVE_RESULT_MISMATCH');
   assert.equal(original.packageNode,oldPackage);assert.equal(page.saveWrites,1);
   if(mismatch){
+   assert.equal(page.saveWrites,1);
    const repeated=await engine.run(action,{path,conflict_policy:'fail'},{operationId:'lost-save'});
    assert.equal(repeated.status,'NOT_APPLIED');assert.equal(repeated.effect_possible,true);assert.equal(page.saveWrites,1);
   }
@@ -970,7 +993,11 @@ async function restSavePage(modified, restReference = true) {
  page.context.location={origin:'https://loginom.invalid'};
  page.context.__loginomDockPreparationV1.receipts.get('prepared').request=JSON.stringify({session:'save-session'});
  await page.execute('async page=>{const p=globalThis.__loginomDockPreparationV1;p.receipts=new Map(p.receipts);return true;}');
- page.context.setTimeout=(callback,ms)=>page.waitForTimeout(ms).then(callback);
+ page.context.setTimeout=(callback,ms)=>{
+  const due=page.clock+ms;
+  return setImmediate(()=>page.waitForTimeout(Math.max(0,due-page.clock)).then(callback));
+ };
+ page.context.clearTimeout=clearImmediate;
  page.saveWrites=0;page.modifiedReads=0;
  const save=page.save.bind(page),elements=page.elements.bind(page),click=page.click.bind(page);
  page.save=()=>{page.saveWrites++;save();};
@@ -1212,6 +1239,63 @@ test('REST normalization keeps continuations when the last allowed clean read co
  assert.equal(outcome.trace.find(e=>e.event==='rest_package_normalization').modified_after,false);
  assert.equal(page.saveWrites,2);
  assert.equal(page.events.filter(e=>e==='package_reopened').length,1);
+});
+
+for(const cleanAfter of [4900,5200,Infinity])
+test('REST normalization confirms the same Save at '+cleanAfter+' ms',async()=>{
+ const page=await restSavePage([true]);
+ const session=page.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session;
+ const reads=[];
+ let savedAt;
+ const click=page.click.bind(page);
+ page.click=async item=>{
+  await click(item);
+  if(item.symbol==='native-save')savedAt=page.clock;
+ };
+ session.IsPackageModified=async()=>{
+  if(savedAt===undefined)return true;
+  const elapsed=page.clock-savedAt;
+  reads.push(elapsed);
+  // The control RPC starts at the cutoff and receives its reply 200 ms later.
+  if(elapsed>=5000)await page.waitForTimeout(200);
+  return page.clock-savedAt<cleanAfter;
+ };
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'});
+ const clean=cleanAfter!==Infinity;
+ assert.equal(outcome.status,clean?'SUCCEEDED':'AMBIGUOUS',JSON.stringify(outcome));
+ if(clean)assert.equal(outcome.output.workflow_continuations.length,1);
+ else assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ assert.deepEqual(reads.filter(ms=>ms>=5000),cleanAfter<5000?[]:[5000]);
+ assert.equal(outcome.trace.find(e=>e.event==='rest_package_normalization').modified_after,!clean);
+ assert.equal(page.saveWrites,2);
+});
+
+for(const budget of [20000,10600])
+test('REST normalization stops waiting for a late confirmation and keeps the continuation reserve: '+budget,{timeout:5000},async()=>{
+ const page=await restSavePage([true]),deadline=page.clock+budget;
+ const evaluate=page.evaluate.bind(page);
+ const session=page.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session;
+ let confirmationStarted,finishRead;
+ page.evaluate=async(fn,arg)=>{
+  if(arg?.cleanDeadline!==undefined)session.IsPackageModified=async()=>{
+   if(page.clock<arg.cleanDeadline)return true;
+   assert.equal(confirmationStarted,undefined,'only one confirmation RPC is allowed');
+   confirmationStarted=page.clock;
+   return new Promise(resolve=>{finishRead=resolve;});
+  };
+  return evaluate(fn,arg);
+ };
+ const outcome=await run(page,'package.save_checkpoint',{path:'/user/data/packages/rest.lgp',conflict_policy:'fail'},{deadline_at:deadline});
+ assert.equal(typeof finishRead,'function',JSON.stringify(outcome.trace.find(e=>e.event==='rest_package_normalization')));
+ finishRead(false);
+ assert.equal(outcome.status,'AMBIGUOUS');
+ assert.match(outcome.error.message,/REST_PACKAGE_NORMALIZATION_STILL_MODIFIED/);
+ const confirmationTime=page.clock-confirmationStarted;
+ assert.ok(confirmationTime>0&&confirmationTime<=500);
+ assert.ok(deadline-page.clock>=5000);
+ if(budget===10600)assert.ok(confirmationTime<500,'confirmation must use only the time left before the reserve');
+ assert.equal(outcome.trace.find(e=>e.event==='rest_package_normalization').modified_after,true);
+ assert.equal(page.saveWrites,2);
 });
 
 test('REST normalization stops if the native session changes between modified-state reads',async()=>{

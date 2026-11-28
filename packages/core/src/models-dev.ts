@@ -1,4 +1,18 @@
-import { Cause, Context, Duration, Effect, Layer, Option, Result, Schedule, Schema, Semaphore } from "effect"
+import {
+  Cause,
+  Clock,
+  Context,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  PubSub,
+  Result,
+  Schedule,
+  Schema,
+  Semaphore,
+  Stream,
+} from "effect"
 import { HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http"
 import { ConfigProvider } from "@opencode/schema/config/provider"
 import { MaxTokensField, MediaInput } from "@opencode/schema/model-compatibility"
@@ -476,6 +490,8 @@ export { Event } from "@opencode/schema/models-dev"
 export interface Interface {
   readonly get: () => Effect.Effect<readonly Snapshot[]>
   readonly refresh: (force?: boolean) => Effect.Effect<void>
+  readonly remoteAvailable?: Effect.Effect<boolean>
+  readonly remoteAvailabilityChanges?: Stream.Stream<boolean>
 }
 
 export const Options = Schema.Struct({
@@ -556,11 +572,20 @@ export const layer = (options?: Options) =>
 
       const source = options?.url || defaultSource
       const fetch = options?.fetch ?? true
+      const refreshEnabled = fetch && !process.argv.includes("--get-yargs-completions")
       const userAgent = App.useragent(app)
       const key = cacheKey(source)
       const metaKey = `${key}:meta`
       const ttl = Duration.minutes(5)
+      const availabilityTTL = Duration.toMillis(Duration.minutes(1))
       const lock = Semaphore.makeUnsafe(1)
+      const availabilityChanges = yield* PubSub.sliding<boolean>(1)
+      let checked: { available: boolean; at: number } | undefined
+      const markAvailability = Effect.fnUntraced(function* (result: boolean) {
+        const previous = checked?.available
+        checked = { available: result, at: yield* Clock.currentTimeMillis }
+        if (result !== previous) yield* PubSub.publish(availabilityChanges, result)
+      })
       // The v1 catalog was cached under unversioned keys; free that multi-MB row.
       yield* kv.remove(key.replace("models-dev:v2:", "models-dev:"))
       yield* kv.remove(`${key.replace("models-dev:v2:", "models-dev:")}:meta`)
@@ -668,16 +693,32 @@ export const layer = (options?: Options) =>
 
       const get = (): Effect.Effect<readonly Snapshot[]> => cachedGet
 
-      const refresh = Effect.fn("ModelsDev.refresh")(function* (force = false) {
+      const refresh = Effect.fn("ModelsDev.refresh")(function* (force = false, checkAvailability = false) {
         yield* lock
           .withPermit(
             Effect.gen(function* () {
+              if (checkAvailability && checked && (yield* Clock.currentTimeMillis) - checked.at <= availabilityTTL)
+                return
               const stored = Option.getOrUndefined(
                 Schema.decodeUnknownOption(CacheMeta)((yield* kv.get(metaKey)) ?? (yield* kv.get(key))),
               )
-              if (!force && stored && Date.now() - stored.updatedAt < Duration.toMillis(ttl)) return
-              const response = yield* fetchApi(force ? undefined : stored?.etag)
-              const digest = response && bodyDigest(response.text)
+              if (
+                !force &&
+                !checkAvailability &&
+                (!refreshEnabled || checked !== undefined) &&
+                stored &&
+                Date.now() - stored.updatedAt < Duration.toMillis(ttl)
+              )
+                return
+              const { response, digest } = yield* Effect.gen(function* () {
+                const response = yield* fetchApi(force ? undefined : stored?.etag)
+                const digest = response && bodyDigest(response.text)
+                if (response && (force || stored?.digest !== digest)) yield* decodeCatalog(response.text)
+                return { response, digest }
+              }).pipe(
+                Effect.tap(() => markAvailability(true)),
+                Effect.tapError(() => markAvailability(false)),
+              )
               // models.dev rarely changes between polls; skip invalidation and
               // the Refreshed event for a byte-identical body so downstream
               // provider/model update listeners stay quiet.
@@ -686,7 +727,6 @@ export const layer = (options?: Options) =>
                 return
               }
               if (!response) return
-              yield* decodeCatalog(response.text)
               yield* writeCache(response.text, response.etag, digest)
               yield* invalidate
               yield* bus.publish(ModelsDev.Event.Refreshed, {}, { global: true })
@@ -698,12 +738,19 @@ export const layer = (options?: Options) =>
           )
       })
 
-      if (fetch && !process.argv.includes("--get-yargs-completions")) {
+      if (refreshEnabled) {
         // Schedule.spaced runs the effect once, then waits between completions.
         yield* Effect.forkScoped(refresh().pipe(Effect.repeat(Schedule.spaced(ttl)), Effect.ignore))
       }
 
-      return Service.of({ get, refresh })
+      return Service.of({
+        get,
+        refresh,
+        remoteAvailable: refreshEnabled
+          ? refresh(false, true).pipe(Effect.map(() => checked?.available ?? false))
+          : undefined,
+        remoteAvailabilityChanges: refreshEnabled ? Stream.fromPubSub(availabilityChanges) : undefined,
+      })
     }),
   )
 

@@ -57,6 +57,7 @@ test("static extraction validation detects missing, altered, escaped and foreign
       await writeFile(join(directory, file), executable)
       await chmod(join(directory, file), 0o755)
     }
+    await Bun.write(join(directory, "host/node-host.mjs"), "export {}")
     expect((await verifyResourceTree(directory, hash(manifest))).files).toBe(resource.files.length)
     for (const path of [
       "skills/package-docs/scripts/package-docs.mjs",
@@ -136,6 +137,7 @@ test("validates win32-x64 PE resources and unpacked application payload", async 
     await writeFile(join(directory, "LICENSE.electron.txt"), "electron")
     await writeFile(join(directory, "LICENSES.chromium.html"), "chromium")
 
+    await Bun.write(join(directory, "resources/loginom/host/node-host.mjs"), "export {}")
     expect((await verifyWindowsApplication(directory, "loginom-ai-agent", hash(manifest))).target).toBe("win32-x64")
     executable.writeUInt16LE(0x014c, executable.readUInt32LE(0x3c) + 4)
     await writeFile(join(directory, "resources/loginom", paths.browser), executable)
@@ -175,6 +177,7 @@ test.skipIf(process.platform === "win32")(
       }
       const manifest = JSON.stringify(resource)
       await writeFile(join(directory, "resource-manifest.json"), manifest)
+      await Bun.write(join(directory, "host/node-host.mjs"), "export {}")
       expect((await verifyResourceTree(directory, hash(manifest), "darwin-arm64")).files).toBe(3)
       await chmod(join(directory, "node"), 0o644)
       await expect(verifyResourceTree(directory, hash(manifest), "darwin-arm64")).rejects.toThrow(
@@ -364,6 +367,7 @@ test.skipIf(process.platform !== "darwin")(
         files: ["node", "chrome"].map((path) => ({ path, sha256: hash(code) })),
       })
       await writeFile(join(resources, "resource-manifest.json"), inventory)
+      await Bun.write(join(resources, "host/node-host.mjs"), "export {}")
       const marker = join(bundle, "Contents/Resources/marker.txt")
       await writeFile(marker, "sealed resource")
       await $`codesign --force --sign - ${bundle}`.quiet()
@@ -468,6 +472,8 @@ test("verify-artifact accepts the installer listed in the manifest and rejects a
       await writeFile(join(resources, path), executable)
     }
     await writeFile(join(resources, "resource-manifest.json"), inventory)
+    const host = join(resources, "host/node-host.mjs")
+    await Bun.write(host, "export {}")
     await mkdir(join(directory, "app/resources/icons"), { recursive: true })
     for (const path of ["loginom-ai-agent.exe", "LICENSE.electron.txt", "LICENSES.chromium.html"])
       await writeFile(join(directory, "app", path), path.endsWith(".exe") ? executable : path)
@@ -490,6 +496,10 @@ test("verify-artifact accepts the installer listed in the manifest and rejects a
       expect(result.exitCode).not.toBe(0)
       expect(result.stderr.toString()).toContain(code)
     }
+    await Bun.write(host, 'export const marker = "con08-fault"')
+    await failure("manifest.json", artifact.file, "RELEASE_CON08_FIXTURE_PRESENT")
+    await Bun.write(host, "export {}")
+
     const altered = Buffer.from(installer)
     altered[100] ^= 1
     await write("altered.exe", altered)

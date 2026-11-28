@@ -1,7 +1,7 @@
 import { PluginError } from "./error"
 import type { ErrorLog } from "./lifecycle"
 
-/** Bounds one load of the host module and the CLI, so no caller waits on a hung load forever. */
+/** Bounds one load of the host module, so no caller waits on a hung load forever. */
 export const LOAD_TIMEOUT_MS = 30_000
 
 /** Settles a caller's promise. */
@@ -80,8 +80,7 @@ export function transition<Host>(state: State<Host>, event: Event<Host>): Transi
 
   if (state.status === "loading") return loading(state, event)
 
-  // The CLI lookup a timed-out load waited on keeps running. When it finishes and nothing replaced that load, its host
-  // still serves the start and the subscriptions it was for.
+  // A timed-out load keeps running. If nothing replaced it, its host still serves the start and the subscriptions.
   if (event.type === "load.succeeded" && state.status === "idle" && event.attempt === state.attempt)
     return loaded(event.host, state.started, [], [])
 
@@ -269,7 +268,7 @@ export function createDriver<
     demand(ipc: string): void
   },
 >(input: {
-  /** Loads the host module and the CLI, and returns how to build the host from them. */
+  /** Loads the host module and returns how to build the host from it. */
   readonly load: () => Promise<() => Host>
   /** The Ipcs windows subscribed to. */
   readonly subscribed: () => readonly string[]

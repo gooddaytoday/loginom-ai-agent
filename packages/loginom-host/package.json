@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./system-proxy": "./src/system-proxy/index.ts",
+    "./write-outcomes": "./src/connection/write-outcomes.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {
@@ -14,6 +15,7 @@
   },
   "dependencies": {
     "@loginom-ai-agent/product": "workspace:*",
+    "@loginom-ai-agent/runtime": "workspace:*",
     "@opencode/schema": "workspace:*",
     "@xmldom/xmldom": "0.8.15",
     "@zip.js/zip.js": "2.7.62",

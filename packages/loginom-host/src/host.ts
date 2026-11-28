@@ -2,14 +2,16 @@ import { inputStore, type InputFile } from "./inputs"
 import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
-import { connectionService } from "./connection/connection-service"
+import { connectionService, type RuntimeHandle } from "./connection/connection-service"
 import { connectionStore, type ActiveConnection } from "./connection/connection-store"
 import type { CredentialCodec } from "./connection/credentials"
 import { recoveryStore } from "./connection/recovery-store"
+import { SavedCopyReadback, type WriteVerdict, writeOutcomes, type WriteRecord } from "./connection/write-outcomes"
+import { StepCheckResult, StepOperationId } from "./step-state"
 import { fileReferences } from "./file-reference"
 import { dashboardRequest, type DashboardStorageOperation } from "../../loginom-runtime/src/dashboard-storage.mjs"
 import { DashboardRead, DashboardDelete, DashboardDeleteResult, DashboardPublish, PublicationRef, PublicationSet, PublicationSource, PublicationWrite, decodeDashboardDeleteResult } from "./dashboard"
@@ -211,9 +213,13 @@ export async function createLoginomHost(options: {
   headless?: boolean
   preflightHeadless?: boolean
   strictRecovery?: boolean
+  desktopWriteOutcomes?: boolean
   closeSavedPackageOnShutdown?: boolean
   // Private launcher capability baked into packaged release builds; never from env or the model.
   browserRecovery?: boolean
+  // The Node entry may wrap replacement preparation in a CON-08 fixture build.
+  prepareConnectionSwitch?: (prepare: () => Promise<RuntimeHandle>, signal: AbortSignal) => Promise<RuntimeHandle>
+  onConnectionApplication?: Loginom.ConnectionApplicationListener
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
@@ -223,6 +229,8 @@ export async function createLoginomHost(options: {
   const references = fileReferences(join(root, "file-references"))
   await references.cleanup()
   const journal = await recoveryStore(join(root, "recovery"), { strict: options.strictRecovery === true })
+  const writes = options.desktopWriteOutcomes && !options.strictRecovery
+    ? await writeOutcomes(join(root, "write-outcomes")) : undefined
   const generations = new Map<
     number,
     {
@@ -491,6 +499,48 @@ export async function createLoginomHost(options: {
     }
     throw error
   }
+  async function prepareGeneration(connection: ActiveConnection, signal?: AbortSignal): Promise<RuntimeHandle> {
+    const knowledge = await superviseKnowledge(
+      {
+        node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
+        entry: join(resources, "runtime/src/knowledge-entry.mjs"),
+        stateDir: join(root, "knowledge", String(connection.generation)),
+        generation: connection.generation,
+        helpRoot: join(resources, "help"),
+        environment,
+      },
+      signal,
+    ).catch(startupFailure)
+    const catalog = knowledge.request("list")
+    const ready = catalog.then(() => undefined)
+    const generation = { connection, knowledge, catalog, ready, children: new Map<string, Promise<Runtime>>() }
+    generations.set(connection.generation, generation)
+    void ready.catch(() => undefined)
+    return {
+      ready,
+      async reset() {
+        const results = await Promise.allSettled(
+          [...generation.children.entries()].map(async ([chat, child]) => {
+            await (await child).close()
+            generation.children.delete(chat)
+          }),
+        )
+        if (results.some((result) => result.status === "rejected"))
+          throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+      },
+      async close() {
+        generations.delete(connection.generation)
+        const results = await Promise.allSettled([
+          knowledge.close(),
+          ...[...generation.children.values()].map(async (child) => (await child).close()),
+        ])
+        if (results.some((result) => result.status === "rejected")) {
+          shutdown.failed = true
+          throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
+        }
+      },
+    }
+  }
   const service = await connectionService(
     connectionStore(join(root, "connection"), options.codec),
     {
@@ -548,45 +598,15 @@ export async function createLoginomHost(options: {
           ])
         }
       },
-      async prepare(connection) {
-        const knowledge = await superviseKnowledge({
-          node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
-          entry: join(resources, "runtime/src/knowledge-entry.mjs"),
-          stateDir: join(root, "knowledge", String(connection.generation)),
-          generation: connection.generation,
-          helpRoot: join(resources, "help"),
-          environment,
-        }).catch(startupFailure)
-        const catalog = knowledge.request("list")
-        const ready = catalog.then(() => undefined)
-        const generation = { connection, knowledge, catalog, ready, children: new Map<string, Promise<Runtime>>() }
-        generations.set(connection.generation, generation)
-        void ready.catch(() => undefined)
-        return {
-          ready,
-          async reset() {
-            const results = await Promise.allSettled(
-              [...generation.children.entries()].map(async ([chat, child]) => {
-                await (await child).close()
-                generation.children.delete(chat)
-              }),
-            )
-            if (results.some((result) => result.status === "rejected"))
-              throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-          },
-          async close() {
-            generations.delete(connection.generation)
-            const results = await Promise.allSettled([
-              knowledge.close(),
-              ...[...generation.children.values()].map(async (child) => (await child).close()),
-            ])
-            if (results.some((result) => result.status === "rejected"))
-              throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-          },
-        }
+      prepare(connection, switchSignal) {
+        const prepare = () => prepareGeneration(connection, switchSignal)
+        return switchSignal && options.prepareConnectionSwitch
+          ? options.prepareConnectionSwitch(prepare, switchSignal)
+          : prepare()
       },
     },
     journal,
+    options.onConnectionApplication,
   )
   const dashboardOperations = new Map<AbortController, Promise<unknown>>()
   function dashboardOperation(operation: DashboardStorageOperation, input: DashboardRead | DashboardPublish | DashboardDelete, signal?: AbortSignal) {
@@ -642,6 +662,22 @@ export async function createLoginomHost(options: {
     resourceController.abort()
     for (const controller of dashboardOperations.keys()) controller.abort(new Error("DASHBOARD_CANCELLED"))
   }
+  async function checkStepState(chat: string, operationId: string, originalGeneration?: number, owner?: string): Promise<typeof StepCheckResult.Type | "owner_lost"> {
+    const unavailable = { state: "unavailable", retryAvailable: false } as const
+    const unavailableOwner = owner === undefined ? unavailable : "owner_lost"
+    const status = await service.api.status()
+    if (originalGeneration !== undefined && status.generation !== originalGeneration) return unavailableOwner
+    const children = generations.get(status.generation)?.children
+    const child = children?.get(chat)
+    if (!child || lost.has(chat) || (originalGeneration === undefined && stale.has(chat))) return unavailableOwner
+    const result = await child.then((runtime) => runtime.request("checkStepState", { operationId, owner }, 25000))
+      .catch((error: unknown) => error instanceof Error && error.message === "LOGINOM_RUNTIME_DISCONNECTED" ? unavailableOwner : unavailable)
+    const after = await service.api.status()
+    if (children?.get(chat) !== child || status.generation !== after.generation) return unavailableOwner
+    if (owner !== undefined && result === "owner_lost") return result
+    return Schema.is(StepCheckResult)(result) ? result : unavailable
+  }
+
   return {
     ...service,
     beginClose,
@@ -753,6 +789,56 @@ export async function createLoginomHost(options: {
     },
     journal,
     recoveries,
+    writes,
+    writeServer(generation: number) {
+      const current = generations.get(generation)
+      if (!current) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
+      return writeServer(current.connection.url)
+    },
+    async checkRecordedStep(entry: WriteRecord) {
+      const unavailable = { state: "unavailable", retryAvailable: false } as const
+      const operationId = entry.receipt.operationID
+      if (!writes || !writes.reserveCheck(entry)) return { observation: unavailable }
+      try {
+        if (!generations.get(entry.generation)?.children.has(entry.chat)) return { observation: unavailable, ownerLost: true }
+        if (!entry.receipt.fresh || !Schema.is(StepOperationId)(operationId)) return { observation: unavailable }
+        const result = await checkStepState(entry.chat, operationId, entry.generation, entry.receipt.owner)
+        if (result === "owner_lost") return { observation: unavailable, ownerLost: true }
+        if (result.state !== "observed") return { observation: result }
+        const step = result.step
+        const status: typeof WriteVerdict.Type = step.outcome === "completed" ? "applied"
+          : step.outcome === "not_applied" && result.retryAvailable ? "not_applied" : "unknown"
+        if (status !== "unknown") await writes.finish(entry, status, step)
+        return { observation: result, status }
+      } finally {
+        writes.release(entry)
+      }
+    },
+    async readSavedWriteTarget(entry: WriteRecord): Promise<typeof SavedCopyReadback.Type> {
+      const path = entry.baseline.packagePath
+      if (!path) return "unavailable"
+      const lease = service.acquire(randomUUID())
+      if (!lease) return "unavailable"
+      const chat = createHash("sha256").update(randomUUID()).digest("hex")
+      try {
+        const current = generations.get(lease.generation)
+        if (!current || lease.generation !== entry.generation || writeServer(current.connection.url) !== entry.server)
+          return "unavailable"
+        const child = await retain(current, chat, launch(current.connection, chat, "dashboard"))
+        try {
+          const result = await child.request("write-outcome.readback", entry.baseline, 7_000)
+          return Schema.is(SavedCopyReadback)(result) ? result : "unavailable"
+        } finally {
+          await child.close().catch(() => { shutdown.failed = true })
+          current.children.delete(chat)
+          lost.delete(chat)
+        }
+      } catch {
+        return "unavailable"
+      } finally {
+        lease.release()
+      }
+    },
     knowledge(generation: number) {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
@@ -810,6 +896,7 @@ export async function createLoginomHost(options: {
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
     },
+    checkStepState,
     async workState(generation: number, chat: string) {
       // Inspect only the existing owner. Losing it is uncertainty, not evidence of idle work.
       if (lost.has(chat) || stale.has(chat)) throw new Error("LOGINOM_RUNTIME_UNAVAILABLE")
@@ -857,4 +944,9 @@ export async function createLoginomHost(options: {
       )
     },
   }
+}
+
+function writeServer(url: string) {
+  const target = new URL(url)
+  return createHash("sha256").update(target.origin).digest("hex")
 }

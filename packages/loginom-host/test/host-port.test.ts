@@ -11,6 +11,7 @@ import { LoginomHost } from "../src/adapter"
 import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
 import { recoveryStore } from "../src/connection/recovery-store"
+import { writeOutcomes } from "../src/connection/write-outcomes"
 import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 
 async function prepareRun(client: ReturnType<typeof transport>, run: string) {
@@ -591,7 +592,7 @@ test("a killed runtime requires an explicit prepare before the next scenario cal
   }
 }, 15000)
 
-test.each(["after-call", "during-admission", "disconnect-before-exit", "strict-before-dispatch"])(
+test.each(["after-call", "during-admission", "disconnect-before-exit", "strict-before-dispatch", "desktop-before-dispatch"])(
   "a chat runtime restarts at most twice in one turn: %s",
   async (exitAt) => {
     const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
@@ -615,6 +616,14 @@ test.each(["after-call", "during-admission", "disconnect-before-exit", "strict-b
       }
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
+      if (m.operation === 'fixture-exit') process.exit(1);
+      if (m.operation === 'write-outcome.prepare') {
+        const path='/user/package.lgp';
+        process.send({id:m.id,result:m.input.name==='dock_prepare'?{effect:'read'}:{effect:'node',operation:'node.add',paths:[path],
+          receipt:{owner:'10000000-0000-4000-8000-000000000000',operationID:'node',fresh:true},
+          baseline:{document:'doc',workflow:'wf',packagePath:path,savedDigest:null,draft:false}}});
+        return;
+      }
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
       const action = m.input.arguments.action;
@@ -627,7 +636,7 @@ test.each(["after-call", "during-admission", "disconnect-before-exit", "strict-b
         }
         process.kill(process.pid, 'SIGKILL'); return;
       }
-      process.send({id:m.id,result:{result:{action},recoveryPending:false,activeWork:false}});
+      process.send({id:m.id,result:{result:{action},recoveryPending:false,activeWork:false,writeSettled:true}});
     });
   `,
     )
@@ -648,6 +657,7 @@ test.each(["after-call", "during-admission", "disconnect-before-exit", "strict-b
       codec: credentials("linux"),
       environment: {},
       strictRecovery: exitAt === "strict-before-dispatch",
+      desktopWriteOutcomes: exitAt === "desktop-before-dispatch",
     })
     const requests = new EventEmitter()
     const replies = new EventEmitter()
@@ -660,6 +670,18 @@ test.each(["after-call", "during-admission", "disconnect-before-exit", "strict-b
       },
       {
         ...host,
+        writes: host.writes && {
+          ...host.writes,
+          async dispatch(entry) {
+            await host.writes?.dispatch(entry)
+            if (admission.exit) {
+              admission.exit = false
+              const runtime = await host.runtime(entry.generation, entry.chat)
+              await runtime.request("fixture-exit").catch(() => undefined)
+              await runtime.exited
+            }
+          },
+        },
         journal: {
           ...host.journal,
           async begin(chat, generation) {
@@ -695,6 +717,16 @@ test.each(["after-call", "during-admission", "disconnect-before-exit", "strict-b
       await waitForKnowledge(host)
       expect(await client.request("acquire", { run: "one", session: "chat" })).toEqual({ generation: 1 })
       await prepareRun(client, "one")
+      if (exitAt === "desktop-before-dispatch") {
+        admission.exit = true
+        await expect(call("one", "finish")).rejects.toThrow("LOGINOM_WRITE_NOT_DISPATCHED")
+        expect(await Bun.file(calls).exists()).toBe(false)
+        const restarted = await writeOutcomes(join(root, "write-outcomes"))
+        expect(restarted.find(createHash("sha256").update("chat").digest("hex"))).toMatchObject({ status: "not_applied" })
+        await prepareRun(client, "one")
+        expect(await call("one", "finish")).toEqual({ action: "finish" })
+        return
+      }
       if (exitAt === "strict-before-dispatch") {
         admission.exit = true
         await expect(call("one", "finish")).rejects.toThrow("LOGINOM_SCOPE_DENIED")

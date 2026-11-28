@@ -1,5 +1,6 @@
 export { parseProxyAddress, proxyHostPort } from "./address"
 export { translateBypass } from "./bypass"
+export { desktopServiceProxy } from "./desktop-service"
 export { explicitProxy } from "./environment"
 export { parseGnomeSettings } from "./gnome"
 export { parseKdeSettings } from "./kde"
