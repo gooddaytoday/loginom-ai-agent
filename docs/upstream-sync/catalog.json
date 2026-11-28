@@ -187,7 +187,14 @@
       "title": "Built-in plugin page navigation for dashboard links",
       "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
-    { "id": "CAT-10", "title": "Web app, UI kit, session UI and Loginom localization", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
+    {
+      "id": "CAT-10",
+      "title": "Web app, UI kit, session UI and Loginom localization",
+      "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],
+      "notes": {
+        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events."
+      }
+    },
     {
       "id": "CAT-15",
       "title": "Conversation search fields and sidebar shortcut (C1.5)",

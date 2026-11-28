@@ -72,7 +72,9 @@ export async function stageHeldKnowledge(entry: string, gate: string) {
     },
     async release(outcome?: "fail") {
       if (outcome === "fail") await writeFile(gate + ".fail", "")
-      await Promise.all([rm(gate, { force: true }), rm(gate + ".held", { force: true })])
+      // Prevent a concurrent rename from leaving a held gate behind.
+      await rm(gate, { force: true })
+      await rm(gate + ".held", { force: true })
     },
     async lists() {
       return (await readFile(gate + ".lists", "utf8").catch(() => "")).length

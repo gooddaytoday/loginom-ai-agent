@@ -169,3 +169,37 @@ test("polling is bounded and keeps edits made while the connection is pending", 
   })
   expect(check(paused.state).effects).toMatchObject([{ type: "check", input: { revision: 1, username: "next-user" } }])
 })
+
+test("a temporary status failure retries and refreshes the pending task count", () => {
+  const pending = { ...fresh, revision: 1, state: "pending", application: { state: "pending", tasks: 2 } } as const
+  const applying = form(pending)
+  expect(view(applying).waitingTasks).toBe(2)
+
+  const failedPoll = transition(applying, {
+    type: "status",
+    attempt: applying.attempt,
+    now: 2000,
+    result: { ok: false, issue: "unavailable" },
+  })
+  expect(failedPoll.effects).toMatchObject([{ type: "status", delay: 1000 }])
+
+  const updated = transition(failedPoll.state, {
+    type: "status",
+    attempt: failedPoll.state.attempt,
+    now: 3000,
+    result: { ok: true, value: { ...pending, application: { state: "pending", tasks: 1 } } },
+  })
+  expect(view(updated.state)).toMatchObject({ waitingTasks: 1, issue: undefined })
+})
+
+test("the last task count disappears when status polling runs out of time", () => {
+  const applying = form({ ...fresh, revision: 1, state: "pending", application: { state: "pending", tasks: 2 } })
+  const expired = transition(applying, {
+    type: "status",
+    attempt: applying.attempt,
+    now: 16000,
+    result: { ok: false, issue: "unavailable" },
+  })
+  expect(expired.effects).toEqual([])
+  expect(view(expired.state)).toMatchObject({ waitingTasks: 0, retry: true })
+})
