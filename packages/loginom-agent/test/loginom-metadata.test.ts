@@ -35,7 +35,7 @@ test("Dock forwards the saved graph in v1 alongside the busy signal", async () =
   const loginom = { ...save, busy, savedPackageGraph }
   const input = reply(receipt, loginom)
   const result = await dockToolResult(input, 1)
-  expect(result.metadata.loginom).toEqual(loginom)
+  expect(result.metadata?.loginom).toEqual(loginom)
   expect(result.content).toEqual(input.content[0].text)
 })
 
