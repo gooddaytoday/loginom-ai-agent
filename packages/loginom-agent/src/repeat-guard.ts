@@ -84,6 +84,8 @@ export function repeatGuard(getQuestion: () => Promise<Info | undefined>) {
                   { label: Hint, description: "Указать агенту, что сделать вместо повтора" },
                 ],
               })
+              // Continue runs this call and resets the count; the next identical call starts a new streak.
+              // Stop or a hint rejects this call without resetting the count, so an identical retry asks again.
               if (answer === Continue) current.count = 0
               else {
                 const hint =
