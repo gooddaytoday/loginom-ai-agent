@@ -2,6 +2,18 @@
 
 Цель — Ubuntu 22.04+ и Debian 12+, x86_64. Windows и macOS собираются и отлаживаются на отдельных машинах по соседним инструкциям. Основной Linux-пакет — DEB; AppImage — дополнительный переносимый вариант. Выполненные проверки и их границы приведены в [итоговом отчёте от 16 сентября 2026](reports/2026-09-16-linux/report.md).
 
+## Требования
+
+- **DEB:** `sudo apt install ./loginom-ai-agent-linux-amd64.deb` установит пакет и его зависимости. Ничего вручную устанавливать не нужно.
+- **AppImage:** для запуска без предварительного извлечения нужна библиотека FUSE 2 (`libfuse.so.2`), для безопасного сохранения пароля — утилита `secret-tool`. AppImage не устанавливает эти зависимости:
+  - Ubuntu 22.04 / Debian 12: `sudo apt install libfuse2 libsecret-tools`.
+  - Ubuntu 24.04+ / Debian 13+: `sudo apt install libfuse2t64 libsecret-tools`.
+  - Fedora: `sudo dnf install fuse fuse-libs libsecret`.
+
+Для сохранения пароля в обоих форматах в пользовательском сеансе должен работать Secret Service, например GNOME Keyring. При ошибке Desktop [`LOGINOM_CREDENTIAL_PROTECTION_UNAVAILABLE`](https://github.com/gooddaytoday/loginom-ai-agent/blob/7e2f7e8405bfcda90ec5a53e0a077b499d89d026/packages/loginom-host/src/connection/linux-secret-service.ts#L42-L44) проверьте наличие `secret-tool` и доступность Secret Service.
+
+AppImage также требует системные библиотеки GTK, NSS, GBM и ALSA. Для ALSA нужна настоящая библиотека: `libasound2t64` на Ubuntu 24.04+/Debian 13+, `libasound2` на Ubuntu 22.04/Debian 12; OSS shim её не заменяет.
+
 ## Сборка
 
 Из корня репозитория установить workspace-зависимости закреплённым Bun 1.3.14. Для сборки runtime нужны заранее подготовленные Node 24.19.0 и Chromium revision 1246; точные хеши и версии находятся в `packages/product/loginom-release.json`. Системные Node/Bun пользователя заменять не требуется.
@@ -34,7 +46,7 @@ bun test src/main/loginom electron-builder.config.test.ts scripts/release/artifa
 
 Начиная с 0.1.3, production DEB устанавливает файлы в `/opt/loginom-ai-agent`; название в меню остаётся `Loginom AI Agent`. При обновлении dpkg удаляет старый `/opt/Loginom AI Agent`, профиль пользователя не переносится и не удаляется.
 
-DEB устанавливается через `apt install ./loginom-ai-agent-linux-amd64.deb`: apt разрешает системные зависимости, включая GTK, NSS, GBM и ALSA. AppImage требует эти системные библиотеки и рабочий FUSE либо предварительное извлечение. Для ALSA нужна настоящая библиотека: `libasound2t64` на Ubuntu 24+/Debian 13, `libasound2` на Ubuntu 22/Debian 12; OSS shim её не заменяет. Sandbox Chromium остаётся включённым; запуск root и `--no-sandbox` не являются допустимыми обходами ошибок приёмки.
+Sandbox Chromium остаётся включённым; запуск root и `--no-sandbox` не являются допустимыми обходами ошибок приёмки.
 
 Исходный архив создавать из того же проверенного commit:
 

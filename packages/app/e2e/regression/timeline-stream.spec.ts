@@ -4,7 +4,7 @@ import { timelinePresets } from "@opencode/session-ui/timeline/detail"
 import { createTwoFilesPatch } from "diff"
 import { readSessionDraftText } from "../utils/drafts"
 import { holdRoute } from "../utils/app"
-import nodeOutput from "../fixtures/loginom-node-output.json"
+import nodeOutput from "../fixtures/loginom-node-output.json" with { type: "json" }
 import {
   assistantID,
   assistantMessage,

@@ -61,7 +61,7 @@ import { terminalFontFamily, useSettings } from "@/settings/model"
 import { useSettingsSurface } from "@/settings/surface"
 import { formatKeybindParts, useCommand } from "@/shell/commands/command"
 import { createMediaQuery } from "@solid-primitives/media"
-import { useIsRouting, useLocation } from "@solidjs/router"
+import { useIsRouting, useLocation, useNavigate } from "@solidjs/router"
 import { useLanguage } from "@/runtime/i18n/language"
 import {
   createHostApiAttachState,
@@ -126,6 +126,7 @@ type Attached = {
   mode: Accessor<"light" | "dark">
   routing: Accessor<boolean>
   path: Accessor<string>
+  page: (plugin: string, id: string) => void
   keybind: (command: string) => readonly string[]
   matches: (command: string, event: KeyboardEvent) => boolean
   servers: Accessor<readonly string[]>
@@ -373,9 +374,10 @@ export function createHostApis() {
       font: () => current()?.font() ?? terminalFontFamily(undefined),
       mode: () => current()?.mode() ?? (systemDark() ? "dark" : "light"),
     }),
-    router: () => ({
+    router: (plugin) => ({
       routing: () => current()?.routing() ?? false,
       path: () => current()?.path() ?? "",
+      openPage: (id) => write((value) => value.page(plugin, id)),
     }),
     keybinds: () => ({
       keybind: (command) => current()?.keybind(command) ?? [],
@@ -534,6 +536,7 @@ export function createPluginAttachment(apis: HostApis) {
   const host = usePluginHost()
   const command = useCommand()
   const location = useLocation()
+  const navigate = useNavigate()
   const platform = usePlatform()
   const theme = useTheme()
   const menu = createSessionPanelMenu()
@@ -1200,6 +1203,7 @@ export function createPluginAttachment(apis: HostApis) {
     font: () => terminalFontFamily(settings.appearance.terminalFont()),
     routing: useIsRouting(),
     path: () => `${location.pathname}${location.search}`,
+    page: (plugin, id) => navigate(`/page/${encodeURIComponent(plugin)}/${encodeURIComponent(id)}`),
     keybind: command.keybindParts,
     matches: command.matches,
     servers: () => global.servers.list().map(ServerConnection.key),
