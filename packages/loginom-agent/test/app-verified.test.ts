@@ -214,3 +214,96 @@ test("summary RPC reads only the exact session in its Location", async () => {
   ])
     expect(await run(foreign)).toEqual({ facts: [], notVerified: [unconfirmed("promptUnavailable")] })
 })
+
+test("a late Save receipt resolves only the admitted Save in this turn", () => {
+  const admission = {
+    runtimeId: "32ef40ff-08d2-476a-ad73-1ef3feb17ce8",
+    documentId: "doc",
+    startSequence: 5,
+  }
+  const ambiguous = {
+    type: "assistant",
+    id: "save",
+    content: [
+      {
+        type: "tool" as const,
+        id: "save-tool",
+        name: "loginom_dock_action_run",
+        state: {
+          status: "error",
+          input: { action_key: "package.save_checkpoint" },
+          metadata: {
+            generation: 4,
+            loginom: {
+              v: 1,
+              operationId: "save-1",
+              state: "settled",
+              status: "AMBIGUOUS",
+              kind: "save",
+              verificationRequest: { kind: "save", ...admission },
+            },
+          },
+        },
+      },
+    ],
+  }
+  const inspect = (id: string, operationId: string, window: typeof admission) => {
+    const message = step(id, operationId, saved, { ...window, confirmedSequence: 12 })
+    return { ...message, content: message.content.map((part) => ({ ...part, name: "loginom_dock_operation_inspect" })) }
+  }
+  const history = [
+    user("prompt"),
+    ambiguous,
+    inspect("other-operation", "foreign-save", admission),
+    inspect("other-runtime", "save-1", { ...admission, runtimeId: "c58fbbe2-0983-44dc-ba70-abfcd876c880" }),
+    inspect("other-document", "save-1", { ...admission, documentId: "foreign" }),
+    inspect("other-admission", "save-1", { ...admission, startSequence: 6 }),
+  ]
+  const unverified = appVerifiedSummary(history, "prompt")
+  expect(unverified.facts).toEqual([])
+  expect(unverified.notVerified.filter(({ status }) => status === "unconfirmed")).toEqual([
+    unconfirmed("noSaveReceipt", ref("save", "save-tool")),
+  ])
+
+  const verified = appVerifiedSummary([...history, inspect("inspection", "save-1", admission)], "prompt")
+  expect(verified.facts.map(({ evidence, source }) => [evidence, source.toolCallID])).toEqual([
+    [saved, "inspection-tool"],
+  ])
+  expect(verified.notVerified.some(({ reason }) => reason === "noSaveReceipt")).toBe(false)
+  expect(appVerifiedSummary([...history, user("next"), inspect("inspection", "save-1", admission)], "next").facts).toEqual([])
+})
+
+test("a variables-only reread does not ask for table evidence; a table reread still does", () => {
+  const read = (id: string, tableRead: boolean, status: string) => ({
+    type: "assistant",
+    id,
+    content: [
+      {
+        type: "tool" as const,
+        id: `${id}-tool`,
+        name: "loginom_dock_node_read",
+        state: {
+          status,
+          input: { source_operation_id: "previous-node" },
+          metadata: {
+            generation: 4,
+            loginom: {
+              v: 1,
+              operationId: id,
+              state: "settled",
+              verificationRequest: { kind: "node", execute: false, tableRead },
+            },
+          },
+        },
+      },
+    ],
+  })
+  const variables = read("variable-snapshot", false, "completed")
+  expect(appVerifiedSummary([user("prompt"), variables], "prompt").notVerified).toContainEqual(
+    notRequested("noTableReadReceipt"),
+  )
+  const result = appVerifiedSummary([user("prompt"), variables, read("table", true, "error")], "prompt")
+  expect(result.notVerified.filter(({ status }) => status === "unconfirmed")).toEqual([
+    unconfirmed("noTableReadReceipt", ref("table", "table-tool")),
+  ])
+})

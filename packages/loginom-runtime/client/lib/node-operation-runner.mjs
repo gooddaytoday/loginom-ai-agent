@@ -38,6 +38,10 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
  };
  return Object.freeze({
   has:id=>jobs.has(id),
+  verificationRequest(id){
+   const request=jobs.get(id)?.request;
+   return request&&{kind:'node',execute:request.finish==='execute',tableRead:!!request.read?.ports?.length};
+  },
   workflow(id){
    const request=jobs.get(id)?.request;
    return request?.workflow_ref?structuredClone({document_id:request.document_id,workflow_ref:request.workflow_ref}):null;

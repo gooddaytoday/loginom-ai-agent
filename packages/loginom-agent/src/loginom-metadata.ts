@@ -118,12 +118,19 @@ export const LoginomEvidence = Schema.Union([
     }),
   }),
 ])
-const receiptWindow = Schema.Struct({
+const receiptStart = {
   runtimeId: Schema.String.check(Schema.isUUID()),
   documentId: id,
   startSequence: Schema.Int.check(Schema.isGreaterThan(0)),
+}
+const receiptWindow = Schema.Struct({
+  ...receiptStart,
   confirmedSequence: count,
 }).check(Schema.makeFilter((window) => window.startSequence < window.confirmedSequence))
+const verificationRequest = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal("save"), ...receiptStart }),
+  Schema.Struct({ kind: Schema.Literal("node"), execute: Schema.Boolean, tableRead: Schema.Boolean }),
+])
 
 const packagePath = Schema.String.check(
   Schema.isMaxLength(1024),
@@ -176,6 +183,7 @@ const extensionFields = {
   savedPackageGraph,
   evidence: Schema.Array(LoginomEvidence),
   receiptWindow,
+  verificationRequest,
   packageAccess,
   packageVariables,
   agentCopy,

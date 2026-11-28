@@ -784,21 +784,24 @@ export async function createBridge(config, session, { browserTransport: managedB
             // Validation throws, earlier reconciliation and proven no-effect
             // refusals do not admit this Save. Bind only its returned receipt;
             // an ambiguous admitted result can still be confirmed by inspection.
-            if(saveAdmission&&outcome.operation_id===operationId
-              &&!(['NOT_APPLIED','FAILED'].includes(outcome.status)&&outcome.effect_possible===false))
-              saveAdmissions.set(operationId,saveAdmission);
+            const admittedSave=saveAdmission&&outcome.operation_id===operationId&&outcome.action_key===saveAdmission.action_key
+              &&!(['NOT_APPLIED','FAILED'].includes(outcome.status)&&outcome.effect_possible===false)?saveAdmission:null;
+            if(admittedSave)saveAdmissions.set(operationId,admittedSave);
             await logResult(request.params.name,outcome);
             const normalization = outcome.trace?.find(e => e.event === 'rest_package_normalization');
             if(normalization)await recordExecution({phase:'rest_package_normalization',operation_id:outcome.operation_id,...normalization});
             if (outcome.status === 'SUCCEEDED' && ['package.save_as','package.save_checkpoint'].includes(outcome.action_key)
                 && outcome.output?.package_ref?.path) savedPackages.set(outcome.output.package_ref.path, outcome.operation_id);
-            const confirmedSave=saveRequest?outcome:request.params.name==='dock_operation_inspect'
+            const confirmedSave=saveRequest?(outcome.operation_id===operationId?outcome:null):request.params.name==='dock_operation_inspect'
               &&outcome.status==='SUCCEEDED'&&outcome.action_key==='operation.inspect'
               &&outcome.operation_id===args.operation_id&&outcome.output?.state==='resolved'
               &&outcome.output.cleanup_confirmed===true&&outcome.output.outcome?.operation_id===args.operation_id
                 ?outcome.output.outcome:null;
             const admission=confirmedSave&&saveAdmissions.get(confirmedSave.operation_id);
-            if(admission&&confirmedSave.status==='SUCCEEDED')admission.confirmed??=receiptSequence.next();
+            const ownedConfirmation=admission?.document_id&&confirmedSave.status==='SUCCEEDED'
+              &&confirmedSave.action_key===admission.action_key&&confirmedSave.output?.package_ref?.path===admission.path
+              &&confirmedSave.output?.package_ref?.active_identity===admission.path;
+            if(ownedConfirmation)admission.confirmed??=receiptSequence.next();
             // Reconciliation confirms the original admission, not a new Save.
             // An older receipt can never supersede a later confirmed mutation.
             if(admission&&confirmedSave.status==='SUCCEEDED'&&confirmedSave.action_key===admission.action_key
@@ -904,9 +907,12 @@ export async function createBridge(config, session, { browserTransport: managedB
               // Knowledge/journal failure cannot erase a completed browser receipt.
               reply.content.push({ type: 'text', text: 'Recovery context unavailable; keep the operation receipt and inspect the actual state.' });
             }
-            if(userProfile && confirmedSave)projectSave?.(options=>loginomSaveMetadata(confirmedSave,{...options,
-              receiptWindow:admission&&{runtimeId:receiptSequence.id,documentId:admission.document_id,
+            if(userProfile&&ownedConfirmation)projectSave?.(options=>loginomSaveMetadata(confirmedSave,{...options,
+              receiptWindow:{runtimeId:receiptSequence.id,documentId:admission.document_id,
                 startSequence:admission.sequence,confirmedSequence:admission.confirmed}}));
+            else if(userProfile&&admittedSave?.document_id&&outcome.status==='AMBIGUOUS')
+              projectSave?.(options=>loginomSaveMetadata(outcome,{...options,verificationRequest:{kind:'save',
+                runtimeId:receiptSequence.id,documentId:admittedSave.document_id,startSequence:admittedSave.sequence}}));
             return reply;
           });
         }

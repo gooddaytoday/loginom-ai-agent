@@ -3,6 +3,8 @@ import test from 'node:test';
 import {nodeResultReply} from '../lib/node-result-reply.mjs';
 import {loginomFeedMetadata, loginomSaveMetadata} from '../lib/user-results.mjs';
 import {withLoginomMetadata} from '../lib/loginom-feed-metadata.mjs';
+import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
+import {createNodeOperationRunner} from '../lib/node-operation-runner.mjs';
 
 const node = {document_id:'document', workflow_id:'workflow', node_id:'node-guid'};
 const facts = {kind:'execute', node:{ref:node, label:'Фильтр', type:'transform.filter_data'}};
@@ -57,6 +59,27 @@ test('save proves only the path unless the reopened workflow graph was checked',
     {event:'reopened_package_observed', actual_path:path, path_matches:true, graph_matches:true, graph:{nodes:['first','second']}},
   ]}).evidence, [{kind:'saved', path}, {kind:'reopenedGraphRead', nodeCount:2, scope:'activeWorkflow'}]);
   assert.equal(loginomSaveMetadata({...save, status:'AMBIGUOUS'}), undefined);
+});
+
+test('feed describes the admitted variable snapshot before the node produces any output', async () => {
+  const operationId = 'snapshot';
+  const workflowRef = {workflow_id:node.workflow_id, tab_tid:'tab', prefix:'prefix', navigation_path:[]};
+  const read = buildNodeReadRequest({operation_id:operationId, source_operation_id:'configure'}, {
+    parameters:{target:{type:'variables.user'}, workflow_ref:workflowRef},
+    outcome:{status:'SUCCEEDED', cleanup_complete:true, output:{node, cleanup_complete:true,
+      execution:{status:'not_requested', execution_id:null}}},
+  });
+  assert.deepEqual(read.read.ports, []);
+  assert.deepEqual(read.read.variable_ports, [4]);
+  const runner = createNodeOperationRunner({validate:()=>1, progress:()=>null, run:async()=>({status:'FAILED'})});
+  const tool = 'dock_node_read';
+  const reply = nodeResultReply(runner.start(read), {userProfile:true, tool});
+  const result = withLoginomMetadata(reply, {receipt:loginomFeedMetadata(reply, {tool,
+    facts:{verificationRequest:runner.verificationRequest(operationId)}})});
+  assert.equal(result._meta.loginom.operationId, operationId);
+  assert.deepEqual(result._meta.loginom.verificationRequest, {kind:'node', execute:false, tableRead:false});
+  assert.equal(result._meta.loginom.evidence, undefined);
+  await runner.close();
 });
 
 test('feed producers compose one operation block without replacing the reply or other fields', () => {

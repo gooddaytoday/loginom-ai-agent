@@ -8,6 +8,7 @@ export const LOGINOM_METADATA_FIELD_MAX_BYTES = Object.freeze({
   savedPackageGraph: 8 * 1024,
   evidence: 4 * 1024,
   receiptWindow: 512,
+  verificationRequest: 512,
   packageAccess: 4 * 1024,
   packageVariables: 8 * 1024,
   agentCopy: 8 * 1024,

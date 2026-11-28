@@ -8,6 +8,7 @@ export const LOGINOM_METADATA_FIELD_MAX_BYTES: Readonly<{
   savedPackageGraph: number
   evidence: number
   receiptWindow: number
+  verificationRequest: number
   packageAccess: number
   packageVariables: number
   agentCopy: number

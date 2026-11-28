@@ -69,7 +69,14 @@ const checks = {
 type Check = keyof typeof checks
 type EvidenceKind = (typeof LoginomEvidence.Type)["kind"]
 
-function requestedChecks(tool: string, value: unknown): Check[] {
+function requestedChecks(tool: string, value: unknown, admitted: LoginomMetadata["verificationRequest"]): Check[] {
+  if (admitted?.kind === "node" && (tool === "loginom_dock_node_apply" || tool === "loginom_dock_node_read")) {
+    const wanted: Check[] = []
+    if (tool === "loginom_dock_node_apply" && admitted.execute) wanted.push("executed")
+    if (admitted.tableRead) wanted.push("tableRead")
+    if (tool === "loginom_dock_node_read" && admitted.execute) wanted.push("executed")
+    return wanted
+  }
   const input = Option.getOrUndefined(decodeInput(value))
   if (!input) return []
   const ports = input.read?.ports
@@ -82,7 +89,7 @@ function requestedChecks(tool: string, value: unknown): Check[] {
     case "loginom_dock_node_read":
       if (input.kind === "source" || input.kind === "context") return []
       return [
-        ...(ports?.length !== 0 ? ["tableRead" as const] : []),
+        ...(ports?.length ? ["tableRead" as const] : []),
         ...(input.execution === "execute" ? ["executed" as const] : []),
       ]
     case "loginom_dock_action_run":
@@ -117,6 +124,11 @@ const unavailable = (): typeof report.Type => ({
   notVerified: [{ reason: "promptUnavailable", status: "unconfirmed" }],
 })
 
+const saveKey = (
+  operationId: string,
+  start: Pick<NonNullable<LoginomMetadata["receiptWindow"]>, "runtimeId" | "documentId" | "startSequence">,
+) => JSON.stringify([operationId, start.runtimeId, start.documentId, start.startSequence])
+
 export function appVerifiedHandler(sessions: SummarySessions, location: Location) {
   return async (value: unknown) => {
     const { sessionID, promptID } = decodeRequest(value)
@@ -137,6 +149,7 @@ export function appVerifiedSummary(messages: readonly Message[], promptID: strin
 
   const attempts: { checks: Check[]; call: typeof call.Type; observed: Set<EvidenceKind> }[] = []
   const pending = new Map<string, (typeof attempts)[number]["observed"]>()
+  const pendingSaves = new Map<string, (typeof attempts)[number]["observed"]>()
   const facts = new Map<
     string,
     {
@@ -152,12 +165,15 @@ export function appVerifiedSummary(messages: readonly Message[], promptID: strin
       const receipt = Option.getOrUndefined(decodeReceipt(part.state.metadata))
       const loginom = decodeLoginomMetadata(receipt?.loginom)
       const operation = loginom && receipt && JSON.stringify([receipt.generation, loginom.operationId, loginom.attempt])
-      const wanted = requestedChecks(part.name, part.state.input)
+      const admitted = loginom?.verificationRequest
+      const wanted = requestedChecks(part.name, part.state.input, admitted)
       const reference = { messageID: message.id, toolCallID: part.id }
       const observed = new Set<EvidenceKind>()
       if (wanted.length) {
         attempts.push({ checks: wanted, call: reference, observed })
         if (operation && loginom?.state === "running") pending.set(operation, observed)
+        if (wanted.includes("saved") && admitted?.kind === "save" && loginom?.status === "AMBIGUOUS")
+          pendingSaves.set(saveKey(loginom.operationId, admitted), observed)
       }
       if (
         !loginom ||
@@ -166,8 +182,13 @@ export function appVerifiedSummary(messages: readonly Message[], promptID: strin
       )
         continue
       const { operationId, attempt, node, status, receiptWindow } = loginom
+      const originalSave = receiptWindow && pendingSaves.get(saveKey(operationId, receiptWindow))
       for (const evidence of loginom.evidence ?? []) {
         if (evidence.kind !== "executed" && status !== "SUCCEEDED") continue
+        if (evidence.kind === "saved" || evidence.kind === "reopenedGraphRead") {
+          if (part.name === "loginom_dock_operation_inspect" && !originalSave) continue
+          originalSave?.add(evidence.kind)
+        }
         observed.add(evidence.kind)
         if (operation && !wanted.length) pending.get(operation)?.add(evidence.kind)
         const key = JSON.stringify([

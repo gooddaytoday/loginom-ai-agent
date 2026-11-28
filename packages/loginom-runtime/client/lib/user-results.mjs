@@ -195,7 +195,9 @@ export function compactKnowledgeBundle(description) {
 
 const FEED_PREVIEW_MAX_BYTES = 12 * 1024;
 
-export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptWindow} = {}) {
+export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptWindow, verificationRequest} = {}) {
+  if (verificationRequest && outcome.status === 'AMBIGUOUS')
+    return {v:1, operationId:outcome.operation_id, state:'settled', status:outcome.status, kind:'save', verificationRequest};
   const path = outcome.output?.package_ref?.path;
   if (outcome.status !== 'SUCCEEDED' || !['package.save_as', 'package.save_checkpoint'].includes(outcome.action_key)
       || !outcome.operation_id || typeof path !== 'string' || !path || path !== outcome.output.package_ref.active_identity) return;
@@ -218,7 +220,7 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
   const text = (value, max = 1000) => typeof value === 'string'
     ? [...redactor.text(value).toWellFormed()].slice(0, max).join('') : undefined;
   const reference = receipt.node ?? receipt.progress?.node;
-  const matchingFacts = facts && ['document_id','workflow_id','node_id']
+  const matchingFacts = facts?.node && ['document_id','workflow_id','node_id']
     .every(key => facts.node.ref[key] === (reference?.ref ?? reference)?.[key]) ? facts : undefined;
   const node = matchingFacts?.node ?? reference;
   const guid = node?.ref?.node_id ?? node?.node_id;
@@ -229,6 +231,7 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
   const succeeded = state === 'settled' && receipt.status === 'SUCCEEDED' && !reply.isError;
   const result = {
     v: 1, operationId: receipt.operation_id, state,
+    ...(facts?.verificationRequest && {verificationRequest:facts.verificationRequest}),
     attempt: receipt.attempt, status: state === 'settled' ? receipt.status : undefined,
     phase: text(receipt.phase ?? receipt.progress?.pending_phase, 128),
     node: typeof guid === 'string' && guid && label !== undefined && type ? {guid, label, type} : undefined,
