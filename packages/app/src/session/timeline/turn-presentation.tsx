@@ -1,4 +1,5 @@
 import { createMemo, For, type Accessor } from "solid-js"
+import { timelinePreset, type TimelineDetail } from "@opencode/session-ui/timeline/detail"
 import { TimelineRow } from "@opencode/session-ui/timeline/projection"
 import { createTurnPresentationProjection } from "@opencode/session-ui/timeline/turn-presentation"
 import { TurnPresentation, type TurnPresentationInput, type TurnPresentationValue } from "@opencode/plugin/gui/builtin"
@@ -13,8 +14,18 @@ export type TurnDisclosure = {
   setOpen: (id: string, open: boolean) => void
 }
 
-export function createTurnPresentation(base: ReturnType<typeof createTimelineProjection>, disclosure: TurnDisclosure) {
+export function createTurnPresentation(
+  base: ReturnType<typeof createTimelineProjection>,
+  disclosure: TurnDisclosure,
+  detail: Accessor<TimelineDetail>,
+) {
   const host = usePluginHost()
+  const forcedOpen = createMemo(() => {
+    const preset = timelinePreset(detail())?.id
+
+    return preset === "detailed" || preset === "everything"
+  })
+  const open = (id: string) => forcedOpen() || disclosure.open(id)
 
   const descriptions = createMemo(() => {
     const entries = host.items(TurnPresentation)
@@ -65,10 +76,13 @@ export function createTurnPresentation(base: ReturnType<typeof createTimelinePro
 
   return {
     description: (id: string) => descriptions().get(id),
+    open,
+    forcedOpen,
     projection: createTurnPresentationProjection({
       base,
       presentation: (id) => descriptions().get(id)?.kind,
-      ...disclosure,
+      open,
+      setOpen: disclosure.setOpen,
     }),
   }
 }
@@ -78,12 +92,12 @@ const marker = { completed: "✓", in_progress: "●", pending: "○" }
 export function TurnPresentationRow(props: {
   row: TimelineRow.TurnPresentation
   value: TurnPresentationValue
-  disclosure: TurnDisclosure
+  open: boolean
+  forcedOpen: boolean
+  toggle: () => void
   padding: Accessor<string>
   centered: boolean
 }) {
-  const open = () => props.disclosure.open(props.row.userMessageID)
-
   return (
     <div
       data-message-id={props.row.userMessageID}
@@ -119,12 +133,13 @@ export function TurnPresentationRow(props: {
         return (
           <button
             type="button"
-            aria-expanded={open()}
-            class="flex min-w-0 max-w-full cursor-pointer items-baseline gap-1.5 rounded py-1 text-start hover:text-text-strong"
-            onClick={() => props.disclosure.setOpen(props.row.userMessageID, !open())}
+            aria-expanded={props.open}
+            disabled={props.forcedOpen}
+            class="flex min-w-0 max-w-full items-baseline gap-1.5 rounded py-1 text-start enabled:cursor-pointer enabled:hover:text-text-strong"
+            onClick={props.toggle}
           >
             <Icon
-              name={open() ? "outline-chevron-down" : "outline-chevron-right"}
+              name={props.open ? "outline-chevron-down" : "outline-chevron-right"}
               size="small"
               class="relative top-0.5 shrink-0 self-start"
             />

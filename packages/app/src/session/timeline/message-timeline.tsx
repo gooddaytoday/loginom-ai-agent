@@ -181,7 +181,7 @@ function MessageTimelineView(
   const parentID = props.data.parentID
   const parentTitle = props.data.parentTitle
   const childTitle = props.data.childTitle
-  const turns = createTurnPresentation(props.data.projection, props.turnDisclosure)
+  const turns = createTurnPresentation(props.data.projection, props.turnDisclosure, props.data.timelineDetail)
   const projection = turns.projection
   const sessionDirectory = createMemo(() => props.session.data.info()?.location.directory ?? sdk().directory)
 
@@ -347,8 +347,7 @@ function MessageTimelineView(
     actions: props.actions,
     timelineDetail: props.data.timelineDetail,
     disclosure: virtualized.disclosure,
-    activityOpen: (id: string) =>
-      turns.description(id)?.kind === "summary" && props.turnDisclosure.open(id) ? true : undefined,
+    activityOpen: (id: string) => (turns.description(id)?.kind === "summary" && turns.open(id) ? true : undefined),
     centered: () => props.centered,
     padding: turnPadding,
     anchor: props.anchor,
@@ -597,7 +596,14 @@ function MessageTimelineView(
                     <TurnPresentationRow
                       row={current}
                       value={value()}
-                      disclosure={props.turnDisclosure}
+                      open={turns.open(current.userMessageID)}
+                      forcedOpen={turns.forcedOpen()}
+                      toggle={() =>
+                        props.turnDisclosure.setOpen(
+                          current.userMessageID,
+                          !props.turnDisclosure.open(current.userMessageID),
+                        )
+                      }
                       padding={turnPadding}
                       centered={props.centered}
                     />

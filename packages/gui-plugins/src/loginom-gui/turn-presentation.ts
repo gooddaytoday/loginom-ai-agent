@@ -8,14 +8,6 @@ import { decodeFacts, loginomStepPhrase } from "./step-phrase"
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   ctx.add(TurnPresentation, {
     describe(input) {
-      const calls = input.messages.flatMap((message) =>
-        message.content.filter(
-          (part): part is SessionMessageAssistantTool => part.type === "tool" && part.name.startsWith("loginom_"),
-        ),
-      )
-
-      if (!calls.length) return
-
       if (input.phase === "working") {
         const todos = input.todos.flatMap(({ content, status }) =>
           status === "cancelled" ? [] : [{ content, status }],
@@ -38,6 +30,11 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
         }
       }
 
+      const calls = input.messages.flatMap((message) =>
+        message.content.filter(
+          (part): part is SessionMessageAssistantTool => part.type === "tool" && part.name.startsWith("loginom_"),
+        ),
+      )
       const locale = ctx.locale.locale()
 
       const actions = [

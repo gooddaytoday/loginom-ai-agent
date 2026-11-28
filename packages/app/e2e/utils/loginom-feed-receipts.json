@@ -1,0 +1,93 @@
+{
+  "read": {
+    "v": 1,
+    "operationId": "read-sales",
+    "state": "settled",
+    "attempt": 1,
+    "status": "SUCCEEDED",
+    "phase": "node_ready",
+    "node": {
+      "guid": "sales-node",
+      "label": "Продажи",
+      "type": "transform.filter_data"
+    },
+    "executionId": "sales-execution",
+    "executionStatus": "completed",
+    "effectPossible": true,
+    "cleanupComplete": true,
+    "limitations": [],
+    "kind": "read",
+    "ports": [
+      {
+        "index": 0,
+        "guid": "sales-output",
+        "rowCount": 0,
+        "columnCount": 1,
+        "preview": {
+          "schema": [
+            {
+              "index": 0,
+              "name": "Value",
+              "type": "string"
+            }
+          ],
+          "sample": [],
+          "sampleComplete": true
+        },
+        "details": {
+          "delivered": {
+            "kind": "preview"
+          }
+        }
+      }
+    ],
+    "evidence": [
+      {
+        "kind": "tableRead",
+        "port": 0,
+        "portGuid": "sales-output",
+        "rowsRead": 0,
+        "rowCount": 0,
+        "executionId": "sales-execution"
+      }
+    ],
+    "outputConfiguration": {
+      "kind": "unavailable",
+      "reason": "configuration_not_confirmed"
+    }
+  },
+  "save": {
+    "v": 1,
+    "operationId": "save-sales",
+    "state": "settled",
+    "status": "SUCCEEDED",
+    "kind": "save",
+    "evidence": [
+      {
+        "kind": "saved",
+        "path": "/user/ABC-анализ.lgp"
+      }
+    ]
+  },
+  "export": {
+    "v": 1,
+    "operationId": "export-sales",
+    "state": "settled",
+    "attempt": 1,
+    "status": "SUCCEEDED",
+    "phase": "node_ready",
+    "executionId": "sales-execution",
+    "executionStatus": "completed",
+    "effectPossible": true,
+    "cleanupComplete": true,
+    "limitations": [],
+    "files": [
+      {
+        "artifactId": "report-artifact",
+        "name": "ABC-анализ.csv",
+        "bytes": 256
+      }
+    ],
+    "kind": "export"
+  }
+}

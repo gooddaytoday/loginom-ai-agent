@@ -23,7 +23,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry } from "@opencode/plugin/gui/host"
-import { ToolRenderer, TurnPresentation, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
+import { Page, ToolRenderer, TurnPresentation, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
 import { Predicate } from "effect"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { pluralCategory, resolveTemplate } from "@opencode/ui/context/i18n"
@@ -820,6 +820,9 @@ function createHost(input: HostInput) {
 
         if (toolRenderer && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add tool renderers")
+
+        if (registry.id === Page.id && !input.builtins?.has(plugin))
+          throw new Error("Only built-in plugins can add pages")
 
         if (registry.id === TurnPresentation.id && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add turn presentations")

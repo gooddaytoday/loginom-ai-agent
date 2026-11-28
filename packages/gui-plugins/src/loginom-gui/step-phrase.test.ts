@@ -5,24 +5,18 @@ import { Option } from "effect"
 
 const messages = Object.entries(dict)
 
-const rules = new Intl.PluralRules("ru")
-
 const copy = {
   t: (key: string, params?: Record<string, string | number | boolean>) =>
     (messages.find(([name]) => name === key)?.[1] ?? key).replace(/{{(\w+)}}/g, (_, name: string) =>
       String(params?.[name] ?? ""),
     ),
-  plural: (key: string, count: number) => copy.t(`${key}.${rules.select(count)}`, { count }),
 }
 
-const settled = { v: 1, state: "settled", status: "SUCCEEDED" }
+const settled = { v: 1, operationId: "test-operation", state: "settled", status: "SUCCEEDED" }
 
 test.each([
-  { facts: { kind: "import", sourceName: "sales-demo.csv" }, title: "Прочитал таблицу «sales-demo.csv»" },
-  { facts: { kind: "build", nodeCount: 4 }, title: "Собрал сценарий из 4 узлов" },
-  { facts: { kind: "build", nodeCount: 21 }, title: "Собрал сценарий из 21 узла" },
   {
-    facts: { kind: "save", package: { name: "ABC-анализ.lgp", directory: "/user" } },
+    facts: { kind: "save", evidence: [{ kind: "saved", path: "/user/ABC-анализ.lgp" }] },
     title: "Сохранил «ABC-анализ.lgp» в /user",
   },
   { facts: { kind: "unrecognized" }, title: "Выполнил шаг в Loginom" },
@@ -31,8 +25,12 @@ test.each([
 })
 
 test("uses the same phrase inline and preserves the filename's case", () => {
-  const facts = decodeFacts({ ...settled, kind: "import", sourceName: "Sales.csv" })
-  expect(loginomStepPhrase(copy, facts, { lowercase: true })).toBe("прочитал таблицу «Sales.csv»")
+  const facts = decodeFacts({
+    ...settled,
+    kind: "export",
+    files: [{ artifactId: "sales", name: "Sales.csv", bytes: 1024 }],
+  })
+  expect(loginomStepPhrase(copy, facts, { lowercase: true })).toBe("выгрузил «Sales.csv»")
 })
 
 test("uses the C3.1 node and port facts to identify an import with a read result", () => {
@@ -49,26 +47,21 @@ test("uses the C3.1 node and port facts to identify an import with a read result
 
 test("falls back for an older receipt and distinguishes pending work", () => {
   expect(loginomStepPhrase(copy, decodeFacts(undefined))).toBe("Выполнил шаг в Loginom")
-  expect(loginomStepPhrase(copy, decodeFacts({ v: 1, state: "running", kind: "build", nodeCount: 4 }))).toBe(
-    "Получил промежуточный результат Loginom",
-  )
+  expect(
+    loginomStepPhrase(copy, decodeFacts({ v: 1, operationId: "execute", state: "running", kind: "execute" })),
+  ).toBe("Получил промежуточный результат Loginom")
 })
 
-test("only shows a retry limit and timeout duration when the failure receipt provides them", () => {
-  const failure = { v: 1, state: "settled", status: "FAILED", kind: "build", attempt: 1 }
-  expect(
-    failureTitle(
-      copy,
-      Option.getOrUndefined(
-        decodeFacts({
-          ...failure,
-          maxAttempts: 2,
-          error: { message: "Internal error", timeoutMs: 30_000 },
-        }),
-      ),
-    ),
-  ).toBe("Не удалось собрать сценарий в Loginom · Loginom не ответил за 30 с · попытка 1 из 2")
-  expect(failureTitle(copy, Option.getOrUndefined(decodeFacts(failure)))).toBe(
-    "Не удалось собрать сценарий в Loginom · попытка 1",
+test("shows the producer’s failure message and attempt", () => {
+  const facts = decodeFacts({
+    ...settled,
+    status: "FAILED",
+    kind: "execute",
+    attempt: 1,
+    error: { code: "NODE_EXECUTION_FAILED", message: "Internal error", source: "loginom" },
+  })
+
+  expect(failureTitle(copy, Option.getOrUndefined(facts))).toBe(
+    "Не удалось выполнить узел в Loginom · Internal error · попытка 1",
   )
 })

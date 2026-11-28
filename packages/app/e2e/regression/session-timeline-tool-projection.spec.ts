@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
+// Captured from the projection functions in #1471 (32f1f5fbe4), #1504 (d4c352d4fe) and #1484 (e743ae4ec0).
+import loginomReceipts from "../utils/loginom-feed-receipts.json" with { type: "json" }
 import {
   assistantMessage,
   partUpdated,
@@ -112,34 +114,35 @@ const loginomPlan = [
 function loginomRead() {
   return toolPart(
     "prt_loginom_read",
-    "loginom_file_profile",
+    "loginom_dock_node_read",
     "completed",
     {},
     {
-      metadata: {
-        loginom: {
-          v: 1,
-          operationId: "read",
-          state: "settled",
-          status: "SUCCEEDED",
-          kind: "import",
-          sourceName: "sales-demo.csv",
-        },
-      },
+      metadata: { loginom: loginomReceipts.read },
     },
   )
 }
 
-function loginomBuild() {
+function loginomSave() {
   return toolPart(
-    "prt_loginom_build",
+    "prt_loginom_save",
+    "loginom_dock_action_run",
+    "completed",
+    {},
+    {
+      metadata: { loginom: loginomReceipts.save },
+    },
+  )
+}
+
+function loginomExport() {
+  return toolPart(
+    "prt_loginom_export",
     "loginom_dock_node_apply",
     "completed",
     {},
     {
-      metadata: {
-        loginom: { v: 1, operationId: "build", state: "settled", status: "SUCCEEDED", kind: "build", nodeCount: 4 },
-      },
+      metadata: { loginom: loginomReceipts.export },
     },
   )
 }
@@ -149,20 +152,15 @@ for (const [width, newTimeline] of [
   [390, true],
 ] as const) {
   test(`Loginom live plan at ${width}px`, async ({ page }, testInfo) => {
-    await setupTimeline(page, {
+    const timeline = await setupTimeline(page, {
       locale: "ru",
       viewport: { width, height: 850 },
       settings: { newTimeline, timelineDetail: timelinePresets[2].value },
       messages: [
         userMessage([userText("Построй сценарий ABC-анализа по продажам.")]),
-        assistantMessage(
-          [
-            toolPart("prt_loginom_todo", "todowrite", "completed", { todos: loginomPlan }),
-            loginomRead(),
-            toolPart("prt_loginom_build", "loginom_dock_node_apply", "running", {}),
-          ],
-          { completed: false },
-        ),
+        assistantMessage([toolPart("prt_loginom_todo", "todowrite", "completed", { todos: loginomPlan })], {
+          completed: false,
+        }),
       ],
     })
 
@@ -172,6 +170,10 @@ for (const [width, newTimeline] of [
       /●.*Собрать сценарий/,
       /○.*Сохранить пакет/,
     ])
+    await expect(plan.getByText("Собрать сценарий")).toHaveAttribute("aria-current", "step")
+    const step = "prt_loginom_read"
+    await timeline.send(partUpdated(toolPart(step, "loginom_dock_node_read", "running", {})))
+    await expect(page.locator(`[data-timeline-part-ids="${step}"], [data-timeline-part-id="${step}"]`)).toHaveCount(1)
     await expect(plan.getByText("Собрать сценарий")).toHaveAttribute("aria-current", "step")
     await expect(page.getByRole("button", { name: /^Работал / })).toHaveCount(0)
     await page.screenshot({ path: testInfo.outputPath(`loginom-plan-${width}.png`), animations: "disabled" })
@@ -189,10 +191,11 @@ for (const [width, newTimeline] of [
           [
             reasoningPart("prt_loginom_thought", "Проверю входные поля и пороги."),
             loginomRead(),
-            loginomBuild(),
+            loginomExport(),
+            loginomSave(),
             textPart(
               "prt_loginom_answer",
-              "Готово. Сценарий проверен.\n\n[ABC-анализ.lgp](https://example.test/ABC.lgp)",
+              "Готово. Сценарий проверен.\n\n[ABC-анализ.csv](https://example.test/ABC.csv)",
             ),
           ],
           { created: 1700000036000 },
@@ -202,11 +205,13 @@ for (const [width, newTimeline] of [
 
     const summary = page.getByRole("button", { name: /^Работал 37 с · / })
     const answer = page.getByText("Готово. Сценарий проверен.")
-    const result = page.getByRole("link", { name: "ABC-анализ.lgp" })
+    const result = page.getByRole("link", { name: "ABC-анализ.csv" })
 
     const step = page.locator('[data-timeline-part-id="prt_loginom_read"]')
 
-    await expect(summary).toHaveText("Работал 37 с · прочитал таблицу «sales-demo.csv», собрал сценарий из 4 узлов")
+    await expect(summary).toHaveText(
+      "Работал 37 с · прочитал результат узла «Продажи», выгрузил «ABC-анализ.csv», сохранил «ABC-анализ.lgp» в /user",
+    )
     await expect(summary).toHaveAttribute("aria-expanded", "false")
     await expect(step).toHaveCount(0)
     await expect(answer).toBeVisible()
@@ -214,6 +219,22 @@ for (const [width, newTimeline] of [
     await expect(page.getByRole("list", { name: "План", exact: true })).toHaveCount(0)
     await page.screenshot({ path: testInfo.outputPath(`loginom-summary-${width}.png`), animations: "disabled" })
 
+    await page.keyboard.press("Control+,")
+    const settings = page.getByTestId("settings-screen")
+    const slider = settings.getByRole("slider", { name: "Подробности временной шкалы", exact: true })
+    await expect(slider).toBeEnabled()
+    await slider.press("ArrowRight")
+    await expect(slider).toHaveAttribute("aria-valuetext", "Подробно")
+    await settings.getByRole("button", { name: "Назад в приложение", exact: true }).click()
+    await expect(settings).toBeHidden()
+    await expect(summary).toHaveAttribute("aria-expanded", "true")
+    await expect(step).toBeVisible()
+    await expect(result).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath(`loginom-detailed-${width}.png`), animations: "disabled" })
+
+    await page.reload()
+    await expect(summary).toHaveAttribute("aria-expanded", "false")
+    await expect(step).toHaveCount(0)
     await summary.focus()
     await summary.press("Enter")
     await expect(summary).toHaveAttribute("aria-expanded", "true")
@@ -231,6 +252,45 @@ for (const [width, newTimeline] of [
     await expect(result).toBeVisible()
   })
 }
+
+test("a shell notice reveals a hidden call in a completed Loginom turn", async ({ page }) => {
+  await setupTimeline(page, {
+    sessionMessages: [
+      userMessage(),
+      assistantMessage([
+        loginomRead(),
+        toolPart(
+          "prt_loginom_shell",
+          "shell",
+          "completed",
+          { command: "bun serve.ts" },
+          {
+            output: "listening",
+            metadata: { shellID: "shell_loginom", status: "running" },
+          },
+        ),
+      ]),
+      {
+        id: "msg_1002_shell_finished",
+        type: "synthetic",
+        text: '<shell id="shell_loginom" state="completed" command="bun serve.ts">\nlistening\n</shell>',
+        description: "bun serve.ts",
+        metadata: { source: "shell", shellID: "shell_loginom", state: "completed" },
+        time: { created: 1700000003000 },
+      },
+    ],
+  })
+
+  const summary = page.getByRole("button", { name: /^Worked / })
+  const notice = page.getByRole("button", { name: /^Shell finished/ })
+  const call = page.locator('[data-timeline-part-id="prt_loginom_shell"]')
+
+  await expect(summary).toHaveAttribute("aria-expanded", "false")
+  await expect(call).toHaveCount(0)
+  await notice.click()
+  await expect(summary).toHaveAttribute("aria-expanded", "true")
+  await expect(call).toBeInViewport()
+})
 
 test("an OpenCode turn keeps its native tools and reply", async ({ page }) => {
   await setupTimeline(page, {

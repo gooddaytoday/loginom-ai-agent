@@ -1,8 +1,9 @@
 import { Option, Schema } from "effect"
 import type { Plugin } from "@opencode/plugin/gui"
+import { getDirectory, getFilename } from "@opencode/util/path"
 import type definition from "./index"
 
-type Copy = Pick<Parameters<Plugin.Setup<typeof definition>>[0], "t" | "plural">
+type Copy = Pick<Parameters<Plugin.Setup<typeof definition>>[0], "t">
 
 const count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
@@ -12,24 +13,21 @@ const text = Schema.NonEmptyString
 
 const Facts = Schema.Struct({
   v: Schema.Literal(1),
+  operationId: text,
   state: Schema.Literals(["running", "settled"]),
   status: Schema.optionalKey(Schema.Literals(["SUCCEEDED", "FAILED", "NOT_APPLIED", "AMBIGUOUS"])),
   kind: Schema.optionalKey(text),
-  sourceName: Schema.optionalKey(text),
-  nodeCount: Schema.optionalKey(count),
-  package: Schema.optionalKey(Schema.Struct({ name: text, directory: text })),
-  node: Schema.optionalKey(Schema.Struct({ label: Schema.String, type: text })),
+  node: Schema.optionalKey(Schema.Struct({ guid: text, label: Schema.String, type: text })),
   attempt: Schema.optionalKey(positive),
-  maxAttempts: Schema.optionalKey(positive),
-  error: Schema.optionalKey(
-    Schema.Struct({
-      message: text,
-      timeoutMs: Schema.optionalKey(positive),
-    }),
+  error: Schema.optionalKey(Schema.Struct({ code: Schema.String, message: Schema.String })),
+  ports: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ index: count, guid: text, rowCount: count, columnCount: count })),
   ),
-  ports: Schema.optionalKey(Schema.Array(Schema.Struct({ index: count, rowCount: count, columnCount: count }))),
-  files: Schema.optionalKey(Schema.Array(Schema.Struct({ name: text, bytes: count }))),
+  files: Schema.optionalKey(Schema.Array(Schema.Struct({ artifactId: text, name: Schema.String, bytes: count }))),
+  evidence: Schema.optionalKey(Schema.Array(Schema.Unknown)),
 })
+
+const decodeSaved = Schema.decodeUnknownOption(Schema.Struct({ kind: Schema.Literal("saved"), path: text }))
 
 const Progress = Schema.Struct({
   version: Schema.Literal(1),
@@ -45,6 +43,16 @@ export const decodeFacts = Schema.decodeUnknownOption(Facts)
 export const decodeProgress = Schema.decodeUnknownOption(Progress)
 
 type Facts = Option.Option.Value<ReturnType<typeof decodeFacts>>
+
+function savedPackage(facts: Facts) {
+  const saved = facts.evidence
+    ?.map((item) => Option.getOrUndefined(decodeSaved(item)))
+    .find((item) => item !== undefined)
+
+  if (!saved) return
+
+  return { name: getFilename(saved.path), directory: getDirectory(saved.path).replace(/\/$/, "") || "/" }
+}
 
 function operation(facts?: Facts) {
   if (facts?.kind !== "read" && facts?.node?.type.startsWith("imports.") && facts.ports?.length) return "import"
@@ -75,12 +83,12 @@ function completedTitle(copy: Copy, input: ReturnType<typeof decodeFacts>, pendi
 
   switch (kind) {
     case "import":
-      return facts.sourceName ? copy.t("step.import", { name: facts.sourceName }) : copy.t("step.import.unnamed")
-    case "build":
-      if (facts.nodeCount) return copy.plural("step.build", facts.nodeCount)
-      break
-    case "save":
-      return facts.package ? copy.t("step.save", facts.package) : copy.t("step.save.unnamed")
+      return copy.t("step.import.unnamed")
+    case "save": {
+      const saved = savedPackage(facts)
+
+      return saved?.name ? copy.t("step.save", saved) : copy.t("step.save.unnamed")
+    }
     case "add":
     case "configure":
     case "execute":
@@ -104,7 +112,6 @@ export function failureTitle(copy: Copy, facts?: Facts) {
 
     switch (kind) {
       case "import":
-      case "build":
       case "save":
       case "configure":
       case "execute":
@@ -116,17 +123,8 @@ export function failureTitle(copy: Copy, facts?: Facts) {
     }
   })()
 
-  const error = facts?.error
-
-  const reason = error?.timeoutMs
-    ? copy.t("failure.timeout", { seconds: Math.ceil(error.timeoutMs / 1000) })
-    : error?.message
-
-  const attempt = facts?.attempt
-    ? facts.maxAttempts && facts.maxAttempts >= facts.attempt
-      ? copy.t("failure.attemptOf", { attempt: facts.attempt, total: facts.maxAttempts })
-      : copy.t("failure.attempt", { attempt: facts.attempt })
-    : undefined
+  const reason = facts?.error?.message
+  const attempt = facts?.attempt ? copy.t("failure.attempt", { attempt: facts.attempt }) : undefined
 
   if (reason && attempt) return copy.t("failure.withReasonAndAttempt", { action, reason, attempt })
 
@@ -140,11 +138,11 @@ export function failureTitle(copy: Copy, facts?: Facts) {
 export function stepDetails(copy: Copy, facts?: Facts) {
   if (!facts) return []
 
+  const saved = savedPackage(facts)
+
   return [
-    ...(facts.sourceName ? [copy.t("field.source", { name: facts.sourceName })] : []),
     ...(facts.node?.label ? [copy.t("field.node", { name: facts.node.label })] : []),
-    ...(facts.nodeCount === undefined ? [] : [copy.t("field.nodes", { count: facts.nodeCount })]),
-    ...(facts.package ? [copy.t("field.package", facts.package)] : []),
+    ...(saved?.name ? [copy.t("field.package", saved)] : []),
     ...(facts.ports ?? []).map(({ index, rowCount, columnCount }) =>
       copy.t("field.port", { port: index + 1, rows: rowCount, columns: columnCount }),
     ),
