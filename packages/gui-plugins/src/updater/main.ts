@@ -35,7 +35,7 @@ const setup: Plugin.MainSetup = async (ctx) => {
             from: { settings: "channel", file: Product.stores.updater },
           })
 
-          const { readUpdateSettings, updatePolicyPath } = await import("./signed-feed")
+          const { readUpdateSettings, updatePolicyPath } = await import("../update-feed")
 
           try {
             return readUpdateSettings({

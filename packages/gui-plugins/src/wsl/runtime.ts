@@ -2,37 +2,19 @@ import { spawn } from "node:child_process"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import type { MainContext } from "@opencode/plugin/gui/main"
-import type { WslDistroProbe, WslInstalledDistro, WslOnlineDistro, WslRuntimeCheck } from "./contract"
-import { discoverScript, installScript, parseVersion, versionScript } from "./remote-cli"
+import type { RunWslOptions, WslCommandResult, WslDistroProbe, WslInstalledDistro, WslOnlineDistro, WslRuntimeCheck } from "./contract"
+import { discoverScript, parseVersion, versionScript } from "./remote-cli"
+import { shellEscape } from "../shell-escape"
+
+export { shellEscape } from "../shell-escape"
 
 export type WslCommandLine = {
   stream: "stdout" | "stderr"
   text: string
 }
 
-export type WslCommandResult = {
-  code: number | null
-  signal: NodeJS.Signals | null
-  stdout: string
-  stderr: string
-}
-
-export type RunWslOptions = {
-  signal?: AbortSignal
-  /**
-   * Ceiling on how long we wait for the child process to exit. When the
-   * LXSS service or a specific distro wedges (e.g. Ubuntu-24.04 with a
-   * pending first-run prompt), `wsl.exe` never returns and any command
-   * that doesn't specify a timeout hangs the entire startup flow. Default
-   * is 20s - enough for slow cold-starts, short enough to fail fast on
-   * a wedge. Callers can override for longer-running jobs.
-   */
-  timeoutMs?: number
-}
-
 export type WslCliBuild = {
   version: string
-  binary?: string
 }
 
 export type WslRuntime = ReturnType<typeof createWslRuntime>
@@ -47,13 +29,6 @@ export function wslArgs(args: string[], distro?: string | null, user?: string | 
   return [...(distro ? ["-d", distro] : []), ...(user ? ["--user", user] : []), "--exec", ...args]
 }
 
-export function wslCliInstallCommand(cli: WslCliBuild) {
-  return installScript({
-    version: cli.version,
-    binary: cli.binary ? `"$(wslpath -a ${shellEscape(cli.binary)})"` : undefined,
-  })
-}
-
 export function summarize(value: string) {
   return value
     .split(/\r?\n/g)
@@ -62,12 +37,8 @@ export function summarize(value: string) {
     .join("\n")
 }
 
-export function shellEscape(value: string) {
-  return `'${value.replace(/'/g, `'"'"'`)}'`
-}
-
 /** WSL commands; `t` resolves the plugin's copy for errors the user sees. */
-export function createWslRuntime(t: MainContext["t"]) {
+export function createWslRuntime(t: MainContext["t"], cli = { discover: discoverScript }) {
   const runWsl = (args: string[], opts: RunWslOptions = {}) => runCommand("wsl", args, opts)
 
   const runPowerShell = (command: string, opts: RunWslOptions = {}) =>
@@ -296,17 +267,6 @@ export function createWslRuntime(t: MainContext["t"]) {
       requireSuccess(result, t("error.installDistro", { distro }))
     },
 
-    async installCli(distro: string, cli: WslCliBuild, opts?: RunWslOptions) {
-      const result = await runInteractiveCommand(
-        system32("wsl.exe"),
-        wslArgs(["bash", "-lc", wslCliInstallCommand(cli)], distro),
-        withTimeout(opts, DEFAULT_WSL_INSTALL_TIMEOUT_MS),
-        DEFAULT_WSL_INSTALL_TIMEOUT_MS,
-      )
-
-      requireSuccess(result, t("error.installOpencode"))
-    },
-
     async probeDistro(name: string, opts?: RunWslOptions): Promise<WslDistroProbe> {
       const executable = await runWslInDistro(["/bin/true"], name, opts).catch((error) => ({
         code: 1,
@@ -320,27 +280,31 @@ export function createWslRuntime(t: MainContext["t"]) {
           name,
           canExecute: false,
           hasBash: false,
-          hasCurl: false,
+          hasArchiveTools: false,
           error: summarize(executable.stderr || executable.stdout) || t("error.executeDistro"),
         }
       }
 
-      const [bash, curl] = await Promise.all([
+      const [bash, tools] = await Promise.all([
         runWslSh("command -v bash >/dev/null && printf yes || printf no", name, opts),
-        runWslSh("command -v curl >/dev/null && printf yes || printf no", name, opts),
+        runWslSh(
+          "command -v tar >/dev/null && command -v sha256sum >/dev/null && command -v flock >/dev/null && printf yes || printf no",
+          name,
+          opts,
+        ),
       ])
 
       return {
         name,
         canExecute: true,
         hasBash: bash.code === 0 && summarize(bash.stdout) === "yes",
-        hasCurl: curl.code === 0 && summarize(curl.stdout) === "yes",
+        hasArchiveTools: tools.code === 0 && summarize(tools.stdout) === "yes",
         error: null,
       }
     },
 
     async resolveCli(distro: string, opts?: RunWslOptions) {
-      return firstLine((await runWslSh(discoverScript(), distro, opts)).stdout)
+      return firstLine((await runWslSh(cli.discover(), distro, opts)).stdout)
     },
 
     async readCliVersion(command: string, distro: string, opts?: RunWslOptions) {

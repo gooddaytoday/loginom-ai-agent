@@ -10,7 +10,8 @@
     "./dashboard-link": "./src/dashboard-link.ts",
     "./cli-profile": "./src/cli-profile.ts",
     "./skills": "./src/skills.ts",
-    "./update-signature": "./src/update-signature.ts"
+    "./update-signature": "./src/update-signature.ts",
+    "./wsl-release": "./src/wsl-release.ts"
   },
   "scripts": {
     "test": "bun test",

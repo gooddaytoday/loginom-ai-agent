@@ -12,7 +12,9 @@
       mount({
         server: query.get("server"),
         mode: query.get("mode"),
+        locale: query.get("locale") === "ru" ? "ru" : "en",
         wsl: query.get("wsl"),
+        cli: query.get("cli"),
         restart: query.get("restart"),
         path: query.get("path"),
         ssh: query.get("ssh"),

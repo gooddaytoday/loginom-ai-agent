@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { wslArchiveDigest, wslArchiveName } from "../packages/product/src/wsl-release"
 import { createPrivateKey, sign } from "node:crypto"
 import { mkdtemp, readdir, rm, stat, lstat, appendFile } from "node:fs/promises"
 import { execFileSync } from "node:child_process"
@@ -169,6 +170,24 @@ export async function checkRelease(dir: string) {
   return sums
 }
 
+/** The candidate already contains the archive and its checksum. Sign it with the release key before staging it. */
+export async function signWslCandidate(
+  dir: string,
+  version: string,
+  key: string,
+  keys: readonly string[] = UPDATE_PUBLIC_KEYS,
+) {
+  const archive = wslArchiveName(version)
+  const sums = await checkRelease(dir)
+  const digest = sums.get(archive)
+  if (!digest) throw Error("Missing WSL CLI archive")
+  const checksum = await Bun.file(join(dir, archive + ".sha256")).bytes()
+  const signature = signed(checksum, key, keys)
+  if (wslArchiveDigest(version, checksum, decoder.decode(signature), keys) !== digest)
+    throw Error("WSL CLI archive hash mismatch")
+  await Bun.write(join(dir, archive + ".sha256.sig"), signature)
+}
+
 // Release CI signs before uploading to the GitHub draft. The mirror never has a
 // signing key and must preserve every byte, including channel metadata.
 export async function signRelease(
@@ -179,7 +198,7 @@ export async function signRelease(
   keys: readonly string[] = UPDATE_PUBLIC_KEYS,
 ) {
   minimum(version, min)
-  await checkRelease(dir)
+  const sums = await checkRelease(dir)
   const documents = new Map<string, Uint8Array>()
   for (const name of metadataNames.filter((name) => name !== "cli.json")) {
     if (!(await Bun.file(join(dir, name)).exists())) {
@@ -212,6 +231,11 @@ export async function signRelease(
         }),
       ),
     )
+  }
+  const archive = wslArchiveName(version)
+  const archiveHash = sums.get(archive)
+  if (archiveHash) {
+    documents.set(archive + ".sha256", new TextEncoder().encode(`${archiveHash}  ${archive}\n`))
   }
   const signatures = new Map([...documents].map(([name, bytes]) => [name, signed(bytes, key, keys)]))
   for (const [name, bytes] of documents) {
@@ -249,6 +273,13 @@ export async function verifySignedRelease(dir: string, version: string, keys: re
       )
         throw Error(`Metadata hash/size mismatch: ${name}`)
     }
+  }
+  const archive = wslArchiveName(version)
+  if (sums.has(archive)) {
+    const checksum = await Bun.file(join(dir, archive + ".sha256")).bytes()
+    const signature = await Bun.file(join(dir, archive + ".sha256.sig")).text()
+    if (wslArchiveDigest(version, checksum, signature, keys) !== sums.get(archive))
+      throw Error("WSL CLI archive hash mismatch")
   }
   return { sums, names }
 }
@@ -776,7 +807,7 @@ async function main() {
   })
   if (values.help) {
     console.log(
-      "update-feed.ts sign-release --assets <directory> --version X.Y.Z [--min-supported X.Y.Z] [--key <file> or LOGINOM_UPDATES_SIGNING_KEY]\nmirror-release --assets <directory> --version X.Y.Z --channel stable|unstable [--allow-rollback]\nstatus --assets <directory> --version X.Y.Z --channel stable|unstable (read-only mirror verification)\nverify-public --assets <directory> --version X.Y.Z --channel stable|unstable --github-base HTTPS_URL\nLegacy (requires --legacy): publish --channel unstable --version X.Y.Z --from-release vX.Y.Z --key <file> [--staging 100] [--min-supported X.Y.Z]\npromote --to stable --version X.Y.Z --key <file> [--staging N]\nstage --channel stable|unstable --percent N --key <file>\nstatus --channel stable|unstable\nCommon: --feed-base HTTPS_URL (or LOGINOM_AI_AGENT_UPDATE_FEED), --config <S3 credentials file>, --public-key <test PEM> (repeatable). publish: --assets <checked local release directory> instead of --from-release.",
+      "update-feed.ts sign-release --assets <directory> --version X.Y.Z [--min-supported X.Y.Z] [--key <file> or LOGINOM_UPDATES_SIGNING_KEY]\nsign-wsl --assets <candidate directory> --version X.Y.Z [--key <file> or LOGINOM_UPDATES_SIGNING_KEY]\nmirror-release --assets <directory> --version X.Y.Z --channel stable|unstable [--allow-rollback]\nstatus --assets <directory> --version X.Y.Z --channel stable|unstable (read-only mirror verification)\nverify-public --assets <directory> --version X.Y.Z --channel stable|unstable --github-base HTTPS_URL\nLegacy (requires --legacy): publish --channel unstable --version X.Y.Z --from-release vX.Y.Z --key <file> [--staging 100] [--min-supported X.Y.Z]\npromote --to stable --version X.Y.Z --key <file> [--staging N]\nstage --channel stable|unstable --percent N --key <file>\nstatus --channel stable|unstable\nCommon: --feed-base HTTPS_URL (or LOGINOM_AI_AGENT_UPDATE_FEED), --config <S3 credentials file>, --public-key <test PEM> (repeatable). publish: --assets <checked local release directory> instead of --from-release.",
     )
     return
   }
@@ -807,15 +838,17 @@ async function main() {
     console.log("Update feeds: " + (enabled ? "enabled" : "disabled explicitly or for an unverified candidate"))
     return
   }
-  if (["sign-release", "mirror-release", "verify-public", "status"].includes(command) && !values.legacy) {
+  if (["sign-release", "sign-wsl", "mirror-release", "verify-public", "status"].includes(command) && !values.legacy) {
     if (positionals.length !== 1 || !values.assets || !values.version) throw Error("Required --assets and --version")
     const keys = values["public-key"]
       ? await Promise.all(values["public-key"].map((file) => Bun.file(resolve(file)).text()))
       : UPDATE_PUBLIC_KEYS
-    if (command === "sign-release") {
+    if (command === "sign-release" || command === "sign-wsl") {
       const key = values.key ? await Bun.file(resolve(values.key)).text() : process.env.LOGINOM_UPDATES_SIGNING_KEY
       if (!key) throw Error("Missing required secret: LOGINOM_UPDATES_SIGNING_KEY")
-      await signRelease(resolve(values.assets), values.version, values["min-supported"] ?? values.version, key, keys)
+      const dir = resolve(values.assets)
+      if (command === "sign-wsl") await signWslCandidate(dir, values.version, key, keys)
+      else await signRelease(dir, values.version, values["min-supported"] ?? values.version, key, keys)
       return
     }
     const readConfig =

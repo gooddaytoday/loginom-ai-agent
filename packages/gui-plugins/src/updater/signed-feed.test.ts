@@ -1,3 +1,4 @@
+import { Predicate } from "effect"
 import { expect, test } from "bun:test"
 import { createHash, generateKeyPairSync, sign } from "node:crypto"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
@@ -5,16 +6,25 @@ import { createServer, request } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { NsisUpdater } from "electron-updater/out/NsisUpdater.js"
-import { checkAutomaticUpdate, loadSignedUpdate, readUpdateBytes, readUpdateSettings } from "./signed-feed"
+import { checkAutomaticUpdate, loadSignedUpdate } from "./signed-feed"
+import { readUpdateBytes, readUpdateSettings } from "../update-feed"
 
 const installedVersion = "0.4.3"
+
 const nextVersion = "0.5.0"
+
 const feed = "https://updates.s3.example.test/updates/"
+
 const override = "https://admin.example.test/alternate/"
+
 const github = { api: "https://api.example.test/releases", download: "https://download.example.test/assets/" }
+
 const trusted = generateKeyPairSync("ed25519")
+
 const foreign = generateKeyPairSync("ed25519")
+
 const keys = [trusted.publicKey.export({ format: "pem", type: "spki" }).toString()]
+
 const hash = createHash("sha512").update("fixture installer").digest("base64")
 
 function manifest(target = `releases/${nextVersion}/loginom-ai-agent-win-x64.exe`, version = nextVersion) {
@@ -86,6 +96,7 @@ test.each([
     const root = mkdtempSync(join(tmpdir(), "loginom-updates-"))
     const policyPath = join(root, "policy.json")
     const s3Path = join(root, "updates-s3.json")
+
     if (policy) writeFileSync(policyPath, JSON.stringify(policy))
     writeFileSync(
       s3Path,
@@ -100,26 +111,34 @@ test.each([
     const yaml = manifest(target, version)
     const signature = sign(null, Buffer.from(yaml), (signer ?? trusted).privateKey).toString("base64")
     const observed: string[] = []
+
     const server = createServer((req, response) => {
       const url = new URL(req.url ?? "", "http://127.0.0.1")
       const pathname = url.pathname
       observed.push(pathname)
+
       if (pathname === "/releases/latest" && githubStatus)
         return response
           .writeHead(githubStatus)
           .end(JSON.stringify({ tag_name: `v${nextVersion}`, draft: false, prerelease: false }))
+
       if (
         (pathname.startsWith("/stable/") || pathname.startsWith("/updates/")) &&
         !url.searchParams.has("X-Amz-Signature")
       )
         return response.writeHead(403).end()
+
       if (pathname === `${path}/latest.yml`) return response.end(tamper ? `${yaml}\n` : yaml)
+
       if (pathname === `${path}/latest.yml.sig`) return response.end(signature)
       response.writeHead(404).end()
     })
+
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
     const address = server.address()
-    if (!address || typeof address === "string") throw Error("Expected a TCP fixture")
+
+    if (!address || Predicate.isString(address)) throw Error("Expected a TCP fixture")
+
     const updater = new NsisUpdater(null, {
       version: installedVersion,
       name: "fixture desktop",
@@ -132,6 +151,7 @@ test.each([
       quit: () => {},
       onQuit: () => {},
     })
+
     updater.autoDownload = false
     updater.logger = null
     const emitted: string[] = []
@@ -145,7 +165,9 @@ test.each([
         preference,
         github: githubStatus || (policy && "feedUrl" in policy) ? github : null,
       })
+
       if (!settings.enabled) return undefined
+
       const selected = await loadSignedUpdate({
         sources: settings.sources,
         currentVersion: installedVersion,
@@ -156,11 +178,13 @@ test.each([
             url,
             (url) => {
               const { pathname, search } = new URL(url)
+
               return request({ hostname: "127.0.0.1", port: address.port, path: pathname + search })
             },
             timeout,
           ),
       })
+
       return selected && (await checkAutomaticUpdate(updater, selected, false))?.info.version
     }
 

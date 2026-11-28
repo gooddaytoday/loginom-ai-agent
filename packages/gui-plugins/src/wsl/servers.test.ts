@@ -38,6 +38,7 @@ test("teardown during a pending start resolves only after the started process ex
   })
 
   await controller.addServer("Debian")
+  expect(saved).toEqual([{ id: "wsl:Debian", distro: "Debian", autostart: true }])
 
   while (!children.length) await Bun.sleep(1)
   expect(children[0].exitCode).toBeNull()
@@ -55,7 +56,10 @@ test("retrying a failed server twice at once spawns one server, which teardown s
     t: (key) => key,
     log: () => undefined,
     installCli: async () => undefined,
-    readServers: () => [{ id: "wsl:Debian", distro: "Debian" }],
+    readServers: () => [
+      { id: "wsl:Debian", distro: "Debian", autostart: true },
+      { id: "wsl:Ubuntu", distro: "Ubuntu" },
+    ],
     writeServers: () => undefined,
     // The launch start fails; every retry comes up at once.
     spawnSidecar: async (distro) => {
@@ -76,6 +80,7 @@ test("retrying a failed server twice at once spawns one server, which teardown s
 
   controller.startConfiguredServers()
   await failed.promise
+  expect(controller.getState().servers[1]?.runtime).toEqual({ kind: "stopped" })
   unsubscribe()
 
   await Promise.all([controller.startServer("wsl:Debian"), controller.startServer("wsl:Debian")])

@@ -15,7 +15,7 @@
 
 - Запуск: `workflow_dispatch` (кандидат любого ref), push в `oc2-migration` при изменении самого workflow, трёх платформенных
   workflow или `packages/desktop/scripts/release/**`, push тега `v*` (тег обязан быть `v<версия packages/desktop/package.json>`).
-  Выпуск, подпись ленты, зеркало S3 и draft — этап G, отдельная команда владельца; секретов в workflow нет.
+  Выпуск, подпись метаданных обновлятора Desktop, зеркало S3 и draft — этап G, отдельная команда владельца.
 - `plan` читает версию Desktop; `linux`, `windows`, `macos` вызывают `loginom-linux.yml`, `loginom-windows.yml`,
   `loginom-macos.yml` через `workflow_call` (macOS получает `version`). Отдельный push Linux убран: Linux собирается один раз внутри этого запуска.
 - `verify-linux/-windows/-macos` на своём раннере скачивают артефакты (`loginom-linux-x64-*`, `loginom-windows-unsigned-<run_id>`,
@@ -27,6 +27,7 @@
   Шаг «G5 mutation» запускает то же с `--undamaged` и ждёт ненулевой код: контроль умеет краснеть. На Linux дополнительно `cli-resources.test.ts`
   (на других системах он пропускается, их комплектность проверяет `candidate.ts g5` на настоящем архиве).
 - `collect` скачивает `loginom-release-*`, `sums.ts` сверяет файлы с тремя манифестами и пишет `SHA256SUMS.txt`; итог — артефакт `loginom-candidate-<sha>` (14 дней).
+- `sign-wsl` после `collect` запускается при push тега `v*` в основном репозитории. Задача берёт `LOGINOM_UPDATES_SIGNING_KEY` из Environment `release`, подписывает `.sha256` Linux CLI и заново пишет `SHA256SUMS.txt`. Итоговый артефакт `loginom-signed-<sha>` содержит `.sha256.sig`. Сборки веток и ручной запуск кандидата не используют секрет.
 - Не входит: `.rpm` (манифест его не знает), `latest*.yml` и blockmap (лента — этап G), матрица DEB `linux-matrix.json`
   (`script/release-notes.ts` вызывает этап G и по-прежнему требует её).
 
@@ -153,7 +154,7 @@ Repository variables (адреса — параметры сборки, runtime 
 
 | Secret                               | Где хранить                  | Назначение                                                                              |
 | ------------------------------------ | ---------------------------- | --------------------------------------------------------------------------------------- |
-| `LOGINOM_UPDATES_SIGNING_KEY`        | Только Environment `release` | Ed25519 PKCS8 PEM, соответствующий одному из `UPDATE_PUBLIC_KEYS`; только подпись draft |
+| `LOGINOM_UPDATES_SIGNING_KEY`        | Только Environment `release` | Ed25519 PKCS8 PEM, соответствующий одному из `UPDATE_PUBLIC_KEYS`; подпись метаданных Desktop и WSL |
 | `LOGINOM_UPDATES_S3_ACCESS_KEY`      | Только Environment `release` | Ключ записи в формате `<tenant_id>:<key_id>`, только шаг mirror                         |
 | `LOGINOM_UPDATES_S3_SECRET_KEY`      | Только Environment `release` | Секрет ключа записи, только шаг mirror                                                  |
 | `LOGINOM_UPDATES_S3_READ_ACCESS_KEY` | Repository secrets           | Access Key чтения в формате `<tenant_id>:<key_id>`; ресурсы Desktop и проверка зеркала  |

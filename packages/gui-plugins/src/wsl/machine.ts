@@ -614,7 +614,7 @@ function distroOf(state: OpenState, distro: string): WslDistro {
 function needsCliCheck(state: OpenState, distro: string) {
   const probe = state.distroProbes[distro]
 
-  return !!probe && probe.canExecute && probe.hasBash && probe.hasCurl && !state.opencodeChecks[distro]
+  return !!probe && probe.canExecute && probe.hasBash && probe.hasArchiveTools && !state.opencodeChecks[distro]
 }
 
 function configuredDistro(state: OpenState, distro: string) {

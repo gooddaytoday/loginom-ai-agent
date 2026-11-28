@@ -12,7 +12,7 @@ import { wslRowView } from "./row-view"
 
 const ubuntu: WslServerConfig = { id: "wsl:Ubuntu", distro: "Ubuntu" }
 
-const readyProbe = { name: "Debian", canExecute: true, hasBash: true, hasCurl: true, error: null }
+const readyProbe = { name: "Debian", canExecute: true, hasBash: true, hasArchiveTools: true, error: null }
 
 function check(distro: string, version: string): WslOpencodeCheck {
   return {
@@ -65,6 +65,7 @@ describe("one job per distro", () => {
     expect(toServersState(updating.state).distroJobs).toEqual({ Ubuntu: "updating" })
     expect(wslRowView(toServersState(updating.state), "Ubuntu")).toEqual({
       version: "1",
+      installed: true,
       button: { label: "server.updating", disabled: true },
       retry: false,
       removable: false,
@@ -196,6 +197,7 @@ describe("updates", () => {
     expect(updated.effects).not.toContainEqual({ type: "resolve", attempt: "u1" })
     expect(wslRowView(toServersState(updated.state), "Ubuntu")).toEqual({
       version: "2",
+      installed: true,
       button: null,
       retry: false,
       removable: true,

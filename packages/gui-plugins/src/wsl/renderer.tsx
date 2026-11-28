@@ -17,7 +17,7 @@ const loadDialog = () => import("./dialog")
 
 type DialogModule = Awaited<ReturnType<typeof loadDialog>>
 
-const setup: Plugin.Setup<typeof definition> = (ctx) => {
+export function setupWslRenderer(ctx: Parameters<Plugin.Setup<typeof definition>>[0], setupCommand: string) {
   if (ctx.app.platform !== "desktop") return
   const ipc = ctx.use(Wsl)
   const dialog = ctx.dialogs
@@ -112,7 +112,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       remove: () => Promise.try(() => api().removeServer({ id: item.config.id })),
       row: (row) => (
         <Suspense>
-          <Row row={row} distro={item.config.distro} state={state} api={client} run={run} />
+          <Row row={row} distro={item.config.distro} state={state} api={client} run={run} setupCommand={setupCommand} />
         </Suspense>
       ),
     }
@@ -160,5 +160,3 @@ function serverState(item: WslServerItem): ServerState {
 
   return "stopped"
 }
-
-export default setup

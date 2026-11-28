@@ -10,6 +10,7 @@ export function wslRowView(state: WslServersState | undefined, distro: string) {
 
   return {
     version: check?.version ?? null,
+    installed: Boolean(check?.resolvedPath),
     button: action ? { label: job === "updating" ? "server.updating" : action, disabled: !free } : null,
     retry: !job && (runtime === "failed" || runtime === "stopped"),
     removable: free,

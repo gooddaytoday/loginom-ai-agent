@@ -50,6 +50,15 @@
       ]
     },
     {
+      "id": "CAT-30",
+      "title": "Desktop WSL product CLI (C5.7, В-101)",
+      "paths": ["packages/gui-plugins/README.md", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/wsl/**",
+        "packages/gui-plugins/src/loginom-gui/wsl-*.ts", "packages/gui-plugins/src/wsl-*.ts",
+        "packages/gui-plugins/src/update-feed.ts", "packages/gui-plugins/src/update-proxy.ts", "packages/gui-plugins/src/update-request.ts", "packages/gui-plugins/src/shell-escape.ts",
+        "packages/app/e2e/regression/settings-wsl.spec.ts", "packages/app/e2e/utils/settings-wsl.*",
+        "packages/app/test-browser/builtin-plugins.test.ts"]
+    },
+    {
       "id": "CAT-03",
       "title": "Brand: documentation, icons, repository dotdirs",
       "paths": [

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { updateProxy } from "./proxy"
+import { updateProxy } from "../update-proxy"
 
 test.each([
   [{}, "system"],

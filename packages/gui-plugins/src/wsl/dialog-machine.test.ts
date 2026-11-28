@@ -28,7 +28,7 @@ function wsl(fields: Partial<typeof WslServersState.Encoded>) {
   })
 }
 
-const probe = (name: string) => ({ name, canExecute: true, hasBash: true, hasCurl: true, error: null })
+const probe = (name: string) => ({ name, canExecute: true, hasBash: true, hasArchiveTools: true, error: null })
 
 const check = (distro: string, version: string | null) => ({
   distro,
