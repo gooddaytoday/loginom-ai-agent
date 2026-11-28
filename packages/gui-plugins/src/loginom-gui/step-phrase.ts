@@ -1,8 +1,8 @@
-import { Option, Schema } from "effect"
+import { Effect, Option, Schema } from "effect"
 import type { Plugin } from "@opencode/plugin/gui"
 import type definition from "./index"
 
-type Copy = Pick<Parameters<Plugin.Setup<typeof definition>>[0], "t" | "plural">
+type Copy = Pick<Parameters<Plugin.Setup<typeof definition>>[0], "t">
 
 const count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 
@@ -10,26 +10,40 @@ const positive = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
 
 const text = Schema.NonEmptyString
 
-const Facts = Schema.Struct({
+const displayField = <S extends Schema.Constraint>(schema: S) =>
+  Schema.optional(schema).pipe(Schema.catchDecoding(() => Effect.succeed(Option.none())))
+
+// The timeline reads only the display fields of the Loginom metadata v1 receipt.
+const Receipt = Schema.Struct({
   v: Schema.Literal(1),
+  operationId: text,
   state: Schema.Literals(["running", "settled"]),
-  status: Schema.optionalKey(Schema.Literals(["SUCCEEDED", "FAILED", "NOT_APPLIED", "AMBIGUOUS"])),
-  kind: Schema.optionalKey(text),
-  sourceName: Schema.optionalKey(text),
-  nodeCount: Schema.optionalKey(count),
-  package: Schema.optionalKey(Schema.Struct({ name: text, directory: text })),
-  node: Schema.optionalKey(Schema.Struct({ label: Schema.String, type: text })),
-  attempt: Schema.optionalKey(positive),
-  maxAttempts: Schema.optionalKey(positive),
-  error: Schema.optionalKey(
+  status: displayField(Schema.Literals(["SUCCEEDED", "FAILED", "NOT_APPLIED", "AMBIGUOUS"])),
+  kind: displayField(Schema.Literals(["add", "configure", "execute", "export", "read", "save"])),
+  node: displayField(Schema.Struct({ guid: text, label: Schema.String, type: text })),
+  attempt: displayField(positive),
+  error: displayField(
     Schema.Struct({
-      message: text,
-      timeoutMs: Schema.optionalKey(positive),
+      code: Schema.String,
+      message: Schema.String,
+      source: Schema.Literals(["loginom", "runtime", "host"]),
     }),
   ),
-  ports: Schema.optionalKey(Schema.Array(Schema.Struct({ index: count, rowCount: count, columnCount: count }))),
-  files: Schema.optionalKey(Schema.Array(Schema.Struct({ name: text, bytes: count }))),
+  ports: displayField(
+    Schema.Array(
+      Schema.Struct({
+        guid: text,
+        index: count,
+        rowCount: count,
+        columnCount: count,
+      }),
+    ),
+  ),
+  files: displayField(Schema.Array(Schema.Struct({ artifactId: text, name: Schema.String, bytes: count }))),
+  evidence: displayField(Schema.Array(Schema.Unknown)),
 })
+
+const decodeSaved = Schema.decodeUnknownOption(Schema.Struct({ kind: Schema.Literal("saved"), path: text }))
 
 const Progress = Schema.Struct({
   version: Schema.Literal(1),
@@ -37,14 +51,28 @@ const Progress = Schema.Struct({
   startedAt: count,
   lastReplyAt: Schema.NullOr(count),
   stalledSince: Schema.NullOr(count),
-  substep: Schema.NullOr(Schema.Struct({ kind: Schema.Literal("fields"), index: positive, total: positive })),
+  substep: Schema.NullOr(
+    Schema.Struct({
+      kind: Schema.Literal("fields"),
+      index: positive,
+      total: positive,
+    }),
+  ),
 })
 
-export const decodeFacts = Schema.decodeUnknownOption(Facts)
+export const decodeFacts = Schema.decodeUnknownOption(Receipt)
 
 export const decodeProgress = Schema.decodeUnknownOption(Progress)
 
 type Facts = Option.Option.Value<ReturnType<typeof decodeFacts>>
+
+function savedPath(facts?: Facts) {
+  for (const item of facts?.evidence ?? []) {
+    const saved = decodeSaved(item)
+
+    if (Option.isSome(saved)) return saved.value.path
+  }
+}
 
 function operation(facts?: Facts) {
   if (facts?.kind !== "read" && facts?.node?.type.startsWith("imports.") && facts.ports?.length) return "import"
@@ -75,12 +103,24 @@ function completedTitle(copy: Copy, input: ReturnType<typeof decodeFacts>, pendi
 
   switch (kind) {
     case "import":
-      return facts.sourceName ? copy.t("step.import", { name: facts.sourceName }) : copy.t("step.import.unnamed")
-    case "build":
-      if (facts.nodeCount) return copy.plural("step.build", facts.nodeCount)
-      break
-    case "save":
-      return facts.package ? copy.t("step.save", facts.package) : copy.t("step.save.unnamed")
+      return copy.t("step.import")
+    case "save": {
+      const path = savedPath(facts)
+
+      if (!path) return copy.t("step.save.unnamed")
+
+      const separator = path.lastIndexOf("/")
+
+      if (separator < 0 || separator === path.length - 1) return copy.t("step.save.path", { path })
+
+      const directory = path.slice(0, separator || 1)
+
+      return copy.t("step.save", {
+        name: path.slice(separator + 1),
+        directory,
+      })
+    }
+
     case "add":
     case "configure":
     case "execute":
@@ -98,13 +138,25 @@ function completedTitle(copy: Copy, input: ReturnType<typeof decodeFacts>, pendi
   return copy.t("step.done")
 }
 
+export function failureReason(copy: Copy, facts?: Facts) {
+  const error = facts?.error
+
+  const message = error?.message.trim().split(/\r?\n/, 1)[0]?.trim()
+
+  const summary =
+    message && !message.startsWith("{") && !message.startsWith("[") ? [...message].slice(0, 240).join("") : undefined
+
+  const code = error?.code && /^[A-Z][A-Z0-9_.:-]{0,79}$/.test(error.code) ? error.code : undefined
+
+  return code && summary ? copy.t("failure.codeAndMessage", { code, summary }) : (code ?? summary)
+}
+
 export function failureTitle(copy: Copy, facts?: Facts) {
   const action = (() => {
     const kind = operation(facts)
 
     switch (kind) {
       case "import":
-      case "build":
       case "save":
       case "configure":
       case "execute":
@@ -116,17 +168,8 @@ export function failureTitle(copy: Copy, facts?: Facts) {
     }
   })()
 
-  const error = facts?.error
-
-  const reason = error?.timeoutMs
-    ? copy.t("failure.timeout", { seconds: Math.ceil(error.timeoutMs / 1000) })
-    : error?.message
-
-  const attempt = facts?.attempt
-    ? facts.maxAttempts && facts.maxAttempts >= facts.attempt
-      ? copy.t("failure.attemptOf", { attempt: facts.attempt, total: facts.maxAttempts })
-      : copy.t("failure.attempt", { attempt: facts.attempt })
-    : undefined
+  const reason = failureReason(copy, facts)
+  const attempt = facts?.attempt ? copy.t("failure.attempt", { attempt: facts.attempt }) : undefined
 
   if (reason && attempt) return copy.t("failure.withReasonAndAttempt", { action, reason, attempt })
 
@@ -140,13 +183,17 @@ export function failureTitle(copy: Copy, facts?: Facts) {
 export function stepDetails(copy: Copy, facts?: Facts) {
   if (!facts) return []
 
+  const path = savedPath(facts)
+
   return [
-    ...(facts.sourceName ? [copy.t("field.source", { name: facts.sourceName })] : []),
     ...(facts.node?.label ? [copy.t("field.node", { name: facts.node.label })] : []),
-    ...(facts.nodeCount === undefined ? [] : [copy.t("field.nodes", { count: facts.nodeCount })]),
-    ...(facts.package ? [copy.t("field.package", facts.package)] : []),
+    ...(path ? [copy.t("field.package", { path })] : []),
     ...(facts.ports ?? []).map(({ index, rowCount, columnCount }) =>
-      copy.t("field.port", { port: index + 1, rows: rowCount, columns: columnCount }),
+      copy.t("field.port", {
+        port: index + 1,
+        rows: rowCount,
+        columns: columnCount,
+      }),
     ),
     ...(facts.files ?? []).map((file) => copy.t("field.file", file)),
   ]
