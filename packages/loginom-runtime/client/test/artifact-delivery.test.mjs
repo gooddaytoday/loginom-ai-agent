@@ -750,6 +750,18 @@ test('no-effect verification cannot erase an already submitted upload',async()=>
  assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
 });
 
+test('delivery reports an unavailable local download directory without resubmitting the upload',async()=>{
+ const f=fixture();
+ f.runtime.verifyDeliveredArtifact=async()=>({status:'NOT_APPLIED',cleanup_complete:true,
+  error:{code:'DOWNLOAD_LOCAL_STORAGE_UNAVAILABLE',message:'The disk quota for downloads is exhausted.'}});
+ const result=await f.service.deliver(request);
+ assert.equal(result.error.code,'DOWNLOAD_LOCAL_STORAGE_UNAVAILABLE');
+ assert.match(result.error.message,/quota/);
+ assert.equal(result.outcome.upload_submitted_or_unknown,true);
+ assert.equal(result.outcome.inspection_required,true);
+ assert.equal(f.calls.filter(call=>call==='upload').length,1);
+});
+
 for(const stale of [false,true])test('native delivery adapter rebinds the first tab before its single Files gesture; stale='+stale,async()=>{
  const vm=await import('node:vm');
  const {createActionRuntime}=await import('../lib/executor.mjs');

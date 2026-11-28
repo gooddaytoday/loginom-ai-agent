@@ -2,7 +2,7 @@ import { createRequire } from "node:module"
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
-import { browserLaunch, prepareBrowserProfile } from "../client/lib/browser-launch.mjs"
+import { browserDownloadEnvironment, browserLaunch, prepareBrowserProfile } from "../client/lib/browser-launch.mjs"
 import { createRedactor } from "../client/lib/redact.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 import { connectionTimelineScript } from "../client/lib/connection-recovery.mjs"
@@ -427,7 +427,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
   const launch = browserLaunch(headless)
   const profileStarted = performance.now()
   await phase({ phase: "browser.profile", status: "starting" })
-  await prepareBrowserProfile(profile)
+  await prepareBrowserProfile(profile, downloadsPath)
   if (httpCachePath && !keepOpen) await mkdir(httpCachePath, { recursive: true, mode: 0o700 })
   await phase({ phase: "browser.profile", status: "ready", duration_ms: Math.round(performance.now() - profileStarted), http_cache: !!httpCachePath && !keepOpen })
   signal?.throwIfAborted()
@@ -456,7 +456,7 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
       // Chrome for Testing otherwise writes debug.log beside chrome.exe on
       // Windows, mutating the signed/manifested application payload. Keep all
       // browser state and diagnostics inside the disposable session profile.
-      env: browserEnvironment(profile),
+      env: { ...browserEnvironment(profile), ...browserDownloadEnvironment(downloadsPath && profile) },
       args: [
         // Browser traffic is always direct; backend proxy policy is independent.
         "--no-proxy-server",

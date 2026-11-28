@@ -24,12 +24,13 @@ export async function createSession(config, { headless = false, managed = null }
   const directory = managed?.directory ?? join(config.stateDir, 'sessions', id);
   const profile = join(directory, 'browser-profile');
   const artifacts = join(directory, 'artifacts');
+  const downloadsPath = browserDownloadsPath(directory);
   await privateDirectory(config.stateDir);
-  for (const path of [directory, profile, artifacts, browserDownloadsPath(directory)]) {
+  for (const path of [directory, profile, artifacts, downloadsPath]) {
     await mkdir(path, { recursive: true, mode: 0o700 });
   }
   // Managed MCP receives an already running context whose profile loginBrowser prepared.
-  if (!managed) await prepareBrowserProfile(profile);
+  if (!managed) await prepareBrowserProfile(profile, downloadsPath);
   const browserRoot = managed?.browserRoot ?? join(config.stateDir, 'runtime', 'browsers');
   if (!managed) process.env.PLAYWRIGHT_BROWSERS_PATH = browserRoot;
   const { chromium } = await import('playwright-core');
@@ -73,7 +74,7 @@ export async function createSession(config, { headless = false, managed = null }
   const executorMode = ['executor-preview', 'executor-replay'].includes(config.mode);
   await writeFile(browserConfig, JSON.stringify({
     browser: { browserName: 'chromium', userDataDir: profile, initScript: [downloadScript],
-      launchOptions: { executablePath, headless, downloadsPath:browserDownloadsPath(directory), ...(managed ? { chromiumSandbox: true } : {}),
+      launchOptions: { executablePath, headless, downloadsPath, ...(managed ? { chromiumSandbox: true } : {}),
         args: ['--no-proxy-server', ...launch.args] }, contextOptions: { viewport: browserViewport } },
     // Keep the browser catalog independent of page-provided WebMCP tools.
     webmcp: false,

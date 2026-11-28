@@ -221,3 +221,9 @@ Headed-прогон 2026-09-24, модель `xiaomi-token-plan-sgp/mimo-v2.6-pr
 5. Playwright MCP в конструкторе `Tab` слушает `filechooser` с момента создания страницы. Подписка выставляет `Page.setInterceptFileChooserDialog`. На защищённом origin двойной щелчок Loginom доходит до `showSaveFilePicker`, Chromium отвергает вызов, Loginom показывает «Ошибка при сохранении файла».
 
 `packages/loginom-host/src/host.ts` и флаг `--headless` в evals на этот механизм не влияют: перехват включается и в видимом окне.
+
+### Linux: Chromium отменяет скачивание после принятого жеста
+
+`Browser.downloadProgress` сообщает `state: canceled`, но не причину записи. До переименования в `.crdownload` Chromium открывает первый файл по системному каталогу Downloads, а не по конечному `downloadsPath` Playwright. Если Downloads недоступен, Chromium может сначала обратиться к общему `/tmp` даже при свободном месте в каталоге профиля.
+
+На Linux браузер получает собственный `XDG_CONFIG_HOME` с `XDG_DOWNLOAD_DIR`, направленным в тот же приватный каталог сеанса, что и `downloadsPath`. Настройки рабочего стола пользователя не изменяются. Проверка серверной копии сообщает `DOWNLOAD_LOCAL_STORAGE_UNAVAILABLE` при подтверждённой ошибке локальной записи; общий `canceled` без такой ошибки не считается доказательством исчерпания квоты. Проверка не подтверждает байты и не повторяет исходную загрузку.
