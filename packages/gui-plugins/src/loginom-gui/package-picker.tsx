@@ -76,7 +76,7 @@ export default function Picker(props: {
     () => {
       const current = server()
 
-      return current && { current, attempt: retryStatus() }
+      return current && { current, client: current.client, attempt: retryStatus() }
     },
     ({ current }, signal) =>
       packageConnection(current, AbortSignal.any([signal, AbortSignal.timeout(12_000)])).finally(() => {
@@ -86,6 +86,33 @@ export default function Picker(props: {
 
   const connected = () =>
     server() && !connection.loading && !connection.error && !statusIssue() ? connection.latest : undefined
+
+  createKeyed(
+    () => props.upload ? undefined : connected(),
+    (current) => {
+      const controller = new AbortController()
+      const { signal } = controller
+
+      const check = async () => {
+        try {
+          const verified = await current.verify(AbortSignal.any([signal, AbortSignal.timeout(12_000)]))
+
+          if (signal.aborted || connected() !== current) return
+
+          if (!verified) return setStatusIssue("changed")
+          timer = setTimeout(() => void check(), 5_000)
+        } catch {
+          if (!signal.aborted && connected() === current) setStatusIssue("packages.statusFailed")
+        }
+      }
+
+      let timer = setTimeout(() => void check(), 5_000)
+      onCleanup(() => {
+        controller.abort()
+        clearTimeout(timer)
+      })
+    },
+  )
 
   const folder = () => trail().at(-1)?.path
 
@@ -98,7 +125,11 @@ export default function Picker(props: {
 
       return { current, path, attempt: retry() }
     },
-    ({ current, path }, signal) => current.list(path, AbortSignal.any([signal, AbortSignal.timeout(145_000)])),
+    async ({ current, path }, signal) => ({
+      list: current.list,
+      path,
+      items: await current.list(path, AbortSignal.any([signal, AbortSignal.timeout(145_000)])),
+    }),
   )
 
   createKeyed(
@@ -157,7 +188,11 @@ export default function Picker(props: {
   }
 
   const rows = createMemo(() => {
-    const latest = deep() ? searchResult() : !listing.loading && !listing.error ? listing.latest : undefined
+    const current = connected()
+
+    if (!current) return
+    const listed = !listing.loading && !listing.error ? listing.latest : undefined
+    const latest = deep() ? searchResult() : listed?.list === current.list && listed.path === folder() ? listed.items : undefined
 
     return latest && visible(latest, query(), byName(), ctx.locale.locale())
   })

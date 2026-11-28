@@ -265,6 +265,7 @@ for (const viewport of [
     const statusResponse = await holdRoute(page, statusRoute)
     const folderResponse = await holdRoute(page, /\/api\/rpc\/loginom\.packages\/list(?:\?|$)/)
 
+    await page.clock.install()
     await page.reload()
     await page.getByRole("button", { name: "Из Loginom" }).click()
     const recents = picker.getByRole("region", { name: "Недавние" })
@@ -286,11 +287,13 @@ for (const viewport of [
 
     await expect(oldPackage).toBeVisible()
     await page.getByRole("button", { name: "Из Loginom" }).click()
-    await expect(rows.first()).toBeVisible()
+    await expect(rows).toHaveText(["Архив", /Продажи\.lgp/, /Баланс\.lgp/])
+    await expect(recentCopy).toBeVisible()
     generation = 2
-    await picker.getByRole("button", { name: "Общие папки" }).click()
+    await page.clock.fastForward(5_000)
     await expect(picker.getByRole("alert")).toHaveText("Подключение изменилось. Обновите его перед новой попыткой.")
     await expect(recents).toHaveCount(0)
+    await expect(rows).toHaveCount(0)
     const newAccountStatus = await holdRoute(page, statusRoute)
 
     await picker.getByRole("button", { name: "Повторить" }).click()
