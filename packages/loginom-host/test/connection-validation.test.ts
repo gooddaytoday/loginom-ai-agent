@@ -10,6 +10,7 @@ import { watch } from "node:fs"
 import { createLoginomHost } from "../src/host"
 import { cliCredentials } from "../src/connection/cli-credentials"
 import { credentials } from "../src/connection/credentials"
+import { connectionService } from "../src/connection/connection-service"
 import { connectionStore } from "../src/connection/connection-store"
 import { writeHelp } from "../../loginom-runtime/client/test/support/help-fixture.mjs"
 import { launchNodeHost } from "../src/node-client"
@@ -27,6 +28,8 @@ async function buildNodeHost(output: string) {
   expect({ code: await child.exited, error: await error }).toEqual({ code: 0, error: "" })
   return join(output, "node-host.mjs")
 }
+
+const diagnosticKey = "synthetic-knowledge-key"
 
 // "held" keeps the Help catalog pending in a stub entry; the other modes run the
 // real entry over <resources>/help, absent or with a changed page.
@@ -61,7 +64,9 @@ async function fixture(
     import {join} from 'node:path';
     let starting;
     function ready() {
-      process.send(${JSON.stringify(error)} ? {id:starting.id,error:${JSON.stringify(error)}}
+      process.send(${JSON.stringify(error)} ? {id:starting.id,error:${JSON.stringify(error)},startupDiagnostics:[{
+        error:{message:'Fixture rejected ' + starting.input.connection.password + ' apiKey=' + ${JSON.stringify(diagnosticKey)}}
+      }]}
         : {id:starting.id,result:{protocol:1,generation:starting.input.generation,checked:true,ready:true,chat:starting.input.chat}});
     }
     process.on('SIGUSR1', ready);
@@ -475,15 +480,126 @@ test("settings reject a bad password through Node IPC without creating an active
   }
 })
 
+test.each(["LOGINOM_KNOWLEDGE_AUTH_FAILED", "LOGINOM_LOGIN_UNAVAILABLE", "LOGINOM_LOGIN_REJECTED"])(
+  "settings preserve the active connection and redact diagnostics when validation fails with %s",
+  async (error) => {
+    const scenario = await fixture(error)
+    try {
+      const root = join(scenario.root, "service")
+      const store = connectionStore(
+        join(root, "connection"),
+        cliCredentials(process.platform, { root, resources: scenario.resources }),
+      )
+      const original = {
+        generation: 1,
+        revision: 1,
+        url: "https://active.example/app/",
+        username: "analyst",
+        apiKey: "",
+        password: "fixture-stored-password",
+      }
+      await store.stage(original)
+      await store.activate(original.generation)
+      const host = await launchNodeHost({
+        node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
+        entry: await buildNodeHost(scenario.root),
+        root,
+        resources: scenario.resources,
+        headless: true,
+      })
+      try {
+        const candidate = { ...scenario.candidate, url: "http://loginom.example/", revision: 1 }
+        await expect(host.request("connection.settings.check", candidate)).rejects.toThrow(error)
+        expect(await host.request("connection.status", {})).toMatchObject({
+          revision: 1,
+          generation: 1,
+          url: original.url,
+          username: original.username,
+          hasPassword: true,
+        })
+        expect(await store.read()).toEqual(original)
+        expect(await store.pending()).toBeUndefined()
+        const log = await readFile(join(root, "validation", "startup-failures.jsonl"), "utf8")
+        expect(log).toContain(error)
+        expect(log).toContain("Fixture rejected [redacted]")
+        expect(log).not.toContain(scenario.candidate.password.value)
+        expect(log).not.toContain(diagnosticKey)
+      } finally {
+        await host.close()
+      }
+    } finally {
+      await scenario.close()
+    }
+  },
+  15_000,
+)
+
+test.each([
+  ["keep", { operation: "preserve" }, "fixture-stored-password"],
+  ["replace", { operation: "replace", value: "fixture-new-password" }, "fixture-new-password"],
+  ["passwordless", { operation: "empty" }, ""],
+] satisfies [string, typeof Loginom.PasswordEdit.Type, string][])(
+  "settings use and persist the selected password operation after restart: %s",
+  async (_operation, password, expectedPassword) => {
+    const directory = await mkdtemp(join(tmpdir(), "connection-password-"))
+    const codec = credentials("linux")
+    const store = connectionStore(directory, codec)
+    const original = {
+      generation: 1,
+      revision: 1,
+      url: "https://loginom.example/app/",
+      username: "analyst",
+      apiKey: "",
+      password: "fixture-stored-password",
+    }
+    try {
+      await store.stage(original)
+      await store.activate(original.generation)
+      const service = await connectionService(store, {
+        async check(candidate) {
+          if (candidate.password !== expectedPassword) throw new Error("LOGINOM_LOGIN_REJECTED")
+          return { state: "verified" }
+        },
+        async prepare() {
+          return { async close() {} }
+        },
+      })
+      try {
+        await service.settled()
+        const { revision, url, username } = original
+        const { validationId } = await service.api.check({ revision, url, username, password }, true)
+        expect(await store.read()).toEqual(original)
+        await service.api.save({ revision, validationId }, true)
+        await service.settled()
+        expect(await service.api.status()).toMatchObject({ generation: 2, hasPassword: expectedPassword !== "" })
+      } finally {
+        await service.close()
+      }
+      const reopened = connectionStore(directory, codec)
+      expect(await reopened.read()).toEqual({
+        ...original,
+        generation: 2,
+        revision: 2,
+        urlSource: "explicit",
+        password: expectedPassword,
+      })
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  },
+)
+
 test("settings save waits for the current turn, including first setup, and survives a Host restart", async () => {
   const f = await fixture("")
   const root = join(f.root, "service")
+  const completed = Promise.withResolvers<Parameters<Loginom.ConnectionApplicationListener>>()
   const options = {
     node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
     entry: await buildNodeHost(f.root),
     root,
     resources: f.resources,
     headless: true,
+    onConnectionApplication: (...event: Parameters<Loginom.ConnectionApplicationListener>) => completed.resolve(event),
   }
   const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources: f.resources }))
   const readCheck = (reply: unknown) => Schema.decodeUnknownSync(Loginom.Validation)(reply)
@@ -496,19 +612,21 @@ test("settings save waits for the current turn, including first setup, and survi
       await expect(host.request("connection.settings.save", { revision: 0, validationId: legacy.validationId }))
         .rejects.toThrow("LOGINOM_VALIDATION_EXPIRED")
 
-      await host.request("connection.settings.turn", { id: "existing-turn", active: true })
+      await host.request("connection.settings.turn", { id: "existing-turn", session: "first", active: true })
       const checked = readCheck(await host.request("connection.settings.check", candidate))
       expect(await host.request("connection.status", {})).toMatchObject({ revision: 0, generation: 0 })
       expect(await host.request("connection.settings.save", { revision: 0, validationId: checked.validationId }))
-        .toMatchObject({ revision: 1, generation: 0, state: "pending" })
+        .toMatchObject({ revision: 1, generation: 0, state: "pending", application: { state: "pending", tasks: 1 } })
       expect(await store.read()).toBeUndefined()
 
-      await host.request("connection.settings.turn", { id: "new-turn", active: true })
-      await host.request("connection.settings.turn", { id: "existing-turn", active: false })
-      const deadline = Date.now() + 5000
-      while (readStatus(await host.request("connection.status", {})).state !== "ready" && Date.now() < deadline)
-        await Bun.sleep(25)
-      expect(readStatus(await host.request("connection.status", {}))).toMatchObject({ generation: 1, state: "ready" })
+      await host.request("connection.settings.turn", { id: "new-turn", session: "next", active: true })
+      await host.request("connection.settings.turn", { id: "existing-turn", session: "first", active: false })
+      expect(await completed.promise).toEqual(["applied", { revision: 1, generation: 1 }])
+      expect(readStatus(await host.request("connection.ready", {}))).toMatchObject({
+        generation: 1,
+        state: "ready",
+        application: { state: "applied" },
+      })
       expect(await store.read())
         .toMatchObject({ username: "user", url: candidate.url, generation: 1 })
       const wrongServer = { revision: 1, url: "http://other.example", username: "user", password: { operation: "preserve" } }
@@ -531,10 +649,11 @@ test("settings save waits for the current turn, including first setup, and survi
 }, 30_000)
 
 
-test("settings Save acknowledges persistence while activation is still blocked", async () => {
+test("settings Save acknowledges persistence before the Node Host reports a catalog failure", async () => {
   const f = await fixture("")
   const root = join(f.root, "service")
   const gate = join(f.root, "allow-activation")
+  const completed = Promise.withResolvers<Parameters<Loginom.ConnectionApplicationListener>>()
   try {
     const host = await launchNodeHost({
       node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
@@ -542,6 +661,7 @@ test("settings Save acknowledges persistence while activation is still blocked",
       root,
       resources: f.resources,
       headless: true,
+      onConnectionApplication: (...event) => completed.resolve(event),
     })
     try {
       const candidate = { ...f.candidate, url: "http://loginom.example/" }
@@ -561,7 +681,7 @@ test("settings Save acknowledges persistence while activation is still blocked",
               process.send({id:message.id,result:{protocol:1,generation:message.input.generation,started:true}});
             }, 10);
           }
-          if (message.operation === 'list') process.send({id:message.id,result:{tools:[]}});
+          if (message.operation === 'list') process.send({id:message.id,error:'LOGINOM_KNOWLEDGE_UNAVAILABLE'});
           if (message.operation === 'interrupt') process.send({id:message.id,result:{interrupted:true}});
           if (message.operation === 'close') process.send({id:message.id,result:{closed:true}},()=>process.disconnect());
         });
@@ -570,6 +690,11 @@ test("settings Save acknowledges persistence while activation is still blocked",
         .toMatchObject({ revision: 1, generation: 0, state: "starting" })
       const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources: f.resources }))
       expect(await store.pending()).toMatchObject({ revision: 1, url: candidate.url, username: candidate.username })
+      await writeFile(gate, "")
+      expect(await completed.promise).toEqual(["failed", { revision: 1, generation: 1 }])
+      const status = Schema.decodeUnknownSync(Loginom.View)(await host.request("connection.status", {}))
+      expect(status).toMatchObject({ generation: 1, state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })
+      expect(status.application).toBeUndefined()
     } finally {
       await writeFile(gate, "")
       await host.close()
@@ -577,7 +702,7 @@ test("settings Save acknowledges persistence while activation is still blocked",
   } finally {
     await f.close()
   }
-}, 15_000)
+}, 30_000)
 
 test("aborting a settings check stops its browser without closing the node Host", async () => {
   const f = await fixture("", "shipped", true)

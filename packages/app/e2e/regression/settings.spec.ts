@@ -13,6 +13,12 @@ import { mockRemoteServer, mockWorkspace, openSession, openSettings, type Worksp
 import { CONSOLE_URL, consoleGateway, consoleSignIn } from "../utils/console"
 import { recordNotifications } from "../utils/notifications"
 import { installSseTransport } from "../utils/sse-transport"
+import {
+  loginomAddress,
+  loginomDiagnosticKey,
+  loginomSettingsFixture,
+  openLoginomSettings,
+} from "../utils/loginom-settings"
 
 const directory = "C:/Projects/settings-demo"
 
@@ -51,6 +57,84 @@ function open(page: Page, input: Partial<WorkspaceInput> = {}) {
     seed: { tabs: [], ...input.seed },
   })
 }
+
+const loginomPassword = "fixture-wrong-password"
+
+for (const [issue, text, address] of [
+  ["knowledgeAuthFailed", "The knowledge service rejected its access key.", loginomAddress],
+  [
+    "loginUnavailable",
+    "The Loginom sign-in page is unavailable. Check the address and network.",
+    "https://offline.example/app/",
+  ],
+  ["credentialsRejected", "Loginom rejected the sign-in. Check the username and password.", loginomAddress],
+] as const) {
+  test(`Loginom shows ${issue} without exposing credentials or saving`, async ({ page }) => {
+    const fixture = loginomSettingsFixture(issue)
+    const journal: string[] = []
+    page.on("console", (message) => journal.push(message.text()))
+    page.on("pageerror", (error) => journal.push(error.message))
+    const form = await openLoginomSettings(page, fixture.onRpc)
+    const connected = form.getByText("Connected as analyst · folder /analyst", { exact: true })
+    await expect(connected).toBeVisible()
+    await form.getByLabel("Address", { exact: true }).fill(address)
+    await form.getByLabel("Password", { exact: true }).fill(loginomPassword)
+    await form.getByRole("button", { name: "Save", exact: true }).click()
+    await expect(form.getByText(text, { exact: true })).toBeVisible()
+    await expect(connected).toBeVisible()
+    expect(fixture.checks).toEqual([
+      {
+        input: {
+          revision: 7,
+          url: address,
+          username: "analyst",
+          password: { operation: "replace", value: loginomPassword },
+        },
+      },
+    ])
+    expect(fixture.saves).toEqual([])
+
+    for (const secret of [loginomPassword, loginomDiagnosticKey]) {
+      await expect(form).not.toContainText(secret)
+      expect(journal.join("\n")).not.toContain(secret)
+    }
+  })
+}
+
+test("Loginom sends preserve, replace and passwordless operations through the settings RPC", async ({ page }) => {
+  const fixture = loginomSettingsFixture()
+  const form = await openLoginomSettings(page, fixture.onRpc)
+  const password = form.getByLabel("Password", { exact: true })
+  const check = form.getByRole("button", { name: "Check", exact: true })
+  const checked = form.getByText("Checked, not yet saved", { exact: true })
+  await expect(password).toHaveAttribute("placeholder", "Password saved")
+  await expect(password).toHaveValue("")
+  await check.click()
+  await expect(checked).toBeVisible()
+  await password.fill("fixture-new-password")
+  await check.click()
+  await expect(checked).toBeVisible()
+  await form.getByText("No password required", { exact: true }).click()
+  await expect(form.getByRole("checkbox", { name: "No password required", exact: true })).toBeChecked()
+  await expect(password).toBeDisabled()
+  await check.click()
+  await expect(checked).toBeVisible()
+
+  const saved = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/save",
+  )
+
+  await form.getByRole("button", { name: "Save", exact: true }).click()
+  expect((await saved).ok()).toBe(true)
+  await expect(checked).toBeHidden()
+  const identity = { revision: 7, url: loginomAddress, username: "analyst" }
+  expect(fixture.checks).toEqual([
+    { input: { ...identity, password: { operation: "preserve" } } },
+    { input: { ...identity, password: { operation: "replace", value: "fixture-new-password" } } },
+    { input: { ...identity, password: { operation: "empty" } } },
+  ])
+  expect(fixture.saves).toEqual([{ input: { revision: 7, validationId: "fixture-validation" } }])
+})
 
 async function openProject(page: Page, name = "Settings demo") {
   const settings = page.getByTestId("settings-screen")
@@ -123,6 +207,116 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
     { input: { revision: 1, url: loginom, username: "analyst" } },
   ])
 })
+
+for (const outcome of ["applied", "failed"] as const) {
+  test(`Loginom settings count draining tasks and refresh on ${outcome}`, ({ page }) =>
+    loginomApplication(page, outcome),
+  )
+}
+
+async function loginomApplication(page: Page, outcome: "applied" | "failed") {
+  const directory = "/service"
+  const oldUrl = "https://old.example/app/"
+  const newUrl = "https://new.example/app/"
+  let generation = 1
+  let revision = 1
+  let tasks = 2
+  let state: "ready" | "pending" | "starting" | "recoverable-error" = "ready"
+
+  function status() {
+    return {
+      revision,
+      generation,
+      url: generation === 1 ? oldUrl : newUrl,
+      username: "analyst",
+      folder: "/analyst",
+      hasPassword: false,
+      failed: state === "recoverable-error",
+      state,
+      ...(state === "pending" && { application: { state: "pending", tasks } }),
+      ...(state === "ready" && generation === 2 && { application: { state: "applied" } }),
+    }
+  }
+
+  const { push } = await mockWorkspace(page, {
+    name: "Loginom",
+    sessions: [],
+    directory,
+    provider: NO_PROVIDER,
+    seed: { locale: "ru" },
+    onRpc: (request) => {
+      if (request.rpcID !== "loginom.connection") return
+
+      switch (request.method) {
+        case "status":
+          return { output: { ok: true, value: status() } }
+        case "check":
+          expect(request.body).toMatchObject({ input: { url: newUrl, revision: 1 } })
+
+          return { output: { ok: true, value: { validationId: "checked", expiresAt: 4102444800000 } } }
+        case "save":
+          expect(request.body).toMatchObject({ input: { revision: 1, validationId: "checked" } })
+          revision = 2
+          state = "pending"
+
+          return { output: { ok: true, value: status() } }
+      }
+    },
+  })
+
+  await page.clock.install()
+  await page.goto("/settings?tab=loginom")
+  const settings = page.getByRole("tabpanel", { name: "Loginom", exact: true })
+  const address = settings.getByRole("textbox", { name: "Адрес" })
+  const notice = settings.getByRole("status")
+  await expect(address).toHaveValue(oldUrl)
+  await address.fill(newUrl)
+
+  // Freeze before Save so each clock step starts exactly one status poll.
+  const now = await page.evaluate(() => Date.now())
+  await page.clock.pauseAt(now + 1_000)
+  await settings.getByRole("button", { name: "Сохранить", exact: true }).click()
+  await expect(notice).toHaveText("Новые параметры применятся после завершения 2 задач")
+
+  async function pollStatus(duration: number) {
+    const [response] = await Promise.all([
+      page.waitForResponse((response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/status"),
+      page.clock.fastForward(duration),
+    ])
+
+    expect(response.ok()).toBe(true)
+  }
+
+  tasks = 1
+  await pollStatus(16_000)
+  await expect(notice).toHaveText("Новые параметры применятся после завершения 1 задачи")
+
+  generation = 2
+  state = "starting"
+  await pollStatus(1_000)
+  await expect(notice).toHaveText("Применяем подключение…")
+  await expect(notice.getByText("Применено", { exact: true })).toHaveCount(0)
+
+  // Leave the clock frozen. The event must refresh the status for the same generation.
+  state = outcome === "applied" ? "ready" : "recoverable-error"
+  await push([
+    {
+      id: `evt_loginom_connection_${outcome}`,
+      created: 1,
+      type: `rpc.loginom.connection.${outcome}`,
+      location: { directory },
+      data: { revision, generation },
+    },
+  ])
+
+  if (outcome === "failed") {
+    await expect(notice).toHaveText("Служба не применила подключение. Проверьте настройки и попробуйте снова.")
+    await expect(notice.getByText("Применено", { exact: true })).toHaveCount(0)
+  } else {
+    await expect(notice.getByText("Применено", { exact: true })).toBeVisible()
+    await expect(address).toHaveValue(newUrl)
+  }
+}
 
 test("settings has its own route and returns through app history", async ({ page }) => {
   const { settings } = await open(page)

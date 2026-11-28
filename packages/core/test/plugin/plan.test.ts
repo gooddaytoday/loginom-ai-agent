@@ -65,6 +65,7 @@ const run = Effect.fnUntraced(function* (events: ReadonlyArray<SessionEvent.Agen
         },
       },
       tool: {
+        ask: () => Effect.die("unused tool.ask"),
         transform: () => Effect.die("unused tool.transform"),
         reload: () => Effect.die("unused tool.reload"),
         list: () => Effect.die("unused tool.list"),

@@ -1,5 +1,6 @@
 import { getDirectory, getFilename } from "@opencode/util/path"
 import { FileIcon } from "@opencode/ui/file-icon"
+import { Icon } from "@opencode/ui/icon"
 import { Button } from "@opencode/ui/button"
 import { Dialog, DialogBody } from "@opencode/ui/dialog"
 import { Keybind } from "@opencode/ui/keybind"
@@ -65,6 +66,8 @@ export function CommandPaletteView(props: {
   placeholder: string
   items: (query: string) => CommandPaletteEntry[]
   sources: ((query: string, signal: AbortSignal) => Promise<CommandPaletteEntry[]>)[]
+  rank?: Parameters<typeof createCommandPaletteSearch>[0]["rank"]
+  keepPreviousWhileLoading?: boolean
   highlight: (item: CommandPaletteEntry | undefined) => void
   select: (item: CommandPaletteEntry | undefined) => void
   close: () => void
@@ -88,6 +91,8 @@ export function CommandPaletteView(props: {
     items: props.items,
     sources: props.sources,
     open: sessionOpen,
+    rank: props.rank,
+    keepPreviousWhileLoading: props.keepPreviousWhileLoading,
   })
 
   return (
@@ -109,7 +114,9 @@ export function CommandPaletteView(props: {
                 : language.t("palette.empty")
           }
           onActive={props.highlight}
-          onSelect={props.select}
+          onSelect={(entry) => {
+            if (!search.waitingForResults()) props.select(entry)
+          }}
           onClose={props.close}
         >
           {(item, row) => {
@@ -177,8 +184,11 @@ function PaletteRow(props: {
           </div>
         }
       >
-        <Match when={props.item.type === "command" || props.item.type === "setting"}>
+        <Match when={props.item.type === "command" || props.item.type === "setting" || props.item.type === "project"}>
           <div class="command-palette-row-main">
+            <Show when={props.item.type === "project"}>
+              <Icon name="folder" class="command-palette-row-icon size-4" />
+            </Show>
             <div class="command-palette-row-text">
               <span class="command-palette-title palette-menu-title" dir="auto">
                 <SearchHighlight text={props.item.title} />

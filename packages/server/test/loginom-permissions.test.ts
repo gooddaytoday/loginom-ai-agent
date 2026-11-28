@@ -244,6 +244,33 @@ const boot = (
   })
 
 describe("loginom.product permissions (B2.6a)", () => {
+  it.live("preserves both concurrent profile PATCHes from different workspaces", () =>
+    Effect.gen(function* () {
+      const test = yield* boot()
+      const profile = path.join(test.dir, "global", "config", "loginom-ai-agent.jsonc")
+      const workspaces = [path.join(test.dir, "first"), path.join(test.dir, "second")]
+      yield* Effect.promise(async () => {
+        await Promise.all(workspaces.map((workspace) => fs.mkdir(workspace)))
+        await Bun.write(profile, JSON.stringify({ shell: "bash" }))
+      })
+      const at = workspaces.map((workspace) => `location[directory]=${encodeURIComponent(workspace)}`)
+      for (const query of at) expect((yield* test.call(`/api/config?${query}`)).status).toBe(200)
+
+      const patches = yield* Effect.all(
+        [
+          test.call(`/api/experimental/config?${at[0]}`, { permissions: settingRules("read", "ask") }, "PATCH"),
+          test.call(`/api/experimental/config?${at[1]}`, { permissions: settingRules("write", "deny") }, "PATCH"),
+        ],
+        { concurrency: "unbounded" },
+      )
+      expect(patches.map((response) => response.status)).toEqual([204, 204])
+      const saved = yield* Effect.promise(() => Bun.file(profile).json())
+      expect(saved.shell).toBe("bash")
+      expect(settingEffect("read", saved.permissions)).toBe("ask")
+      expect(settingEffect("write", saved.permissions)).toBe("deny")
+    }),
+  )
+
   it.live(
     "a profile save denial blocks a package save requested by the model without changing other settings",
     () =>

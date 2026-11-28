@@ -117,6 +117,27 @@ export const testLayer = (
     }),
   )
 
+const profileUpdateLocks = new Map<string, { semaphore: Semaphore.Semaphore; users: number }>()
+
+export const withProfileUpdate = <A, E, R>(directory: string, effect: Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    const fs = yield* FSUtil.Service
+    const resolved = yield* fs.resolve(directory)
+    const key = process.platform === "win32" ? resolved.toLowerCase() : resolved
+    return yield* Effect.acquireUseRelease(
+      Effect.sync(() => {
+        const lock = profileUpdateLocks.get(key) ?? { semaphore: Semaphore.makeUnsafe(1), users: 0 }
+        lock.users++
+        profileUpdateLocks.set(key, lock)
+        return lock
+      }),
+      (lock) => lock.semaphore.withPermit(effect),
+      (lock) => Effect.sync(() => {
+        if (--lock.users === 0) profileUpdateLocks.delete(key)
+      }),
+    )
+  })
+
 export const layer = (options?: Options) =>
   Layer.effect(
     Service,
@@ -132,7 +153,6 @@ export const layer = (options?: Options) =>
       const integrations = new Map<string, ConfigIntegration.Document>()
       const context = yield* Effect.context<FSUtil.Service | Global.Service | Location.Service>()
       const reloadLock = Semaphore.makeUnsafe(1)
-      const updateLock = Semaphore.makeUnsafe(1)
       const decodeOptions = { errors: "all", onExcessProperty: "ignore" } as const
       const decodeInfo = Schema.decodeUnknownOption(Info, decodeOptions)
       const parseInfo = Effect.fn("Config.parseInfo")(function* (text: string, source: string) {
@@ -380,6 +400,7 @@ export const layer = (options?: Options) =>
       })
 
       const initial = yield* ConfigDiscovery.discover(options)
+      const profileDirectory = initial.global ?? AbsolutePath.make(globalService.config)
       let sources = initial
       let configs = yield* load(initial)
       const updates = yield* PubSub.unbounded<Watcher.Update>()
@@ -471,10 +492,9 @@ export const layer = (options?: Options) =>
       const update = Effect.fn("Config.update")(
         function* (patch: Patch) {
           if (patch.shell === undefined && !patch.permissions?.length && !patch.removePermissions?.length) return
-          const directory = initial.global ?? AbsolutePath.make(globalService.config)
-          const candidates = ConfigDiscovery.names.map((name) => path.join(directory, name))
+          const candidates = ConfigDiscovery.names.map((name) => path.join(profileDirectory, name))
           const existing = yield* Effect.filter(candidates, fs.isFile)
-          const fallback = existing.at(-1) ?? path.join(directory, "loginom-ai-agent.jsonc")
+          const fallback = existing.at(-1) ?? path.join(profileDirectory, "loginom-ai-agent.jsonc")
           const permissions = Boolean(patch.permissions?.length || patch.removePermissions?.length)
           const files = permissions && existing.length ? existing : [fallback]
           const documents = yield* Effect.forEach(files, (file) =>
@@ -489,7 +509,7 @@ export const layer = (options?: Options) =>
           if (permissions) yield* reload().pipe(Effect.provide(context))
           else yield* requestReload
         },
-        (effect) => updateLock.withPermit(effect),
+        (effect) => withProfileUpdate(profileDirectory, effect).pipe(Effect.provide(context)),
       )
 
       return Service.of({
