@@ -58,6 +58,28 @@ test("ensures a missing service with native promises", async () => {
   expect(starts).toEqual(["missing"])
 })
 
+test("starts a new service when a dead registration points at a different listener", async () => {
+  await using fixture = await serviceFixture()
+  const stale = fixture.spawn("graceful")
+  await fixture.waitForFile()
+  const registration = fixture.registration
+  const previous = await Bun.file(registration).json()
+  stale.kill()
+  await stale.exited
+
+  const listener = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response(null, { status: 404 }) })
+  try {
+    await Bun.write(registration, JSON.stringify({ ...previous, url: listener.url.href }))
+    const endpoint = await ensure({ file: registration, version: "test", command: fixture.command("graceful") })
+    const current = await Bun.file(registration).json()
+    fixture.track(current.pid)
+    expect(current.pid).not.toBe(stale.pid)
+    expect(endpoint.url).toBe(current.url)
+  } finally {
+    await listener.stop(true)
+  }
+})
+
 test("adds configured environment variables with native promises", async () => {
   await using fixture = await serviceFixture()
   const registration = fixture.registration
@@ -343,23 +365,24 @@ test("stop escalates when the registration disappears before the process exits",
   await stop({ file: registration })
 
   expect(await fixture.signal()).toBe(stopSignal)
-  expect(() => process.kill(original.pid, 0)).toThrow()
   await expectNotListening(original.url)
   expect(await Bun.file(registration).exists()).toBe(false)
   await existing.exited
 }, 15_000)
 
-test.skipIf(process.platform === "win32")(
-  "stop fails when the process survives SIGKILL",
+test.skipIf(process.platform !== "linux")(
+  "stop removes the registration when the service has exited but its parent has not reaped it",
   async () => {
     await using fixture = await serviceFixture()
     const registration = fixture.registration
-    fixture.spawnUnreaped("lingering", "60000")
+    fixture.spawnUnreaped("graceful")
     await fixture.waitForFile()
     const original = await Bun.file(registration).json()
 
-    await expect(stop({ file: registration })).rejects.toThrow(`Server process ${original.pid} is still running`)
+    await stop({ file: registration })
     expect(await Bun.file(registration + ".signal").text()).toBe("SIGTERM")
+    await expectNotListening(original.url)
+    expect(await Bun.file(registration).exists()).toBe(false)
   },
   15_000,
 )
@@ -386,7 +409,6 @@ test.skipIf(!catchesSigterm)(
 
       await stopping
 
-      expect(() => process.kill(original.pid, 0)).toThrow()
       await expectNotListening(original.url)
       expect(await Bun.file(registration).json()).toEqual(replacement)
       expect(await fetch(new URL("/api/info", replacement.url)).then((response) => response.json())).toMatchObject({
