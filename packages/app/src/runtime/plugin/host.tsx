@@ -23,7 +23,7 @@ import {
 } from "solid-js"
 import { createStore } from "solid-js/store"
 import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry } from "@opencode/plugin/gui/host"
-import { ToolRenderer, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
+import { BuiltinSlot, Page, ToolRenderer, type BuiltinCatalog, type BuiltinContext } from "@opencode/plugin/gui/builtin"
 import { Predicate } from "effect"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { pluralCategory, resolveTemplate } from "@opencode/ui/context/i18n"
@@ -817,9 +817,13 @@ function createHost(input: HostInput) {
         if (late()) return () => {}
 
         const toolRenderer = registry.id === ToolRenderer.id
+        const restrictedSlot = registry.id === BuiltinSlot.id && !input.builtins?.has(plugin)
 
         if (toolRenderer && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add tool renderers")
+
+        if (registry.id === Page.id && !input.builtins?.has(plugin))
+          throw new Error("Only built-in plugins can add pages")
 
         let active = toolRenderer
         let claimed: string | undefined
@@ -830,7 +834,15 @@ function createHost(input: HostInput) {
           claimed = undefined
         }
 
+        const disallowedSlot = (value: T | undefined) =>
+          restrictedSlot &&
+          Predicate.hasProperty(value, "at") &&
+          (value.at === "session.timeline.end" || value.at === "session.sidebar.status")
+
         const validate = (value: T | undefined) => {
+          if (disallowedSlot(value))
+            throw new Error("Only built-in plugins can add timeline and conversation status slots")
+
           if (!active) return value
 
           const name = Predicate.hasProperty(value, "tool") && Predicate.isString(value.tool) ? value.tool : undefined
@@ -871,7 +883,17 @@ function createHost(input: HostInput) {
 
         // Validate the initial value in ctx.add, before installing the contribution.
         const initial = validate(reactive ? untrack(() => read?.()) : item)
-        const value = toolRenderer && read ? runWithOwner(owner, () => createMemo(() => validate(read()))) : read
+
+        const value =
+          (toolRenderer || restrictedSlot) && read
+            ? runWithOwner(owner, () =>
+                createMemo(() => {
+                  const current = read()
+
+                  return disallowedSlot(current) ? undefined : validate(current)
+                }),
+              )
+            : read
 
         const key = `${plugin}/${++sequence.value}`
 

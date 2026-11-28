@@ -1,18 +1,21 @@
+import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { createKeyed, usePlugin, type MountedSession } from "@opencode/plugin/gui"
 import { SessionMessage } from "@opencode/schema/session-message"
 import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { createMemo, createSignal, onCleanup, Show } from "solid-js"
 import type definition from "../index"
-import { ConnectionRpc, StepRpc, WriteOutcomeRpc } from "./contracts"
+import { WriteOutcomeRpc } from "./contracts"
 import {
-  available,
   canRetry,
+  checkedOperation,
   needsCheck,
+  pending,
   transition,
   type Check,
   type Event,
   type Failure,
+  type Retry,
   type State,
 } from "./machine"
 
@@ -21,15 +24,17 @@ export default function Block(props: {
   session: MountedSession
   active: boolean
   busy: boolean
+  retry?: Retry
   state: State
   update: (state: State) => void
 }) {
   const ctx = usePlugin<typeof definition>()
   const [connection, setConnection] = createSignal<"checking" | "ready" | "not-ready" | "unknown">("checking")
   const lifetime = new AbortController()
-  const retryID = SessionMessage.ID.create()
-  const applied = () => props.state.check?.kind === "applied"
-  const resolved = createMemo(() => applied() || props.state.kind === "submitted")
+  const checked = () => checkedOperation(props.failure, props.state)
+  const applied = () => checked()?.kind === "applied"
+  const resolved = createMemo(() => props.retry?.status === "completed" || applied())
+  const waiting = () => pending(props.state, props.retry)
   let refresh = () => {}
 
   onCleanup(() => lifetime.abort())
@@ -43,7 +48,7 @@ export default function Block(props: {
   createKeyed(
     statusClient,
     (client) => {
-      const rpc = client.rpc(ConnectionRpc)
+      const rpc = client.rpc(ConnectionSettingsRpc)
       const loop = new AbortController()
       let timer: ReturnType<typeof setTimeout> | undefined
       let request: AbortController | undefined
@@ -63,7 +68,7 @@ export default function Block(props: {
           .catch(() => undefined)
 
         if (loop.signal.aborted || current.signal.aborted) return
-        const result = await ConnectionRpc.methods.status.output["~standard"].validate(response)
+        const result = await ConnectionSettingsRpc.methods.status.output["~standard"].validate(response)
 
         if (loop.signal.aborted || current.signal.aborted) return
         setConnection(
@@ -88,78 +93,64 @@ export default function Block(props: {
   )
 
   const dispatch = (event: Event) => props.update(transition(props.state, event))
-  const failure = props.failure
-  const pendingCheck = () => needsCheck(failure, props.state)
-  const step = () => props.state.check?.step ?? (failure.kind === "write" ? failure.step : undefined)
-  const saved = () => step()?.save?.throughStep.label
+  const operation = () => (props.failure.kind === "write" ? props.failure.operationId : undefined)
+  const pendingCheck = () => needsCheck(props.failure, props.state, props.retry)
+  const canCheck = () =>
+    pendingCheck() &&
+    !waiting() &&
+    !props.busy &&
+    props.state.kind !== "checking" &&
+    props.session.server.connected &&
+    !!operation()
+  const historyStep = () => (props.failure.kind === "write" ? props.failure.step : undefined)
+  const saved = () => (historyStep()?.save ?? checked()?.step?.save)?.throughStep.label
+  const unsaved = () => historyStep()?.persistence === "step_unsaved" || checked()?.step?.persistence === "step_unsaved"
 
   const check = async () => {
-    if (failure.kind !== "write" || !pendingCheck() || !available(props.state) || connection() !== "ready") return
+    const operationId = operation()
+
+    if (!operationId || !canCheck()) return
     dispatch({ type: "check" })
     const sessionID = props.session.id
-    const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(20_000)])
+    const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(40_000)])
     const options = { signal, location: props.session.location }
-    const client = props.session.server.client
-    let result: Check = { kind: "unknown" }
+    let result: Check = { kind: "unknown", operationId }
+    const response = await props.session.server.client
+      .rpc(WriteOutcomeRpc)
+      .check({ sessionID, operationId }, options)
+      .catch(() => undefined)
+    const decoded = await WriteOutcomeRpc.methods.check.output["~standard"].validate(response)
 
-    const checkOperation = async (operationId: string): Promise<Check> => {
-      const response = await client
-        .rpc(StepRpc)
-        .checkState({ sessionID, operationId }, options)
-        .catch(() => undefined)
-
-      const decoded = await StepRpc.methods.checkState.output["~standard"].validate(response)
-
-      if (decoded.issues || decoded.value.state !== "observed") return { kind: "unknown" }
-      const observed = decoded.value
-
-      return observed.step.outcome === "not_applied"
-        ? {
-            kind: "not_applied",
-            retryAvailable: observed.retryAvailable && observed.step.retryAvailable,
-            step: observed.step,
-          }
-        : { kind: observed.step.outcome === "completed" ? "applied" : "unknown", step: observed.step }
-    }
-
-    if (failure.operationId && !failure.writeID) {
-      result = await checkOperation(failure.operationId)
-    } else {
-      const response = await client
-        .rpc(WriteOutcomeRpc)
-        .check({ sessionID, writeID: failure.writeID }, options)
-        .catch(() => undefined)
-
-      const decoded = await WriteOutcomeRpc.methods.check.output["~standard"].validate(response)
-
-      if (!decoded.issues && failure.writeID && decoded.value.writeID === failure.writeID) {
-        const status = decoded.value.status
-
-        if (status === "not_applied") {
-          result = failure.operationId
-            ? await checkOperation(failure.operationId)
-            : { kind: status, retryAvailable: true }
-        } else {
-          result = { kind: status }
-        }
-      }
+    if (!decoded.issues && decoded.value.operationId === operationId && operation() === operationId) {
+      const { status, step } = decoded.value
+      result =
+        status === "not_applied"
+          ? { kind: status, operationId, step, retryAvailable: step?.outcome === "not_applied" && step.retryAvailable }
+          : { kind: status, operationId, step }
     }
 
     if (!lifetime.signal.aborted) dispatch({ type: "checked", result })
   }
 
   const retry = async () => {
-    if (props.busy || connection() !== "ready" || !canRetry(failure, props.state)) return
-    dispatch({ type: "retry" })
-    const marker = ctx.t("failure.retried")
+    const failure = props.failure
+
+    if (props.busy || connection() !== "ready" || !canRetry(failure, props.state, props.retry)) return
+    const requestID = props.state.kind === "retry-send-failed" ? props.state.requestID : SessionMessage.ID.create()
+    dispatch({ type: "retry", requestID })
 
     const ok = await props.session.server.client.session
       .prompt(
         {
           sessionID: props.session.id,
-          id: retryID,
+          id: requestID,
           text: `Retry only the failed Loginom step (${failure.tool}, call ${failure.id}). Verify the original target first. Do not replay preceding steps.`,
-          metadata: { displayText: marker, comments: [], attachments: [] },
+          metadata: {
+            loginomRetry: failure.id,
+            displayText: ctx.t("failure.retrySent"),
+            comments: [],
+            attachments: [],
+          },
         },
         { signal: AbortSignal.any([lifetime.signal, AbortSignal.timeout(15_000)]) },
       )
@@ -168,10 +159,11 @@ export default function Block(props: {
         () => false,
       )
 
-    if (!lifetime.signal.aborted) dispatch({ type: "retried", ok })
+    if (!lifetime.signal.aborted) dispatch({ type: "retried", ok, requestID })
   }
 
   const copy = async () => {
+    const failure = props.failure
     const code = failure.kind === "read" ? "LOGINOM_READ_FAILED" : "LOGINOM_WRITE_OUTCOME_CHECK_REQUIRED"
     const text = ctx.t(failure.kind === "read" ? "failure.read" : "failure.write")
 
@@ -198,7 +190,10 @@ export default function Block(props: {
   }
 
   return (
-    <Show when={!props.busy && props.state.kind !== "submitted"}>
+    <Show
+      when={props.retry?.status !== "completed" && (!props.busy || waiting() || props.retry !== undefined)}
+      fallback={props.retry?.status === "completed" ? <p role="status">{ctx.t("failure.retried")}</p> : undefined}
+    >
       <section
         class="flex flex-col gap-2 rounded-lg border border-v2-border-border-muted p-4 text-13-regular text-v2-text-text-base"
         role="status"
@@ -211,17 +206,17 @@ export default function Block(props: {
           />
           {ctx.t(applied() ? "failure.appliedTitle" : pendingCheck() ? "failure.checkTitle" : "failure.title")}
         </h2>
-        <Show when={failure.kind === "read"}>
+        <Show when={props.failure.kind === "read"}>
           <p>{ctx.t("failure.read")}</p>
         </Show>
-        <Show when={failure.kind === "write"}>
+        <Show when={props.failure.kind === "write"}>
           <p>
             {ctx.t(
               applied()
                 ? "failure.applied"
-                : props.state.check?.kind === "not_applied"
+                : checked()?.kind === "not_applied"
                   ? "failure.notApplied"
-                  : props.state.check?.kind === "unknown"
+                  : checked()?.kind === "unknown"
                     ? "failure.unknown"
                     : "failure.write",
             )}
@@ -229,29 +224,30 @@ export default function Block(props: {
           <p>
             {saved()
               ? ctx.t("failure.saved", { label: saved() ?? "" })
-              : ctx.t(step()?.persistence === "step_unsaved" ? "failure.unsaved" : "failure.unconfirmed")}
+              : ctx.t(unsaved() ? "failure.unsaved" : "failure.unconfirmed")}
           </p>
         </Show>
         <Show when={!applied()}>
           <p class="text-v2-text-text-faint">{connectionLabel()}</p>
-          <Show when={props.state.kind === "retry-failed"}>
+          <Show when={waiting()}>
+            <p>{ctx.t("failure.retryPending")}</p>
+          </Show>
+          <Show when={props.state.kind === "retry-send-failed" && props.retry?.id !== props.state.requestID}>
             <p>{ctx.t("failure.retryFailed")}</p>
+          </Show>
+          <Show when={!waiting() && props.retry?.status === "failed"}>
+            <p>{ctx.t("failure.retryUnconfirmed")}</p>
           </Show>
           <div class="flex flex-wrap items-center gap-2">
             <Show when={pendingCheck()}>
-              <Button
-                type="button"
-                variant="submit"
-                disabled={!available(props.state) || connection() !== "ready"}
-                onClick={() => void check()}
-              >
+              <Button type="button" variant="submit" disabled={!canCheck()} onClick={() => void check()}>
                 {ctx.t(props.state.kind === "checking" ? "failure.checking" : "failure.check")}
               </Button>
             </Show>
             <Button
               type="button"
               variant={pendingCheck() ? "outline" : "submit"}
-              disabled={connection() !== "ready" || !canRetry(failure, props.state)}
+              disabled={props.busy || connection() !== "ready" || !canRetry(props.failure, props.state, props.retry)}
               onClick={() => void retry()}
             >
               {ctx.t("failure.retry")}
