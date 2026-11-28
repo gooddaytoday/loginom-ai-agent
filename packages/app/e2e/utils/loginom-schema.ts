@@ -178,6 +178,7 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
   const node = root.submodels[0].nodes[0]
   const target = { document_id: "doc", workflow_id: "submodel", node_id: node.guid }
   let packageState = options.packageState
+  let copyFromOtherPackage = options.copyFromOtherPackage
   const packageName = () => (packageState === "resaved" ? "Продажи — версия 2.lgp" : "Продажи.lgp")
   const branch = ["Сценарий продаж", "Контроль качества"]
   const selectedNode = { ...node, position: point(405, 100) }
@@ -263,7 +264,7 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
         const dirty = packageState === "dirty"
         const draft = packageState === "draft"
         const path = draft ? null : `/analyst/Пакеты/${packageName()}`
-        const workflowID = options.copyFromOtherPackage ? "other-package" : snapshot.workflow.workflow_id
+        const workflowID = copyFromOtherPackage ? "other-package" : snapshot.workflow.workflow_id
 
         return {
           output: {
@@ -276,7 +277,7 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
               ? {
                   document_id: target.document_id,
                   workflow_id: workflowID,
-                  workflow_ids: parent && !options.copyFromOtherPackage ? [target.workflow_id, workflowID] : [workflowID],
+                  workflow_ids: parent && !copyFromOtherPackage ? [target.workflow_id, workflowID] : [workflowID],
                   path,
                   lastSave: dirty,
                 }
@@ -291,6 +292,9 @@ export async function openLoginomNodeConversation(page: Page, options: NodeLinks
     ...conversation,
     resave() {
       packageState = "resaved"
+    },
+    switchCopyPackage() {
+      copyFromOtherPackage = true
     },
   }
 }

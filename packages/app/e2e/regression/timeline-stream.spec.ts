@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test"
 import type { SessionMessageAssistant, SessionMessageInfo, ShellInfo } from "@opencode/client/promise"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
 import { createTwoFilesPatch } from "diff"
+import { Schema } from "effect"
 import receipts from "../fixtures/loginom-feed-receipts.json" with { type: "json" }
 import { readSessionDraftText } from "../utils/drafts"
 import { holdRoute } from "../utils/app"
@@ -3438,7 +3439,7 @@ for (const width of [1280, 390]) {
               "completed",
               {},
               {
-                metadata: { loginom: receipts.save },
+                metadata: { loginom: Schema.decodeUnknownSync(Schema.Json)(receipts.save) },
               },
             ),
             toolPart(

@@ -26,14 +26,15 @@ async function inSavedFileTab(page, options) {
     const card = workspace?.getActiveTab(), connection = form?.FMapTree?.FServerConnection;
     let pack = card?.Controller?.Node?.data?.node;
     for (let depth = 0; pack && !(pack instanceof app.PackageTreeNode) && depth < 32; depth++) pack = pack.ParentNode;
+    const session = connection?.Session;
     const owns = receipt => receipt?.packageNode === pack && JSON.parse(receipt.request).session === options.sessionId;
+    const ownsWorkflow = receipt => ['verified', 'superseded'].includes(receipt?.phase) && owns(receipt)
+      && (receipt.stepSession?.connection ?? receipt.openConnection) === connection
+      && (receipt.stepSession?.nativeSession ?? receipt.openServerSession) === session;
     const targetOwns = () => {
-      const receipt = prep.receipts.get(options.target.preparationId);
-      return owns(receipt) && ['verified', 'superseded'].includes(receipt.phase)
-        && (receipt.stepSession?.connection ?? receipt.openConnection) === connection
-        && (receipt.stepSession?.nativeSession ?? receipt.openServerSession) === session
-        && [...prep.receipts.values()].some(receipt => owns(receipt) && receipt.workflowId === options.target.workflowId
-          && ['verified', 'superseded'].includes(receipt.phase) && receipt.tab?.getAttribute('data-tid') === options.tabTid);
+      const active = prep.receipts.get(options.target.preparationId);
+      return ownsWorkflow(active) && active.tab?.getAttribute('data-tid') === options.tabTid
+        && [...prep.receipts.values()].some(receipt => receipt.workflowId === options.target.workflowId && ownsWorkflow(receipt));
     };
     const verify = () => {
       if (location.origin !== options.origin || app?.Version !== options.build || app.Version !== '7.4.2'
@@ -46,7 +47,6 @@ async function inSavedFileTab(page, options) {
         || !Array.from({length: form.FMapTree.PackageNodes.Count}, (_, index) => form.FMapTree.PackageNodes.Items(index)).includes(pack))
         throw Error('Saved package owner changed');
     };
-    const session = connection?.Session;
     const readModified = async () => {
       verify();
       const proxy = pack.Package;
@@ -76,7 +76,10 @@ async function inSavedFileTab(page, options) {
     }
     if (options.target && await page.locator('[role="dialog"]:visible,.x-window:visible,.bg-dialog:visible').count())
       throw Error('Saved package window is blocked');
-    if (await tab.count() !== 1 || !await tab.evaluate(element => element.classList.contains('x-tab-active')))
+    if (await tab.count() !== 1 || !await tab.evaluate((element, owner) => {
+      owner.verify();
+      return owner.workspace.getActiveTab() === owner.card && element.classList.contains('x-tab-active');
+    }, owner))
       throw Error('Save workflow tab is not active');
     await page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnFilestorage"]').click({timeout: 1500});
     entered = true;

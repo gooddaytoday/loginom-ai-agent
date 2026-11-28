@@ -13,6 +13,12 @@ const pageID = "package-schema"
 
 const SchemaPage = lazy(() => import("./schema-page"))
 
+function packageWorkflow(state: State) {
+  if (state.status !== "ready") return
+
+  return state.snapshot.source === "window" ? state.snapshot.workflow : state.snapshot.target
+}
+
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   ctx.add(Style, styles)
   const [state, setState] = createSignal<State>({ status: "closed" })
@@ -82,12 +88,11 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     render() {
       onCleanup(close)
 
-      const [copy] = createResource(
+      const [copy, { refetch, mutate }] = createResource(
         () => {
           const current = state()
 
-          if (current.status === "ready" && (current.snapshot.source === "window" || current.snapshot.target))
-            return current.request
+          if (current.status === "ready" && packageWorkflow(current)) return current.request
 
           if (current.status === "empty" && !current.request.finding) return current.request
         },
@@ -103,7 +108,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
         if (current.status === "empty" && !current.request.finding) return path ?? null
 
         if (current.status === "ready") {
-          const workflow = current.snapshot.source === "window" ? current.snapshot.workflow : current.snapshot.target
+          const workflow = packageWorkflow(current)
 
           if (!workflow) return
 
@@ -111,6 +116,22 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
 
           return path && samePackage(path, workflow) ? path : null
         }
+      }
+
+      const copyPackage = async () => {
+        const current = state()
+        const displayed = verifiedCopy()
+
+        if (current.status === "closed" || !displayed || displayed === "workspaceUnavailable") return
+        const workflow = packageWorkflow(current) ?? displayed
+        const fresh = await refetch()
+        const latest = state()
+
+        if (latest.status === "closed" || latest.request !== current.request || !fresh || fresh === "workspaceUnavailable")
+          return
+
+        if (samePackage(fresh, workflow)) await copyText(ctx, fresh.path)
+        else if (latest.status === "empty") mutate(null)
       }
 
       return (
@@ -126,6 +147,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
             }}
             back={back}
             packageCopy={verifiedCopy}
+            copyPackage={() => void copyPackage()}
             copyText={(text) => void copyText(ctx, text)}
           />
         </Suspense>

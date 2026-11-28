@@ -137,8 +137,9 @@ for (const packageState of ["dirty", "resaved"] as const) {
     if (packageState === "resaved") {
       await menuPath.click()
       await expect.poll(readClipboard).toBe("/analyst/Пакеты/Продажи.lgp")
-      conversation.resave()
       await page.getByRole("button", { name: "Действия шага" }).click()
+      await expect(menuPath).toBeEnabled()
+      conversation.resave()
     }
 
     await expect(menuPath).toBeEnabled()
@@ -147,8 +148,9 @@ for (const packageState of ["dirty", "resaved"] as const) {
     await expect.poll(readClipboard).toBe(path)
 
     await page.getByRole("button", { name: "Показать на схеме" }).click()
-    await expect(page.getByText(path, { exact: true })).toBeVisible()
-    await expect(page.getByText("Путь последнего сохранения", { exact: true })).toHaveCount(
+    const schema = page.getByRole("main")
+    await expect(schema.getByText(path, { exact: true })).toBeVisible()
+    await expect(schema.getByText("Путь последнего сохранения", { exact: true })).toHaveCount(
       packageState === "dirty" ? 1 : 0,
     )
     await page.evaluate(() => navigator.clipboard.writeText(""))
@@ -176,3 +178,33 @@ for (const [graph, message] of [
     await expect(page.getByRole("button", { name: "Внутренняя проверка", exact: true })).toHaveCount(0)
   })
 }
+
+for (const graph of [undefined, "parent"] as const) {
+  test(`copies the current package path after Save As while the ${graph ? "saved" : "window"} schema is open`, async ({ page }) => {
+    const conversation = await openLoginomNodeConversation(page, { packageState: "saved", graph })
+    const schema = page.getByRole("main")
+    const copy = schema.getByRole("button", { name: "Скопировать путь" })
+    const readClipboard = () => page.evaluate(() => navigator.clipboard.readText())
+
+    await page.getByRole("button", { name: "Показать на схеме" }).click()
+    await expect(schema.getByText("/analyst/Пакеты/Продажи.lgp", { exact: true })).toBeVisible()
+    await expect(copy).toBeEnabled()
+    conversation.resave()
+    await copy.click()
+    await expect.poll(readClipboard).toBe("/analyst/Пакеты/Продажи — версия 2.lgp")
+    await expect(schema.getByText("/analyst/Пакеты/Продажи — версия 2.lgp", { exact: true })).toBeVisible()
+  })
+}
+
+test("does not copy a path when another package owns it at click time", async ({ page }) => {
+  const conversation = await openLoginomNodeConversation(page, { packageState: "saved", graph: "parent" })
+  const schema = page.getByRole("main")
+  const copy = schema.getByRole("button", { name: "Скопировать путь" })
+  await page.evaluate(() => navigator.clipboard.writeText("без изменений"))
+  await page.getByRole("button", { name: "Показать на схеме" }).click()
+  await expect(copy).toBeEnabled()
+  conversation.switchCopyPackage()
+  await copy.click()
+  await expect(copy).toBeDisabled()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("без изменений")
+})

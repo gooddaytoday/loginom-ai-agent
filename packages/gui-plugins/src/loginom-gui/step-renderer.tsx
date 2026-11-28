@@ -67,6 +67,28 @@ function StepActions(props: { node: StepNode; openNode: OpenNode }) {
     if (current && current !== "workspaceUnavailable" && samePackage(current, props.node)) return current
   }
 
+  const copyPackage = async () => {
+    const location = request()
+    const session = ctx.sessions.current()
+    const node = props.node
+
+    if (
+      !location ||
+      !session ||
+      session.id !== location.sessionID ||
+      session.server.id !== location.serverID ||
+      session.directory !== location.directory ||
+      !copy()
+    )
+      return
+
+    const fresh = await readPackageCopy(ctx, location)
+
+    if (ctx.sessions.current() !== session || props.node !== node) return
+
+    if (fresh && fresh !== "workspaceUnavailable" && samePackage(fresh, node)) await copyText(ctx, fresh.path)
+  }
+
   const copyBadge = () => {
     if (path.loading) return ctx.t("copy.loading")
 
@@ -104,11 +126,7 @@ function StepActions(props: { node: StepNode; openNode: OpenNode }) {
             <Menu.Item
               disabled={!copy()}
               badge={copyBadge()}
-              onSelect={() => {
-                const current = copy()
-
-                if (current) void copyText(ctx, current.path)
-              }}
+              onSelect={() => void copyPackage()}
             >
               {ctx.t("copy.path")}
             </Menu.Item>

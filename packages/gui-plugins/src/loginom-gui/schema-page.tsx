@@ -150,7 +150,7 @@ function NodeDetails(props: { diagram: Diagram; index: number; t: Translate }) {
   )
 }
 
-function PackagePath(props: { value?: PackageCopy; t: Translate; copy: (text: string) => void }) {
+function PackagePath(props: { value?: PackageCopy; t: Translate; copy: () => void }) {
   const path = () => props.value === "workspaceUnavailable" ? null : props.value
 
   return (
@@ -177,11 +177,7 @@ function PackagePath(props: { value?: PackageCopy; t: Translate; copy: (text: st
         size="small"
         variant="ghost"
         disabled={!path()}
-        onClick={() => {
-          const value = path()
-
-          if (value) props.copy(value.path)
-        }}
+        onClick={props.copy}
       >
         <Icon name="copy" size="small" />
         {props.t("copy.path")}
@@ -195,6 +191,7 @@ function WorkflowView(props: {
   dispatch: (event: Event) => void
   t: Translate
   packageCopy?: PackageCopy
+  copyPackage: () => void
   copyText: (text: string) => void
 }) {
   const snapshot = () => props.state.snapshot
@@ -294,7 +291,7 @@ function WorkflowView(props: {
         </Show>
       </header>
       <Show when={props.packageCopy !== undefined}>
-        <PackagePath value={props.packageCopy} t={props.t} copy={props.copyText} />
+        <PackagePath value={props.packageCopy} t={props.t} copy={props.copyPackage} />
       </Show>
       <Show when={crumbs().length > 0}>
         <div class="loginom-schema-section loginom-schema-crumbs">
@@ -492,6 +489,7 @@ export default function SchemaPage(props: {
   retry: () => void
   back: () => void
   packageCopy: Accessor<PackageCopy | undefined>
+  copyPackage: () => void
   copyText: (text: string) => void
 }) {
   const missing = () => {
@@ -519,12 +517,13 @@ export default function SchemaPage(props: {
                 dispatch={props.dispatch}
                 t={props.t}
                 packageCopy={props.packageCopy()}
+                copyPackage={props.copyPackage}
                 copyText={props.copyText}
               />
             )}
           </Show>
           <Show when={props.state().status === "empty" && props.packageCopy()}>
-            <PackagePath value={props.packageCopy()} t={props.t} copy={props.copyText} />
+            <PackagePath value={props.packageCopy()} t={props.t} copy={props.copyPackage} />
           </Show>
           <Show when={!ready()}>
             <div class="loginom-schema-section" role="status">

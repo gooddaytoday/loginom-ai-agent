@@ -73,9 +73,9 @@ test('an unverified archive cannot be reported as an unchanged graph', async () 
 });
 
 
-test('reads a saved package for a departed workflow and restores the current parent tab', async () => {
+test('reads a saved package for a step in another module and restores the active module tab', async () => {
   const bytes = await readFile(new URL('../../../loginom-host/test/fixtures/package-docs/deep.lgp', import.meta.url));
-  const origin = 'https://loginom.test', tabTid = 'package-tab', document = {};
+  const origin = 'https://loginom.test', tabTid = 'module-b-tab', document = {};
   const path = '/analyst/Package.lgp';
   let downloads = 0, modified = false, editWhileReading = false;
   class PackageTreeNode {
@@ -99,20 +99,21 @@ test('reads a saved package for a departed workflow and restores the current par
     IsStreamReleased() { return this.IsDisposed; }
   }
   const pack = new PackageTreeNode();
-  const parent = { Controller: { Node: { data: { node: { ParentNode: pack } } } } };
+  const moduleB = { Controller: { Node: { data: { node: { ParentNode: pack } } } } };
   const files = { Controller: { FController: new FileStorageForm() } };
-  let active = parent;
-  const tab = { getAttribute: () => tabTid, classList: { contains: () => active === parent } };
+  let active = moduleB;
+  const tab = { getAttribute: () => tabTid, classList: { contains: () => active === moduleB } };
   const nativeSession = { IsPackageModified: async () => modified };
   const connection = { Connected: true, UserName: 'analyst', Session: nativeSession };
   const form = { Items: { Workspace: { getActiveTab: () => active } }, FMapTree: {
     FServerConnection: connection, PackageNodes: { Count: 1, Items: () => pack },
   }};
   const owner = { packageNode: pack, request: JSON.stringify({session:'chat'}), tab };
-  const departed = { ...owner, phase: 'superseded', workflowId: 'submodel' };
+  const departed = { ...owner, phase: 'superseded', workflowId: 'module-a',
+    tab: { getAttribute: () => 'module-a-tab' }, openConnection: connection, openServerSession: nativeSession };
   const receipts = new Map([
     ['older', departed],
-    ['current', { ...owner, phase: 'verified', workflowId: 'parent', stepSession: { connection, nativeSession } }],
+    ['current', { ...owner, phase: 'verified', workflowId: 'module-b', stepSession: { connection, nativeSession } }],
   ]);
   const globals = { Uint8Array: BrowserBytes, document, location: {origin}, __loginomDockPreparationV1: { document, id: 'doc', receipts },
     bg: { app: { Version:'7.4.2', PackageTreeNode, Application:{FInstance:{FMainForm:form}} },
@@ -124,23 +125,23 @@ test('reads a saved package for a departed workflow and restores the current par
     evaluateHandle: (fn, input) => handle(evaluate(fn, input)),
     locator: selector => ({
       count: async () => Number(selector.includes('data-tid')),
-      evaluate: fn => evaluate(fn, tab),
-      click: async () => { active = selector.includes('btnFilestorage') ? files : parent; },
+      evaluate: (fn, owner) => evaluate(fn, tab, owner.value),
+      click: async () => { active = selector.includes('btnFilestorage') ? files : moduleB; },
     }),
     waitForFunction: (fn, owner) => handle(evaluate(fn, owner.value)),
     evaluate: (fn, {owner, files, target}) => evaluate(fn, {owner:owner.value, files:files.value,target}),
   };
   const read = runInNewContext(makeSavedPackageGraphCode({ origin, build:'7.4.2', documentId:'doc',
-    sessionId:'chat', account:'analyst', path, tabTid, target:{preparationId:'current', workflowId:'submodel'} }));
+    sessionId:'chat', account:'analyst', path, tabTid, target:{preparationId:'current', workflowId:'module-a'} }));
   modified = true;
   assert.equal((await read(page)).saveRequired, true);
   assert.equal(downloads, 0);
-  assert.equal(active, parent);
+  assert.equal(active, moduleB);
 
   modified = false;
   const result = await read(page);
   assert.equal(result.base64, bytes.toString('base64'));
-  assert.equal(active, parent);
+  assert.equal(active, moduleB);
   editWhileReading = true;
   const changed = await read(page);
   assert.equal(changed.saveRequired, true);
@@ -148,7 +149,15 @@ test('reads a saved package for a departed workflow and restores the current par
   assert.throws(() => parseSavedPackageBytes({ content: [{ type: 'text', text: JSON.stringify(changed) }] }), {
     code: 'PACKAGE_SCHEMA_SAVE_REQUIRED',
   });
-  assert.equal(active, parent);
+  assert.equal(active, moduleB);
+
+  receipts.get('current').tab = departed.tab;
+  await assert.rejects(read(page), /Saved package owner changed/);
+  receipts.get('current').tab = tab;
+
+  departed.openServerSession = {};
+  await assert.rejects(read(page), /Saved package owner changed/);
+  departed.openServerSession = nativeSession;
 
   departed.packageNode = new PackageTreeNode();
   await assert.rejects(read(page), /Saved package owner changed/);
