@@ -1,7 +1,9 @@
 import { createMemo, type Accessor } from "solid-js"
+import { useQuery } from "@tanstack/solid-query"
 import type { SessionInfo } from "@opencode/client/promise"
 import { useGlobal, useServerCtx, type ServerCtx } from "@/runtime/server/runtime"
 import { sessionPermissionRequest, sessionFormRequest } from "@/session/requests/session-request-tree"
+import { stopReason } from "@/session/timeline/model-stop"
 import { needsUser } from "@/session/requests/auto-approve-machine"
 import { ServerConnection } from "@/runtime/server/registry"
 import { projectSettingsKey, useSettings } from "@/settings/model"
@@ -45,6 +47,38 @@ export function useSessionTabAvatarState(
   })
 
   return { unread, loading, attention: needsAttention }
+}
+
+export function useSessionModelStopped(ctx: Accessor<ServerCtx | undefined>, session: Accessor<SessionInfo | undefined>) {
+  const latestIdle = createMemo(() => {
+    const id = session()?.id
+
+    if (id) return ctx()?.data.session.message.list(id).findLast((message) => message.type === "idle")
+  })
+
+  const lastResult = useQuery(() => {
+    const server = ctx()
+    const current = session()
+    const id = current?.id
+
+    return {
+      queryKey: ["session.lastIdle", server?.sdk.scope, id, current?.time.idle ?? current?.time.updated],
+      enabled: !!id && current?.outcome === "failed" && !latestIdle() && server?.sdk.connection.status() === "connected",
+      queryFn: async () => {
+        if (!id || !server) return null
+        const page = await server.sdk.api.message.list({ sessionID: id, type: "idle", order: "desc", limit: 1 })
+
+        return page.data[0] ?? null
+      },
+    }
+  })
+
+  return () => {
+    if (session()?.outcome !== "failed") return false
+    const idle = latestIdle() ?? lastResult.data
+
+    return idle?.type === "idle" && idle.outcome === "failed" && !!stopReason(idle.error)
+  }
 }
 
 // The pending permission and form request that waits on the user anywhere in the session (or its family, for roots).

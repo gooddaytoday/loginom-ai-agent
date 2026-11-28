@@ -1,4 +1,3 @@
-import { modelStopped } from "@/session/timeline/model-stop"
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack, type JSX, type Ref } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Predicate } from "effect"
@@ -8,6 +7,7 @@ import { ActivityRing } from "@opencode/ui/activity-ring"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Icon } from "@opencode/ui/icon"
 import { Menu } from "@opencode/ui/menu"
+import { useSessionModelStopped } from "@/shell/layout/project-avatar-state"
 import { useServerCtx } from "@/runtime/server/runtime"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
@@ -137,11 +137,7 @@ export function TabNavItem(
 
   onCleanup(() => window.clearTimeout(intent))
 
-  const stopped = () => {
-    const session = props.session
-
-    return session && modelStopped(session, serverCtx()?.data.session.message.list(session.id))
-  }
+  const stopped = useSessionModelStopped(serverCtx, () => props.session)
 
   // The project icon stays put; status shows where the close button appears on hover.
   const status = () => {

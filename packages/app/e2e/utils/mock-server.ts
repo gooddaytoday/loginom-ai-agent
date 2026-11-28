@@ -83,6 +83,7 @@ export interface MockServerConfig {
     sessionId: string,
     limit: number,
     before?: string,
+    type?: string,
   ) => {
     items: SessionMessageInfo[]
     cursor?: string
@@ -1465,7 +1466,7 @@ function mockHandlers(
               yield* Effect.promise(() => config.beforeMessagesResponse!({ sessionID: ctx.params.sessionID, before }))
             }
 
-            const pageData = config.pageMessages(ctx.params.sessionID, ctx.query.limit ?? 50, before)
+            const pageData = config.pageMessages(ctx.params.sessionID, ctx.query.limit ?? 50, before, ctx.query.type)
             config.onMessages?.({ sessionID: ctx.params.sessionID, before, phase: "end" })
             const cursor = pageData.cursor ? `cursor_${++state.nextCursor}` : undefined
 

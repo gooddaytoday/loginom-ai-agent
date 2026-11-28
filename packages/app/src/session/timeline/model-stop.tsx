@@ -1,8 +1,10 @@
 import { Option, Schema } from "effect"
 import { For, Show, createSignal } from "solid-js"
-import type { ModelRef, SessionInfo, SessionMessageInfo, SessionMessageUser } from "@opencode/client/promise"
+import type { ModelRef, SessionMessageAssistant, SessionMessageInfo, SessionMessageUser } from "@opencode/client/promise"
 import { useLanguage } from "@/runtime/i18n/language"
 import { Button } from "@opencode/ui/button"
+import { TextShimmer } from "@opencode/ui/text-shimmer"
+import { Tooltip } from "@opencode/ui/tooltip"
 import { usePlatform } from "@/runtime/platform/platform"
 import { limitResetAt } from "../usage-exceeded-dialogs"
 
@@ -21,18 +23,39 @@ const stopReasons = {
   "provider.no-route": "session.modelStop.noRoute",
   "provider.invalid-request": "session.modelStop.invalid",
   "provider.content-filter": "session.modelStop.invalid",
-  "provider.context-overflow": "session.modelStop.overflow",
 } as const
 
-export function stopReason(type: string | undefined) {
-  return Object.entries(stopReasons).find(([code]) => code === type)?.[1]
+type StopReason = (typeof stopReasons)[keyof typeof stopReasons] | "session.modelStop.overflow"
+
+export function stopReason(error: SessionMessageAssistant["error"]): StopReason | undefined {
+  if (error?.type === "provider.invalid-request") {
+    const text = [error.message, error.response?.body].join("\n")
+
+    if (
+      /\b(?:context_length_exceeded|model_context_window_exceeded|request_too_large)\b/i.test(text) ||
+      (error.status !== 429 &&
+        /prompt (?:is )?too long|exceeds? (?:the )?(?:model'?s )?(?:maximum context length|context window)|context window exceeded|exceeded (?:this model )?context window|configured context size|input length.*exceeds.*context length/i.test(text))
+    )
+      return "session.modelStop.overflow"
+  }
+
+  return Object.entries(stopReasons).find(([code]) => code === error?.type)?.[1]
 }
 
-export function modelStopped(session: SessionInfo | undefined, messages: readonly SessionMessageInfo[] | undefined) {
-  if (session?.outcome !== "failed") return false
-  const idle = messages?.findLast((message) => message.type === "idle")
+export function ModelRetry(props: { attempt: number; seconds: number; message: string }) {
+  const language = useLanguage()
+  const text = () =>
+    props.seconds > 0
+      ? language.t("session.modelRetry.waiting", { attempt: props.attempt, seconds: props.seconds })
+      : language.t("session.modelRetry.now", { attempt: props.attempt })
 
-  return !!stopReason(idle?.error?.type)
+  return (
+    <Tooltip appearance="large" contentClass="max-w-80 break-words" value={props.message} placement="top">
+      <div data-slot="session-turn-retry-info" class="text-sm">
+        <TextShimmer text={text()} active />
+      </div>
+    </Tooltip>
+  )
 }
 
 export function freeLimitReset(messages: readonly SessionMessageInfo[], model: ModelRef | undefined) {
@@ -52,7 +75,7 @@ export function sameModel(a: ModelRef, b: ModelRef | undefined) {
 }
 
 export function ModelStop(props: {
-  reason: NonNullable<ReturnType<typeof stopReason>>
+  reason: StopReason
   error: string
   model: ModelRef | undefined
   modelName: string

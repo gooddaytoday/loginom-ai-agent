@@ -47,7 +47,7 @@ import {
 } from "../message/message-content"
 import { taskAgentName, ToolRegistry, type ContextGroupPart } from "../tools/tool-renderer"
 import { GenericTool } from "../components/basic-tool"
-import { SessionRetry } from "../components/session-retry"
+import { SessionRetry, type SessionRetryOverride } from "../components/session-retry"
 import { SessionError } from "../components/session-error"
 import { timelineCategory, type TimelineDetail } from "./detail"
 import { currentToolFailed } from "../message/current-tool-state"
@@ -91,13 +91,15 @@ export type SessionUserPresentation = {
   voice?: boolean
 }
 
-export function createSessionTimelineRowRenderer(input: {
+export function createSessionTimelineRowRenderer<ErrorPresentation>(input: {
   sessionID: Accessor<string>
   status: Accessor<SessionStatus>
   projection: Projection
   presentation: (message: SessionMessageUser) => SessionUserPresentation | undefined
   actions?: SessionUserActions
-  renderError?: (row: TimelineRow.Error) => JSX.Element
+  errorPresentation?: (row: TimelineRow.Error) => ErrorPresentation | undefined
+  renderError?: (presentation: Accessor<ErrorPresentation>) => JSX.Element
+  renderRetry?: SessionRetryOverride
   renderUserNotice?: (message: SessionMessageUser) => JSX.Element
   renderAnswerNote?: (userMessageID: string, answer: SessionMessageAssistant) => JSX.Element
   reasoningMode: Accessor<ReasoningMode>
@@ -1313,6 +1315,7 @@ export function createSessionTimelineRowRenderer(input: {
         <Frame row={current()}>
           <div data-slot="session-turn-message-container" class={`w-full ${padding()}`}>
             <SessionRetry
+              override={input.renderRetry}
               status={{ type: "retry", attempt: current().attempt, message: current().message, next: current().next }}
               show={input.projection.activeMessageID() === current().userMessageID}
             />
@@ -1392,7 +1395,7 @@ export function createSessionTimelineRowRenderer(input: {
       <Frame row={current()}>
         <div data-slot="session-turn-message-container" class={`w-full ${padding()}`}>
           <Show
-            when={input.renderError?.(current())}
+            when={input.errorPresentation?.(current())}
             fallback={
               <Switch fallback={<SessionError message={current().text} />}>
                 <Match when={budgetLimit()}>
@@ -1432,7 +1435,7 @@ export function createSessionTimelineRowRenderer(input: {
               </Switch>
             }
           >
-            {(content) => content()}
+            {(presentation) => input.renderError?.(presentation)}
           </Show>
         </div>
       </Frame>

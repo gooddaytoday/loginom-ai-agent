@@ -1,6 +1,6 @@
 import { useModels } from "@/providers/models/models"
 import { useServerSDK } from "@/runtime/server/client"
-import { freeLimitReset, ModelStop, readModelContinuation, sameModel, stopReason } from "./model-stop"
+import { freeLimitReset, ModelRetry, ModelStop, readModelContinuation, sameModel, stopReason } from "./model-stop"
 import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js"
 import { Predicate } from "effect"
 import { abort } from "@opencode/util/abort"
@@ -311,6 +311,36 @@ function MessageTimelineView(
   const modelName = (model: ModelRef | undefined) =>
     model ? (models.find({ modelID: model.id, providerID: model.providerID })?.name ?? model.id) : "—"
 
+  const errorPresentation = (row: { userMessageID: string; text: string; resetAt?: number }) => {
+    const messages = history()
+    const start = messages.findIndex((message) => message.id === row.userMessageID)
+
+    if (start < 0) return
+    const end = messages.findIndex((message, index) => index > start && message.type === "user")
+    const turn = messages.slice(start + 1, end < 0 ? undefined : end)
+
+    const failure = turn.findLast(
+      (message) => (message.type === "assistant" || message.type === "idle") && stopReason(message.error),
+    )
+
+    if (failure?.type !== "assistant" && failure?.type !== "idle") return
+    const reason = stopReason(failure.error)
+
+    if (!reason) return
+
+    const model =
+      turn.findLast((message) => message.type === "assistant")?.model ??
+      (end < 0 ? props.session.data.info()?.model : undefined)
+
+    return {
+      userMessageID: row.userMessageID,
+      reason,
+      error: failure.error?.message ?? row.text,
+      model,
+      resetAt: row.resetAt,
+    }
+  }
+
   const rowInput = {
     foldUserMessages: settings.general.foldUserMessages,
     sessionID: () => sessionID()!,
@@ -329,56 +359,45 @@ function MessageTimelineView(
       }
     },
     actions: props.actions,
-    renderError: (row: { userMessageID: string; text: string; resetAt?: number }) => {
-      const messages = history()
-      const start = messages.findIndex((message) => message.id === row.userMessageID)
-
-      if (start < 0) return
-      const end = messages.findIndex((message, index) => index > start && message.type === "user")
-      const turn = messages.slice(start + 1, end < 0 ? undefined : end)
-
-      const failure = turn.findLast(
-        (message) => (message.type === "assistant" || message.type === "idle") && stopReason(message.error?.type),
-      )
-
-      if (failure?.type !== "assistant" && failure?.type !== "idle") return
-      const reason = stopReason(failure.error?.type)
-
-      if (!reason) return
-
-      const failedModel =
-        turn.findLast((message) => message.type === "assistant")?.model ??
-        (end < 0 ? props.session.data.info()?.model : undefined)
+    errorPresentation,
+    renderError: (presentation: Accessor<NonNullable<ReturnType<typeof errorPresentation>>>) => {
+      const canContinue = () =>
+        sessionStatus().type === "idle" &&
+        history().findLast((message) => message.type === "user")?.id === presentation().userMessageID
 
       return (
         <ModelStop
-          reason={reason}
-          error={failure.error?.message ?? row.text}
-          model={failedModel}
-          modelName={modelName(failedModel)}
-          resetAt={row.resetAt}
+          reason={presentation().reason}
+          error={presentation().error}
+          model={presentation().model}
+          modelName={modelName(presentation().model)}
+          resetAt={presentation().resetAt}
           alternatives={models.list().flatMap((item) => {
             const model = { id: item.id, providerID: item.provider.id }
 
-            return sameModel(model, failedModel) || freeLimitReset(history(), model) ? [] : [{ model, name: item.name }]
+            if (!models.visible({ modelID: model.id, providerID: model.providerID })) return []
+            if (sameModel(model, presentation().model) || freeLimitReset(history(), model)) return []
+
+            return [{ model, name: item.name }]
           })}
-          canContinue={end < 0 && sessionStatus().type === "idle" && !!props.actions?.chooseModel}
+          canContinue={canContinue() && !!props.actions?.chooseModel}
           connect={() => command.trigger("provider.connect")}
           resume={async (model) => {
             const id = sessionID()
 
-            if (!id || sessionStatus().type !== "idle") return
+            if (!id || !canContinue()) return
             await data.session.prompt({
               sessionID: id,
               prepare: () => api.session.switchModel({ sessionID: id, model }),
               text: language.t("session.modelStop.continuePrompt"),
-              metadata: { modelContinuation: modelName(model), previousModel: modelName(failedModel) },
+              metadata: { modelContinuation: modelName(model), previousModel: modelName(presentation().model) },
             })
             data.session.acceptSend(id)
           }}
         />
       )
     },
+    renderRetry: ModelRetry,
     renderUserNotice: (message: SessionMessageUser) => {
       const continuation = readModelContinuation(message.metadata)
 

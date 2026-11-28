@@ -72,11 +72,6 @@ export const dict = {
   "ui.sessionTurn.error.freeUsageExceeded": "Лимит бесплатного использования превышен",
   "ui.sessionTurn.error.addCredits": "Добавить кредиты",
 
-  "dialog.usageExceeded.freeTier.title": "Достигнут бесплатный лимит",
-  "dialog.usageExceeded.freeTier.description":
-    "Подпишитесь на OpenCode Go за $10/месяц для надёжного доступа к лучшим моделям с открытым исходным кодом.",
-  "dialog.usageExceeded.freeTier.actionLabel": "Подписаться",
-
   "ui.sessionTurn.status.delegating": "Делегирование работы",
   "ui.sessionTurn.status.planning": "Планирование следующих шагов",
   "ui.sessionTurn.status.gatheringContext": "Исследование",
@@ -268,11 +263,11 @@ export const dict = {
   "ui.messagePart.context.notice.many": "{{count}} уведомлений",
   "ui.messagePart.context.thought.few": "мысли",
   "ui.messagePart.context.thought.many": "мыслей",
-  "ui.sessionTurn.retry.attemptRetryingNow": "Модель занята — повторяю · попытка {{attempt}}",
-  "ui.sessionTurn.retry.attemptWaiting.one": "Модель занята — повторю через {{count}} с · попытка {{attempt}}",
-  "ui.sessionTurn.retry.attemptWaiting.few": "Модель занята — повторю через {{count}} с · попытка {{attempt}}",
-  "ui.sessionTurn.retry.attemptWaiting.many": "Модель занята — повторю через {{count}} с · попытка {{attempt}}",
-  "ui.sessionTurn.retry.attemptWaiting.other": "Модель занята — повторю через {{count}} с · попытка {{attempt}}",
+  "ui.sessionTurn.retry.attemptRetryingNow": "Попытка {{attempt}} — повторная попытка",
+  "ui.sessionTurn.retry.attemptWaiting.one": "Попытка {{attempt}} — повтор через {{count}} секунду",
+  "ui.sessionTurn.retry.attemptWaiting.few": "Попытка {{attempt}} — повтор через {{count}} секунды",
+  "ui.sessionTurn.retry.attemptWaiting.many": "Попытка {{attempt}} — повтор через {{count}} секунд",
+  "ui.sessionTurn.retry.attemptWaiting.other": "Попытка {{attempt}} — повтор через {{count}} секунды",
   "ui.messagePart.compaction.started": "Начата компактизация сессии",
   "ui.messagePart.compaction.running": "Компактизация",
   "ui.messagePart.compaction.done": "Сжал начало разговора — дальше агент помнит его кратко",

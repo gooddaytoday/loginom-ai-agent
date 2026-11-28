@@ -12,6 +12,7 @@ import { SettingsSurfaceProvider } from "@/settings/surface"
 import Shell from "@/shell/shell"
 import { requireServerKey } from "./session"
 import { PluginAttachment } from "@/runtime/plugin/root"
+import { PluginPageRoute } from "@/runtime/plugin/pages"
 
 export const File = lazy(() => import("@opencode/session-ui/file").then((module) => ({ default: module.File })))
 
@@ -73,6 +74,7 @@ export function AppRoutes() {
         )}
       />
       <Route path="/new-session" component={DraftRoute} />
+      <Route path="/page/:plugin/:page" component={PluginPageRoute} />
       {ComponentsLab && <Route path="/components" component={ComponentsLab} />}
     </Route>
   )

@@ -25,6 +25,7 @@
       "title": "Upstream endpoints: updates, installer, sharing",
       "paths": [
         "packages/gui-plugins/src/updater/main.ts", "packages/gui-plugins/src/updater/platform.ts",
+        "packages/gui-plugins/src/updater/signed-feed*.ts", "packages/desktop/src/main/plugin/storage.test.ts",
         "packages/gui-plugins/src/updater/whats-new.tsx", "packages/desktop/src/renderer/platform/notifications.ts",
         "packages/desktop/src/renderer/platform/notifications.test.ts", "packages/cli/src/services/updater.ts",
         "packages/cli/test/updater-install.test.ts"
@@ -75,25 +76,57 @@
     },
     {
       "id": "CAT-14",
+      "title": "Built-in GUI tool renderers (C3.0, accepted timeline row exception)",
+      "paths": [
+        "packages/app/component-tests/plugin-host.fixture.tsx",
+        "packages/app/src/runtime/plugin/host.tsx",
+        "packages/app/src/runtime/plugin/render.tsx",
+        "packages/app/src/session/route.tsx",
+        "packages/app/src/session/timeline/cache.ts",
+        "packages/app/src/session/timeline/controller.tsx",
+        "packages/app/src/shell/routes/session-ui-provider.tsx",
+        "packages/gui-plugins/AGENTS.md",
+        "packages/gui-plugins/README.md",
+        "packages/plugin/src/gui/builtin.ts",
+        "packages/session-ui/src/context/data.tsx",
+        "packages/session-ui/src/timeline-next/projection.ts",
+        "packages/session-ui/src/timeline-next/rules.ts",
+        "packages/session-ui/src/timeline-next/tools/context-group.tsx",
+        "packages/session-ui/src/timeline-next/tools/tool-display.tsx",
+        "packages/session-ui/src/timeline/projection.ts",
+        "packages/session-ui/src/tools/tool-renderer.tsx",
+        "packages/ui/src/i18n/en.ts"
+      ]
+    },
+    { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
+    {
+      "id": "CAT-21",
+      "title": "Built-in plugin top-level pages",
+      "paths": [
+        "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
+        "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
+        "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
+      ]
+    },
+    {
+      "id": "CAT-22",
       "title": "C3.4: model stops, continuation, retry and compaction",
       "paths": [
-        "packages/core/src/session/to-session-error.ts",
-        "packages/core/test/session-error.test.ts",
         "packages/app/src/composer/composer.tsx",
         "packages/app/src/runtime/i18n/en.ts",
         "packages/app/src/runtime/i18n/ru.ts",
+        "packages/app/src/session/composer/free-limit-panel.tsx",
         "packages/app/src/session/composer/region.tsx",
         "packages/app/src/session/timeline/message-timeline.tsx",
+        "packages/app/src/shell/layout/project-avatar-state.ts",
         "packages/app/src/shell/titlebar/project-session-row.tsx",
         "packages/app/src/shell/titlebar/tab-nav.*",
-        "packages/session-ui/component-tests/session-timeline.spec.ts",
         "packages/session-ui/src/components/session-retry.tsx",
         "packages/session-ui/src/timeline-next/row.tsx",
         "packages/session-ui/src/timeline/session-timeline-row.tsx",
         "packages/ui/src/i18n/ru.ts"
       ]
     },
-    { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }

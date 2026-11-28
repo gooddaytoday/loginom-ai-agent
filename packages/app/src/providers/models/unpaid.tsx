@@ -138,7 +138,7 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
               <div class="flex w-full flex-col items-start rounded-lg border-[0.5px] border-v2-border-border-muted bg-v2-background-bg-layer-02 p-2.5 pt-2">
                 <div class="flex h-8 w-full select-none items-center px-0.5 pb-2">
                   <div class="flex h-5 items-center text-[13px] font-[440] leading-5 tracking-[-0.04px] text-v2-text-text-muted [font-family:var(--v2-font-family-sans)] [font-variant-numeric:tabular-nums] [font-variation-settings:'slnt'_0]">
-                    {language.t("dialog.model.unpaid.addMore.title")}
+                    {language.t("dialog.model.unpaid.connect.title")}
                   </div>
                 </div>
                 <div class="grid w-full grid-cols-1 gap-y-1.5 gap-x-2 sm:grid-cols-2">
@@ -166,13 +166,9 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
                         />
                         <span class="flex min-w-0 flex-col">
                           <span class="truncate">{providerName(provider)}</span>
-                          <Show when={provider.id === "opencode" || provider.id === "opencode-go"}>
+                          <Show when={provider.id === "opencode"}>
                             <span class="truncate font-[440] text-v2-text-text-muted">
-                              {language.t(
-                                provider.id === "opencode"
-                                  ? "dialog.provider.opencode.tagline"
-                                  : "dialog.provider.opencodeGo.tagline",
-                              )}
+                              {language.t("dialog.provider.opencode.tagline")}
                             </span>
                           </Show>
                         </span>
@@ -184,7 +180,7 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
                     class="col-span-full flex h-8 w-full scroll-my-3.5 items-center justify-start rounded-md px-3 text-left text-[13px] font-[440] leading-5 tracking-[-0.04px] text-v2-text-text-muted [font-family:var(--v2-font-family-sans)] [font-variation-settings:'slnt'_0] hover:bg-v2-overlay-simple-overlay-hover focus:bg-v2-overlay-simple-overlay-hover focus:outline-none"
                     onClick={() => openProviders()}
                   >
-                    {language.t("dialog.model.unpaid.viewMoreProviders")}
+                    {language.t("dialog.model.unpaid.moreProviders")}
                   </button>
                 </div>
               </div>

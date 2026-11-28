@@ -11,11 +11,10 @@ import { TextInput } from "@opencode/ui/text-input"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection } from "@/runtime/server/registry"
 import { useGlobal } from "@/runtime/server/runtime"
-import { useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
+import { useSessionModelStopped, useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
 import { errorMessage } from "@/shell/layout/helpers"
 import { showToast } from "@/shell/notifications/toast"
 import { sessionTreeIDs } from "@/session/requests/session-request-tree"
-import { modelStopped } from "@/session/timeline/model-stop"
 import { sessionLabel } from "@/session/title"
 import { createSessionExporter } from "@/session/commands/export-session"
 import { createSessionRenamer } from "@/session/commands/rename-session"
@@ -70,7 +69,7 @@ export function ProjectSessionRow(props: {
     () => props.session,
   )
 
-  const stopped = () => modelStopped(props.session, ctx()?.data.session.message.list(props.session.id))
+  const stopped = useSessionModelStopped(ctx, () => props.session)
 
   function DeleteDialog() {
     const confirm = () => {
