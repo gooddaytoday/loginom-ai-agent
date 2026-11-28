@@ -582,7 +582,7 @@ export const dict = {
   "error.chain.configInvalidWithMessage": "Config file at {{path}} is invalid: {{message}}",
 
   "notification.permission.title": "Permission required",
-  "notification.permission.packageWrite.title": "Allow writing to the package?",
+  "notification.permission.action.loginom_dock_action_run.title": "Allow writing to the package?",
   "notification.question.title": "Question requires an answer",
   "notification.elicitation.title": "Input requested",
 

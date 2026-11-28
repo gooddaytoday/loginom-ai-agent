@@ -336,7 +336,7 @@ export const dict = {
   "error.chain.configInvalidWithMessage": "Недопустимый конфигурационный файл по адресу {{path}}: {{message}}",
 
   "notification.permission.title": "Требуется разрешение",
-  "notification.permission.packageWrite.title": "Разрешить запись в пакет?",
+  "notification.permission.action.loginom_dock_action_run.title": "Разрешить запись в пакет?",
   "notification.question.title": "Нужен ответ на вопрос",
   "notification.elicitation.title": "Нужно ввести данные",
 

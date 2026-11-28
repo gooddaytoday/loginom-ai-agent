@@ -4,6 +4,7 @@ import { isSessionNotFoundError, type SessionInfo } from "@opencode/client/promi
 import type { ServerSDK } from "@/runtime/server/client"
 import type { Data } from "@opencode/client/solid"
 import { usePlatform } from "@/runtime/platform/platform"
+import en from "@/runtime/i18n/en"
 import { useLanguage } from "@/runtime/i18n/language"
 import { projectSettingsKey, useSettings } from "@/settings/model"
 import { Persist, persisted, removePersisted } from "@/runtime/persistence/storage"
@@ -401,9 +402,12 @@ export function createServerNotificationState(input: {
       if (!request || !settings.notifications.decision()) return
 
       // Request messages, form copy and tool arguments can contain paths or credentials.
+      const actionTitle = "action" in request ? `notification.permission.action.${request.action}.title` : undefined
+
+      // SAFETY: Object.hasOwn verifies the computed key against the base dictionary.
       const subject =
-        "action" in request && request.action === "loginom_dock_action_run"
-          ? "notification.permission.packageWrite.title"
+        actionTitle && Object.hasOwn(en, actionTitle)
+          ? (actionTitle as Extract<keyof typeof en, `notification.permission.action.${string}.title`>)
           : requestTitles[kind]
 
       return platform.notify(language.t(subject), session.title, () => openNotificationSession(tabs, input.key, target))

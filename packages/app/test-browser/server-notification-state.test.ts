@@ -182,7 +182,7 @@ test.each(
         session: {
           get: () => ({ ...session, parentID: "root", projectID: "project-1" }),
           root: () => "root",
-          permission: { list: () => (pending.value ? [{ id: "request-1" }] : []) },
+          permission: { list: () => (pending.value ? [{ id: "request-1", action: "shell" }] : []) },
           form: { list: () => (pending.value ? [{ id: "request-1" }] : []) },
         },
       },
