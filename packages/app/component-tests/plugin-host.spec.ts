@@ -49,6 +49,7 @@ story(
 
       return mountPluginPages()
     }, fixture)
+
     const nav = page.getByRole("navigation", { name: "Plugin pages" })
     const entry = nav.getByRole("button", { name: "Example plugin page", exact: true })
 
@@ -79,6 +80,21 @@ story("a plugin page that fails to render shows a way back to Home", async ({ pa
   await expect(page.getByRole("heading", { name: "Fixture Home" })).toBeVisible()
   await host.evaluate((host) => host.unmount())
 })
+
+for (const registry of ["page", "turn.presentation"]) {
+  story(`a third-party plugin cannot register ${registry} with a public token`, async ({ page }) => {
+    const result = await page.evaluate(
+      async ({ fixture, registry }) => {
+        const { registerThirdPartyPresentation } = await import(fixture)
+
+        return registerThirdPartyPresentation(registry)
+      },
+      { fixture, registry },
+    )
+
+    expect(result).toEqual({ status: "failed", entries: 0 })
+  })
+}
 
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {
   const setups = await page.evaluate(async (fixture) => {

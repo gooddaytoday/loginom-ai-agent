@@ -8,7 +8,7 @@ import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclar
 import type { Desktop, Layout, Locale, StorageScope, StoreOptions } from "./host-apis.js"
 import type { MainContext } from "./main.js"
 import type { Command, IconName, Panel, PanelTab, SlotMap } from "./registries.js"
-import { type JSX } from "solid-js"
+import { type Component, type JSX } from "solid-js"
 
 /**
  * Runs fn when the main thread is idle (a short timeout where requestIdleCallback is missing, e.g. Safari). Load lazy
@@ -115,6 +115,20 @@ export type TurnPresentationInput = {
     }
 )
 
+/** The completed turn and its owning connection, available to a built-in footer. */
+export type TurnPresentationFooterProps = {
+  /** The owning server's host key, as accepted by `ctx.servers.get`. */
+  readonly serverID: string
+  /** The session's directory on the owning server. */
+  readonly directory: string
+  /** The owning session's identifier on its server. */
+  readonly sessionID: string
+  /** The identifier of the user message that opened this turn. */
+  readonly messageID: string
+  /** The assistant messages currently loaded for the turn, in transcript order. */
+  readonly messages: readonly SessionMessageAssistant[]
+}
+
 /** Localized content before the turn's activity or after its answer. */
 export type TurnPresentationValue =
   | {
@@ -137,8 +151,8 @@ export type TurnPresentationValue =
       readonly kind: "summary"
       /** The localized summary shown on the disclosure button, when there is activity to disclose. */
       readonly label?: string
-      /** Optional localized text after the answer. */
-      readonly footer?: string
+      /** Optional component after the answer, mounted when the footer is in the visible timeline. */
+      readonly footer?: Component<TurnPresentationFooterProps>
     }
 
 /** Supplies optional plan and summary rows for a built-in plugin's turns. */

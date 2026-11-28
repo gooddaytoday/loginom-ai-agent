@@ -5,6 +5,7 @@ import { Menu } from "@opencode/ui/menu"
 import { Toast } from "@opencode/ui/toast"
 import {
   Panel,
+  Registry,
   type Appearance,
   type App,
   type Keybinds,
@@ -170,7 +171,11 @@ export async function until(check: () => boolean) {
 }
 
 /** Mounts the real plugin host with one plugin whose every renderer load settles when the test says so. */
-export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View?: Component; extra?: readonly Entry[] }) {
+export function mountPluginHost(input?: {
+  builtins?: ReadonlySet<string>
+  View?: Component
+  extra?: readonly Entry[]
+}) {
   const loads: PromiseWithResolvers<{ default: Plugin.Setup<Entry> }>[] = []
   const [disabled, setDisabled] = createSignal<ReadonlySet<string>>(new Set())
   const hosts: PluginHost[] = []
@@ -240,6 +245,7 @@ export function mountPluginHost(input?: { builtins: ReadonlySet<string>; View?: 
  */
 export function mountPlugins(input: {
   definitions: readonly Entry[]
+  builtins?: ReadonlySet<string>
   surface?: () => JSX.Element
   disabled?: readonly string[]
   bridge?: Bridge
@@ -333,6 +339,7 @@ export function mountPlugins(input: {
               {/* With a bridge, main's plugin manager holds the enable settings, as in a desktop window. */}
               <PluginHostProvider
                 definitions={definitions}
+                builtins={input.builtins}
                 disabled={input.bridge ? undefined : disabled}
                 bridge={input.bridge}
                 apis={fakeApis(storage)}
@@ -374,6 +381,19 @@ export function mountPlugins(input: {
   }
 }
 
+export async function registerThirdPartyPresentation(registry: string) {
+  const host = mountPluginHost()
+
+  try {
+    host.load((ctx) => ctx.add(Registry.define(registry), { title: "Third-party contribution" }))
+    await until(() => host.status() === "failed" || host.status() === "active")
+
+    return { status: host.status(), entries: host.entries(registry) }
+  } finally {
+    host.unmount()
+  }
+}
+
 export function mountPluginPages(options?: Parameters<typeof pagePlugin>[0]) {
   const plugin = pagePlugin(options)
   const history = createMemoryHistory()
@@ -393,6 +413,7 @@ export function mountPluginPages(options?: Parameters<typeof pagePlugin>[0]) {
 
   const host = mountPlugins({
     definitions: [plugin],
+    builtins: new Set([plugin.id]),
     surface: () => (
       <MemoryRouter history={history}>
         <Pages />

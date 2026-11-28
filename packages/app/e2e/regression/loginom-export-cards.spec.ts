@@ -1,40 +1,56 @@
 import { expect, test, type Page } from "@playwright/test"
-import { assistantMessage, setupTimeline, textPart, toolPart, userMessage, userText } from "../utils/timeline"
+import {
+  assistantMessage,
+  sessionID,
+  setupTimeline,
+  textPart,
+  toolPart,
+  userID,
+  userMessage,
+  userText,
+} from "../utils/timeline"
+// Capture from #1471 loginomFeedMetadata and the #1510 export receipt projection and SQLite turn lookup.
+import receipts from "./fixtures/loginom-export-receipts.json" with { type: "json" }
 
 const exportRequest = { finish: "execute", target: { kind: "existing", type: "exports.text" } }
 
-const report = {
-  artifact_id: "csv-export-1",
-  name: "Продажи за период.csv",
-  destination: "/agent/Продажи/Продажи за период.csv",
-  bytes: 512,
-  sha256: "34".repeat(32),
-  verification_id: "verification-1",
-  node: { document_id: "doc-sales", workflow_id: "workflow-main", node_id: "node-sales-export" },
-}
+const report = receipts.first.loginom.export
 
-const detailReport = {
-  ...report,
-  artifact_id: "csv-export-2",
-  name: "Продажи по регионам и городам.csv",
-  destination: "/agent/Продажи/Отчёты/Продажи по регионам и городам.csv",
-  verification_id: "verification-2",
-  node: { ...report.node, node_id: "node-region-export" },
-}
+const detailReport = receipts.second.loginom.export
 
-const localFile = { artifact_id: report.artifact_id, name: report.name, path: `/tmp/fixture/${report.name}` }
+const [localFile] = receipts.first.outputFiles
+
+const repeatID = "msg_2000_timeline_user"
+
+const turnPath = /\/api\/rpc\/loginom\.exports\/turn(?:\?|$)/u
+
+async function setupExportTimeline(
+  page: Page,
+  input: NonNullable<Parameters<typeof setupTimeline>[1]>,
+  first = receipts.single,
+) {
+  await setupTimeline(page, {
+    ...input,
+    beforeNavigate: () =>
+      page.route(turnPath, (route) => {
+        if (route.request().method() !== "POST") return route.fallback()
+
+        const body = route.request().postDataJSON()
+        const output = body.input.sessionID === sessionID && body.input.messageID === userID ? first : receipts.empty
+
+        return route.fulfill({ headers: { "access-control-allow-origin": "*" }, json: { output } })
+      }),
+  })
+}
 
 function confirmed(
   id: string,
-  receipt: typeof report = report,
-  outputFiles = [localFile],
+  metadata: typeof receipts.first | typeof receipts.second = receipts.first,
   tool = "loginom_dock_node_apply",
 ) {
-  const input = tool === "loginom_dock_node_apply" ? exportRequest : { operation_id: "sales" }
+  const input = tool === "loginom_dock_node_apply" ? exportRequest : { operation_id: metadata.loginom.operationId }
 
-  return toolPart(id, tool, "completed", input, {
-    metadata: { loginom: { export: receipt }, outputFiles },
-  })
+  return toolPart(id, tool, "completed", input, { metadata })
 }
 
 function answer() {
@@ -57,7 +73,7 @@ test("shows one confirmed export after the step and names the file after the ans
     if (!request.checkOnly) revealed.push(request.path)
     await route.fulfill({ status: request.path === localFile.path ? 204 : 404 })
   })
-  await setupTimeline(page, {
+  await setupExportTimeline(page, {
     desktopReveal: true,
     locale: "ru",
     viewport: { width: 1280, height: 850 },
@@ -76,7 +92,8 @@ test("shows one confirmed export after the step and names the file after the ans
   await showActivity(page)
 
   const card = page.getByRole("group", { name: report.name })
-  await expect(card.getByText(`Узел «${report.node.node_id}»`)).toBeVisible()
+  await expect(card.getByText("Узел «Выгрузка продаж»", { exact: true })).toBeVisible()
+  await expect(card.getByText(report.node.node_id, { exact: false })).toHaveCount(0)
   await expect(card.getByText(`Путь в Loginom: ${report.destination}`)).toBeVisible()
   await expect(card.getByText(/512\s*Б/)).toBeVisible()
   const open = card.getByRole("button", { name: "Открыть папку" })
@@ -87,19 +104,23 @@ test("shows one confirmed export after the step and names the file after the ans
 })
 
 test("shows two confirmed export cards at 390 px", async ({ page }, testInfo) => {
-  await setupTimeline(page, {
-    locale: "ru",
-    viewport: { width: 390, height: 850 },
-    settings: { newTimeline: false },
-    messages: [
-      userMessage([userText("Выгрузи продажи и отчёт по регионам.")]),
-      assistantMessage([
-        confirmed("prt_export"),
-        confirmed("prt_export_wait", detailReport, [], "loginom_dock_node_wait"),
-        answer(),
-      ]),
-    ],
-  })
+  await setupExportTimeline(
+    page,
+    {
+      locale: "ru",
+      viewport: { width: 390, height: 850 },
+      settings: { newTimeline: false },
+      messages: [
+        userMessage([userText("Выгрузи продажи и отчёт по регионам.")]),
+        assistantMessage([
+          confirmed("prt_export"),
+          confirmed("prt_export_wait", receipts.second, "loginom_dock_node_wait"),
+          answer(),
+        ]),
+      ],
+    },
+    receipts.double,
+  )
 
   await expect(page.getByText("Готово. Отчёт по продажам в папке «Продажи».", { exact: true })).toBeVisible({
     timeout: 30_000,
@@ -115,56 +136,87 @@ test("shows two confirmed export cards at 390 px", async ({ page }, testInfo) =>
   await page.screenshot({ path: testInfo.outputPath("loginom-exports-390.png"), animations: "disabled" })
 })
 
-test("lists the same receipt once when status repeats a confirmed export", async ({ page }) => {
-  await setupTimeline(page, {
+test("reads files for the owning turn even when only a later status call is loaded", async ({ page }) => {
+  const repeated = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/rpc/loginom.exports/turn") &&
+      response.request().postDataJSON().input.messageID === repeatID,
+  )
+
+  await setupExportTimeline(page, {
     locale: "ru",
     messages: [
       userMessage(),
-      assistantMessage([
-        confirmed("prt_export"),
-        confirmed("prt_export_status", report, [], "loginom_dock_node_status"),
-        answer(),
-      ]),
+      assistantMessage([answer()]),
+      userMessage([userText("Проверь состояние выгрузки.")], { id: repeatID, created: 1700000003000 }),
+      assistantMessage(
+        [
+          toolPart(
+            "prt_export_status",
+            "loginom_dock_node_status",
+            "completed",
+            { operation_id: "sales" },
+            {
+              metadata: receipts.repeated,
+            },
+          ),
+          textPart("prt_status_answer", "Выгрузка завершилась."),
+        ],
+        { id: "msg_2001_timeline_assistant", parentID: repeatID, created: 1700000004000 },
+      ),
     ],
   })
-  await expect(page.getByText(`Файлы этого хода: ${report.name}`, { exact: true })).toBeVisible()
+  expect((await repeated).ok()).toBe(true)
+  await expect(page.getByText("Выгрузка завершилась.", { exact: true })).toBeVisible()
+  const first = page.locator(`[data-message-id="${userID}"][data-timeline-row="TurnPresentation"]`)
+  const second = page.locator(`[data-message-id="${repeatID}"][data-timeline-row="TurnPresentation"]`)
+  await expect(first.getByText(`Файлы этого хода: ${report.name}`, { exact: true })).toBeVisible()
+  await expect(second.getByText(/Файлы этого хода|Файлы не создавались/)).toHaveCount(0)
 })
 
 test("prints the empty file summary when the export failed", async ({ page }) => {
-  await setupTimeline(page, {
-    locale: "ru",
-    messages: [
-      userMessage([userText("Выгрузи отчёт.")]),
-      assistantMessage([
-        toolPart("prt_failed_export", "loginom_dock_node_apply", "error", exportRequest),
-        textPart("prt_no_files", "Экспорт завершился ошибкой."),
-      ]),
-    ],
-  })
+  await setupExportTimeline(
+    page,
+    {
+      locale: "ru",
+      messages: [
+        userMessage([userText("Выгрузи отчёт.")]),
+        assistantMessage([
+          toolPart("prt_failed_export", "loginom_dock_node_apply", "error", exportRequest),
+          textPart("prt_no_files", "Экспорт завершился ошибкой."),
+        ]),
+      ],
+    },
+    receipts.empty,
+  )
   await expect(page.getByText("Экспорт завершился ошибкой.", { exact: true })).toBeVisible()
   await expect(page.getByText("Файлы не создавались", { exact: true })).toBeVisible()
   await expect(page.getByRole("group", { name: report.name })).toHaveCount(0)
 })
 
 test("omits the file summary and card for a table sample", async ({ page }) => {
-  await setupTimeline(page, {
-    locale: "ru",
-    messages: [
-      userMessage([userText("Прочитай образец.")]),
-      assistantMessage([
-        toolPart(
-          "prt_sample",
-          "loginom_dock_node_read",
-          "completed",
-          {},
-          {
-            metadata: { outputFiles: [localFile] },
-          },
-        ),
-        textPart("prt_sample_answer", "Прочитал образец."),
-      ]),
-    ],
-  })
+  await setupExportTimeline(
+    page,
+    {
+      locale: "ru",
+      messages: [
+        userMessage([userText("Прочитай образец.")]),
+        assistantMessage([
+          toolPart(
+            "prt_sample",
+            "loginom_dock_node_read",
+            "completed",
+            {},
+            {
+              metadata: { outputFiles: [localFile] },
+            },
+          ),
+          textPart("prt_sample_answer", "Прочитал образец."),
+        ]),
+      ],
+    },
+    receipts.empty,
+  )
   await expect(page.getByText("Прочитал образец.", { exact: true })).toBeVisible()
   await expect(page.getByText(/Файлы этого хода|Файлы не создавались/)).toHaveCount(0)
   await expect(page.getByRole("group", { name: report.name })).toHaveCount(0)
@@ -180,7 +232,7 @@ test("focus rechecks a local file without detaching the timeline or resetting sc
     await pending.promise
     await route.fulfill({ status: 404 })
   })
-  await setupTimeline(page, {
+  await setupExportTimeline(page, {
     desktopReveal: true,
     locale: "ru",
     seedHistory: true,

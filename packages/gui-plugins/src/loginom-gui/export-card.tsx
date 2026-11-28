@@ -52,7 +52,7 @@ export function ExportCard(props: { receipt: ExportReceipt; nodeLabel?: string; 
       <Icon name="file-document" class="shrink-0 text-v2-icon-icon-muted" />
       <div class="min-w-0 break-words">
         <div class="font-medium text-v2-text-text-base">{props.receipt.name}</div>
-        <div>{ctx.t("export.node", { name: props.nodeLabel || props.receipt.node.node_id })}</div>
+        <Show when={props.nodeLabel}>{(name) => <div>{ctx.t("export.node", { name: name() })}</div>}</Show>
         <div>{ctx.t("export.path", { path: props.receipt.destination })}</div>
         <div>{size()}</div>
         <Show when={path()}>

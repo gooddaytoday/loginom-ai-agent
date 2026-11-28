@@ -225,6 +225,7 @@ export async function setupTimeline(
     seedHistory?: boolean
     focusCard?: boolean
     desktopReveal?: boolean
+    beforeNavigate?: () => Promise<void>
     // Session IDs to open as titlebar tabs.
     tabs?: string[]
   } & TimelineServerInput = {},
@@ -298,6 +299,7 @@ export async function setupTimeline(
     })
   }
 
+  await input.beforeNavigate?.()
   const route = sessionHref(sessionID)
 
   if (input.focusCard || input.desktopReveal) {

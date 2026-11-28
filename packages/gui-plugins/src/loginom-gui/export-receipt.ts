@@ -16,7 +16,7 @@ const receipt = Schema.Struct({
   node: Schema.Struct({ document_id: text, workflow_id: text, node_id: text }),
 })
 
-const decodeReceipt = Schema.decodeUnknownOption(Schema.Struct({ export: receipt }))
+const decodeReceipt = Schema.decodeUnknownOption(Schema.Struct({ v: Schema.Literal(1), export: receipt }))
 
 const decodeOutputFiles = Schema.decodeUnknownOption(
   Schema.Array(
@@ -58,24 +58,9 @@ export function localExportPath(receipt: ExportReceipt, metadata: ToolMetadata) 
   )?.path
 }
 
-export function turnExportNames(calls: readonly SessionMessageAssistantTool[]) {
-  const files = new Map<string, ExportReceipt>()
-  let requested = false
-
-  for (const call of calls) {
-    if (
-      (call.name === "loginom_dock_node_apply" || call.name === "loginom_dock_node_resume") &&
-      Option.isSome(decodeExportRequest(call.state.input))
-    ) {
-      requested = true
-    }
-
-    if (call.state.status !== "completed") continue
-
-    const file = confirmedExport(call.name, call.state.status, call.state.metadata)
-
-    if (file) files.set(JSON.stringify([file.verification_id, file.artifact_id]), file)
-  }
-
-  return files.size || requested ? [...files.values()].map((file) => file.name) : undefined
+export function isExportRequest(call: SessionMessageAssistantTool) {
+  return (
+    (call.name === "loginom_dock_node_apply" || call.name === "loginom_dock_node_resume") &&
+    Option.isSome(decodeExportRequest(call.state.input))
+  )
 }

@@ -216,7 +216,10 @@ and retries rendering at the next call status.
 Built-ins can also register a `TurnPresentation` with `ctx.add(TurnPresentation, { describe })`. The callback
 receives the turn's assistant messages, plus its todos while working or its duration once completed. Returning
 `undefined` leaves the turn's presentation in place. A completed summary lets the reader disclose the activity;
-the answer and rows that carry results stay in view.
+the answer and rows that carry results stay in view. A summary can also supply a `footer` component after the answer.
+The footer receives the owning server, directory, session and user message IDs, and the loaded assistant messages.
+Use `createLatest` for a footer that reads server data so the timeline stays mounted while the request runs.
+The host accepts `Page` and `TurnPresentation` registrations only from built-in plugins.
 
 [Lifetimes](#lifetimes) shows `createKeyed` in files.
 
@@ -339,6 +342,9 @@ to the displayed repository or worktree instead of adding a second menu item.
 | `ctx.windows` (main)         | `Windows`                                                                          | The app's main windows                                           |
 | `ctx.embeds` (main)          | `Embeds`                                                                           | `create(view, window)` places a web page                         |
 | `ctx.cli` (main)             | `Cli`                                                                              | The opencode CLI the app runs                                    |
+
+Use `ctx.desktop?.reveal(path, { checkOnly: true })` to check whether a local path can be revealed without opening it.
+Call `reveal(path)` on the user's action. Use `createLatest` for checks that refresh while the timeline is visible.
 
 ### Built-in only
 

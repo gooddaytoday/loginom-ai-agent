@@ -1,7 +1,13 @@
 import { createMemo, For, type Accessor } from "solid-js"
+import { Dynamic } from "solid-js/web"
 import { TimelineRow } from "@opencode/session-ui/timeline/projection"
 import { createTurnPresentationProjection } from "@opencode/session-ui/timeline/turn-presentation"
-import { TurnPresentation, type TurnPresentationInput, type TurnPresentationValue } from "@opencode/plugin/gui/builtin"
+import {
+  TurnPresentation,
+  type TurnPresentationFooterProps,
+  type TurnPresentationInput,
+  type TurnPresentationValue,
+} from "@opencode/plugin/gui/builtin"
 import { Icon } from "@opencode/ui/icon"
 import { SessionTurn } from "@opencode/util/session-turn"
 import { usePluginHost } from "@/runtime/plugin/host"
@@ -64,6 +70,7 @@ export function createTurnPresentation(base: ReturnType<typeof createTimelinePro
   })
 
   return {
+    messages: (id: string) => base.assistantMessagesByParent().get(id) ?? [],
     description: (id: string) => descriptions().get(id),
     projection: createTurnPresentationProjection({
       base,
@@ -87,24 +94,25 @@ const marker = { completed: "✓", in_progress: "●", pending: "○" }
 export function TurnPresentationRow(props: {
   row: TimelineRow.TurnPresentation
   value: TurnPresentationValue
+  turn: TurnPresentationFooterProps
   disclosure: TurnDisclosure
   padding: Accessor<string>
   centered: boolean
 }) {
   const open = () => props.disclosure.open(props.row.userMessageID)
+  const footer = () => (props.value.kind === "summary" ? props.value.footer : undefined)
 
   return (
     <div
       data-message-id={props.row.userMessageID}
       data-timeline-row={props.row._tag}
-      class={`w-full min-w-0 pt-2 text-13-regular leading-text-compact text-v2-text-text-muted ${props.padding()}`}
+      class={`w-full min-w-0 pt-2 empty:hidden text-13-regular leading-text-compact text-v2-text-text-muted ${props.padding()}`}
       classList={{ "md:max-w-session md:mx-auto": props.centered }}
     >
       {(() => {
-        const value = props.value
+        if (props.row.placement === "footer") return <Dynamic component={footer()} {...props.turn} />
 
-        if (props.row.placement === "footer")
-          return value.kind === "summary" && <p class="wrap-break-word">{value.footer}</p>
+        const value = props.value
 
         if (value.kind === "plan")
           return (

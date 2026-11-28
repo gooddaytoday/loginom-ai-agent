@@ -1,0 +1,153 @@
+{
+  "first": {
+    "loginom": {
+      "v": 1,
+      "operationId": "sales",
+      "state": "settled",
+      "attempt": 1,
+      "status": "SUCCEEDED",
+      "phase": "finished",
+      "node": {
+        "guid": "node-sales",
+        "label": "Выгрузка продаж",
+        "type": "exports.text"
+      },
+      "executionId": "exec-sales",
+      "executionStatus": "completed",
+      "cleanupComplete": true,
+      "limitations": [],
+      "files": [
+        {
+          "artifactId": "csv-export-sales",
+          "name": "Продажи за период.csv",
+          "bytes": 512
+        }
+      ],
+      "export": {
+        "artifact_id": "csv-export-sales",
+        "destination": "/agent/Продажи/Продажи за период.csv",
+        "bytes": 512,
+        "sha256": "3434343434343434343434343434343434343434343434343434343434343434",
+        "verification_id": "sales:export-download",
+        "name": "Продажи за период.csv",
+        "node": {
+          "document_id": "doc-sales",
+          "workflow_id": "workflow-main",
+          "node_id": "node-sales"
+        }
+      },
+      "kind": "export"
+    },
+    "outputFiles": [
+      {
+        "artifact_id": "csv-export-sales",
+        "name": "Продажи за период.csv",
+        "path": "/tmp/fixture/Продажи за период.csv"
+      }
+    ]
+  },
+  "second": {
+    "loginom": {
+      "v": 1,
+      "operationId": "regions",
+      "state": "settled",
+      "attempt": 1,
+      "status": "SUCCEEDED",
+      "phase": "finished",
+      "node": {
+        "guid": "node-regions",
+        "label": "Выгрузка по регионам",
+        "type": "exports.text"
+      },
+      "executionId": "exec-regions",
+      "executionStatus": "completed",
+      "cleanupComplete": true,
+      "limitations": [],
+      "export": {
+        "artifact_id": "csv-export-regions",
+        "destination": "/agent/Продажи/Отчёты/Продажи по регионам и городам.csv",
+        "bytes": 512,
+        "sha256": "3434343434343434343434343434343434343434343434343434343434343434",
+        "verification_id": "regions:export-download",
+        "name": "Продажи по регионам и городам.csv",
+        "node": {
+          "document_id": "doc-sales",
+          "workflow_id": "workflow-main",
+          "node_id": "node-regions"
+        }
+      },
+      "kind": "export"
+    },
+    "outputFiles": []
+  },
+  "repeated": {
+    "loginom": {
+      "v": 1,
+      "operationId": "sales",
+      "state": "settled",
+      "attempt": 1,
+      "status": "SUCCEEDED",
+      "phase": "finished",
+      "node": {
+        "guid": "node-sales",
+        "label": "Выгрузка продаж",
+        "type": "exports.text"
+      },
+      "executionId": "exec-sales",
+      "executionStatus": "completed",
+      "cleanupComplete": true,
+      "limitations": [],
+      "kind": "export"
+    }
+  },
+  "single": {
+    "files": [
+      {
+        "artifact_id": "csv-export-sales",
+        "destination": "/agent/Продажи/Продажи за период.csv",
+        "bytes": 512,
+        "sha256": "3434343434343434343434343434343434343434343434343434343434343434",
+        "verification_id": "sales:export-download",
+        "name": "Продажи за период.csv",
+        "node": {
+          "document_id": "doc-sales",
+          "workflow_id": "workflow-main",
+          "node_id": "node-sales"
+        }
+      }
+    ]
+  },
+  "double": {
+    "files": [
+      {
+        "artifact_id": "csv-export-sales",
+        "destination": "/agent/Продажи/Продажи за период.csv",
+        "bytes": 512,
+        "sha256": "3434343434343434343434343434343434343434343434343434343434343434",
+        "verification_id": "sales:export-download",
+        "name": "Продажи за период.csv",
+        "node": {
+          "document_id": "doc-sales",
+          "workflow_id": "workflow-main",
+          "node_id": "node-sales"
+        }
+      },
+      {
+        "artifact_id": "csv-export-regions",
+        "destination": "/agent/Продажи/Отчёты/Продажи по регионам и городам.csv",
+        "bytes": 512,
+        "sha256": "3434343434343434343434343434343434343434343434343434343434343434",
+        "verification_id": "regions:export-download",
+        "name": "Продажи по регионам и городам.csv",
+        "node": {
+          "document_id": "doc-sales",
+          "workflow_id": "workflow-main",
+          "node_id": "node-regions"
+        }
+      }
+    ]
+  },
+  "empty": {
+    "files": []
+  }
+}

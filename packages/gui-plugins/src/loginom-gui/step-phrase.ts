@@ -18,7 +18,7 @@ const Facts = Schema.Struct({
   sourceName: Schema.optionalKey(text),
   nodeCount: Schema.optionalKey(count),
   package: Schema.optionalKey(Schema.Struct({ name: text, directory: text })),
-  node: Schema.optionalKey(Schema.Struct({ label: Schema.String, type: text })),
+  node: Schema.optionalKey(Schema.Struct({ guid: Schema.optionalKey(text), label: Schema.String, type: text })),
   attempt: Schema.optionalKey(positive),
   maxAttempts: Schema.optionalKey(positive),
   error: Schema.optionalKey(

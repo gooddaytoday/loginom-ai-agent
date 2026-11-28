@@ -597,6 +597,19 @@ function MessageTimelineView(
                     <TurnPresentationRow
                       row={current}
                       value={value()}
+                      turn={{
+                        serverID: server.key,
+                        get directory() {
+                          return sessionDirectory()
+                        },
+                        get sessionID() {
+                          return sessionID() ?? ""
+                        },
+                        messageID: current.userMessageID,
+                        get messages() {
+                          return turns.messages(current.userMessageID)
+                        },
+                      }}
                       disclosure={props.turnDisclosure}
                       padding={turnPadding}
                       centered={props.centered}

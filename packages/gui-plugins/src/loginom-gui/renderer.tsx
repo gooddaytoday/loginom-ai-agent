@@ -168,7 +168,7 @@ function Step(props: ToolRendererProps) {
         {(file) => (
           <ExportCard
             receipt={file()}
-            nodeLabel={facts()?.node?.label}
+            nodeLabel={facts()?.node?.guid === file().node.node_id ? facts()?.node?.label : undefined}
             path={localExportPath(file(), props.metadata)}
           />
         )}
