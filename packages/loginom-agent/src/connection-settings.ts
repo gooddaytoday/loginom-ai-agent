@@ -25,7 +25,8 @@ export function connectionSettings(request: Request = ServiceHost.connectionSett
       folder: view.folder,
       hasPassword: view.hasPassword,
       state: view.state,
-      failed: !!view.failure || view.state === "recoverable-error",
+      failed: !!view.failure || view.state === "recoverable-error" || view.browser?.state === "failed",
+      recoveryPending: !!view.recoveries?.length,
     }
   }
   const status = async (method: "connection.status" | "connection.settings.save", input: unknown) => {

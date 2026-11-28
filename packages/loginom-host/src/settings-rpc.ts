@@ -2,9 +2,12 @@ import { Rpc } from "@opencode/schema/rpc"
 import { Schema, Struct } from "effect"
 import { Loginom } from "./loginom"
 
+export const connectionRequiredTool = "loginom_connection_required"
+
 export const Status = Loginom.View.mapFields((fields) => ({
   ...Struct.pick(fields, ["revision", "generation", "url", "username", "folder", "hasPassword", "state"]),
   failed: Schema.Boolean,
+  recoveryPending: Schema.Boolean,
 }))
 export const Address = Schema.String.check(
   Schema.makeFilter((value) => {

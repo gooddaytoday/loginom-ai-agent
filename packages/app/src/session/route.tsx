@@ -42,7 +42,14 @@ export function TargetSessionRouteContent() {
   const data = useData()
   const server = useServer()
   const tabs = useTabs()
-  const toolRenderers = createToolRenderers()
+
+  const toolRenderers = createToolRenderers(() => {
+    const messages = data.session.message.list(params.id)
+    const reverted = data.session.get(params.id)?.revert?.messageID
+    const index = reverted ? messages.findIndex((message) => message.id === reverted) : -1
+
+    return index < 0 ? messages : messages.slice(0, index)
+  })
 
   const resolution = createSessionResolution(
     () => params.id,

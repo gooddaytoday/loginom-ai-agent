@@ -3,7 +3,7 @@
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
-import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import { connectionRequiredTool, ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
@@ -340,8 +340,31 @@ export default Plugin.define({
     // `package-docs` grant.
     const profiles = join(Global.Path.data, "file-profiles")
     const files = await localFiles(ctx, profiles)
+    const loginomSettings = connectionSettings()
+    const connectionNeeded = async () => {
+      if (!ServiceHost.connected()) return
+      const status = await loginomSettings.status()
+      if (status.ok && (status.value.state === "unconfigured" || status.value.failed)) return status.value
+    }
     const repeats = repeatGuard(async () => (await ctx.tool.list()).find((tool) => tool.id === "question"))
     await ctx.tool.transform((editor) => {
+      editor.add({
+        name: connectionRequiredTool,
+        description:
+          "Only when the user's task requires opening or changing a Loginom server package, show the connection card and end the turn. Do not use for questions or local package documentation.",
+        input: { type: "object", properties: {}, additionalProperties: false },
+        options: { codemode: false },
+        execute: async () => {
+          const status = await connectionNeeded()
+          if (!status) return { content: "No Loginom setup is required." }
+          return {
+            content: status.recoveryPending
+              ? "Loginom has an incomplete operation to recover. The card lets the user check recovery status. End this turn without retrying, opening packages, or suggesting new connection settings."
+              : "Loginom is not connected. The connection card is visible to the user. End this turn without retrying or opening packages. The application will signal when the user connects.",
+            metadata: { connectionRequired: true },
+          }
+        },
+      })
       editor.add(
         repeats.wrap(
           files.admitTool(async (sessionID) => {
@@ -409,6 +432,14 @@ export default Plugin.define({
       void hold(event.sessionID)
       await dock.refresh(event.sessionID, profile(event.sessionID), event.model)
       hide(event)
+      if (event.tools[connectionRequiredTool]) {
+        if (await connectionNeeded()) {
+          event.system.push({
+            type: "text",
+            text: `Loginom is not connected. If the current user task needs to open or change a Loginom server package, call ${connectionRequiredTool} first to show the connection card, then stop and wait. Answer other requests normally, without showing the card.`,
+          })
+        } else delete event.tools[connectionRequiredTool]
+      }
       offered.set(event.sessionID, new Set(Object.keys(event.tools)))
       dock.system(event.sessionID).forEach((text) => event.system.push({ type: "text", text }))
       // The kinds the settings deny, named before the model tries them: OpenCode does not offer their tools (B2.6b2).
@@ -518,7 +549,7 @@ export default Plugin.define({
         return { granted: true }
       },
     })
-    await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
+    await ctx.rpc.register(ConnectionSettingsRpc, loginomSettings)
     await ctx.rpc.register(preflight, {
       check: async (value) => {
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)

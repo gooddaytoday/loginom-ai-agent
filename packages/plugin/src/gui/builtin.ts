@@ -84,6 +84,8 @@ export interface ToolRendererProps {
   /** Tool-specific data attached to this call. */
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- A renderer decodes the metadata for its own tool.
   readonly metadata: Readonly<Record<string, unknown>>
+  /** True for the newest call of this tool in the current user turn; false for history or unknown identity. */
+  readonly latest: boolean
   /** The call's current status. */
   readonly status?: string
   /** The output text, once available. */

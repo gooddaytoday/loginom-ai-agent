@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises"
 import { expect, test, type Page } from "@playwright/test"
+import type { Schema } from "effect"
 import type { ConfigEntry, OpenCodeEvent, SessionMessageInfo, WorktreeDirectory } from "@opencode/client/promise"
 import { NO_PROVIDER, REMOTE_SERVER, SERVER, holdRoute, project, seed, session } from "../utils/app"
 import { mockMissingLocation, mockOpenCodeServer } from "../utils/mock-server"
@@ -26,6 +27,232 @@ const override =
 const contributors = "https://api.github.com/repos/anomalyco/opencode/contributors?anon=1&per_page=1"
 
 test.use({ serviceWorkers: "block" })
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  test(`Loginom setup resumes the original session (${viewport.width})`, async ({ page }, testInfo) => {
+    test.setTimeout(90_000)
+    await page.setViewportSize(viewport)
+    const id = "ses_loginom_setup"
+    const request = "Открой пакет из Loginom"
+    const own = viewport.width === 390
+    const address = own ? "https://loginom.example.test/" : "https://app.loginom.ai/"
+    const username = own ? "analyst" : "user"
+    const captures: { sessionID: string; body: Schema.Json }[] = []
+    const checks: unknown[] = []
+    const saves: unknown[] = []
+    let prompted = false
+    let saved = false
+    let ready = false
+    let allowLateReady = false
+    let disconnected = false
+    let recoveryPending = false
+    let reads = 0
+    let readsAtSave = 0
+
+    const task: SessionMessageInfo[] = [
+      { id: "msg_loginom_user", type: "user", text: request, time: { created: 3 } },
+      {
+        id: "msg_loginom_assistant",
+        type: "assistant",
+        agent: "build",
+        model: { id: "test", providerID: "opencode" },
+        content: [
+          {
+            type: "tool",
+            id: "call_loginom_connect",
+            name: "loginom_connection_required",
+            state: {
+              status: "completed",
+              input: {},
+              content: [{ type: "text", text: "Loginom is not connected." }],
+              metadata: { connectionRequired: true },
+            },
+            time: { created: 4, completed: 5 },
+          },
+        ],
+        time: { created: 4 },
+      },
+    ]
+
+    const previous: SessionMessageInfo[] = task.map((message) =>
+      message.type === "assistant"
+        ? {
+            ...message,
+            id: "msg_loginom_previous_assistant",
+            time: { created: 2 },
+            content: message.content.map((part) =>
+              part.type === "tool"
+                ? { ...part, id: "call_loginom_previous", time: { created: 2, completed: 3 } }
+                : part,
+            ),
+          }
+        : { ...message, id: "msg_loginom_previous_user", time: { created: 1 } },
+    )
+
+    const view = () => ({
+      ok: true,
+      value: {
+        revision: saved ? 1 : 0,
+        generation: ready ? 1 : 0,
+        url: ready ? address : "https://app.loginom.ai/",
+        username: ready ? username : "user",
+        folder: ready ? `/${username}` : "/user",
+        hasPassword: false,
+        failed: disconnected,
+        recoveryPending,
+        state: recoveryPending ? "recoverable-error" : ready ? "ready" : saved ? "pending" : "unconfigured",
+      },
+    })
+
+    const { editor } = await openSession(page, {
+      name: "Loginom setup",
+      sessions: [{ id, title: "Loginom setup" }],
+      seed: { locale: "ru" },
+      pageMessages: () => ({ items: prompted ? [...previous, ...task] : [] }),
+      onPrompt: ({ sessionID, body }) => {
+        prompted = sessionID === id && body.text === request
+      },
+      onRpc: ({ rpcID, method, body }) => {
+        if (rpcID !== "loginom.connection") return
+
+        if (method === "status") {
+          if (++reads === 1) return { unavailable: true }
+
+          if (saved && (own ? reads > readsAtSave + 1 : allowLateReady)) ready = true
+
+          return { output: view() }
+        }
+
+        if (method === "check") {
+          checks.push(body)
+
+          return { output: { ok: true, value: { validationId: "fixture-check", expiresAt: Date.now() + 60_000 } } }
+        }
+
+        if (method === "save") {
+          saves.push(body)
+          saved = true
+          readsAtSave = reads
+
+          return own ? { unavailable: true } : { output: view() }
+        }
+      },
+      onSynthetic: (input) => {
+        captures.push(input)
+
+        return {
+          id: "inb_loginom_resume",
+          sessionID: id,
+          type: "synthetic",
+          delivery: "steer",
+          time: { created: 4 },
+          payload: { text: "Loginom подключён. Продолжи предыдущую задачу пользователя." },
+        }
+      },
+    })
+
+    const pill = page.getByRole("button", { name: "Loginom", exact: true })
+    const card = page.getByRole("region", { name: "Подключиться к Loginom" })
+    await expect(card).toHaveCount(0)
+    await pill.click()
+    await expect(page.getByText("https://app.loginom.ai/", { exact: true })).toBeVisible()
+    await expect(page.getByText("user", { exact: true })).toBeVisible()
+    await expect(page.getByText("Не подключён", { exact: true })).toBeVisible()
+    await page.keyboard.press("Escape")
+    await editor.fill(request)
+    await editor.press("Enter")
+    await expect.poll(() => prompted).toBe(true)
+    await page.reload()
+    await expect(card).toHaveCount(1)
+    await expect(card).toBeVisible()
+    await expect(pill).toBeVisible()
+    await expect(
+      card.getByText(
+        "app.loginom.ai — публичный стенд Loginom: вход под user без пароля. Для рабочих данных подключите свой сервер.",
+        { exact: true },
+      ),
+    ).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath(`loginom-card-${viewport.width}.png`) })
+
+    if (own) {
+      await card.getByRole("button", { name: "Свой сервер Loginom" }).click()
+      await expect(page).toHaveURL(/\/settings/)
+      const url = page.getByRole("textbox", { name: "Адрес", exact: true })
+      const user = page.getByRole("textbox", { name: "Пользователь", exact: true })
+      await expect(url).toHaveValue("")
+      await expect(user).toHaveValue("")
+      await url.fill(address)
+      await user.fill(username)
+      const noPassword = page.getByRole("checkbox", { name: "Пароль не нужен" })
+      await page.getByText("Пароль не нужен", { exact: true }).click()
+      await expect(noPassword).toBeChecked()
+      await page.getByRole("button", { name: "Сохранить", exact: true }).click()
+      await expect(page).toHaveURL(new RegExp(id))
+    } else {
+      await card.getByRole("button", { name: "Подключить публичный стенд" }).click()
+      await expect(card.getByRole("status")).toHaveText(/Подключение ещё не применено/, { timeout: 22_000 })
+      expect(captures).toEqual([])
+      allowLateReady = true
+    }
+
+    await expect(page.getByText(`Подключено к ${address}`, { exact: true })).toBeVisible()
+    await expect(card).toHaveCount(0)
+    await expect(page.getByText("Подключено", { exact: true })).toHaveCount(2)
+    await expect(page.getByRole("button", { name: "Loginom", exact: true })).toBeVisible()
+    await expect
+      .poll(() => captures)
+      .toEqual([
+        {
+          sessionID: id,
+          body: { resume: true, text: "Loginom подключён. Продолжи предыдущую задачу пользователя." },
+        },
+      ])
+    expect(checks).toEqual([
+      {
+        input: {
+          url: address,
+          username,
+          revision: 0,
+          password: { operation: "empty" },
+        },
+      },
+    ])
+    expect(saves).toEqual([{ input: { revision: 0, validationId: "fixture-check" } }])
+    disconnected = true
+    recoveryPending = own
+    await expect(card).toBeVisible({ timeout: 8_000 })
+
+    if (own) {
+      const checkStatus = card.getByRole("button", { name: "Проверить состояние" })
+      await expect(checkStatus).toBeVisible()
+      await expect(card.getByRole("button", { name: "Подключить", exact: true })).toHaveCount(0)
+      await expect(card.getByRole("button", { name: "Изменить", exact: true })).toHaveCount(0)
+
+      const statusResponse = page.waitForResponse((response) =>
+        new URL(response.url()).pathname.endsWith("/loginom.connection/status"),
+      )
+
+      await checkStatus.click()
+      await statusResponse
+      await expect(checkStatus).toBeVisible()
+      expect(checks).toHaveLength(1)
+      expect(saves).toHaveLength(1)
+
+      recoveryPending = false
+      await expect(card.getByText(address, { exact: true })).toBeVisible({ timeout: 8_000 })
+      await expect(card.getByRole("button", { name: "Подключить", exact: true })).toBeEnabled()
+      await card.getByRole("button", { name: "Изменить", exact: true }).click()
+      await expect(page.getByRole("textbox", { name: "Адрес", exact: true })).toHaveValue(address)
+      await expect(page.getByRole("textbox", { name: "Пользователь", exact: true })).toHaveValue(username)
+    } else {
+      await pill.click()
+      await expect(page.getByText("Не подключён", { exact: true })).toBeVisible()
+    }
+  })
+}
 
 // One project with 12 worktrees, each with one session, and a configured zsh shell.
 function open(page: Page, input: Partial<WorkspaceInput> = {}) {
@@ -87,6 +314,7 @@ for (const [issue, text, address] of [
       },
     ])
     expect(fixture.saves).toEqual([])
+
     for (const secret of [loginomPassword, loginomDiagnosticKey]) {
       await expect(form).not.toContainText(secret)
       expect(journal.join("\n")).not.toContain(secret)
@@ -112,9 +340,11 @@ test("Loginom sends preserve, replace and passwordless operations through the se
   await expect(password).toBeDisabled()
   await check.click()
   await expect(checked).toBeVisible()
+
   const saved = page.waitForResponse(
     (response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/save",
   )
+
   await form.getByRole("button", { name: "Save", exact: true }).click()
   expect((await saved).ok()).toBe(true)
   await expect(checked).toBeHidden()
@@ -153,6 +383,7 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
     onRpc: (request) => {
       if (request.rpcID !== "loginom.connection") return
       expect(request.directory).toBe(serviceDirectory)
+
       switch (request.method) {
         case "status":
           return {
@@ -166,17 +397,20 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
                 folder: `/${username}`,
                 hasPassword: false,
                 failed: false,
+                recoveryPending: false,
                 state: revision ? "ready" : "unconfigured",
               },
             },
           }
         case "check":
           checks.push(request.body)
+
           return { output: { ok: true, value: { validationId: "checked", expiresAt: 4102444800000 } } }
         case "save":
           expect(request.body).toMatchObject({ input: { revision: 0, validationId: "checked" } })
           username = "analyst"
           revision = 1
+
           return { unavailable: true }
       }
     },
@@ -2119,15 +2353,19 @@ test("providers: settings and the connect dialog list popular providers in the s
     { id: "anthropic", name: "Anthropic" },
     { id: "google", name: "Google" },
   ]
+
   const { settings } = await open(page, {
     integrations: popular.toReversed().map((item) => ({ ...item, methods: [{ type: "key" }], connections: [] })),
   })
+
   const names = popular.map((item) => item.name)
 
   await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+
   const section = settings.locator(".settings-section").filter({
     has: page.getByRole("heading", { name: "Popular providers", exact: true }),
   })
+
   await expect(section.locator(".settings-provider-name")).toHaveText(names)
 
   await settings.getByRole("button", { name: "Show more providers", exact: true }).click()

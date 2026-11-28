@@ -1,5 +1,6 @@
 // Loginom access grants and the tool policy (guarantee G1). The product plugin hides what a session's task may not use
 // (`context`) and rejects what it calls anyway (`execute.before`); both ask `permits`.
+import { connectionRequiredTool } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { HostTaskScope } from "@loginom-ai-agent/loginom-host/task-scope"
 
 export type Profile = "default" | "package-docs" | "loginom-automation" | "loginom-dashboard"
@@ -49,6 +50,7 @@ const profileTools = new Set(["package_docs_run", "dashboard_draft", "dashboard_
 export function permits(profile: Profile, tool: string) {
   if (profile === "loginom-dashboard") return dashboard.has(tool)
   if (profile === "package-docs") return docs.has(tool) || local.has(tool)
+  if (tool === connectionRequiredTool) return true
   if (tool.startsWith("loginom_")) return profile === "loginom-automation" || local.has(tool)
   if (profileTools.has(tool)) return false
   return profile !== "loginom-automation" || tool !== "subagent"

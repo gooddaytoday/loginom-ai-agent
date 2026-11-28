@@ -155,6 +155,18 @@
       "title": "Built-in plugin page navigation for dashboard links",
       "paths": ["packages/app/src/runtime/plugin/host-apis.tsx"]
     },
+    {
+      "id": "CAT-27",
+      "title": "Composer status dot and Loginom connection card browser acceptance",
+      "paths": [
+        "packages/app/src/session/composer/plugin-pills.tsx", "packages/plugin/src/gui/registries.ts",
+        "packages/app/e2e/regression/settings.spec.ts", "packages/app/e2e/utils/mock-api.ts", "packages/app/e2e/utils/mock-server.ts",
+        "packages/app/e2e/utils/loginom-settings.ts",
+        "packages/app/src/session/route.tsx", "packages/app/src/session/timeline/tool-renderers.tsx",
+        "packages/plugin/src/gui/builtin.ts", "packages/session-ui/src/tools/tool-renderer.tsx",
+        "packages/server/test/loginom-dock-catalog.test.ts", "packages/server/test/loginom-host-lease.test.ts"
+      ]
+    },
     { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }

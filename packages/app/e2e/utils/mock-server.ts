@@ -167,6 +167,7 @@ export interface MockServerConfig {
   sessionStatus?: Resolvable<Record<string, { type: string }>>
   inbox?: unknown[] | (() => unknown[])
   onPrompt?: (input: { sessionID: string; body: Schema.JsonObject }) => void
+  onSynthetic?: (input: { sessionID: string; body: Schema.Json }) => Schema.Json
   onCompact?: (input: { sessionID: string; body: Schema.JsonObject }) => void
   // POST /api/session/:id/fork creates `<id>_fork` in the same directory. The hook may hold the request, or return an
   // answer to replace the response.
@@ -1229,16 +1230,21 @@ function mockHandlers(
         // The goal plugin's pill reads each routed session's goal; no scenario sets one.
         rpcCall: (ctx) => {
           const url = new URL(ctx.request.url, config.server ?? SERVER)
+
           const response = config.onRpc?.({
             ...ctx.params,
             directory: url.searchParams.get("location[directory]"),
             body: ctx.payload,
           })
+
           if (response && "unavailable" in response)
             return Effect.fail(new MockServiceUnavailable({ message: "RPC unavailable" }))
+
           if (response) return Effect.succeed(response)
+
           if (ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get")
             return Effect.succeed({ output: null })
+
           return Effect.fail(
             new MockUnsupported({ message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC` }),
           )
@@ -1333,6 +1339,13 @@ function mockHandlers(
               },
             }
           }),
+        sessionSynthetic: (ctx) => {
+          const synthetic = config.onSynthetic
+
+          return synthetic
+            ? Effect.sync(() => ({ data: synthetic({ sessionID: ctx.params.sessionID, body: ctx.payload }) }))
+            : Effect.fail(new MockUnsupported({ message: "The mock server cannot resume a session" }))
+        },
         // Like the server, a compaction is admitted as a steered inbox item under the proposed ID.
         sessionCompact: (ctx) =>
           Effect.sync(() => {

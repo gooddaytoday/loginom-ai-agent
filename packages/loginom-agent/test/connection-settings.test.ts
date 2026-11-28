@@ -26,6 +26,7 @@ test("the settings RPC emits only the display status, even for a migrated addres
       hasPassword: true,
       state: "ready",
       failed: false,
+      recoveryPending: false,
     },
   })
 })
@@ -85,4 +86,31 @@ test("settings reject URL parameters before calling the Host and pass the active
   expect(called).toBeUndefined()
   expect(await settings.check(input, context)).toMatchObject({ ok: true })
   expect(called).toBe(context.signal)
+})
+
+test("the settings RPC reports a failed browser login without exposing recovery records", async () => {
+  const stored = {
+    revision: 1,
+    generation: 1,
+    url: "https://loginom.example/",
+    username: "user",
+    folder: "/user",
+    hasPassword: true,
+  }
+  let recoveries: string[] = []
+  const settings = connectionSettings(async () => ({
+    ...stored,
+    state: recoveries.length ? "recoverable-error" : "ready",
+    browser: { state: "failed", failure: "LOGINOM_LOGIN_REJECTED" },
+    recoveries,
+  }))
+  expect(await settings.status()).toMatchObject({
+    ok: true,
+    value: { ...stored, state: "ready", failed: true, recoveryPending: false },
+  })
+  recoveries = ["fixture-recovery-id"]
+  expect(await settings.status()).toEqual({
+    ok: true,
+    value: { ...stored, state: "recoverable-error", failed: true, recoveryPending: true },
+  })
 })

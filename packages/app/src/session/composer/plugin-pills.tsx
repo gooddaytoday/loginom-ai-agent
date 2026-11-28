@@ -16,7 +16,6 @@ import { usePluginHost } from "@/runtime/plugin/host"
 import { Contribution } from "@/runtime/plugin/render"
 import { composerLanePlacement, type useComposerLaneAlignment } from "./composer-lane"
 
-
 type Alignment = ReturnType<ReturnType<typeof useComposerLaneAlignment>>
 
 const tones: Record<ComposerPillTone, string> = {
@@ -185,7 +184,12 @@ function PluginPill(props: { pill: ComposerPill; input: ComposerPillProps; align
 function Content(props: { view: ComposerPillView }): JSX.Element {
   return (
     <>
-      <PillIcon name={props.view.icon} tone={props.view.tone} />
+      <Show
+        when={!props.view.icon && props.view.tone}
+        fallback={<PillIcon name={props.view.icon} tone={props.view.tone} />}
+      >
+        {(tone) => <span aria-hidden="true" class={`size-2 shrink-0 rounded-full bg-current ${tones[tone()]}`} />}
+      </Show>
       <span dir="auto" class="min-w-0 max-w-[260px] truncate">
         {props.view.label}
       </span>

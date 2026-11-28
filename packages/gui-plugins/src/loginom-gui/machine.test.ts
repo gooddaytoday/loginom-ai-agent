@@ -11,10 +11,12 @@ const fresh = {
   state: "unconfigured",
   hasPassword: false,
   failed: false,
+  recoveryPending: false,
 } satisfies Status
 
 function form(status: Status = fresh) {
   const loaded = transition(initial, { type: "target", available: true }).state
+
   return transition(loaded, { type: "status", now: 1000, attempt: loaded.attempt, result: { ok: true, value: status } })
     .state
 }
@@ -38,11 +40,13 @@ test("an empty password belongs to the password field unless passwordless was se
 
 test("a rejected password stays on its field and allows another check", () => {
   const checking = check().state
+
   const rejected = transition(checking, {
     type: "checked",
     attempt: checking.attempt,
     result: { ok: false, issue: "credentialsRejected" },
   }).state
+
   expect(view(rejected)).toMatchObject({ fieldErrors: { password: "credentialsRejected" }, busy: false })
   expect(check(rejected).effects).toMatchObject([{ type: "check" }])
 })
@@ -70,20 +74,24 @@ test("Save checks first and reports pending activation until the service applies
   const checking = transition(form(), { type: "submit", submit: "save", now: 1000 }).state
   const saved = transition(checking, { type: "checked", attempt: checking.attempt, result: validation })
   expect(saved.effects).toMatchObject([{ type: "save", input: { validationId: "checked" } }])
+
   const pending = transition(saved.state, {
     type: "saved",
     now: 1000,
     attempt: saved.state.attempt,
     result: { ok: true, value: { ...fresh, revision: 1, state: "pending" } },
   })
+
   expect(view(pending.state)).toMatchObject({ message: "pending", readOnly: false })
   expect(pending.effects).toMatchObject([{ type: "status" }])
+
   const applied = transition(pending.state, {
     type: "status",
     now: 2000,
     attempt: pending.state.attempt,
     result: { ok: true, value: { ...fresh, revision: 1, generation: 1, state: "ready" } },
   }).state
+
   expect(view(applied)).toMatchObject({ connected: { username: "user", folder: "/user" }, readOnly: false })
 })
 
@@ -95,12 +103,14 @@ test("unavailable, changed targets and disposal ignore late completions", () => 
   expect(transition(gone, result).state).toBe(gone)
 
   const loading = transition(gone, { type: "target", available: true }).state
+
   const timedOut = transition(loading, {
     type: "status",
     now: 2000,
     attempt: loading.attempt,
     result: { ok: false, issue: "unavailable" },
   }).state
+
   expect(view(timedOut)).toMatchObject({ message: "serviceUnavailable", retry: true })
   const disposed = transition(loading, { type: "disposed" }).state
   expect(transition(disposed, result).state).toBe(disposed)
@@ -117,11 +127,13 @@ test("a disconnected check preserves the address and username for a retry", () =
   const draft = { url: "https://other.example/", username: "analyst" }
   const edited = transition(form(), { type: "edit", patch: draft }).state
   const checking = check(edited).state
+
   const failed = transition(checking, {
     type: "checked",
     attempt: checking.attempt,
     result: { ok: false, issue: "unavailable" },
   }).state
+
   expect(view(failed)).toMatchObject({ draft, issue: "unavailable", busy: false })
   expect(check(failed).effects).toMatchObject([{ type: "check", input: draft }])
 })
@@ -130,21 +142,25 @@ test("a lost Save reply refreshes the revision before another check", () => {
   const checking = check().state
   const verified = transition(checking, { type: "checked", attempt: checking.attempt, result: validation }).state
   const saving = transition(verified, { type: "submit", submit: "save", now: 3000 }).state
+
   const refreshing = transition(saving, {
     type: "saved",
     attempt: saving.attempt,
     now: 4000,
     result: { ok: false, issue: "saveFailed" },
   })
+
   expect(refreshing.effects).toMatchObject([{ type: "status", attempt: refreshing.state.attempt }])
   expect(view(refreshing.state).issue).toBeUndefined()
   const edited = transition(refreshing.state, { type: "edit", patch: { username: "next-user" } }).state
+
   const current = transition(edited, {
     type: "status",
     attempt: refreshing.state.attempt,
     now: 5000,
     result: { ok: true, value: { ...fresh, revision: 1, generation: 1, state: "ready" } },
   }).state
+
   expect(view(current)).toMatchObject({
     issue: undefined,
     connected: { username: "user" },
@@ -168,4 +184,27 @@ test("polling is bounded and keeps edits made while the connection is pending", 
     draft: { username: "next-user" },
   })
   expect(check(paused.state).effects).toMatchObject([{ type: "check", input: { revision: 1, username: "next-user" } }])
+})
+
+test.each([false, true])("a late ready status activates the saved connection unless explicitly reset (%s)", (reset) => {
+  const checking = transition(form(), { type: "submit", submit: "save", now: 1000 }).state
+  const saving = transition(checking, { type: "checked", attempt: checking.attempt, result: validation }).state
+  const pending = { ok: true, value: { ...fresh, revision: 1, state: "pending" } } as const
+  const applying = transition(saving, { type: "saved", attempt: saving.attempt, now: 1000, result: pending }).state
+  const paused = transition(applying, { type: "status", attempt: applying.attempt, now: 16_000, result: pending })
+  expect(view(paused.state)).toMatchObject({ busy: false, awaitingActivation: true })
+  expect(paused.effects).toEqual([])
+
+  const waiting = reset ? transition(paused.state, { type: "reset" }).state : paused.state
+  const refresh = transition(waiting, { type: "refresh", background: true }).state
+
+  const failed = transition(refresh, {
+    type: "status", attempt: refresh.attempt, now: 19_000, result: { ok: false, issue: "unavailable" },
+  }).state
+
+  const retry = transition(failed, { type: "refresh", background: true }).state
+  const ready = { ...fresh, revision: 1, generation: 1, state: "ready" } as const
+  const applied = transition(retry, { type: "status", attempt: retry.attempt, now: 22_000, result: { ok: true, value: ready } })
+  expect(view(applied.state)).toMatchObject({ connected: ready, awaitingActivation: false })
+  expect(applied.effects).toEqual(reset ? [] : [{ type: "activated", status: ready }])
 })

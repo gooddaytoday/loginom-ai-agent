@@ -437,6 +437,14 @@ const Group = HttpApiGroup.make("mock")
     }),
   )
   .add(
+    HttpApiEndpoint.post("sessionSynthetic", "/api/session/:sessionID/synthetic", {
+      params: SessionParams,
+      payload: JsonPayload,
+      success: Json,
+      error: Unsupported,
+    }),
+  )
+  .add(
     HttpApiEndpoint.post("sessionCompact", "/api/session/:sessionID/compact", {
       params: SessionParams,
       payload: JsonPayload,
