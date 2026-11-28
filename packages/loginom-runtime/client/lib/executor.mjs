@@ -870,6 +870,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
   let restoreViewport = null;
   let workflow = task.checkpoint?.workflow_ref ?? null;
   let loginomBuild = null;
+  let saveGraph;
   let graphBinding=task.checkpoint?.graph_binding??null;
   const record = (event, detail = {}) => trace.push({ at_ms: Date.now() - started, event, ...detail });
   const remaining = () => Math.max(0, deadline - Date.now());
@@ -1771,11 +1772,11 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if (staged.package_identity.running)
       throw new Error('Cannot save the package while a process is running or its nodes are locked. No save request was sent.');
     if (!same(staged, before)) throw Error('Package changed after save preflight');
-    const recordSaveGraph = async () => {
-      try { record('save_graph_before_write', {graph:await page.evaluate(readSaveGraph)}); }
-      catch { record('save_graph_before_write', {graph:null}); }
+    const captureSaveGraph = async () => {
+      try { saveGraph = await page.evaluate(readSaveGraph); }
+      catch { saveGraph = null; }
     };
-    await recordSaveGraph();
+    await captureSaveGraph();
     await click('file_dialog.confirm', true);
     record('save_requested', { path: before.path });
     const expectedConflict = '"' + before.path + '" уже существует. Вы хотите заменить его?';
@@ -1801,7 +1802,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       if ((await yes.innerText()).trim() !== 'Да' || (await noButton.innerText()).trim() !== 'Нет')
         throw new Error('Save confirmation answer labels differ');
       if (task.parameters.conflict_policy === 'replace') {
-        await recordSaveGraph();
+        await captureSaveGraph();
         await click('message.yes', true);
         record('overwrite_confirmed');
       } else {
@@ -2006,8 +2007,6 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       continuations = await bindSavedContinuations(before, before.continuations, 'reconcile');
     }
     record('save_continuations_observed', { continuations, reopened, native_identity_verified: true });
-    const savedGraph = receipt.trace.findLast(entry => entry.event === 'save_graph_before_write');
-    if (savedGraph) record('save_graph_before_write', {graph:savedGraph.graph});
     phase = 'verified'; effectPossible = true;
     record('postcondition_verified', { proof: 'save_receipt_and_unmodified_native_package', package_path: before.path, reopened });
     const output = { package_ref: { kind: 'package', path: before.path, active_identity: before.path }, reopened };
@@ -2105,6 +2104,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       if (restoreViewport) await cleanup('viewport', restoreViewport);
     }
     outcome.cleanup_complete = !trace.some(entry => ['cleanup_failed', 'cleanup_deferred'].includes(entry.event));
+    if (saveGraph !== undefined && task.receipt_namespace) outcome.private_save_graph = saveGraph;
     return outcome;
   })();
 }
@@ -2192,7 +2192,7 @@ export function parseCapabilityResult(response,{redactor}={}) {
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
   nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null,
-  browserRecovery = false, probePreparedPage, reopenNodePackage, cacheDirectory, serverSourceCache = true }) {
+  browserRecovery = false, probePreparedPage, reopenNodePackage, cacheDirectory, serverSourceCache = true, protectOperation }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   const executeBrowser=execute;
   execute=async(...args)=>{
@@ -2222,6 +2222,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     return result;
   };
   let pending = null;
+  const settlePending = async operation => {
+    if(pending!==operation)return;
+    if(operation.endProtection)await operation.endProtection();
+    if(pending===operation)pending=null;
+  };
   let running = false;
   const operations = new Map();
   const auxiliary = new Map();
@@ -2446,7 +2451,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }
     if (outcome.operation_id !== operation.id) throw new Error('Dock capability operation identity does not match');
     if (mode !== 'prepare' && outcome.status === 'SUCCEEDED') validateActionParameters(operation.action.output_schema, outcome.output, 'output');
+    retainSaveGraph(operation, outcome);
     return outcome;
+  };
+  const retainSaveGraph = (operation, outcome) => {
+    if (!Object.hasOwn(outcome, 'private_save_graph')) return;
+    if (['package.save_as', 'package.save_checkpoint'].includes(outcome.action_key))
+      operation.saveGraph = outcome.private_save_graph;
+    delete outcome.private_save_graph;
   };
   const remember = async (operation, phase, outcome) => {
     await onRecord({ operation_id: operation.id, action_key: operation.action.action_key, action_revision: operation.action.revision,
@@ -2468,6 +2480,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (receipt.action_key === operation.action.action_key && receipt.status === 'SUCCEEDED' && operation.action.output_schema) {
         validateActionParameters(operation.action.output_schema, receipt.output, 'output');
       }
+      retainSaveGraph(operation, receipt);
     }
     return state;
   };
@@ -2698,7 +2711,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const outcome=nodeApplyOutcome(operation,operation.nodeApply.result);
       await remember(operation,'completed',outcome);
       operation.outcome=outcome;operation.cleanupConfirmed=true;
-      if(pending===operation)pending=null;
+      await settlePending(operation);
       // A release whose delivery journal failed is redelivered here; its job
       // must not keep the earlier AMBIGUOUS outcome as unsettled work.
       if(nodeJobs.has(operation.id)&&nodeJobs.status(operation.id).state==='settled')nodeJobs.settle(operation.id,outcome);
@@ -2711,7 +2724,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const result=await inspectNodeTarget({request:operation.parameters,operation,adapter:operation.nodeTargetAdapter,record:nodeTargetRecord,deadline:now()+15000});
     const outcome=nodeTargetOutcome(operation,result);await remember(operation,'reconciled',outcome);
     operation.outcome=outcome;operation.cleanupConfirmed=outcome.cleanup_complete;
-    if(result.status!=='AMBIGUOUS'&&result.cleanup_complete===true)pending=null;
+    if(result.status!=='AMBIGUOUS'&&result.cleanup_complete===true)await settlePending(operation);
     return outcome;
   };
   const reconcilePending = async signal => {
@@ -2744,7 +2757,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if (state.receipt.action_key === operation.action.action_key) operation.outcome = state.receipt;
         if (operation.cleanupConfirmed && operation.outcome.status !== 'AMBIGUOUS' && !operation.storageDownloadNavigation) {
           if(operation.action.capability==='artifact.upload' && (operation.outcome.status==='NOT_APPLIED'||operation.outcome.status==='FAILED'&&operation.outcome.output?.conflict_rejected===true))await operation.uploadLease?.release();
-          pending = null; return operation.outcome;
+          await settlePending(operation); return operation.outcome;
         }
       }
       if(operation.cleanupConfirmed===false && operation.verification?.byteOutcome?.output?.bytes_verified===true)
@@ -2774,8 +2787,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       await remember(operation, 'reconciled', outcome);
       operation.outcome = outcome;
       operation.cleanupConfirmed = outcome.cleanup_complete === true;
-      if (outcome.status === 'SUCCEEDED' || outcome.status === 'NOT_APPLIED') {
-        pending = null;
+      if ((outcome.status === 'SUCCEEDED' || outcome.status === 'NOT_APPLIED') &&
+          (!operation.endProtection || operation.cleanupConfirmed)) {
+        await settlePending(operation);
         operation.outcome = outcome;
       }
       return outcome;
@@ -2899,7 +2913,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           operation.transportUncertain=false;
         }else await remember(operation,'operation_abandoned',outcome);
         operation.outcome=outcome;operation.cleanupConfirmed=true;
-        pending=null;nodeJobs.settle(operation.id,operation.outcome);
+        await settlePending(operation);nodeJobs.settle(operation.id,operation.outcome);
         returned={status:'SUCCEEDED',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'resolved',
           effect_possible:false,error:null,trace:[],recovery_operation_id:recoveryOperationId,
           output:{resolution:'released_after_proof',goal_verified:false,original_outcome:structuredClone(operation.outcome)}};
@@ -3216,7 +3230,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       // Redelivery of the original request reports its own failure and the linked recovery.
       operation.outcome.output.browser_recovery = { receipt_id: receipt.id, status: receipt.status, facts: receipt.facts };
       await remember(operation, 'operation_abandoned', operation.outcome);
-      pending = null; nodeJobs.settle(operation.id, operation.outcome);
+      await settlePending(operation); nodeJobs.settle(operation.id, operation.outcome);
       recoveryReceipts.set(receipt.id, receipt);
       recoveredSteps.set(step.key, { operation_id: operation.id, code, receipt_id: receipt.id });
       leased = null;
@@ -3782,6 +3796,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     },
     nodeApplyStatus:id=>sourceReads.has(id)?sourceReads.status(id):nodeJobs.status(id),
     nodeApplyWorkflow:id=>nodeJobs.workflow(id),
+    savedGraphBefore: id => operations.get(id)?.saveGraph,
     saveNodeIntent(documentId, workflowId) {
       const sorting=new Map(), intendedLabels=new Map();
       for(const operation of operations.values()) {
@@ -3897,7 +3912,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const resolved = { ...structuredClone(operation.outcome), resolution, goal_verified: false,
             recovery_operation_id: recoveryOperationId, observation_id: observationId };
           await remember(operation, strategy === 'abandon_operation' ? 'operation_abandoned' : 'observed_state_accepted', resolved);
-          operation.outcome = resolved; pending = null; observations.clear();
+          operation.outcome = resolved; await settlePending(operation); observations.clear();
           const result = { status: 'SUCCEEDED', action_key: 'operation.recover', action_revision: '1', operation_id: operationId,
             phase: 'resolved', effect_possible: false, error: null, trace: [], output: { resolution,
               goal_verified: false, original_outcome: resolved }, recovery_operation_id: recoveryOperationId };
@@ -3936,7 +3951,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         await remember(record, 'recovery_completed', outcome);
         const returned = { ...outcome, recovery_operation_id: recoveryOperationId };
         auxiliary.set(recoveryOperationId, { signature, outcome: structuredClone(returned) });
-        if (!operation.transportUncertain && operation.cleanupConfirmed && ['SUCCEEDED', 'NOT_APPLIED'].includes(outcome.status)) pending = null;
+        if (!operation.transportUncertain && operation.cleanupConfirmed && ['SUCCEEDED', 'NOT_APPLIED'].includes(outcome.status)) await settlePending(operation);
         return returned;
       } finally { running = false; }
     },
@@ -4402,13 +4417,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         operation.deadline=now()+60000;
         await remember(operation,resume?'node_target_resume_prepared':'prepared');signal?.throwIfAborted();
         operations.set(operation.id,operation);pending=operation;observations.clear();
+        if(protectOperation)operation.endProtection??=await protectOperation(operationId);
         const result=await prepareNodeTarget({request:operation.parameters,operation,adapter:operation.nodeTargetAdapter,record:nodeTargetRecord,signal,now});
         // A settled child receipt is needed even after cancellation. Never infer
         // cleanup from a model summary or release the gate on transport timeout.
         result.cleanup_complete=!operation.targetPhase?.pending || operation.targetPhase.pending.receipt?.cleanup_complete===true;
         const outcome=nodeTargetOutcome(operation,result);operation.outcome=outcome;operation.cleanupConfirmed=outcome.cleanup_complete;
         try{await remember(operation,'completed',outcome);}catch(error){operation.outcome=failed(operation,'EVIDENCE_WRITE_FAILED',String(error.message));return operation.outcome;}
-        if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)pending=null;
+        if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)await settlePending(operation);
         return structuredClone(outcome);
       }finally{running=false;}
     },
@@ -4737,6 +4753,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         await remember(operation,resume?'node_apply_resume_prepared':'prepared');
         if(!admissionUncertainty)signal?.throwIfAborted();
         operations.set(operation.id,operation);pending=operation;observations.clear();
+        if(protectOperation)operation.endProtection??=await protectOperation(operationId);
         let result;
         try{result=await applyNode({request,operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,
           record:onRecord,signal,stopSignal,now,resume,deadlineAt:admissionDeadline,admissionUncertainty});}
@@ -4763,7 +4780,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             error:{code:'EVIDENCE_WRITE_FAILED',message:String(error.message).slice(0,1000)}});
           return structuredClone(operation.outcome);
         }
-        if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)pending=null;
+        if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)await settlePending(operation);
         // T4: an unconfirmed export download is offered to browser recovery first;
         // the plain save-and-report continuation stays available as the alternative.
         const exported=exportRecoveryTrigger(operation);
@@ -4822,6 +4839,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         await remember(operation, 'prepared');
         signal?.throwIfAborted();
         if (deadlineAt !== undefined && now() >= operation.deadline) throw new Error('Action parent deadline expired before mutation');
+        if(protectOperation&&['package.save_as','package.save_checkpoint'].includes(actionKey)){
+          operation.endProtection=await protectOperation(operation.id);
+          if(signal?.aborted||now()>=operation.deadline){
+            await operation.endProtection();
+            signal?.throwIfAborted();
+            throw Error('Save deadline expired before mutation');
+          }
+        }
         operations.set(operation.id, operation);
         pending = operation;
         observations.clear();
@@ -4841,7 +4866,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           operation.outcome = failed(operation, 'EVIDENCE_WRITE_FAILED', String(error?.message ?? error).slice(0, 1000));
           return operation.outcome;
         }
-        if (outcome.status !== 'AMBIGUOUS' && operation.cleanupConfirmed) pending = null;
+        if (outcome.status !== 'AMBIGUOUS' && operation.cleanupConfirmed) await settlePending(operation);
         return outcome;
       } finally { running = false; }
     },
@@ -4867,7 +4892,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }});
   // Internal delivery calls retain the original runtime methods. The returned
   // facade prevents a second caller from changing UI between transfer stages.
-  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','nodeApplyWorkflow','saveNodeIntent','waitNodeApply']);
+  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','nodeApplyWorkflow','savedGraphBefore','saveNodeIntent','waitNodeApply']);
   const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply','deleteNode']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{
@@ -4888,6 +4913,17 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return value(...args);
     }]));
   return Object.freeze({...exposed,...browserRecoveryApi,
+    nodeFeedFacts:id=>{
+      const state=operations.get(id)?.nodeApply;
+      const observed=state?.phases.find(phase=>phase.phase==='target')?.value?.target?.node;
+      if(!observed||observed.ref?.node_id!==state.node?.node_id)return;
+      const label=state.phases.find(phase=>phase.phase==='finish')?.value?.node_label??observed.label;
+      const request=state.request;
+      const kind=request.mode===NODE_READ_MODE?'read':request.mode==='add_only'?'add':request.finish==='execute'
+        ?observed.type?.startsWith('exports.')?'export':'execute'
+        :request.finish==='done'?'configure':undefined;
+      return {node:{ref:observed.ref,label,type:observed.type},kind};
+    },
     // Host lifecycle cleanup must bypass the user mutation facade. A retained
     // node/recovery gate still blocks package cleanup; it cannot block draining
     // the owned worker or removing its private local download cache.

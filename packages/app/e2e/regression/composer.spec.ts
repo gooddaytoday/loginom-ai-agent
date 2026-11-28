@@ -149,7 +149,7 @@ test("closing the @ menu aborts its session search", async ({ page }) => {
   }
 })
 
-test("the free usage limit opens the Go dialog once, swaps the composer for the free limit panel, and restores the prompt", async ({
+test("the free usage limit offers model connection without an upsell and restores the prompt", async ({
   page,
   context,
 }) => {
@@ -248,16 +248,18 @@ test("the free usage limit opens the Go dialog once, swaps the composer for the 
     },
   ])
 
-  const upsell = page.getByRole("dialog", { name: "Free limit reached" })
-  await expect(upsell).toContainText("Your free messages reset at")
   await expect(page.getByText(/^You've used today's free messages\. They reset at /)).toBeVisible()
-  // With no paid provider the panel stands in for the composer until Go is connected.
-  await expect(page.locator('[data-component="session-free-limit"]')).toContainText("Free usage resets at")
+  const panel = page.getByRole("status").filter({ hasText: "Model stopped the turn" })
+  await expect(panel).toContainText("Free usage resets at")
+  await expect(panel).toContainText("Connect a model with a subscription, an API key, or your own server.")
+  await expect(panel.getByRole("button")).toHaveText(["Connect model"])
+  await expect(page.getByRole("dialog")).toHaveCount(0)
   await expect(view.editor).toHaveCount(0)
   await expect(page.getByText("Free usage limit reached.")).toHaveCount(0)
 
-  // Subscribe -> Go API key -> Continue switches the model in the current session without opening a new draft tab.
-  await upsell.getByRole("button", { name: "Subscribe", exact: true }).click()
+  await panel.getByRole("button", { name: "Connect model", exact: true }).click()
+  const providers = page.getByRole("dialog", { name: "Connect provider", exact: true })
+  await providers.getByText("OpenCode Go", { exact: true }).click()
   const connect = page.getByRole("dialog", { name: "Connect OpenCode Go", exact: true })
   await connect.getByPlaceholder("API key").fill("sk-go-test")
   await connect.getByRole("button", { name: "Continue", exact: true }).click()
@@ -269,32 +271,6 @@ test("the free usage limit opens the Go dialog once, swaps the composer for the 
   await expect(page.locator("[data-titlebar-tab-slot]")).toHaveCount(1)
   await expect(page.locator('[data-action="composer-model"]')).toContainText("GLM-5 Go")
   await expect(view.editor).toHaveText("Refactor the parser")
-
-  // After the 24-hour window, "Don't show again" permanently suppresses the dialog across reloads, and an attachment-only draft survives.
-  const day2 = T0 + 2 * 86_400_000
-  await page.clock.setFixedTime(day2)
-
-  await view.push([
-    {
-      id: "evt_free_limit_2",
-      created: day2 + 1,
-      type: "session.step.started",
-      location,
-      durable: durable(2),
-      data: { sessionID, assistantMessageID: "msg_free_assistant_2", agent: "build", model, started: day2 + 1 },
-    },
-    {
-      id: "evt_free_limit_3",
-      created: day2 + 2,
-      type: "session.step.failed",
-      location,
-      durable: durable(3),
-      data: { sessionID, assistantMessageID: "msg_free_assistant_2", error },
-    },
-  ])
-
-  await upsell.getByRole("button", { name: "Don't show again", exact: true }).click()
-  await expect(upsell).toHaveCount(0)
 
   const later = T0 + 4 * 86_400_000
   await page.clock.setFixedTime(later)
@@ -316,7 +292,7 @@ test("the free usage limit opens the Go dialog once, swaps the composer for the 
       created: later + 3,
       type: "session.step.started",
       location,
-      durable: durable(4),
+      durable: durable(2),
       data: { sessionID, assistantMessageID: "msg_free_assistant_3", agent: "build", model, started: later + 3 },
     },
     {
@@ -324,7 +300,7 @@ test("the free usage limit opens the Go dialog once, swaps the composer for the 
       created: later + 4,
       type: "session.step.failed",
       location,
-      durable: durable(5),
+      durable: durable(3),
       data: { sessionID, assistantMessageID: "msg_free_assistant_3", error },
     },
   ])

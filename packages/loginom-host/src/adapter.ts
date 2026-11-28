@@ -9,6 +9,7 @@ import { DashboardDelete, DashboardDeleteResult, DashboardOperation, DashboardVe
 import type { DashboardStorageOperation } from "../../loginom-runtime/src/dashboard-storage.mjs"
 import { Option, Schema } from "effect"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
+import { Busy, decodeBusy, decodeStepProgress, type DockProgress } from "./step-progress"
 
 const state: { connection?: ReturnType<typeof transport> } = {}
 export function connect(port: Port) {
@@ -123,6 +124,11 @@ export async function acquire(session: string) {
     async tools() {
       return connection.request("tools", { run }, undefined, observe)
     },
+    async busy() {
+      return Schema.decodeUnknownSync(Schema.NullOr(Busy))(
+        await connection.request("busy", { run }, undefined, observe),
+      )
+    },
     async call(
       name: string,
       args: unknown,
@@ -131,6 +137,7 @@ export async function acquire(session: string) {
       admissions?: { userMessage: string; files: InputFile[] }[],
       packageInput?: { admissionID: string; file: InputFile },
       scanReceipt?: { profile_id: string; records: number; sha256: string; bytes: number; identity: unknown; basis: "backend_exact_scan" },
+      progress?: (value: DockProgress) => void,
     ) {
       // Serialize before transport admission so waiting does not consume the IPC timeout
       // or create durable recovery records for calls that have not started.
@@ -143,9 +150,19 @@ export async function acquire(session: string) {
           signal?.addEventListener("abort", abort, { once: true })
           return await connection.request(
             "call",
-            { run, name, args, userMessage, admissions, ...(packageInput ? { packageInput } : {}), ...(scanReceipt ? { scanReceipt } : {}) },
+            { run, name, args, userMessage, admissions, ...(packageInput ? { packageInput } : {}), ...(scanReceipt ? { scanReceipt } : {}), ...(progress ? { stepProgress: true } : {}) },
             Math.max(180_000, runtimeCallTimeout(name, args) + 30_000),
             observe,
+            progress && ((value) => {
+              if (signal?.aborted || queue.released) return
+              if (value && typeof value === "object" && "busy" in value) {
+                const busy = decodeBusy(value.busy)
+                if (busy) progress({ loginom: { busy } })
+              } else {
+                const update = decodeStepProgress(value)
+                if (update) progress({ loginomStep: update })
+              }
+            }),
           )
         } finally {
           signal?.removeEventListener("abort", abort)

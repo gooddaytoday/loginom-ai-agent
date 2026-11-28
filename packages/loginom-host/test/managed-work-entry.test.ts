@@ -2,6 +2,11 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readFile, rm, symlink, unlink } from "node:fs/promises"
 import { MessageChannel } from "node:worker_threads"
 import { Schema } from "effect"
+import { Agent } from "@opencode/schema/agent"
+import { AbsolutePath } from "@opencode/schema/schema"
+import { Session } from "@opencode/schema/session"
+import { SessionMessage } from "@opencode/schema/session-message"
+import { Tool } from "@opencode/schema/tool"
 import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import { supervise } from "../src/supervisor"
@@ -12,8 +17,9 @@ import { HostTaskScope } from "../src/task-scope"
 import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
 import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
+import { dockTools } from "../../loginom-agent/src/dock"
 
-test("actual managed entry reads live bridge work and dispatching over private IPC", async () => {
+test("actual managed entry relays work, dispatch and Dock tool progress over private IPC", async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "managed-work-entry-"))
@@ -40,12 +46,21 @@ test("actual managed entry reads live bridge work and dispatching over private I
       new URL("../../loginom-runtime/src/dashboard-storage.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/src/protected-operation.mjs": await readFile(
+      new URL("../../loginom-runtime/src/protected-operation.mjs", import.meta.url), "utf8",
+    ),
     "runtime/src/resources.mjs": `export async function verifyResources() {
       return { manifestHash: 'fixture', manifest: { actionManifestSha256: 'fixture' } };
     }`,
     "runtime/src/connection-check.mjs": `
+      import { EventEmitter } from 'node:events';
       export const loginomAddress = value => value;
-      export const loginBrowser = async () => ({ context: { close: async () => {} } });
+      export const loginBrowser = async ({ onContextCreated }) => {
+        const context = Object.assign(new EventEmitter(), { pages: () => [], close: async () => {} });
+        onContextCreated?.(context);
+        context.emit('response', { url: () => 'http://example.test/app/', fromServiceWorker: () => false });
+        return { context };
+      };
       export const reauthenticateReloadedPage = async () => { throw Error('work state fixture does not log in again'); };`,
     "runtime/client/package.json": JSON.stringify({ type: "module" }),
     "runtime/client/lib/execution-journal.mjs": await readFile(
@@ -58,6 +73,14 @@ test("actual managed entry reads live bridge work and dispatching over private I
     ),
     "runtime/client/lib/browser-downloads.mjs": await readFile(
       new URL("../../loginom-runtime/client/lib/browser-downloads.mjs", import.meta.url),
+      "utf8",
+    ),
+    "runtime/client/lib/step-progress.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/step-progress.mjs", import.meta.url),
+      "utf8",
+    ),
+    "runtime/client/lib/loginom-feed-metadata.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/loginom-feed-metadata.mjs", import.meta.url),
       "utf8",
     ),
     "runtime/client/lib/catalog.mjs": await readFile(
@@ -79,12 +102,24 @@ test("actual managed entry reads live bridge work and dispatching over private I
        export const artifactFailure=artifacts.artifactFailure ?? (()=>null);`,
     "runtime/client/lib/bridge.mjs": `
       import { readFileSync } from 'node:fs';
+      import { withLoginomMetadata } from './loginom-feed-metadata.mjs';
+      import { loginomFeedMetadata } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/user-results.mjs", import.meta.url).href)};
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
-      export async function createBridge() { return {
+      export let protect;
+      export async function createBridge(_config, _session, {presentNodeReply, protectOperation}) {
+       protect = protectOperation;
+       return {
         server: { connect: async () => {} }, close: async () => ({
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
+        applyWithScanReceipt: async reply => {
+          const end = await protectOperation(reply.structuredContent.operation_id);
+          await end();
+          return presentNodeReply(
+            withLoginomMetadata(reply, {operationId:reply.structuredContent.operation_id, state:'settled', verificationStale:true}),
+            options => loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'}));
+        },
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -97,6 +132,19 @@ test("actual managed entry reads live bridge work and dispatching over private I
         async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
         async callTool(input, _unused, { signal }) {
           if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
+          if (input.arguments.progressFixture) {
+            const { stepPhase } = await import('../../../../lib/step-progress.mjs');
+            const { protect } = await import('../../../../lib/bridge.mjs');
+            const end = await protect('progress-operation');
+            try {
+            stepPhase('configuring', 'transform.group_data', { kind: 'fields', index: 2, total: 3 });
+            await new Promise(resolve => setTimeout(resolve, 1700));
+            stepPhase('reading', 'transform.group_data');
+            await new Promise(resolve => setTimeout(resolve, 1550));
+            setTimeout(() => stepPhase('executing'), 50);
+            return { content: [{ type: 'text', text: 'original model result' }] };
+            } finally { await end(); }
+          }
           if (!input.arguments.hold) return { content: [] };
           await new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(Error('aborted')), { once: true }));
         }
@@ -122,7 +170,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
     stateDir: join(directory, "state"),
     generation: 1,
     chat: "chat",
-    connection: { url: "http://example.test", username: "user", apiKey: "fixture", password: "" },
+    connection: { url: "http://example.test", username: "test", apiKey: "fixture", password: "private-password" },
     environment: {},
   })
   try {
@@ -142,7 +190,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
       { activeWork: false, unsettledWork: false },
     ]) {
       await Bun.write(work, JSON.stringify(state))
-      expect(await runtime.request("work")).toEqual({ ...state, dispatching: false })
+      expect(await runtime.request("work")).toEqual({ ...state, dispatching: false, busy: null })
     }
     const args = { intent: "open_package", operation_id: "local-package" }
     const packageArtifact = { artifactID: "artifact", uploadGrantID: "grant" }
@@ -151,13 +199,65 @@ test("actual managed entry reads live bridge work and dispatching over private I
       recoveryPending: false,
       activeWork: false,
     })
+    const receipt = {
+      result_version: "user-v1",
+      operation_id: "test-operation",
+      state: "settled",
+      status: "SUCCEEDED",
+      node: { node_id: "node-guid", label: "test node", type: "transform.filter_data" },
+      output: {
+        ports: [
+          {
+            port: 0,
+            port_guid: "port-guid",
+            fresh: true,
+            row_count: 3,
+            sample_complete: true,
+            schema: [{ index: 0, name: "test_name", type: "string" }],
+            sample: ["contest result", "fixture", "private-password"].map((value) => [{ type: "string", value }]),
+          },
+        ],
+      },
+    }
+    const content = [{ type: "text", text: JSON.stringify(receipt) }]
+    const updates: unknown[] = []
+    const busy = { version: 1, windowId: expect.any(String), operationId: "test-operation", active: false }
+    expect(
+      await runtime.request("call", {
+        name: "dock_node_apply",
+        arguments: { content, structuredContent: receipt },
+        scanReceipt: {},
+        stepProgress: true,
+      }, undefined, update => updates.push(update)),
+    ).toMatchObject({
+      result: {
+        content,
+        _meta: {
+          loginom: {
+            operationId: "test-operation",
+            busy,
+            node: { label: "test node" },
+            verificationStale: true,
+            ports: [
+              {
+                preview: {
+                  schema: [{ name: "test_name" }],
+                  sample: [[{ value: "contest result" }], [{ value: "[redacted]" }], [{ value: "[redacted]" }]],
+                },
+              },
+            ],
+          },
+        },
+      },
+    })
+    expect(updates).toEqual([{ busy: { ...busy, active: true } }, { busy }])
     const call = runtime
       .request("call", { name: "fixture", arguments: { hold: true } })
       .catch((error: unknown) => error)
-    expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: true })
+    expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: true, busy })
     expect(await runtime.request("interrupt")).toEqual({ interrupted: true })
     expect(await call).toMatchObject({ message: "LOGINOM_RUNTIME_FAILED" })
-    expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: false })
+    expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: false, busy })
   } finally {
     await runtime.close()
     expect(await runtime.exited).toEqual({ code: 0, signal: null })
@@ -223,6 +323,63 @@ test("actual managed entry reads live bridge work and dispatching over private I
     )
     await run.call("dock_prepare", {}, "msg_original")
     await run.tools()
+    const sessionID = Session.ID.make("ses_file_errors")
+    const messageID = SessionMessage.ID.make("msg_original")
+    type DockPlugin = Parameters<typeof dockTools>[0]["plugin"]
+    const captured: { transform?: Parameters<DockPlugin["tool"]["transform"]>[0] } = {}
+    const dock = await dockTools({
+      plugin: {
+        location: { directory: AbsolutePath.make(directory) },
+        tool: {
+          transform: async (transform) => {
+            captured.transform = transform
+            return { dispose: async () => undefined }
+          },
+          reload: async () => undefined,
+        },
+        model: { list: async () => { throw Error("No model access in fixture") } },
+        session: { context: async () => [] },
+      },
+      files: { ask: async () => undefined, snapshot: async () => { throw Error("Unexpected file snapshot") } },
+      profiles: directory,
+      ready: () => true,
+      wrap: (tool) => tool,
+      lease: async () => run,
+      task: async () => messageID,
+      failure: () => undefined,
+    })
+    await dock.refresh(sessionID, "loginom-automation", undefined)
+    type Editor = Parameters<NonNullable<typeof captured.transform>>[0]
+    const tools = new Map<string, Parameters<Editor["add"]>[0]>()
+    captured.transform?.({
+      add: (tool) => tools.set(tool.name, tool),
+      list: () => [], get: () => undefined, namespace: () => undefined, update: () => undefined, remove: () => undefined,
+    })
+    const tool = tools.get("loginom_fixture")
+    if (!tool) throw Error("Fixture tool not registered")
+    const updates: unknown[] = []
+    const entered = Promise.withResolvers<void>()
+    const running = tool.execute({ progressFixture: true }, {
+      sessionID, messageID, agent: Agent.ID.make("fixture"), id: Tool.CallID.make("fixture"),
+      signal: new AbortController().signal,
+      progress: async (update) => { updates.push(update); entered.resolve() },
+    })
+    await Promise.race([entered.promise, running])
+    const active = await run.busy()
+    if (!active) throw Error("Protected operation did not publish a live snapshot")
+    expect(active).toMatchObject({ version: 1, windowId: expect.any(String), operationId: "progress-operation", active: true })
+    const result = await running
+    const settled = { ...active, active: false }
+    expect(await run.busy()).toEqual(settled)
+    expect(result).toEqual({ content: "original model result", metadata: { generation: 1 } })
+    expect(updates).toEqual([
+      { loginom: { busy: active } },
+      { loginom: { busy: active }, loginomStep: { version: 1, phase: "configuring", nodeType: "transform.group_data", substep: { kind: "fields", index: 2, total: 3 }, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
+      { loginom: { busy: active }, loginomStep: { version: 1, phase: "reading", nodeType: "transform.group_data", substep: null, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
+      { loginom: { busy: settled }, loginomStep: { version: 1, phase: "reading", nodeType: "transform.group_data", substep: null, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
+    ])
+    await Bun.sleep(1_600)
+    expect(updates).toHaveLength(4)
     for (const [name, code] of [
       ["missing", "LOGINOM_FILE_NOT_FOUND"],
       ["directory", "LOGINOM_FILE_NOT_REGULAR"],
@@ -244,7 +401,10 @@ test("actual managed entry reads live bridge work and dispatching over private I
       expect(error).toMatchObject({ message: code })
       if (name === "oversize")
         expect(error).toMatchObject({ details: { actual: 16 * 1024 * 1024 + 1, limit: 16 * 1024 * 1024 } })
-      const text = error instanceof Error ? error.message + JSON.stringify("details" in error ? error.details : undefined) : String(error)
+      const text =
+        error instanceof Error
+          ? error.message + JSON.stringify("details" in error ? error.details : undefined)
+          : String(error)
       expect(text).toContain(code)
       expect(text).not.toMatch(/secret|sourcePath|\/private|stack|AAAA/)
       expect(host.journal.pending()).toEqual([])

@@ -15,6 +15,9 @@ import { loginBrowser, loginomAddress, reauthenticateReloadedPage } from "./conn
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
+import { observeLoginomReplies, withStepProgress } from "../client/lib/step-progress.mjs"
+import { createProtectedOperation } from "./protected-operation.mjs"
+import { withLoginomMetadata } from "../client/lib/loginom-feed-metadata.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -34,6 +37,8 @@ const state = {
   browser: undefined,
   browserProfile: undefined,
   browserServer: undefined,
+  lastLoginomReplyAt: null,
+  protectedOperation: undefined,
   inputs: new Map(),
   owner: undefined,
   uploadDirectory: undefined,
@@ -145,7 +150,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
+      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache, validationLogout } = validateStartInput(input)
       state.owner = { chat: input.chat, generation: input.generation }
       state.startupStateDir = input.stateDir
       state.startupStarted = performance.now()
@@ -194,7 +199,7 @@ async function handle(message) {
           clientRevision: resources.manifestHash, actionManifestDigest: resources.manifest.actionManifestSha256 } }),
       }
       if (input.validation === true) {
-        await loginBrowser(login)
+        await loginBrowser({ ...login, validationLogout })
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
@@ -202,7 +207,12 @@ async function handle(message) {
       const { createSession } = await import("../client/lib/session.mjs")
       const { createBridge } = await import("../client/lib/bridge.mjs")
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),
-        onContextCreated: context => { state.browser = context } })
+        onContextCreated: context => {
+          state.browser = context
+          observeLoginomReplies(context, new URL(input.connection.url).origin, () => {
+            state.lastLoginomReplyAt = Date.now()
+          })
+        } })
       state.browser = authenticated.context
       state.owner.origin = new URL(input.connection.url).origin
       const config = {
@@ -246,8 +256,23 @@ async function handle(message) {
       )
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
+      const knownSecrets = [input.connection.apiKey, input.connection.password]
+      state.protectedOperation = createProtectedOperation(authenticated.context, new URL(input.connection.url).origin)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+        protectOperation: state.protectedOperation.begin,
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
+        presentNodeReply: async (reply, project) => {
+          const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
+          let result = reply
+          try {
+            const projection = project({ outputFiles, knownSecrets, busy: state.protectedOperation.snapshot() })
+            if (projection) {
+              const { busy, savedPackageGraph, ...receipt } = projection
+              result = withLoginomMetadata(reply, { receipt, busy, savedPackageGraph })
+            }
+          } catch {}
+          return outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result
+        },
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
           state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,
             [input.connection.apiKey, input.connection.password, input.connection.username]) })
@@ -312,6 +337,7 @@ async function handle(message) {
           activeWork: state.bridge.hasActiveWork(),
           unsettledWork: state.bridge.hasUnsettledWork(),
           dispatching: state.controller !== undefined,
+          busy: state.protectedOperation.snapshot() ?? null,
         },
       })
       return
@@ -358,6 +384,9 @@ async function handle(message) {
       throw Error("LOGINOM_REQUEST_INVALID")
     const controller = new AbortController()
     state.controller = controller
+    const unsubscribeBusy = message.input.stepProgress === true
+      ? state.protectedOperation.subscribe(busy => send({ id: message.id, progress: { busy } }))
+      : undefined
     try {
       // Allow the bounded owned read and cleanup to return before the outer IPC
       // deadlines. Other tools retain room for a 60-second dock_node_wait.
@@ -365,14 +394,20 @@ async function handle(message) {
         signal: controller.signal,
         timeout: runtimeCallTimeout(message.input.name, message.input.arguments),
       }
-      const result = message.input.packageArtifact !== undefined
+      const result = await withStepProgress({
+        name: message.input.name,
+        signal: controller.signal,
+        lastReply: () => state.lastLoginomReplyAt,
+        send: message.input.stepProgress === true ? progress => send({ id: message.id, progress }) : undefined,
+      }, async () => message.input.packageArtifact !== undefined
         ? await state.bridge.prepareLocalPackage(message.input.arguments, message.input.packageArtifact, {
             signal: AbortSignal.any([controller.signal, AbortSignal.timeout(options.timeout)]),
           })
         : message.input.scanReceipt !== undefined
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
-          : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options)
-      const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
+          : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options))
+      const outputFiles = result._meta?.loginom && Array.isArray(result._meta.outputFiles)
+        ? result._meta.outputFiles : await state.session.artifactStore.outputFiles(result.structuredContent)
       send({
         id: message.id,
         result: {
@@ -382,6 +417,7 @@ async function handle(message) {
         },
       })
     } finally {
+      unsubscribeBusy?.()
       state.controller = undefined
     }
   } catch (error) {

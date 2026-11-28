@@ -68,10 +68,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "Gemini သည် ယခုအချိန်တွင် အလွန်ပူပြင်းသည်။",
   "ui.sessionTurn.error.freeUsageExceeded": "အခမဲ့အသုံးပြုမှု ကျော်လွန်သွားပါပြီ။",
   "ui.sessionTurn.error.addCredits": "ခရက်ဒစ်များထည့်ပါ။",
-  "dialog.usageExceeded.freeTier.title": "အခမဲ့ကန့်သတ်ချက် ပြည့်သွားပါပြီ။",
-  "dialog.usageExceeded.freeTier.description":
-    "တစ်လလျှင် $10 ဖြင့် အကောင်းဆုံးသော open-source မော်ဒယ်များသို့ ယုံကြည်စိတ်ချရသောဝင်ရောက်ခွင့်အတွက် OpenCode Go ကို စာရင်းသွင်းပါ။",
-  "dialog.usageExceeded.freeTier.actionLabel": "စာရင်းသွင်းပါ။",
   "ui.sessionTurn.status.delegating": "အလုပ်လွှဲအပ်ခြင်း။",
   "ui.sessionTurn.status.planning": "နောက်အဆင့်များကို စီစဉ်ခြင်း။",
   "ui.sessionTurn.status.gatheringContext": "စူးစမ်းလေ့လာခြင်း။",

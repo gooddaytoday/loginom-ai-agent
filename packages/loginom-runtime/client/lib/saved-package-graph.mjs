@@ -45,21 +45,36 @@ async function inSavedFileTab(page, options) {
     };
     const session = connection?.Session;
     verify();
-    return {verify, workspace, card, path: options.path, limit: options.limit};
+    const cards = workspace.items?.items;
+    if (!Array.isArray(cards) || cards.length > 32 || !cards.includes(card)) throw Error('Workspace tab inventory unavailable');
+    const initial = new Set(cards);
+    const isFiles = candidate => candidate?.Controller?.FController?.constructor?.name === 'FileStorageForm';
+    const inventory = () => {
+      const current = app.Application.FInstance.FMainForm.Items.Workspace;
+      if (current !== workspace || prep.document !== document) throw Error('Workspace changed during saved package read');
+      return current.items.items;
+    };
+    const openedFiles = () => {
+      const added = inventory().filter(candidate => !initial.has(candidate) && isFiles(candidate));
+      if (added.length > 1) throw Error('Ambiguous new Files tabs');
+      return added[0];
+    };
+    return {verify, workspace, card, isFiles, inventory, openedFiles, path: options.path, limit: options.limit};
   }, options);
   const tab = page.locator('[data-tid='+JSON.stringify(options.tabTid)+']');
-  let files, entered = false;
+  let files, readTimer, attempted = false;
   try {
-    if (await tab.count() !== 1 || !await tab.evaluate(element => element.classList.contains('x-tab-active')))
+    if (await tab.count() !== 1 || !await tab.evaluate((element, owner) =>
+      owner.card.tab?.el?.dom === element && element.classList.contains('x-tab-active'), owner))
       throw Error('Save workflow tab is not active');
+    attempted = true;
     await page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnFilestorage"]').click({timeout: 1500});
-    entered = true;
     files = await page.waitForFunction(owner => {
       owner.verify();
       const card = owner.workspace.getActiveTab(), controller = card?.Controller?.FController;
       return controller?.constructor?.name === 'FileStorageForm' && controller.FFileStorage ? card : null;
     }, owner, {timeout: 2500});
-    return await page.evaluate(async ({owner, files}) => {
+    const read = page.evaluate(async ({owner, files}) => {
       const verify = () => {
         owner.verify();
         if (owner.workspace.getActiveTab() !== files) throw Error('Saved package Files tab changed');
@@ -67,21 +82,11 @@ async function inSavedFileTab(page, options) {
       verify();
       const name = owner.path.split('/').at(-1), dir = owner.path.slice(0, -name.length);
       if (bg.TBGFileOpenMode.fomRead !== 0) throw Error('Native read-only mode changed');
-      const storage = files.Controller.FController.FFileStorage;
-      const info = await storage.GetFileInfo(owner.path);
-      if (info === null || info === undefined) {
-        const directoryExists = await storage.DirectoryExists(dir.slice(0, -1));
-        verify();
-        if (directoryExists !== true) throw Error('Saved package directory unavailable');
-        return {fileExists:false};
-      }
-      await ReleaseObject(info, true);
-      verify();
-      const downloader = new bg.filestorage.FileDownloader(name, dir, storage);
+      const downloader = new bg.filestorage.FileDownloader(name, dir, files.Controller.FController.FFileStorage);
       try {
         if (downloader.FullFilename !== owner.path) throw Error('Native saved path differs');
         const size = await downloader.GetFileSize();
-        if (!Number.isSafeInteger(size) || size < 1 || size > owner.limit) return {fileExists:true};
+        if (!Number.isSafeInteger(size) || size < 1 || size > owner.limit) throw Error('Saved package size outside bound');
         verify();
         const stream = await downloader.GetFileStream();
         if (downloader.FShareDenyNone) throw Error('Saved package does not have an exclusive read');
@@ -93,22 +98,51 @@ async function inSavedFileTab(page, options) {
           bytes.set(chunk, offset);
         }
         verify();
-        return {fileExists:true, base64:bytes.toBase64()};
-      } catch {
-        verify();
-        return {fileExists:true};
+        return {base64:bytes.toBase64()};
       } finally {
         await downloader.Dispose();
         if (!downloader.IsStreamReleased() || !downloader.IsDisposed) throw Error('Saved package stream did not close');
       }
     }, {owner, files});
+    const deadline = new Promise((_, reject) => {
+      readTimer = setTimeout(() => reject(Error('Saved package read timed out')), 9000);
+    });
+    return await Promise.race([read, deadline]);
   } finally {
+    clearTimeout(readTimer);
     try {
-      if (entered && await owner.evaluate((owner, files) => files
-        ? owner.workspace.getActiveTab() === files
-        : owner.workspace.getActiveTab()?.Controller?.FController?.constructor?.name === 'FileStorageForm', files)) {
-        await tab.click({timeout: 1500});
-        await page.waitForFunction(owner => owner.workspace.getActiveTab() === owner.card, owner, {timeout: 1500});
+      if (attempted) {
+        const opened = await owner.evaluateHandle((owner, files) => {
+          if (files) return owner.openedFiles() === files ? files : null;
+          return owner.openedFiles() ?? null;
+        }, files);
+        try {
+          try {
+            if (await owner.evaluate((owner, files) => {
+              const active = owner.workspace.getActiveTab();
+              return (files ? active === files : owner.isFiles(active)) && owner.inventory().includes(owner.card);
+            }, files)) {
+              const original = await owner.evaluateHandle(owner => owner.card.tab?.el?.dom);
+              try {
+                await original.asElement()?.click({timeout: 1500});
+                await page.waitForFunction(owner => owner.workspace.getActiveTab() === owner.card, owner, {timeout: 1500});
+              } finally { await original.dispose(); }
+            }
+          } finally {
+            if (await opened.evaluate((card, owner) => card !== null && owner.inventory().includes(card), owner)) {
+              const close = await opened.evaluateHandle((card, owner) => {
+                const buttons = card === owner.openedFiles() && card.tab?.el?.dom?.querySelectorAll('[data-ref="closeEl"]');
+                return buttons?.length === 1 ? buttons[0] : null;
+              }, owner);
+              try {
+                const button = close.asElement();
+                if (!button) throw Error('Owned Files close control unavailable');
+                await button.click({timeout: 1500});
+                await page.waitForFunction(({owner, opened}) => !owner.inventory().includes(opened), {owner, opened}, {timeout: 1500});
+              } finally { await close.dispose(); }
+            }
+          }
+        } finally { await opened.dispose(); }
       }
     } finally {
       await files?.dispose();
@@ -121,24 +155,19 @@ export function makeSavedPackageGraphCode(options) {
   return `async page=>(${inSavedFileTab.toString()})(page,${JSON.stringify({...options, limit:maxBytes})})`;
 }
 
-function parseSavedPackageRead(response) {
+export function parseSavedPackageBytes(response) {
   if (!response?.isError) for (const block of response?.content ?? []) {
     if (block.type !== 'text') continue;
     const text = block.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/)?.[1] ?? block.text;
     if (text.length > Math.ceil(maxBytes / 3) * 4 + 64) continue;
     try {
-      const {base64, fileExists} = JSON.parse(text);
-      if (fileExists === false && base64 === undefined) return {fileExists};
-      if (typeof base64 !== 'string') {
-        if (fileExists === true) return {fileExists};
-        continue;
-      }
+      const {base64} = JSON.parse(text);
+      if (typeof base64 !== 'string') continue;
       const bytes = Buffer.from(base64, 'base64');
-      if (fileExists !== false && bytes.length && bytes.length <= maxBytes && bytes.toString('base64') === base64)
-        return {fileExists:true, bytes};
+      if (bytes.length && bytes.length <= maxBytes && bytes.toString('base64') === base64) return bytes;
     } catch {}
   }
-  return {fileExists:null};
+  throw Error('Saved package read unavailable');
 }
 
 const child = (parent, name) => Array.from(parent?.childNodes ?? []).find(element => element.nodeType === 1 && element.localName === name);
@@ -177,36 +206,10 @@ async function savedGraphs(bytes) {
   } finally { await archive.close(); }
 }
 
-export function uncheckedSaveFacts(path) {
-  return {path, fileExists:null, fileRead:false, nodeCount:null, workflowGuidMatch:null, runVerified:null, rowCount:null};
-}
-
-export async function readSavedPackageFacts({path, response, before}) {
-  const {bytes, fileExists} = parseSavedPackageRead(response);
-  const facts = {...uncheckedSaveFacts(path), fileExists};
-  if (!bytes) return {save:facts};
-  let graphs;
-  try { graphs = await savedGraphs(bytes); } catch { return {save:facts}; }
-  facts.fileRead = true;
-  facts.nodeCount = graphs.reduce((count, graph) => count + graph.nodes.length, 0);
-  if (!before) return {save:facts, graphs};
-  try {
-    const expected = new Set(before.nodes.map(node => guid(node.id)));
-    const inventories = graphs.map(graph => new Set(graph.nodes.map(node => guid(node.getAttribute('Guid')))));
-    if (expected.size === before.nodes.length && inventories.every((ids, index) => ids.size === graphs[index].nodes.length)) {
-      const matches = inventories.length === 1 ? inventories : inventories.filter(ids => [...expected].some(id => ids.has(id)));
-      if (matches.length === 1) {
-        const [actual] = matches;
-        facts.workflowGuidMatch = expected.size === actual.size && [...expected].every(id => actual.has(id));
-      }
-    }
-  } catch {}
-  return {save:facts, graphs};
-}
-
-export function compareSavedPackageWorkflows({graphs, before, sorting = new Map(), intendedLabels = new Map()}) {
+export async function compareSavedPackageGraph({bytes, before, sorting = new Map(), intendedLabels = new Map()}) {
   const expected = new Map(before.nodes.map(node => [guid(node.id), node]));
   if (!expected.size || expected.size !== before.nodes.length) throw Error('Pre-save node identity unavailable');
+  const graphs = await savedGraphs(bytes);
   const matching = graphs.filter(({nodes}) => nodes.some(node => expected.has(guid(node.getAttribute('Guid')))));
   if (matching.length !== 1) throw Error('Saved workflow identity unavailable');
   const {nodes, links} = matching[0];
