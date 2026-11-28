@@ -2,6 +2,7 @@
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
+import { Definition as ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
@@ -11,6 +12,7 @@ import { Global } from "@opencode/util/global"
 import { Schema } from "effect"
 import { grants, next, permits, type Grant, type Profile } from "./access"
 import { BrowserRecovery } from "./browser-recovery"
+import { connectionSettings } from "./connection-settings"
 import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
 import { dashboardTools } from "./dashboard-tools"
@@ -37,6 +39,7 @@ import {
   withDefaults,
   type Kind,
 } from "./permissions"
+import { repeatGuard } from "./repeat-guard"
 import { apply, bundled, hub } from "./skills"
 
 export { Dashboard }
@@ -172,16 +175,18 @@ export default Plugin.define({
     // running execution and its lease. A plugin that is disposed releases what it still holds. Without a ready Host the
     // lease is `undefined`. A failed record write only loses that lease: the event loop below must keep running to
     // release the others.
-    const leases = new Map<string, Promise<ServiceHost.Lease | undefined>>()
+    const runs = new Map<string, { lease: Promise<ServiceHost.Lease | undefined>; endTurn: () => Promise<void> }>()
     // Why the Host refused a session's lease; the model is told (B2.5d).
     const refused = new Map<string, string>()
     // A dashboard session never leases the Host (0.4 `turnLifecycle.acquireRun`): without a lease it has no Dock
     // catalog and no Loginom hints either.
     const hold = (sessionID: string) => {
-      if (dashboard()) return Promise.resolve(undefined)
-      const current =
-        leases.get(sessionID) ??
-        ServiceHost.acquire(sessionID).then(
+      const current = runs.get(sessionID)
+      if (current) return current.lease
+      const endTurn = ServiceHost.connectionSettings.holdTurn()
+      const lease = dashboard()
+        ? Promise.resolve(undefined)
+        : ServiceHost.acquire(sessionID).then(
           (lease) => {
             refused.delete(sessionID)
             return lease
@@ -191,18 +196,19 @@ export default Plugin.define({
             return undefined
           },
         )
-      leases.set(sessionID, current)
-      return current
+      runs.set(sessionID, { lease, endTurn })
+      return lease
     }
     const drop = async (sessionID: string) => {
-      const current = leases.get(sessionID)
-      leases.delete(sessionID)
+      const current = runs.get(sessionID)
+      runs.delete(sessionID)
       refused.delete(sessionID)
       offered.delete(sessionID)
       deleted.delete(sessionID)
       dock.forget(sessionID)
-      const lease = await current
+      const lease = await current?.lease
       if (lease) await ServiceHost.release(lease).catch(() => undefined)
+      await current?.endTurn()
     }
 
     // The task's user message, which a Host input belongs to: the latest admitted prompt, as for grants. A session this
@@ -227,7 +233,7 @@ export default Plugin.define({
         })
         return
       }
-      const lease = await leases.get(event.sessionID)
+      const lease = await runs.get(event.sessionID)?.lease
       await lease
         ?.call(
           "dock_browser_recovery",
@@ -336,12 +342,15 @@ export default Plugin.define({
     // `package-docs` grant.
     const profiles = join(Global.Path.data, "file-profiles")
     const files = await localFiles(ctx, profiles)
+    const repeats = repeatGuard(async () => (await ctx.tool.list()).find((tool) => tool.id === "question"))
     await ctx.tool.transform((editor) => {
       editor.add(
-        files.admitTool(async (sessionID) => {
-          const host = await hold(sessionID)
-          return host && { host, userMessage: await task(sessionID) }
-        }),
+        repeats.wrap(
+          files.admitTool(async (sessionID) => {
+            const host = await hold(sessionID)
+            return host && { host, userMessage: await task(sessionID) }
+          }),
+        ),
       )
       fileTools(files, profiles).forEach((tool) => editor.add(tool))
       editor.add(packageDocs(files, ctx.location.directory, resources))
@@ -359,6 +368,7 @@ export default Plugin.define({
       ready: () => ServiceHost.connected(),
       failure: (sessionID) => refused.get(sessionID),
       task,
+      wrap: repeats.wrap,
     })
 
     // The lease events start once the catalog that `drop` clears exists.
@@ -372,7 +382,10 @@ export default Plugin.define({
       ] as const
       for await (const event of ctx.event.subscribe({ types: [...types], signal: stop.signal })) {
         if (event.type === "session.execution.started") void hold(event.data.sessionID)
-        else await drop(event.data.sessionID)
+        else {
+          repeats.reset(event.data.sessionID)
+          await drop(event.data.sessionID)
+        }
       }
     })().catch(() => undefined)
 
@@ -414,6 +427,7 @@ export default Plugin.define({
       hide(event)
     })
     await ctx.tool.hook("execute.before", async (event) => {
+      if (!repeats.tracks(event.tool)) repeats.reset(event.sessionID)
       await bound(event.sessionID)
       if (!permits(profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
@@ -477,6 +491,7 @@ export default Plugin.define({
       if (event.prompt.agents?.length && dashboard())
         throw new Error("LOGINOM_SCOPE_DENIED: a dashboard session does not run subagents")
       tasks.set(event.sessionID, event.messageID)
+      repeats.reset(event.sessionID)
       const value = event.metadata?.[token]
       if (event.metadata) delete event.metadata[token]
       const wizard = typeof value === "string" ? pending.get(value) : undefined
@@ -505,6 +520,7 @@ export default Plugin.define({
         return { granted: true }
       },
     })
+    await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
     await ctx.rpc.register(preflight, {
       check: async (value) => {
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)
@@ -609,7 +625,7 @@ export default Plugin.define({
 
     return async () => {
       stop.abort()
-      await Promise.all([...leases.keys()].map(drop))
+      await Promise.all([...runs.keys()].map(drop))
       await drafts.close()
     }
   },
