@@ -7,6 +7,8 @@ import {createNodeProcedure} from '../lib/node-procedure.mjs';
 import {applyNode} from '../lib/node-apply.mjs';
 import {createExecutionJournal} from '../lib/execution-journal.mjs';
 import {nodeResultReply} from '../lib/node-result-reply.mjs';
+import {loginomFeedMetadata} from '../lib/user-results.mjs';
+import {withLoginomMetadata} from '../lib/loginom-feed-metadata.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 
 // l667lin-diag:661–737: successful native Train, then a toast outside
@@ -235,8 +237,10 @@ async function applyToast(fixture,record=async entry=>entry,{unconfirmedCleanup=
 }
 
 function waitReply(result){
- return nodeResultReply({operation_id:result.operation_id,state:'settled',outcome:{status:result.status,error:result.error,output:result}},
-  {userProfile:true,tool:'dock_node_wait'});
+ const tool='dock_node_wait';
+ const reply=nodeResultReply({operation_id:result.operation_id,state:'settled',outcome:{status:result.status,error:result.error,output:result}},
+  {userProfile:true,tool});
+ return withLoginomMetadata(reply,{receipt:loginomFeedMetadata(reply,{tool})});
 }
 
 test('apply runtime releases a recorded JavaScript failure with a persistently visible toast',async()=>{
@@ -244,7 +248,8 @@ test('apply runtime releases a recorded JavaScript failure with a persistently v
  const result=await applyToast(f);
  assert.equal(result.status,'FAILED');assert.equal(result.error.code,'NODE_EXECUTION_FAILED');assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);assert.ok(result.next_step);
  assert.deepEqual(f.actions.map(a=>a.ref),['ui-launch','ui-close']);
- assert.deepEqual(waitReply(result)._meta,{loginom:{kind:'post_launch_message',message:defaultMessage}});
+ assert.deepEqual(waitReply(result)._meta.loginom.error,
+  {code:'NODE_EXECUTION_FAILED',source:'loginom',attribution:'after_launch',message:defaultMessage});
 });
 
 test('an owned failed child yields a redacted native error and exact node identity even if cleanup is unconfirmed',async context=>{
@@ -256,13 +261,15 @@ test('an owned failed child yields a redacted native error and exact node identi
   message:`Сбой: fixture-known-value; "${profile}"; "${windowsProfile}"; https://user:fixture-url-value@example.test/f/path-value?token=query-value; token=bare-value`});
  const result=await applyToast(fixture,record,{unconfirmedCleanup:true});
  assert.equal(result.status,'AMBIGUOUS');assert.equal(result.cleanup_complete,false);
- const reply=waitReply(result),native=reply._meta?.loginom;
- assert.equal(native?.kind,'node_failed');assert.deepEqual(native.node,fixture.node);
+ const reply=waitReply(result),native=reply._meta?.loginom?.error;
+ assert.equal(reply._meta.loginom.v,1);
+ assert.equal(native?.attribution,'verified_node');assert.deepEqual(native.node,fixture.node);
  assert.match(native.message,/^Сбой:.*\[путь скрыт\].*\[URL скрыт\]/);
  assert.doesNotMatch(JSON.stringify(reply),/fixture-known-value|Profile One|Fixture's Profile|fixture-url-value|path-value|query-value|bare-value/);
 });
 
 test('an unowned native notification does not turn a routine runtime error into a Loginom failure',async()=>{
  const fixture=replay('owner','execute_graph_node',{nodeId:'fc94c88b-6b37-451b-9d57-a9378122d8a3'});
- assert.equal(waitReply(await applyToast(fixture))._meta,undefined);
+ const error=waitReply(await applyToast(fixture))._meta?.loginom?.error;
+ assert.equal(error?.source,'runtime');assert.equal(error.attribution,undefined);assert.equal(error.node,undefined);
 });

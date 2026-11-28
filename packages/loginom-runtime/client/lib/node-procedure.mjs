@@ -1091,8 +1091,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             const checks={new_execution_group:!!execution,failed_owned_child:!!child,toast_error_kind:toast?.kind==='error',
               // Loginom renders stack line breaks as <br>; textContent omits
               // those newlines, preserving every other character of the error.
-              toast_message_matches:!!child&&(toast?.message===child.error_details
-                ||toast?.message===child.error_details?.replace(/\r?\n/g,'')),toast_caption_matches:!!child&&toast?.caption===child.caption+':',
+              toast_message_matches:!!child&&(toast?.message?.trim()===child.error_details.trim()
+                ||toast?.message?.trim()===child.error_details.trim().replace(/\r?\n/g,'')),toast_caption_matches:!!child&&toast?.caption===child.caption+':',
               dialog_unique:state.ui.dialogs.length===1,dialog_ref:dialog?.ref===portal.ref,close_unique:closes.length===1,
               browser_document:state.dom_epoch.document===launchEvidence.browser_document,after_launch:now()>=launchEvidence.started_at,
               native_context:JSON.stringify(canonical(native.node_context))===JSON.stringify(canonical(state.prepared_node_context)),

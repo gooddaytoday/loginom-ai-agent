@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readNodeProcesses} from '../lib/node-process-context.mjs';
+import {captureExecutionBaseline,identifyNewExecution,verifyFailedExecution} from '../lib/node-execution-evidence.mjs';
+import {nativeErrorText} from '../lib/node-failure.mjs';
+import {loginomFeedMetadata} from '../lib/user-results.mjs';
+import {withLoginomMetadata} from '../lib/loginom-feed-metadata.mjs';
+import {createRedactor} from '../lib/redact.mjs';
 
 function fixture(prefix='ConsoleForm') {
   const base=prefix+';ProgressForm;',elements=new Map();
@@ -57,6 +62,27 @@ test('native process inventory binds both split grids and cached tree records',a
 test('empty loaded history is a valid pre-launch baseline',async()=>{
  const f=fixture();f.root.childNodes=[];f.left.children=[];f.right.children=[];
  const r=await readNodeProcesses(f.page,{},f.readNode);assert.equal(r.verified,true);assert.deepEqual(r.processes,[]);
+});
+test('the v1 native error cannot expose a password spanning the old 1000-character read boundary',async()=>{
+ const f=fixture(),password='fixture-boundary-value',prefix='native failure: '+'x'.repeat(974)+' ';
+ const baseline=captureExecutionBaseline(await readNodeProcesses(f.page,{},f.readNode),f.node);
+ const failed={isModel:true,internalId:103,childNodes:[],data:{id:'2',loaded:true,Status:42,
+  ErrorDetails:prefix+password+'; diagnostic tail',ProgressBarCls:'bg-progress-ptpsError',CanCancelProcess:false}};
+ f.root.childNodes.push(failed);
+ const snapshot=await readNodeProcesses(f.page,{},f.readNode);
+ const redactor=createRedactor([password]);
+ const execution=verifyFailedExecution(identifyNewExecution(baseline,snapshot),snapshot,value=>nativeErrorText(value,redactor));
+ const reply={structuredContent:{result_version:'user-v1',operation_id:'boundary',state:'settled',status:'FAILED',
+   execution,error:execution.error},content:[]};
+ const metadata=withLoginomMetadata(reply,{receipt:loginomFeedMetadata(reply,{tool:'dock_node_wait'})})._meta.loginom;
+ assert.equal(metadata.v,1);
+ assert.equal(metadata.error.message,(prefix+'[redacted]; diagnostic tail').slice(0,1000));
+ assert.equal(metadata.error.attribution,'after_launch');
+ assert.equal(metadata.error.node,undefined);
+ assert.doesNotMatch(JSON.stringify(metadata),/fixture-/);
+ failed.data.ErrorDetails='x'.repeat(4097);
+ const oversized=await readNodeProcesses(f.page,{},f.readNode);
+ assert.equal(oversized.processes.find(process=>process.process_id==='2').error_details,undefined);
 });
 for(const [name,mutate] of Object.entries({
  hidden_console:f=>f.left.hidden=true,loading_store:f=>f.store.isLoading=()=>true,

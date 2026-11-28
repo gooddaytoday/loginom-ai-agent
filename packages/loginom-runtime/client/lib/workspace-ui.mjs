@@ -850,12 +850,13 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         error_list:items.length===1&&items[0].parentElement?.classList.contains('bg-error-list')===true,
         close_icon:closes.length===1&&!!closes[0].querySelector('.x-tool-close')});
       if(Object.values(checks).some(ok=>!ok))return finish();
-      const caption=captions[0].textContent.trim(),message=items[0].textContent.trim();
-      Object.assign(checks,{caption_nonempty:!!caption,caption_bounded:caption.length<=241,message_nonempty:!!message,message_bounded:message.length<=1000});
+      const caption=captions[0].textContent.trim(),message=items[0].textContent;
+      Object.assign(checks,{caption_nonempty:!!caption,caption_bounded:caption.length<=241,message_nonempty:!!message.trim(),message_bounded:message.length<=4096});
       return finish(Object.values(checks).every(Boolean)?{kind:'error',caption,message}:null);
     };
     const dialogs = dialogElements.map(element => ({ ref: refOf(element), title: short(element.getAttribute('aria-label') ?? select('[role="heading"],.x-title-text').find(item => element.contains(item))?.textContent),
-        text: textOf(element, downloadToastObservation&&getTid(element)==='toast'),
+        text: getTid(element)==='toast'&&element.classList.contains('bg-notify-msg-color-error')?''
+          :textOf(element, downloadToastObservation&&getTid(element)==='toast'),
         ...(downloadToastObservation&&getTid(element)==='toast'?{class_name:short(element.getAttribute('class'),512)}:{}),
         ...(errorToast(element)?{error_toast:errorToast(element)}:{}),
         ...(nodeErrorToastObservation&&getTid(element)==='toast'?{error_toast_diagnostic:errorToastDiagnostics.get(element)}:{}),

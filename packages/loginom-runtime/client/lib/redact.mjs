@@ -5,8 +5,9 @@ const usageCounters = new Set(['input_tokens', 'output_tokens', 'prompt_tokens',
   'cache_read_tokens', 'cache_write_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens', 'cached_tokens', 'reasoning_tokens']);
 const secretField = key => sensitiveKey.test(key.replace(/([a-z])([A-Z])/g, '$1_$2'));
 
-export function createRedactor(knownValues = []) {
+export function createRedactor(knownValues = [], { sanitizeNativeErrors = false } = {}) {
   const known = new Set(knownValues.filter(value => typeof value === 'string' && value.length >= 4));
+  const shortKnown = knownValues.filter(value => typeof value === 'string' && value.length > 0 && value.length < 4);
   const scalar = value => JSON.isRawJSON(value) ? JSON.parse(value.rawJSON) : value;
   function text(raw) {
     let value = raw;
@@ -36,6 +37,18 @@ export function createRedactor(knownValues = []) {
       })
       .replace(/data:(?:image|audio|video|application)\/[^\s"']+/gi, '[binary omitted]');
     return value;
+  }
+  function nativeText(raw) {
+    if(shortKnown.some(value=>raw.includes(value)||raw.includes(encodeURIComponent(value))||raw.includes(JSON.stringify(value).slice(1,-1))))
+      return '[сообщение скрыто]';
+    return text(raw)
+      .replace(/\b[a-z][a-z0-9+.-]*(?::\/\/|%3a%2f%2f)[^\s<>"'`]+/gi,'[URL скрыт]')
+      .replace(/(["'`])(?:[a-z]:[\\/]|\\\\|~?\/)[^\r\n]*?\1/gi,'$1[путь скрыт]$1')
+      .replace(/(^|[\s'"`(=:\[])(?:[a-z]:[\\/]|\\\\|~?\/)[^\r\n<>"`|;\]]+/gi,'$1[путь скрыт]')
+      .replace(/\b(?:token|secret|pwd|sessionid|signature)\b["']?\s*[:=]\s*(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;}&]+)/gi,'[секрет скрыт]')
+      .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,'[секрет скрыт]')
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,'')
+      .trim().slice(0,1000)||'[сообщение скрыто]';
   }
   function collect(value, depth = 0) {
     if (depth > 40) throw new Error('Redaction nesting limit');
@@ -87,6 +100,8 @@ export function createRedactor(knownValues = []) {
           result[key] = count === null || (Number.isSafeInteger(count) && count >= 0) ? item : marker;
         }
         else if (secretField(key)) result[key] = marker;
+        else if (sanitizeNativeErrors && typeof item === 'string' && (key === 'error_details' || key === 'message' && value.kind === 'error'))
+          result[key] = nativeText(item);
         else if (['code', 'command', 'cmd'].includes(key) && typeof item === 'string'
             && /password|passwd|cookie|authorization|private.?key/i.test(item)) result[key] = '[credential operation omitted]';
         else result[key] = clean(item, seen, depth + 1, preserveJsonText);
@@ -97,5 +112,5 @@ export function createRedactor(knownValues = []) {
   return { redact(value, {preserveJsonText = false} = {}) {
     try { collect(value); return clean(value, new Set(), 0, preserveJsonText); }
     catch { return { type: 'redaction_failure', omitted: true, reason: 'Content omitted because redaction could not complete' }; }
-  }, prime(value) { collect(value); }, text };
+  }, prime(value) { collect(value); }, text, nativeText };
 }

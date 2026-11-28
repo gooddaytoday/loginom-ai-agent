@@ -136,7 +136,7 @@ export function verifyFailedChildExecution(execution,snapshot,expected,owner,saf
     &&owner.record_id===child.record_id&&sameNode(owner.node,execution.node)&&owner.node?.verified===true
     &&owner.node.surface==='graph','Failed child Show Node proof differs');
   const message=safeText(child.error_details);
-  return {...verifyFailedExecution(execution,snapshot),process_id:child.process_id,process_record_id:child.record_id,
+  return {...verifyFailedExecution(execution,snapshot,safeText),process_id:child.process_id,process_record_id:child.record_id,
     owner_verified:true,ownership_source:'native_process_model_identity_and_show_node',error_source:'native_child_error_details',
     error:{code:'NODE_EXECUTION_FAILED',message,native:{source:'native_child_error_details',message,node:structuredClone(execution.node)}}};
 }

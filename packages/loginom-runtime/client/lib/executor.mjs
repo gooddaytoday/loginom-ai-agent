@@ -2193,7 +2193,7 @@ export function parseCapabilityResult(response,{redactor}={}) {
   throw error;
 }
 
-export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, nativeErrorRedactor = redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
+export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
   nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null,
   browserRecovery = false, probePreparedPage, reopenNodePackage, cacheDirectory, serverSourceCache = true }) {
@@ -4542,7 +4542,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       running=true;
       try {
         if(!operation){
-          operation={id:operationId,signature,parameters:request,scanReceipt:structuredClone(scanReceipt),nativeErrorRedactor,
+          operation={id:operationId,signature,parameters:request,scanReceipt:structuredClone(scanReceipt),nativeErrorRedactor:redactor,
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
             checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:admissionDeadline};
           if(admissionUncertainty?.child){
@@ -4876,6 +4876,17 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return value(...args);
     }]));
   return Object.freeze({...exposed,...browserRecoveryApi,
+    nodeFeedFacts:id=>{
+      const state=operations.get(id)?.nodeApply;
+      const observed=state?.phases.find(phase=>phase.phase==='target')?.value?.target?.node;
+      if(!observed||observed.ref?.node_id!==state.node?.node_id)return;
+      const label=state.phases.find(phase=>phase.phase==='finish')?.value?.node_label??observed.label;
+      const request=state.request;
+      const kind=request.mode===NODE_READ_MODE?'read':request.mode==='add_only'?'add':request.finish==='execute'
+        ?observed.type?.startsWith('exports.')?'export':'execute'
+        :request.finish==='done'?'configure':undefined;
+      return {node:{ref:observed.ref,label,type:observed.type},kind};
+    },
     // Host lifecycle cleanup must bypass the user mutation facade. A retained
     // node/recovery gate still blocks package cleanup; it cannot block draining
     // the owned worker or removing its private local download cache.
