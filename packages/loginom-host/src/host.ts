@@ -215,6 +215,7 @@ export async function createLoginomHost(options: {
   closeSavedPackageOnShutdown?: boolean
   // Private launcher capability baked into packaged release builds; never from env or the model.
   browserRecovery?: boolean
+  onConnectionApplication?: Loginom.ConnectionApplicationListener
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
@@ -485,12 +486,12 @@ export async function createLoginomHost(options: {
         resourceCacheVersion: resourceVersion,
       },
       signal,
-    ).catch(startupFailure)
+    ).catch((error: unknown) => startupFailure(error, packageFolder !== undefined))
   }
-  function startupFailure(error: unknown): never {
+  function startupFailure(error: unknown, picker = false): never {
     // Recoverable readiness/browser failures must not hide uncertain child cleanup.
     if (error instanceof RuntimeStartupError && !error.cleanupConfirmed) {
-      startupCleanup.failed = true
+      if (!picker) startupCleanup.failed = true
       throw new Error("LOGINOM_RUNTIME_CLEANUP_FAILED", { cause: error })
     }
     throw error
@@ -591,6 +592,7 @@ export async function createLoginomHost(options: {
       },
     },
     journal,
+    options.onConnectionApplication,
   )
   const dashboardOperations = new Map<AbortController, Promise<unknown>>()
   function dashboardOperation(operation: DashboardStorageOperation, input: DashboardRead | DashboardPublish | DashboardDelete, signal?: AbortSignal) {
@@ -669,36 +671,20 @@ export async function createLoginomHost(options: {
     if (!lease) {
       throw Error(packageConnectionError(await service.api.status()) ?? "LOGINOM_CONNECTION_NOT_READY")
     }
-    let cleanupConfirmed = true
     try {
       const current = generations.get(input.generation)
       if (!current || lease.generation !== input.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
       const runtime = await launch(current.connection, chat, { packageFolder: input.folder, packageQuery: input.query }, signal)
-      cleanupConfirmed = false
       await runtime.close()
-      cleanupConfirmed = true
       signal.throwIfAborted()
       return decodeFolderListings({
         listings: "listings" in runtime.ready ? runtime.ready.listings : undefined,
+        skippedFolders: "skippedFolders" in runtime.ready ? runtime.ready.skippedFolders : undefined,
         truncated: "truncated" in runtime.ready ? runtime.ready.truncated : undefined,
       }, input)
-    } catch (error) {
-      if (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED") cleanupConfirmed = false
-      if (!cleanupConfirmed) shutdown.failed = true
-      throw error
     } finally {
       lease.release()
       await retainPackageFailures().catch(() => undefined)
-      if (cleanupConfirmed)
-        await rm(join(packageState, "generations", String(lease.generation), "chats", chat), {
-          recursive: true,
-          force: true,
-          maxRetries: 4,
-          retryDelay: 100,
-        }).catch(() => {
-          shutdown.failed = true
-          throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")
-        })
     }
   }
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
@@ -749,7 +735,7 @@ export async function createLoginomHost(options: {
       previous?.controller.abort(Error("LOGINOM_PACKAGE_FOLDER_CANCELLED"))
       const controller = new AbortController()
       const reading = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
-      // The next login waits for the previous worker's checked logout and exit.
+      // The next login waits for the previous worker to finish logout and exit.
       const pending = (async () => {
         await previous?.pending.catch(() => undefined)
         return performFolderRead(input, reading)

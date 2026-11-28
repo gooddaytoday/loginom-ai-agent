@@ -27,7 +27,11 @@ export const ReadFolder = Schema.Struct({
 })
 export type ReadFolder = typeof ReadFolder.Type
 
-const FolderReadResult = Schema.Struct({ listings: Schema.Array(FolderListing), truncated: Schema.Boolean })
+const FolderReadResult = Schema.Struct({
+  listings: Schema.Array(FolderListing),
+  skippedFolders: Schema.Array(Folder),
+  truncated: Schema.Boolean,
+})
 export type FolderReadResult = typeof FolderReadResult.Type
 
 const decodeListings = Schema.decodeUnknownOption(FolderReadResult, { onExcessProperty: "error" })
@@ -42,6 +46,11 @@ export function decodeFolderListings(value: unknown, { folder, query }: ReadFold
       page.entries.some((entry) => entry.name.includes("/") || entry.path !== page.folder + "/" + entry.name ||
         (query !== undefined && entry.kind !== "package"))) throw Error("LOGINOM_REPLY_INVALID")
     seen.add(page.folder)
+  }
+  if (result.value.skippedFolders.length && !result.value.truncated) throw Error("LOGINOM_REPLY_INVALID")
+  for (const skipped of result.value.skippedFolders) {
+    if (!skipped.startsWith(folder + "/") || seen.has(skipped)) throw Error("LOGINOM_REPLY_INVALID")
+    seen.add(skipped)
   }
   return result.value
 }

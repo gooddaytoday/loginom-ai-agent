@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { packageListHandlers } from "../src/package-list"
-import { type FolderListing, packageConnectionError, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
+import { type FolderListing, type FolderReadResult, packageConnectionError, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
 
 const folder = (name: string, path: string): FolderListing["entries"][number] => ({ kind: "folder", name, path })
 const pkg = (name: string, path: string) => ({
@@ -49,7 +49,7 @@ function fixture() {
       if (reason) throw Error(reason)
       return 11
     },
-    async read(input: ReadFolder, signal: AbortSignal) {
+    async read(input: ReadFolder, signal: AbortSignal): Promise<FolderReadResult> {
       signal.throwIfAborted()
       requests.push(input)
       const result = table.get(input.folder)
@@ -57,7 +57,7 @@ function fixture() {
       const listings = input.query === undefined ? [result] : [...table.values()].map(page => ({
         ...page, entries: page.entries.filter(entry => entry.kind === "package"),
       }))
-      return { listings, truncated: false }
+      return { listings, skippedFolders: [], truncated: false }
     },
   }
   return { rpc: packageListHandlers(host), host, table, requests, view }
@@ -93,20 +93,20 @@ test("recursive search filters pages and reuses one host read for every cursor",
   expect(f.requests).toEqual([{ folder: "/user", generation: 11 }, { folder: "/user", generation: 11, query: input.text }])
 })
 
-test("every cursor page shows that the result is partial", async () => {
+test("every cursor page includes the skipped folders from the partial search", async () => {
   const f = fixture()
   const read = f.host.read
-  f.host.read = async (input, signal) => ({ ...await read(input, signal), truncated: true })
+  f.host.read = async (input, signal) => ({ ...await read(input, signal), skippedFolders: ["/user/denied"], truncated: true })
   const input = { folder: "/user", text: "", recursive: true }
   const first = await f.rpc.search(input, call())
-  expect(first).toMatchObject({ truncated: true })
+  expect(first).toMatchObject({ skippedFolders: ["/user/denied"], truncated: true })
   if (!("cursor" in first) || !first.cursor) throw Error("Expected cursor")
   const second = await f.rpc.search({ ...input, cursor: first.cursor }, call())
-  expect(second).toMatchObject({ truncated: true })
+  expect(second).toMatchObject({ skippedFolders: ["/user/denied"], truncated: true })
   if (!("cursor" in second) || !second.cursor) throw Error("Expected cursor")
   expect(await f.rpc.search({ ...input, cursor: second.cursor }, call())).toEqual({
     folder: "/user/two", entries: [pkg("Годовые продажи.lgp", "/user/two/Годовые продажи.lgp")],
-    slow: false, truncated: true,
+    slow: false, skippedFolders: ["/user/denied"], truncated: true,
   })
   expect(f.requests).toHaveLength(1)
 })

@@ -7,10 +7,10 @@ import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
 import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 
-for (const failFirstClose of [false, true]) test(
-  failFirstClose
-    ? "a picker close failure affects one read and the next read succeeds without restarting the host"
-    : "only the latest package read starts after the previous runtime closes, leaving the conversation running",
+for (const failure of ["none", "starting", "ready", "logout"]) test(
+  failure === "none"
+    ? "only the latest package read starts after the previous runtime closes, leaving the conversation running"
+    : `picker removes the profile after worker exit, preserving the ${failure} failure for that read`,
   async () => {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
@@ -39,6 +39,7 @@ for (const failFirstClose of [false, true]) test(
       `
       import { mkdirSync, writeFileSync, appendFileSync } from "node:fs";
       import { join } from "node:path";
+      const failure = ${JSON.stringify(failure)};
       let started, folder, startMessage;
       process.on("message", message => {
         const reply = result => process.send({ id: message.id, result });
@@ -52,16 +53,17 @@ for (const failFirstClose of [false, true]) test(
           if (!packageFolder) return reply({ ...started, ready: true, chat });
           folder = packageFolder;
           appendFileSync(join(stateDir, "reads"), "start " + folder + "\\n");
-          if (folder === "/user") { startMessage = message; return }
-          return reply({ ...started, listings: [{ folder, entries: [], slow: false }], truncated: false });
+          if (folder === "/user" && failure !== "ready") { startMessage = message; return }
+          return reply({ ...started, listings: [{ folder, entries: [], slow: false }], skippedFolders: [], truncated: false });
         }
         if (message.operation === "inspect") return reply(started);
         if (message.operation === "close") {
           if (!folder) return process.send({ id: message.id, result: { closed: true } }, () => process.disconnect());
           setTimeout(() => {
             appendFileSync(join(process.cwd(), "reads"), "close " + folder + "\\n");
-            if (startMessage) process.send({ id: startMessage.id, error: "LOGINOM_PACKAGE_FOLDER_CANCELLED" });
-            const response = folder === "/user" && ${failFirstClose}
+            const startError = failure === "logout" ? "LOGINOM_LOGOUT_UNCONFIRMED" : "LOGINOM_PACKAGE_FOLDER_CANCELLED";
+            if (startMessage) process.send({ id: startMessage.id, error: startError });
+            const response = folder === "/user" && (failure === "starting" || failure === "ready")
               ? { error: "LOGINOM_RUNTIME_CLEANUP_FAILED" } : { result: { closed: true } };
             process.send({ id: message.id, ...response }, () => process.disconnect());
           }, 120);
@@ -88,14 +90,21 @@ for (const failFirstClose of [false, true]) test(
       const cancelled = first.catch((error: unknown) => error)
       for (let i = 0; i < 100 && !(await Bun.file(trace).exists()); i++) await Bun.sleep(20)
       expect(await readFile(trace, "utf8")).toBe("start /user\n")
+      const chats = join(state, "generations", "1", "chats")
+      if (failure === "ready") {
+        expect(await cancelled).toMatchObject({ message: "LOGINOM_RUNTIME_CLEANUP_FAILED" })
+        expect(await readdir(chats)).toEqual([])
+      }
       const skipped = host.readPackageFolders({ folder: "/common/intermediate", generation: 1 })
       const skippedCancelled = skipped.catch((error: unknown) => error)
       expect(await host.readPackageFolders({ folder: "/common", generation: 1 })).toEqual({
         listings: [{ folder: "/common", entries: [], slow: false }],
+        skippedFolders: [],
         truncated: false,
       })
       expect(await cancelled).toMatchObject({
-        message: failFirstClose ? "LOGINOM_RUNTIME_CLEANUP_FAILED" : "LOGINOM_PACKAGE_FOLDER_CANCELLED",
+        message: failure === "none" ? "LOGINOM_PACKAGE_FOLDER_CANCELLED"
+          : failure === "logout" ? "LOGINOM_LOGOUT_UNCONFIRMED" : "LOGINOM_RUNTIME_CLEANUP_FAILED",
       })
       expect(await skippedCancelled).toMatchObject({ message: "LOGINOM_PACKAGE_FOLDER_CANCELLED" })
       expect(await readFile(trace, "utf8")).toBe("start /user\nclose /user\nstart /common\nclose /common\n")
@@ -103,16 +112,21 @@ for (const failFirstClose of [false, true]) test(
       const closes = (await readdir(state)).filter(name => name.startsWith("runtime-close-"))
       expect(closes).toHaveLength(10)
       expect(closes.filter(name => oldCloses.includes(name)).sort()).toEqual(oldCloses.slice(-8).sort())
+      const receipts = await Promise.all(closes.filter(name => !oldCloses.includes(name)).map(async name =>
+        JSON.parse(await readFile(join(state, name), "utf8"))))
+      expect(receipts.filter(receipt => receipt.closed_ack === false)).toHaveLength(
+        failure === "starting" || failure === "ready" ? 1 : 0,
+      )
+      expect(receipts.every(receipt => receipt.exit_code === 0)).toBe(true)
       const retained = (await readFile(join(state, "startup-failures.jsonl"), "utf8")).trimEnd().split("\n")
       expect(retained).toHaveLength(10)
       expect(retained).toContain(diagnostics[11])
       expect(retained).not.toContain(diagnostics[0])
-      expect(await readdir(join(root, "package-list", "generations", "1", "chats"))).toHaveLength(failFirstClose ? 1 : 0)
+      expect(await readdir(chats)).toEqual([])
       expect(await readdir(join(root, "runtime", "generations", "1", "chats"))).toEqual(["conversation"])
       expect(await conversation.request("inspect")).toEqual({ protocol: 1, generation: 1 })
     } finally {
-      if (failFirstClose) await expect(host.close()).rejects.toThrow("LOGINOM_RUNTIME_CLEANUP_FAILED")
-      else await host.close()
+      await host.close()
     }
   } finally {
     await rm(directory, { recursive: true, force: true })

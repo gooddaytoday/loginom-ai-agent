@@ -158,14 +158,16 @@ export async function readPackageFolders(page, { folder, query, origin, username
   const budget = AbortSignal.timeout(remaining)
   const reading = signal ? AbortSignal.any([signal, budget]) : budget
   if (query === undefined) {
-    return { listings: [await readPackageFolder(page, { folder, origin, username }, reading)], truncated: false }
+    return { listings: [await readPackageFolder(page, { folder, origin, username }, reading)], skippedFolders: [], truncated: false }
   }
-  const listings = []
+  const listings = [], skippedFolders = []
   const pending = [folder]
   const normalize = text => text.normalize("NFC").toLocaleLowerCase("ru")
   const match = normalize(query.trim())
-  while (pending.length && listings.length < maxSearchFolders) {
+  let attempted = 0
+  while (pending.length && attempted < maxSearchFolders) {
     const current = pending.pop()
+    attempted++
     try {
       const listing = await readPackageFolder(page, { folder: current, origin, username }, reading)
       for (const entry of listing.entries.filter(entry => entry.kind === "folder").reverse()) pending.push(entry.path)
@@ -173,11 +175,14 @@ export async function readPackageFolders(page, { folder, query, origin, username
         entry.kind === "package" && normalize(entry.name).includes(match)) })
     } catch (error) {
       signal?.throwIfAborted()
-      if (!budget.aborted || error !== budget.reason) throw error
-      if (!listings.length) listings.push({ folder, entries: [], slow: false })
-      return { listings, truncated: true }
+      if (budget.aborted && error === budget.reason) {
+        if (current === folder) throw Error(unavailable)
+        return { listings, skippedFolders, truncated: true }
+      }
+      if (current === folder || error?.message !== unavailable) throw error
+      skippedFolders.push(current)
     }
   }
   signal?.throwIfAborted()
-  return { listings, truncated: pending.length > 0 }
+  return { listings, skippedFolders, truncated: pending.length > 0 || skippedFolders.length > 0 }
 }

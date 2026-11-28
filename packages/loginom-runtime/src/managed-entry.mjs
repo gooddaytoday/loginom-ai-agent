@@ -1,6 +1,6 @@
 import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
-import { join } from "node:path"
+import { isAbsolute, join } from "node:path"
 import { tmpdir } from "node:os"
 import { appendFile, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { appendFileSync } from "node:fs"
@@ -153,6 +153,9 @@ async function handle(message) {
         throw Error("LOGINOM_START_INVALID")
       if (packageReader && (!packageReader.isPackageFolder(input.packageFolder) || input.validation === true
           || acceptanceCleanupPackage || closeSavedPackageOnShutdown || browserRecovery)) throw Error("LOGINOM_START_INVALID")
+      if (input.packageBrowserProfile !== undefined && (!packageReader || process.platform !== "win32"
+          || typeof input.packageBrowserProfile !== "string" || !isAbsolute(input.packageBrowserProfile)))
+        throw Error("LOGINOM_START_INVALID")
       state.owner = { chat: input.chat, generation: input.generation }
       state.startupStateDir = input.stateDir
       state.startupStarted = performance.now()
@@ -184,8 +187,9 @@ async function handle(message) {
       // state path is already close to MAX_PATH on Windows, so a valid profile
       // can otherwise fail before Loginom authentication even starts.
       const browserProfile =
-        process.platform === "win32" ? await mkdtemp(join(tmpdir(), "lb")) : join(directory, "browser-profile")
-      state.browserProfile = process.platform === "win32" ? browserProfile : undefined
+        process.platform === "win32" ? input.packageBrowserProfile ?? await mkdtemp(join(tmpdir(), "lb"))
+          : join(directory, "browser-profile")
+      state.browserProfile = process.platform === "win32" && !input.packageBrowserProfile ? browserProfile : undefined
       await startupPhase({ phase: "runtime.profile", status: "ready", duration_ms: Math.round(performance.now() - profileStarted) })
       const login = {
         browserPath: resources.browserPath,

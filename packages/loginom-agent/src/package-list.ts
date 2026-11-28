@@ -62,7 +62,11 @@ export function packageListHandlers(host = ServiceHost.packageFolders): RpcHandl
         const result = read.listings[index]
         if (!result) throw Error("LOGINOM_REPLY_INVALID")
         const entries = result.entries.filter((entry) => entry.kind === "package").filter((entry) => normalize(entry.name).includes(query))
-        const page = { folder: result.folder, entries, slow: result.slow, ...(read.truncated ? { truncated: true as const } : {}) }
+        const page = {
+          folder: result.folder, entries, slow: result.slow,
+          ...(read.truncated ? { truncated: true as const } : {}),
+          ...(read.skippedFolders.length ? { skippedFolders: read.skippedFolders } : {}),
+        }
         if (index + 1 >= read.listings.length) return page
 
         const next = randomUUID()

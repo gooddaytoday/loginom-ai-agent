@@ -58,6 +58,8 @@ export function DialogSessionSearch(props: { archived?: boolean }) {
 
     if (!ctx) return []
 
+    const [promptSearchFailed, setPromptSearchFailed] = createSignal(false)
+
     const load = createServerSessionEntries({
       server: ServerConnection.key(conn),
       archived: props.archived,
@@ -71,17 +73,23 @@ export function DialogSessionSearch(props: { archived?: boolean }) {
 
         if (!search || props.archived) return ctx.sdk.api.session.list(filters, { signal })
 
-        const requests = SEARCH_FIELDS.map((searchField) =>
-          ctx.sdk.api.session.list({ ...filters, searchField }, { signal }),
+        const fields = Array.from(search).length >= 3 ? [...SEARCH_FIELDS, "prompt" as const] : SEARCH_FIELDS
+
+        const results = await Promise.allSettled(
+          fields.map((searchField) => ctx.sdk.api.session.list({ ...filters, searchField }, { signal })),
         )
 
-        if (Array.from(search).length >= 3) {
-          requests.push(ctx.sdk.api.session.list({ ...filters, searchField: "prompt" }, { signal }))
+        if (!signal.aborted) {
+          setPromptSearchFailed(
+            results.some((result, index) => fields[index] === "prompt" && result.status === "rejected"),
+          )
         }
 
-        const results = await Promise.all(requests)
+        const succeeded = results.filter((result) => result.status === "fulfilled")
 
-        return { data: results.flatMap((result) => result.data) }
+        if (succeeded.length === 0) throw new Error("Session search failed")
+
+        return { data: succeeded.flatMap((result) => result.value.data) }
       },
       get: (sessionID, signal) => ctx.sdk.api.session.get({ sessionID }, { signal }),
       untitled: () => language.t("command.session.new"),
@@ -125,7 +133,12 @@ export function DialogSessionSearch(props: { archived?: boolean }) {
               })),
           ...format(load.items(query)),
         ],
-        search: (query: string, signal: AbortSignal) => load.search(query, signal).then(format),
+        search: (query: string, signal: AbortSignal) => {
+          setPromptSearchFailed(false)
+
+          return load.search(query, signal).then(format)
+        },
+        promptSearchFailed,
       },
     ]
   })
@@ -229,6 +242,13 @@ export function DialogSessionSearch(props: { archived?: boolean }) {
       sources={loaders.map((loader) => loader.search)}
       rank={props.archived ? undefined : rankConversationSearch}
       keepPreviousWhileLoading={!props.archived}
+      statusMessage={
+        props.archived
+          ? undefined
+          : loaders.some((loader) => loader.promptSearchFailed())
+            ? language.t("sidebar.search.promptUnavailable")
+            : ""
+      }
       highlight={() => {}}
       select={select}
       close={() => dialog.close(layer?.id)}

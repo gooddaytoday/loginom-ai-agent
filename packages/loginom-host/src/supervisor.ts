@@ -1,8 +1,10 @@
 import { fork } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { appendFile, mkdir, writeFile } from "node:fs/promises"
+import { appendFile, mkdir, rm, writeFile } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
+import { tmpdir } from "node:os"
 import { hostError, hostException } from "./errors"
+import { runtimeNoProxyKey } from "./system-proxy/environment"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { recordLocalDiagnostics } from "../../loginom-runtime/client/lib/local-diagnostics.mjs"
 
@@ -81,6 +83,32 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
     "NODE_USE_ENV_PROXY",
     "LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT",
   ]
+  const runtimeNoProxy = environment[runtimeNoProxyKey]
+  const runtimeProxy = () => {
+    if (!runtimeNoProxy) return env
+    let marker: unknown
+    try {
+      marker = JSON.parse(runtimeNoProxy)
+    } catch {
+      return env
+    }
+    if (!Array.isArray(marker) || marker.length !== 4) return env
+    const [http, https, systemBypass, userBypass] = marker
+    if (typeof http !== "string" || typeof https !== "string" || typeof systemBypass !== "string" || typeof userBypass !== "string") return env
+    let removed = false
+    for (const [key, value] of Object.entries(env)) {
+      const name = key.toUpperCase()
+      if ((name === "HTTP_PROXY" && value === http) || (name === "HTTPS_PROXY" && value === https)) {
+        delete env[key]
+        removed = true
+      }
+    }
+    if (!removed) return env
+    for (const key of ["NO_PROXY", "no_proxy"]) if (env[key] === systemBypass) env[key] = userBypass
+    if (env.NODE_USE_ENV_PROXY === "1" && !["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"].some((key) => env[key]))
+      delete env.NODE_USE_ENV_PROXY
+    return env
+  }
   if (platform === "linux")
     keys.push(
       "DISPLAY",
@@ -102,27 +130,36 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
         const name = key.toUpperCase()
         if (allowed.has(name) && environment[key] && !(name in env)) env[name] = environment[key]
       })
-    return env
+    return runtimeProxy()
   }
   keys.forEach((key) => {
     if (environment[key]) env[key] = environment[key]
   })
-  return env
+  return runtimeProxy()
 }
 
 // One browser child per generation/chat; knowledge has one child per generation.
 // Both use the same private transport and acknowledged cleanup contract.
 export async function supervise(input: Launch, signal?: AbortSignal) {
   if (!isAbsolute(input.resources)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
+  const picker = input.packageFolder !== undefined
+  if (picker && (!Number.isSafeInteger(input.generation) || input.generation < 1 || !/^[a-zA-Z0-9_-]{1,160}$/.test(input.chat)))
+    throw Error("LOGINOM_START_INVALID")
+  const packageBrowserProfile = picker && process.platform === "win32" ? join(tmpdir(), "lb" + randomUUID()) : undefined
+  const pickerProfiles = picker ? [
+    join(input.stateDir, "generations", String(input.generation), "chats", input.chat),
+    ...(packageBrowserProfile ? [packageBrowserProfile] : []),
+  ] : []
   // Browser validation follows the separate local Help check in Host.
   const runtime = await superviseProcess(
     { ...input, diagnosticSecrets: [input.connection.apiKey, input.connection.password, input.connection.username] },
-    { ...input, environment: undefined, protocol: 1 },
+    { ...input, packageBrowserProfile, environment: undefined, protocol: 1 },
     Math.max(1, Math.min(input.validation ? 210_000 : 120_000, (input.startupDeadline ?? Infinity) - Date.now())),
     signal,
     // Picker cancellation may need to drain an in-flight login before native logout.
-    input.packageFolder !== undefined ? 50_000
+    picker ? 50_000
       : input.closeSavedPackageOnShutdown === true || input.acceptanceCleanupPackage ? 45_000 : 15_000,
+    pickerProfiles,
   )
   const ready = runtime.ready
   if (
@@ -170,6 +207,7 @@ async function superviseProcess(
   timeout = 120_000,
   signal?: AbortSignal,
   closeTimeout = 5000,
+  pickerProfiles: readonly string[] = [],
 ) {
   signal?.throwIfAborted()
   if (![input.node, input.entry, input.stateDir].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
@@ -189,7 +227,10 @@ async function superviseProcess(
   const startupFailure: { value?: ReturnType<typeof knowledgeStartupFailure> } = {}
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
     child.once("exit", (code, signal) => resolve({ code, signal }))
-    child.once("error", () => resolve({ code: 1, signal: null }))
+    child.on("error", () => {
+      // An IPC or kill error after spawn does not prove the worker exited.
+      if (child.pid === undefined) resolve({ code: 1, signal: null })
+    })
   })
   function fail() {
     pending.forEach((request) => {
@@ -282,7 +323,10 @@ async function superviseProcess(
           exit_code: outcome.code, exit_signal: outcome.signal,
           ...(startupFailure.value ? { startup_failure: startupFailure.value } : {}),
         }) + "\n", { mode: 0o600, flag: "wx" }).catch(() => undefined)
+        const profiles = await Promise.allSettled(pickerProfiles.map((path) =>
+          rm(path, { recursive: true, force: true, maxRetries: 4, retryDelay: 100 })))
         if (
+          profiles.some((result) => result.status === "rejected") ||
           !reply ||
           typeof reply !== "object" ||
           !("closed" in reply) ||
@@ -325,8 +369,9 @@ async function superviseProcess(
       () => true,
       () => false,
     )
-    // Cancellation may replace the request failure only after cleanup is confirmed.
-    throw new RuntimeStartupError(signal?.aborted && cleanupConfirmed ? signal.reason : cause, cleanupConfirmed)
+    // A closed worker does not certify server logout.
+    const logoutUnconfirmed = pickerProfiles.length > 0 && cause instanceof Error && cause.message === "LOGINOM_LOGOUT_UNCONFIRMED"
+    throw new RuntimeStartupError(signal?.aborted && cleanupConfirmed && !logoutUnconfirmed ? signal.reason : cause, cleanupConfirmed)
   } finally {
     signal?.removeEventListener("abort", cancel)
   }

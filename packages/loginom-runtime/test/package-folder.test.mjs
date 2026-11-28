@@ -119,16 +119,44 @@ test("empty shared folder is a valid response", async () => {
   assert.deepEqual((await f.read(undefined, "/common")).listings[0], { folder: "/common", entries: [], slow: false })
 })
 
-test("canceling a pending folder read rejects instead of publishing a partial result", async () => {
+test("canceling a recursive search after a completed folder rejects instead of publishing a partial result", async () => {
   const f = fixture()
   const active = Promise.withResolvers()
   const controller = new AbortController()
-  f.fileList.GetDirectoryItems = () => { active.resolve(); return new Promise(() => {}) }
-  const result = f.read(controller.signal)
+  f.fileList.GetDirectoryItems = path => {
+    if (path === "/common/") return [{ FileName: "child" }]
+    active.resolve()
+    return new Promise(() => {})
+  }
+  const result = f.read(controller.signal, "/common", "ПРОД")
   await active.promise
   controller.abort(Error("cancelled"))
   await assert.rejects(result, { message: "cancelled" })
-  assert.deepEqual(f.events, [])
+})
+
+test("a denied child preserves the packages found before and after it", async () => {
+  const f = fixture()
+  f.fileList.GetDirectoryItems = path => {
+    if (path === "/common/a-denied/") throw Error("Access denied")
+    return path === "/common/" ? [{ FileName: "b-accessible" }, { FileName: "a-denied" }] : []
+  }
+  f.form.SetCurrentDirLockWrapper = async () => { throw Error("Access denied in Files") }
+  const result = await f.read(undefined, "/common", "ПРОД")
+  assert.deepEqual(result, {
+    truncated: true,
+    skippedFolders: ["/common/a-denied"],
+    listings: ["/common", "/common/b-accessible"].map(folder => ({
+      folder, slow: false,
+      entries: [{ ...expected[1], path: folder + "/" + newer.FileName }],
+    })),
+  })
+})
+
+test("recursive search of a denied root fails", async () => {
+  const f = fixture()
+  f.fileList.GetDirectoryItems = () => { throw Error("Access denied") }
+  f.form.SetCurrentDirLockWrapper = async () => { throw Error("Access denied in Files") }
+  await assert.rejects(f.read(undefined, "/common", "ПРОД"), { message: "LOGINOM_PACKAGE_FOLDER_UNAVAILABLE" })
 })
 
 test("a Files window for a different folder does not become a successful empty result", async () => {

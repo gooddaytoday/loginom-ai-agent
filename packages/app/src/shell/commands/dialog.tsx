@@ -68,6 +68,7 @@ export function CommandPaletteView(props: {
   sources: ((query: string, signal: AbortSignal) => Promise<CommandPaletteEntry[]>)[]
   rank?: Parameters<typeof createCommandPaletteSearch>[0]["rank"]
   keepPreviousWhileLoading?: boolean
+  statusMessage?: string
   highlight: (item: CommandPaletteEntry | undefined) => void
   select: (item: CommandPaletteEntry | undefined) => void
   close: () => void
@@ -144,6 +145,14 @@ export function CommandPaletteView(props: {
             )
           }}
         </SearchList>
+        <Show when={props.statusMessage !== undefined}>
+          <div
+            role="status"
+            class="shrink-0 px-3 pb-2 text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-muted empty:p-0"
+          >
+            {props.statusMessage}
+          </div>
+        </Show>
       </DialogBody>
     </Dialog>
   )

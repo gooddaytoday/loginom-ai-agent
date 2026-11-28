@@ -36,8 +36,9 @@ export const Definition = Rpc.define({
           folder: Folder,
           entries: Schema.Array(Package),
           slow: Schema.Boolean,
-          // True on every page if the traversal reached its limit.
+          // Every page marks an incomplete traversal and names unreadable folders it attempted.
           truncated: Schema.optional(Schema.Literal(true)),
+          skippedFolders: Schema.optional(Schema.Array(Folder)),
           cursor: Schema.optional(Schema.String),
         }),
       ),
