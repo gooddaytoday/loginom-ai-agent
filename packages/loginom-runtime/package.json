@@ -10,6 +10,9 @@
     "@zip.js/zip.js": "2.7.62",
     "acorn": "8.15.0"
   },
+  "devDependencies": {
+    "yaml": "2.9.1"
+  },
   "scripts": {
     "test:upstream": "cd client && node --test test/*.test.mjs"
   }
