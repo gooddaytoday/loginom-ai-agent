@@ -1,5 +1,6 @@
 import { Tool } from "@opencode/schema/tool"
 import type { Rpc } from "@opencode/schema/rpc"
+import { Session } from "@opencode/schema/session"
 import type { OpenCodeEvent } from "@opencode/client"
 import type { RpcCallOptions, RpcEventPayload, SelectedEvent, SubscribeOptions } from "@opencode/client/promise/api"
 import { Effect, Schema, SchemaAST, Stream } from "effect"
@@ -648,6 +649,10 @@ export function fromPromise(plugin: Plugin) {
             move: adaptApiMethod(SessionEndpoints["session.move"], host.session.move),
             wait: adaptApiMethod(SessionEndpoints["session.wait"], host.session.wait),
             context: adaptApiMethod(SessionEndpoints["session.context"], host.session.context),
+            experimental: {
+              activePrompt: ({ sessionID }) =>
+                run(host.session.experimental.activePrompt({ sessionID: Session.ID.make(sessionID) })),
+            },
             instructions: {
               entry: {
                 list: adaptApiMethod(

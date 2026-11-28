@@ -110,8 +110,9 @@ const loginomStep = {
   events: {},
 } as const
 
-// Prompt metadata key that carries the wizard's one-time token to the `prompt` hook; the hook removes it.
+// Prompt metadata key that carries the wizard's one-time token to admission and its receipt to delivery.
 const token = "loginom.runner"
+const wizardKey = (sessionID: string, messageID: string) => `wizard:${sessionID}:${messageID}`
 // Permission request metadata key of the product's own check of the rules (B2.6b).
 const marker = "loginom.permission.probe"
 
@@ -140,17 +141,10 @@ const permission = {
 export default Plugin.define({
   id: "loginom.product",
   setup: async (ctx) => {
-    // Access grants (G1), keyed by the exact session ID: a subsession, a fork and a scheduled wake run in another
-    // session or arrive as a new prompt, so none of them inherits a grant. A grant lives for one task, as in 0.4: from the
-    // prompt or skill activation that issued it until the session admits its next prompt. It is not tied to an execution:
-    // a scheduled wake joins a running execution as a steer prompt. Memory only, so a restart drops every grant.
-    const granted = new Map<string, Profile>()
     const pending = new Map<string, { sessionID: string; profile: Grant }>()
     // A dashboard's work folder confines every session of its Location to `loginom-dashboard` for good (B2.9b, 0.4
     // `baseProfile`): no skill, attachment or wizard grant changes it, and a subsession or a fork lives here too.
     const dashboard = Dashboard.latch(ctx.location.directory)
-    const profile = (sessionID: string): Profile =>
-      dashboard() ? "loginom-dashboard" : (granted.get(sessionID) ?? "default")
     // A dashboard chat runs only on its own draft (B2.9d): an old chat of a folder that was deleted or prepared again,
     // or one moved in from elsewhere, is refused before its prompt is admitted, before the model and before any tool.
     const binding = Dashboard.binding(ctx, dashboard)
@@ -165,6 +159,27 @@ export default Plugin.define({
     const resources = process.env.LOGINOM_AI_AGENT_RESOURCES
     const catalog = await bundled(resources)
     await ctx.skill.transform((editor) => apply(editor, catalog, hub))
+    const activePrompt = (sessionID: string) => ctx.session.experimental.activePrompt({ sessionID })
+    const task = async (sessionID: string) => (await activePrompt(sessionID)).user?.id ?? ""
+    const attached = (current: Profile, id: unknown) =>
+      catalog.some((entry) => entry.id === id) ? next(current, id) : current
+    const deliveredProfile = async (
+      sessionID: string,
+      active: Awaited<ReturnType<typeof activePrompt>>,
+    ): Promise<Profile> => {
+      const user = active.user
+      if (!user || active.inherited) return "default"
+      const wizard = user.metadata?.[token] === true ? await ctx.storage.get(wizardKey(sessionID, user.id)) : undefined
+      let current = next("default", wizard)
+      for (const skill of user.skills ?? []) current = attached(current, skill.id)
+      for (const call of active.tools) if (call.name === "skill") current = attached(current, call.input.id)
+      return current
+    }
+    const profile = async (sessionID: string): Promise<Profile> => {
+      if (dashboard()) return "loginom-dashboard"
+      const active = await activePrompt(sessionID)
+      return active.steering ? "default" : deliveredProfile(sessionID, active)
+    }
     // A dashboard session sees none of its Location's MCP servers: no tools, resources or prompts (0.4 `allowsMcp`).
     await ctx.mcp.transform((editor) => {
       if (dashboard()) editor.list().forEach(([name]) => editor.remove(name))
@@ -237,14 +252,6 @@ export default Plugin.define({
       if (lease) await ServiceHost.release(lease).catch(() => undefined)
       await current?.endTurn()
     }
-
-    // The task's user message, which a Host input belongs to: the latest admitted prompt, as for grants. A session this
-    // process has not seen a prompt for (resumed after a restart) uses its latest user message.
-    const tasks = new Map<string, string>()
-    const task = async (sessionID: string) =>
-      tasks.get(sessionID) ??
-      (await ctx.session.context({ sessionID })).findLast((message) => message.type === "user")?.id ??
-      ""
 
     // Browser recovery (G4), 0.4 `turnLifecycle.endTurn`: when the session would go idle while an attempt still holds the
     // Loginom page, one reminder per attempt keeps the same execution working. A synthetic message is not a prompt, so the
@@ -373,6 +380,7 @@ export default Plugin.define({
       ask: ctx.tool.ask,
       interrupt: (sessionID) => ctx.session.interrupt({ sessionID }),
     })
+    const repeatTasks = new Map<string, string>()
     await ctx.tool.transform((editor) => {
       editor.add(
         repeats.wrap(
@@ -386,9 +394,7 @@ export default Plugin.define({
       editor.add(packageDocs(files, ctx.location.directory, resources))
     })
 
-    // The Dock catalog of the session's Host run (B2.5d): its tools come and go with the connection generation. The
-    // `context` hook binds the run to the task and reads the catalog at every step boundary, as 0.4 did every turn; an
-    // admitted prompt and a completed grant or Dock call read it ahead, so the next step's tool snapshot already has it.
+    // Bind the Host run and refresh its Dock catalog before the request takes its tool snapshot.
     const dock = await dockTools({
       plugin: ctx,
       files,
@@ -413,15 +419,28 @@ export default Plugin.define({
       for await (const event of ctx.event.subscribe({ types: [...types], signal: stop.signal })) {
         if (event.type === "session.execution.started") void hold(event.data.sessionID)
         else {
+          repeatTasks.delete(event.data.sessionID)
           repeats.reset(event.data.sessionID)
           await drop(event.data.sessionID)
         }
       }
     })().catch(() => undefined)
 
+    await ctx.session.hook("experimental.tools.prepare", async (event) => {
+      if (dashboard()) return
+      const active = await activePrompt(event.sessionID)
+      const taskID = active.user?.id ?? ""
+      if (repeatTasks.get(event.sessionID) !== taskID) {
+        repeatTasks.set(event.sessionID, taskID)
+        repeats.reset(event.sessionID)
+      }
+      void hold(event.sessionID)
+      await dock.refresh(event.sessionID, await deliveredProfile(event.sessionID, active), event.model, taskID)
+    })
+
     // Hide what the task may not use, in every request that offers tools, and reject a call that names it anyway.
-    const hide = (event: SessionContext) => {
-      const current = profile(event.sessionID)
+    const hide = async (event: SessionContext) => {
+      const current = await profile(event.sessionID)
       Object.keys(event.tools)
         .filter((name) => !permits(current, name))
         .forEach((name) => delete event.tools[name])
@@ -435,12 +454,7 @@ export default Plugin.define({
         return
       }
       await bound(event.sessionID)
-      // The execution's lease, without waiting for a Host still in its handshake. `session.execution.started` cannot be
-      // relied on for it: an execution that starts while the Location's plugins are still activating (a synthetic wake,
-      // a resume) publishes it before this plugin's `setup` subscribes; its first step waits for the activation (B2.6a2).
-      void hold(event.sessionID)
-      await dock.refresh(event.sessionID, profile(event.sessionID), event.model)
-      hide(event)
+      await hide(event)
       offered.set(event.sessionID, new Set(Object.keys(event.tools)))
       dock.system(event.sessionID).forEach((text) => event.system.push({ type: "text", text }))
       // The kinds the settings deny, named before the model tries them: OpenCode does not offer their tools (B2.6b2).
@@ -450,16 +464,16 @@ export default Plugin.define({
     })
     await ctx.session.hook("compaction", async (event) => {
       await bound(event.sessionID)
-      hide(event)
+      await hide(event)
     })
     await ctx.session.hook("generate", async (event) => {
       await bound(event.sessionID)
-      hide(event)
+      await hide(event)
     })
     await ctx.tool.hook("execute.before", async (event) => {
       repeats.before(event.sessionID, event.tool)
       await bound(event.sessionID)
-      if (!permits(profile(event.sessionID), event.tool))
+      if (!permits(await profile(event.sessionID), event.tool))
         throw new Error(`LOGINOM_SCOPE_DENIED: tool ${event.tool} is not available in this task`)
       // A dashboard session's file tools stay in its work folder (B2.9c); a client counts the refusal as a denied
       // permission, as it counts the hook's (`permission.rejected`).
@@ -483,7 +497,6 @@ export default Plugin.define({
       calls.set(`${event.messageID} ${event.id}`, event.tool)
     })
 
-    // The agent grants itself access in an ordinary conversation by loading a bundled product skill (decision 11).
     await ctx.tool.hook("execute.after", async (event) => {
       calls.delete(`${event.messageID} ${event.id}`)
       // The folder may have been prepared again while the call ran: its result does not reach the old chat (B2.9d,
@@ -503,40 +516,27 @@ export default Plugin.define({
         event.error = new Tool.Error({ message: text, metadata: { ...event.error.metadata, ...refusalMetadata(text) } })
         return
       }
-      if (event.tool === "skill") {
-        const current = profile(event.sessionID)
-        const requested = next(current, (event.input as { id?: unknown } | undefined)?.id)
-        if (requested === "default" || requested === current) return
-        granted.set(event.sessionID, requested)
-      }
-      if (event.tool === "skill" || dock.registered(event.tool))
-        await dock.refresh(event.sessionID, profile(event.sessionID), undefined, true)
     })
 
-    // Every admitted prompt starts a new task. It holds a grant only when the user attached a bundled product skill or
-    // the wizard issued it; a scheduled wake and a subagent prompt carry text only.
+    // A task holds a grant only when the user attached a bundled product skill or the wizard issued it.
     await ctx.session.hook("prompt", async (event) => {
       await bound(event.sessionID)
       // An attached agent asks for a subagent, which a dashboard session does not run (0.4 refused its subtask).
       if (event.prompt.agents?.length && dashboard())
         throw new Error("LOGINOM_SCOPE_DENIED: a dashboard session does not run subagents")
-      tasks.set(event.sessionID, event.messageID)
-      repeats.reset(event.sessionID)
       const value = event.metadata?.[token]
       if (event.metadata) delete event.metadata[token]
+      if (event.operation === "edit" || event.delivery === "queue") return
       const wizard = typeof value === "string" ? pending.get(value) : undefined
-      const requested =
-        wizard?.sessionID === event.sessionID
-          ? wizard.profile
-          : (event.prompt.skills ?? []).reduce<Profile>((current, skill) => next(current, skill.id), "default")
-      if (requested === "default") granted.delete(event.sessionID)
-      else granted.set(event.sessionID, requested)
-      await dock.refresh(event.sessionID, requested, undefined, true)
+      const authorized = typeof value === "string" && wizard?.sessionID === event.sessionID
+      if (authorized) {
+        pending.delete(value)
+        await ctx.storage.set(wizardKey(event.sessionID, event.messageID), wizard.profile)
+        event.metadata = { ...event.metadata, [token]: true }
+      }
+      repeats.reset(event.sessionID)
     })
-    await ctx.session.hook("fork", async (event) => {
-      granted.delete(event.sessionID)
-      await binding.fork(event.sessionID)
-    })
+    await ctx.session.hook("fork", (event) => binding.fork(event.sessionID))
 
     await ctx.rpc.register(runner, {
       start: async (value) => {

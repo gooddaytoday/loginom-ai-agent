@@ -57,6 +57,18 @@ export class MockBadRequest extends Schema.TaggedError<MockBadRequest>()("MockBa
   message: Schema.String,
 }) {}
 
+export class MockInboxConflict extends Schema.TaggedError<MockInboxConflict>()(
+  "ConflictError",
+  { resource: Schema.String, message: Schema.String },
+  { httpApiStatus: 409 },
+) {}
+
+export class MockMessageNotFound extends Schema.TaggedError<MockMessageNotFound>()(
+  "MessageNotFoundError",
+  { sessionID: Schema.String, messageID: Schema.String, message: Schema.String },
+  { httpApiStatus: 404 },
+) {}
+
 export class MockInternal extends Schema.TaggedError<MockInternal>()("MockInternal", {
   message: Schema.String,
 }) {}
@@ -487,10 +499,19 @@ const Group = HttpApiGroup.make("mock")
     }),
   )
   .add(
+    HttpApiEndpoint.put("sessionInboxEdit", "/api/session/:sessionID/inbox/:inboxID", {
+      params: { ...SessionParams, inboxID: Schema.String },
+      payload: JsonPayload,
+      success: NoContent,
+      error: MockInboxConflict,
+    }),
+  )
+  .add(
     HttpApiEndpoint.patch("sessionInboxUpdate", "/api/session/:sessionID/inbox/:inboxID", {
       params: { ...SessionParams, inboxID: Schema.String },
       payload: Schema.Struct({ delivery: Schema.Literals(["steer", "queue"]) }),
       success: NoContent,
+      error: MockInboxConflict,
     }),
   )
   .add(
@@ -550,7 +571,7 @@ const Group = HttpApiGroup.make("mock")
     HttpApiEndpoint.get("messageGet", "/api/session/:sessionID/message/:messageID", {
       params: { ...SessionParams, messageID: Schema.String },
       success: Json,
-      error: MockNotFound.pipe(HttpApiSchema.status(404)),
+      error: MockMessageNotFound,
     }),
   )
   .add(

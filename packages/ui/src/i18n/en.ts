@@ -230,6 +230,7 @@ const source = {
   "ui.promptInput.exitShell": "Exit",
   "ui.promptInput.steer": "Steer",
   "ui.promptInput.queue": "Queue",
+  "ui.promptInput.saveQueued": "Save",
   "ui.promptInput.steerHint": "Send without interrupting",
 
   "ui.tabs.close": "Close tab",

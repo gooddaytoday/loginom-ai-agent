@@ -109,6 +109,7 @@ export const baseTranscript = (input: {
   readonly tools: Tool.Snapshot
   readonly initial: ReadonlyArray<Instructions.Rendered>
   readonly messages: ReadonlyArray<SessionMessage.Info>
+  readonly includeMetadataOnly?: boolean
 }) => {
   const providerMetadataKey = input.model.model.route.providerMetadataKey ?? input.model.model.provider
   return {
@@ -125,14 +126,15 @@ export const baseTranscript = (input: {
       },
     ].filter((part) => part.text.length > 0),
     // Hooks read each stored message's metadata on the messages built from it; `prepare` strips it before the request.
-    messages: input.messages.flatMap((message) =>
-      toLLMMessages([message], input.model.ref, providerMetadataKey).map(
+    messages: input.messages.flatMap((message): SessionRequestMessage[] => {
+      const lowered = toLLMMessages([message], input.model.ref, providerMetadataKey)
+      if (input.includeMetadataOnly && lowered.length === 0 && message.type === "user" && message.metadata)
+        return [{ ...Message.make({ id: message.id, role: "user", content: [] }), metadata: message.metadata }]
+      return lowered.map(
         (item): SessionRequestMessage =>
-          message.metadata === undefined || item.id !== message.id
-            ? item
-            : { ...item, metadata: message.metadata },
-      ),
-    ),
+          message.metadata === undefined || item.id !== message.id ? item : { ...item, metadata: message.metadata },
+      )
+    }),
   }
 }
 
@@ -339,9 +341,10 @@ export const layer = Layer.effect(
         // Strip the stored metadata hooks could read, so it never reaches the provider.
         messages: boundImages(
           unsupportedParts(
-            shaped.messages.map((message) => {
+            shaped.messages.flatMap((message) => {
               const { metadata, ...rest } = message
-              return metadata === undefined ? message : Message.make(rest)
+              if (metadata !== undefined && message.role === "user" && message.content.length === 0) return []
+              return [metadata === undefined ? message : Message.make(rest)]
             }),
             model.capabilities,
             model.model.provider,

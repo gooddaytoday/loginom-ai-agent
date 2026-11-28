@@ -63,6 +63,8 @@ const forkTitle = (value?: string) => {
   return `${value} (fork #1)`
 }
 
+export const isForkedMessageID = (id: SessionMessage.ID) => /_\d+$/.test(id)
+
 function setSession(
   db: DatabaseService,
   sessionID: SessionSchema.ID,

@@ -1,12 +1,18 @@
 import fs from "node:fs/promises"
 import path from "node:path"
+import { pathToFileURL } from "node:url"
 import { describe, expect } from "bun:test"
 import { Agent } from "@opencode/core/agent"
+import { Bus } from "@opencode/core/bus"
+import { Database } from "@opencode/core/database/database"
 import { llmClient } from "@opencode/core/effect/app-node-platform"
 import { Flag } from "@opencode/core/flag"
 import { SdkPlugins } from "@opencode/core/plugin/sdk"
 import { Schedule } from "@opencode/core/schedule"
 import { Session } from "@opencode/core/session"
+import { SessionRestart } from "@opencode/core/session/execution/restart"
+import { SessionInbox } from "@opencode/core/session/inbox"
+import { SessionTable } from "@opencode/core/session/sql"
 import { Tool } from "@opencode/core/tool"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { define } from "@opencode/plugin/effect/plugin"
@@ -16,6 +22,7 @@ import { Permission } from "@opencode/schema/permission"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Skill } from "@opencode/schema/skill"
 import { Global } from "@opencode/util/global"
+import { eq } from "drizzle-orm"
 import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, Schema, type Scope, Stream } from "effect"
 import { HttpEffect, HttpRouter, HttpServer } from "effect/http"
 import { LanguageModel, LLMClient, type LLMRequest } from "../../ai/src/effect"
@@ -57,6 +64,7 @@ type Catalog = "verified" | "damaged" | "missing"
 // `config` is the project config. `dashboard` puts the Location in a dashboard's work folder under the server's data
 // root (B2.9b) instead of the project directory; `host` is a scripted Host the server starts first (B2.3).
 type Options = {
+  directory?: string
   catalog?: Catalog
   sources?: boolean
   files?: Record<string, string>
@@ -70,7 +78,7 @@ const boot = (
   options: Options = {},
 ) =>
   Effect.gen(function* () {
-    const dir = (yield* tmpdirScoped("loginom-access-")).path
+    const dir = options.directory ?? (yield* tmpdirScoped("loginom-access-")).path
     // The product plugin's own data directory (dashboards, file profiles) is the case's, not the runner's.
     yield* Effect.acquireRelease(
       Effect.promise(() => temporaryData()),
@@ -141,7 +149,7 @@ const boot = (
         {
           // Schedules are on by default in the dev channel.
           app: { channel: "dev", version: "test" },
-          database: { path: ":memory:" },
+          database: { path: options.directory ? path.join(dir, "loginom-ai-agent.db") : ":memory:" },
           config: {
             ...(options.sources ? {} : { project: false, claude: false }),
             ...(options.config ? { content: JSON.stringify(options.config) } : {}),
@@ -311,6 +319,7 @@ const boot = (
         ),
       )
     return {
+      context,
       sessions,
       create,
       prompt,
@@ -323,6 +332,7 @@ const boot = (
       requests,
       ran,
       answered,
+      handler,
       prompts,
       held,
       gate,
@@ -733,12 +743,14 @@ describe("loginom.product access and tool gate (G1)", () => {
         // A fork of a granted session runs without the grant. A synthetic message wakes it without a prompt, and the
         // same kind of message keeps the parent's grant: it is not a new task.
         const original = yield* test.create("original")
-        yield* test.wizard(original, "loginom-automation", script({ tool: probe }, { text: "end" }))
+        yield* test.prompt(original, script({ tool: probe }, { text: "end" }), ["loginom-automation"])
         const fork = yield* test.sessions.fork({ sessionID: original })
         yield* test.sessions.synthetic({ sessionID: fork.id, text: script({ tool: probe }, { text: "end" }) })
         yield* until(() => Effect.succeed(test.answered.includes(`${fork.id} end`) ? true : undefined))
         yield* test.sessions.wait(fork.id)
         expect(test.ran(fork.id)).toBe(0)
+        yield* test.prompt(fork.id, script({ tool: probe }, { text: "own prompt" }), ["loginom-automation"])
+        expect(test.ran(fork.id)).toBe(1)
         yield* test.sessions.synthetic({
           sessionID: original,
           text: script({ tool: probe }, { text: "synthetic end" }),
@@ -794,6 +806,286 @@ describe("loginom.product access and tool gate (G1)", () => {
       }).pipe(Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )
+  it.live(
+    "editing queued local files over HTTP keeps the active Loginom grant and sends only current file guidance",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot(undefined, { files: { "kept.db": "kept data", "removed.db": "removed data" } })
+        const sessionID = yield* test.create("edit queued files")
+        const local = (name: string) => ({ uri: pathToFileURL(path.resolve(test.resources, "..", name)).href })
+        const kept = yield* test.sessions.prompt({
+          sessionID,
+          text: "initial kept prompt",
+          files: [local("kept.db")],
+          delivery: "queue",
+          resume: false,
+        })
+        const removed = yield* test.sessions.prompt({
+          sessionID,
+          text: "initial removed prompt",
+          files: [local("removed.db")],
+          delivery: "steer",
+          resume: false,
+        })
+        yield* test.sessions.queueInbox({ sessionID, inboxID: removed.id })
+        const edit = (
+          inboxID: string,
+          body: { text: string; files?: { uri: string }[]; metadata?: Record<string, unknown> },
+        ) =>
+          Effect.promise(async () => {
+            const response = await test.handler(
+              new Request(`http://opencode.local/api/session/${sessionID}/inbox/${inboxID}`, {
+                method: "PUT",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(body),
+              }),
+            )
+            expect(response.status).toBe(204)
+          })
+        const run = yield* test
+          .wizard(sessionID, "loginom-automation", script({ tool: probe, gated: true }, { text: "granted end" }))
+          .pipe(Effect.forkScoped)
+        const first = yield* until(() => test.requests(sessionID).pipe(Effect.map((all) => all[0])))
+        expect(names(first)).toContain(probe)
+        expect(JSON.stringify(first.messages)).not.toContain("Attached local data reference:")
+        yield* edit(kept.id, { text: "first edit", files: [local("kept.db")] })
+        const queued = yield* test.sessions.inbox(sessionID)
+        const metadata = (id: string) => {
+          const item = queued.find((entry) => entry.id === id)
+          return item?.type === "user" ? item.payload.metadata : undefined
+        }
+        const removedText = script({ text: "removed after edits" })
+        yield* edit(kept.id, { text: "", files: [local("kept.db")], metadata: metadata(kept.id) })
+        yield* edit(removed.id, { text: removedText, metadata: metadata(removed.id) })
+        yield* Deferred.succeed(test.gate, undefined)
+        yield* Fiber.join(run)
+        expect(test.ran(sessionID)).toBe(1)
+
+        for (const [row, needle] of [
+          [kept, "kept.db. Use loginom_file_admit"],
+          [removed, removedText],
+        ] as const) {
+          if ((yield* test.sessions.inbox(sessionID)).some((item) => item.id === row.id))
+            yield* test.sessions.resume(sessionID)
+          const request = yield* until(() =>
+            test
+              .requests(sessionID)
+              .pipe(
+                Effect.map((requests) =>
+                  requests.find((item) => item.messages.some((message) => text(message).includes(needle))),
+                ),
+              ),
+          )
+          const contents = request.messages.map(text).join("\n")
+          expect(contents).toContain(needle)
+          expect(contents.match(/kept\.db\. Use loginom_file_admit/g)).toHaveLength(1)
+          expect(contents).not.toContain("removed.db")
+          yield* test.sessions.wait(sessionID)
+        }
+
+        const history = yield* test.sessions.messages({ sessionID })
+        expect(history.find((item) => item.id === kept.id)).toMatchObject({ type: "user", text: "" })
+        expect(
+          history.filter((item) => item.type === "synthetic" && item.metadata?.loginom_attachment_reference),
+        ).toEqual([])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "editing a queued skill mention changes only the delivered task's Loginom grant",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const sessionID = yield* test.create("edit queued skill")
+        const skill = { id: Skill.ID.make("loginom-automation") }
+        const edit = (inboxID: string, body: { text: string; skills: Array<typeof skill> }) =>
+          Effect.promise(async () => {
+            const response = await test.handler(
+              new Request(`http://opencode.local/api/session/${sessionID}/inbox/${inboxID}`, {
+                method: "PUT",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(body),
+              }),
+            )
+            expect(response.status).toBe(204)
+          })
+        const run = yield* test
+          .wizard(sessionID, "loginom-automation", script({ tool: probe, gated: true }, { text: "active end" }))
+          .pipe(Effect.forkScoped)
+        const first = yield* until(() => test.requests(sessionID).pipe(Effect.map((all) => all[0])))
+        expect(names(first)).toContain(probe)
+
+        const mention = "@loginom-automation"
+        const row = yield* test.sessions.prompt({
+          sessionID,
+          text: `${mention} initial request`,
+          skills: [{ ...skill, mention: { text: mention, start: 0, end: mention.length } }],
+          delivery: "steer",
+          resume: false,
+        })
+        const moved = yield* Effect.promise(() =>
+          test.handler(
+            new Request(`http://opencode.local/api/session/${sessionID}/inbox/${row.id}`, {
+              method: "PATCH",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ delivery: "queue" }),
+            }),
+          ),
+        )
+        expect(moved.status).toBe(204)
+        const removed = script({ tool: probe }, { text: "removed skill end" })
+        yield* edit(row.id, { text: removed, skills: [] })
+        const [edited] = yield* test.sessions.inbox(sessionID)
+        expect(edited).toMatchObject({ id: row.id, type: "user", delivery: "queue", payload: { text: removed } })
+        expect(edited?.type === "user" && edited.payload.skills).toBeUndefined()
+        yield* Deferred.succeed(test.gate, undefined)
+        yield* Fiber.join(run)
+        if ((yield* test.sessions.inbox(sessionID)).some((item) => item.id === row.id))
+          yield* test.sessions.resume(sessionID)
+
+        const requestWith = (input: string) =>
+          until(() =>
+            test
+              .requests(sessionID)
+              .pipe(
+                Effect.map((requests) =>
+                  requests.find((request) => request.messages.some((message) => text(message).includes(input))),
+                ),
+              ),
+          )
+        expect(names(yield* requestWith(removed))).not.toContain(probe)
+        yield* test.sessions.wait(sessionID)
+        expect(test.ran(sessionID)).toBe(1)
+
+        const ungranted = yield* test.sessions.prompt({ sessionID, text: "no skill", delivery: "queue", resume: false })
+        const added = script({ tool: probe }, { text: "added skill end" })
+        yield* edit(ungranted.id, { text: added, skills: [skill] })
+        yield* test.sessions.resume(sessionID)
+        expect(names(yield* requestWith(added))).toContain(probe)
+        yield* test.sessions.wait(sessionID)
+        expect(test.ran(sessionID)).toBe(2)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a queued prompt retains its attached Loginom skill after the server opens the same inbox again",
+    () =>
+      Effect.gen(function* () {
+        const directory = (yield* tmpdirScoped("loginom-inbox-restart-")).path
+        const tool = "loginom_dock_node_apply"
+        const prompt = script({ tool, input: { path: "node" } }, { text: "resumed with skill" })
+        const queued = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const test = yield* boot(undefined, { directory })
+            const sessionID = yield* test.create("pending before shutdown")
+            const row = yield* test.sessions.prompt({
+              sessionID,
+              text: prompt,
+              skills: [{ id: Skill.ID.make("loginom-automation") }],
+              delivery: "queue",
+              resume: false,
+            })
+            expect(yield* test.requests(sessionID)).toEqual([])
+            return row
+          }),
+        )
+        const host = scriptedHost({ catalog: () => [dockTool("dock_node_apply")] })
+        const restarted = yield* boot(undefined, { directory, host })
+        expect((yield* restarted.sessions.inbox(queued.sessionID)).map((item) => item.id)).toEqual([queued.id])
+        yield* restarted.sessions.resume(queued.sessionID)
+        yield* restarted.sessions.wait(queued.sessionID)
+        const [first] = yield* restarted.requests(queued.sessionID)
+        expect(names(first)).toContain(tool)
+        expect(host.requests("call").map((input) => input.name)).toEqual(["dock_node_apply"])
+        expect(yield* restarted.sessions.inbox(queued.sessionID)).toEqual([])
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a newer steer revokes a queued grant even when its delivery is still being prepared",
+    () =>
+      Effect.gen(function* () {
+        const started = yield* Deferred.make<void>()
+        const release = yield* Deferred.make<void>()
+        const test = yield* boot((ctx) =>
+          ctx.session
+            .hook("experimental.tools.prepare", () =>
+              Effect.gen(function* () {
+                if (yield* Deferred.succeed(started, undefined)) yield* Deferred.await(release)
+              }),
+            )
+            .pipe(Effect.asVoid),
+        )
+        const sessionID = yield* test.create("new steer at delivery")
+        const row = yield* test.sessions.prompt({
+          sessionID,
+          text: script({ tool: probe }, { text: "queued end" }),
+          skills: [{ id: Skill.ID.make("loginom-automation") }],
+          delivery: "queue",
+          resume: false,
+        })
+        const run = yield* test.sessions.resume(sessionID).pipe(Effect.forkScoped)
+        yield* Deferred.await(started)
+        expect((yield* test.sessions.context(sessionID)).findLast((message) => message.type === "user")?.id).toBe(
+          row.id,
+        )
+        yield* test.sessions.prompt({ sessionID, text: script({ text: "steer end" }) })
+        yield* Deferred.succeed(release, undefined)
+        yield* Fiber.join(run)
+        yield* test.sessions.wait(sessionID)
+        expect(test.answered).toContain(`${sessionID} steer end`)
+        const [first] = yield* test.requests(sessionID)
+        expect(first).toBeDefined()
+        expect(names(first)).not.toContain(probe)
+        expect(test.ran(sessionID)).toBe(0)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "recovers the delivered grant after a restart before the first model request",
+    () =>
+      Effect.gen(function* () {
+        const directory = (yield* tmpdirScoped("loginom-delivery-restart-")).path
+        const tool = "loginom_dock_node_apply"
+        const row = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const test = yield* boot(undefined, { directory })
+            const sessionID = yield* test.create("delivered before shutdown")
+            const row = yield* test.sessions.prompt({
+              sessionID,
+              text: script({ tool, input: { path: "node" } }, { text: "recovered" }),
+              skills: [{ id: Skill.ID.make("loginom-automation") }],
+              delivery: "queue",
+              resume: false,
+            })
+            const { db } = Context.get(test.context, Database.Service)
+            yield* db.update(SessionTable).set({ time_suspended: Date.now() }).where(eq(SessionTable.id, sessionID))
+            yield* SessionInbox.promote(db, Context.get(test.context, Bus.Service), sessionID, "input")
+            expect(yield* test.sessions.inbox(sessionID)).toEqual([])
+            expect((yield* test.sessions.context(sessionID)).findLast((message) => message.type === "user")?.id).toBe(
+              row.id,
+            )
+            expect(yield* test.requests(sessionID)).toEqual([])
+            return row
+          }),
+        )
+        const host = scriptedHost({ catalog: () => [dockTool("dock_node_apply")] })
+        const restarted = yield* boot(undefined, { directory, host })
+        yield* Context.get(restarted.context, SessionRestart.Service).resumeSuspendedSessions
+        yield* until(() => Effect.succeed(restarted.answered.includes(`${row.sessionID} recovered`) ? true : undefined))
+        yield* restarted.sessions.wait(row.sessionID)
+        const [first] = yield* restarted.requests(row.sessionID)
+        expect(names(first)).toContain(tool)
+        expect(host.requests("call").map((input) => input.name)).toEqual(["dock_node_apply"])
+        expect(restarted.answered).toContain(`${row.sessionID} recovered`)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
   it.live(
     "a prompt admitted during a granted step revokes the grant for the calls that step still makes",
     () =>

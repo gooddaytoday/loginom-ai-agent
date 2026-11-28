@@ -95,7 +95,7 @@ export async function dockTools(input: {
   // A run serves one task with one profile (`loginom-host/src/host-port.ts`). Its first binding may name the task's
   // profile, as 0.4 bound the profile it derived from history; a later task binds as `default` and then requests and
   // applies its grant, as 0.4 did for a command or a loaded skill. An unchanged binding asks the Host nothing.
-  const bind = async (lease: Lease, task: string, profile: Profile, eager: boolean) => {
+  const bind = async (lease: Lease, task: string, profile: Profile) => {
     const scope = (value: Profile) => ({ taskMessageID: SessionV1.MessageID.make(task), profile: value })
     const current = bound.get(lease)
     if (!current) {
@@ -104,8 +104,6 @@ export async function dockTools(input: {
       return
     }
     if (current.task === task && current.profile === profile) return
-    // Outside a step boundary a call of the same run may be in flight, and the Host refuses to rebind then.
-    if (eager && current.task !== task) return
     if (current.task !== task) {
       await lease.scope("bind", scope("default"))
       bound.set(lease, { task, profile: "default" })
@@ -117,12 +115,10 @@ export async function dockTools(input: {
   }
 
   /**
-   * Binds the session's Host run to its task and reads its catalog, as 0.4 did before each turn. The `context` hook does
-   * it at every step boundary; a failure there leaves the session without Dock tools and tells the model why. `eager`
-   * refreshes (an admitted prompt, a completed tool) only prepare the registry for the next step's tool snapshot and
-   * fail silently.
+   * Binds the session's Host run to its task and reads its catalog before each step's tool snapshot.
+   * A failure leaves the session without Dock tools and tells the model why.
    */
-  const refresh = async (sessionID: string, profile: Profile, model: Model.Ref | undefined, eager = false) => {
+  const refresh = async (sessionID: string, profile: Profile, model?: Model.Ref, task?: string) => {
     // A Host still starting holds up no session: until its handshake the session has no Dock tools, as in 0.4.
     const lease = input.ready() ? await input.lease(sessionID) : undefined
     if (!lease) {
@@ -132,12 +128,11 @@ export async function dockTools(input: {
       return
     }
     const failed = (phase: string) => (error: unknown) => {
-      if (!eager) catalogs.set(sessionID, { names: new Set(), failure: phase + ": " + hostErrorText(error) })
+      catalogs.set(sessionID, { names: new Set(), failure: phase + ": " + hostErrorText(error) })
       return undefined
     }
-    const scoped = await input
-      .task(sessionID)
-      .then((task) => bind(lease, task, profile, eager))
+    const scoped = await Promise.resolve(task ?? input.task(sessionID))
+      .then((taskID) => bind(lease, taskID, profile))
       .then(() => true, failed("scope"))
     if (!scoped) return
     const catalog = await lease.tools().then(decodeCatalog).catch(failed("catalog"))
@@ -184,7 +179,7 @@ export async function dockTools(input: {
 
   const forget = (sessionID: string) => catalogs.delete(sessionID)
 
-  return { refresh, hide, system, forget, registered: (name: string) => registered.has(name) }
+  return { refresh, hide, system, forget }
 
   async function images(model: Model.Ref | undefined) {
     if (!model) return false

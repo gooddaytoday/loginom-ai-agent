@@ -91,6 +91,8 @@ export function SessionQueuePanel(props: { queue: SessionQueueView; hidden?: boo
     <Grow when={open()} fade class="relative z-0" onClosed={() => dispatch(PANEL_CLOSED_EVENT)}>
       <div
         data-component="session-queue-panel"
+        role="region"
+        aria-label={language.t("session.queue.label")}
         inert={!open()}
         class="relative z-0 -mb-3 rounded-xl bg-v2-background-bg-base px-1.5 pt-1.5 shadow-[inset_0_0_0_0.5px_var(--v2-border-border-base)]"
         // Match the composer overlap so the scroll crop meets the input edge.
@@ -101,6 +103,11 @@ export function SessionQueuePanel(props: { queue: SessionQueueView; hidden?: boo
             {language.plural("session.queue.count", count())}
           </div>
         </Grow>
+        <Show when={count() > 0 && !props.queue.working()}>
+          <p role="status" class="px-1.5 py-1 text-[12px] leading-4 text-v2-text-text-muted">
+            {language.t("session.queue.waiting")}
+          </p>
+        </Show>
         <DragDropProvider
           sensors={(defaults) => [
             ...defaults.filter((sensor) => sensor !== PointerSensor),
@@ -220,8 +227,9 @@ function SessionQueueRow(props: { queue: SessionQueueView; id: string; row: Queu
                 type="button"
                 data-action="session-queue-edit"
                 dir="auto"
+                title={language.t("session.queue.edit")}
                 aria-disabled={entry().pending}
-                class="max-w-full min-w-0 self-start truncate rounded-sm text-start text-[13px] font-[440] leading-[var(--line-height-compact)]"
+                class="flex max-w-full min-w-0 items-center gap-1 self-start rounded-sm text-start text-[13px] font-[440] leading-[var(--line-height-compact)]"
                 classList={{
                   "text-v2-text-text-faint": editing() || entry().pending,
                   "cursor-progress": entry().pending,
@@ -230,8 +238,11 @@ function SessionQueueRow(props: { queue: SessionQueueView; id: string; row: Queu
                 }}
                 onClick={() => props.queue.edit(props.id)}
               >
-                {entry().text ||
-                  (entry().attachments ? language.plural("session.queue.attachments", entry().attachments) : "")}
+                <Icon name="edit" size="small" class="shrink-0 text-v2-icon-icon-muted" />
+                <span class="min-w-0 truncate">
+                  {entry().text ||
+                    (entry().attachments ? language.plural("session.queue.attachments", entry().attachments) : "")}
+                </span>
               </button>
               <Show when={entry().attachments && entry().text}>
                 <span class="shrink-0 whitespace-nowrap text-[13px] font-[440] leading-[var(--line-height-compact)] text-v2-text-text-muted">

@@ -536,6 +536,7 @@ export const has = Effect.fn("SessionInbox.has")(function* (
   db: DatabaseService,
   sessionID: SessionSchema.ID,
   scope: Scope,
+  type?: "user",
 ) {
   const row = yield* db
     .select({ id: SessionInboxTable.id })
@@ -543,6 +544,7 @@ export const has = Effect.fn("SessionInbox.has")(function* (
     .where(
       and(
         eq(SessionInboxTable.session_id, sessionID),
+        type === undefined ? undefined : eq(SessionInboxTable.type, type),
         scope === "input"
           ? or(eq(SessionInboxTable.delivery, "steer"), eq(SessionInboxTable.delivery, "queue"))
           : eq(SessionInboxTable.delivery, scope),
@@ -618,7 +620,8 @@ export const promote = Effect.fn("SessionInbox.promote")(function* (
       if (!queued) return 0
       if (isControl(queued)) return undefined
       const promoted = yield* publish(db, bus, sessionID, [queued])
-      return promoted + (yield* publish(db, bus, sessionID, beforeControl(yield* pendingSteers(db, sessionID))))
+      const rows = beforeControl(yield* pendingSteers(db, sessionID))
+      return promoted + (yield* publish(db, bus, sessionID, rows))
     }),
   )
 })

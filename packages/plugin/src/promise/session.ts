@@ -10,10 +10,14 @@ import type { SessionMessage } from "@opencode/schema/session-message"
 import type { TokenUsage } from "@opencode/schema/token-usage"
 import type { JsonSchema, Types } from "effect"
 import type { ModelHooks } from "./registration.js"
+import type { SessionActivePrompt, SessionToolsPrepare } from "../effect/session.js"
+
+export type { SessionActivePrompt, SessionToolsPrepare } from "../effect/session.js"
 
 export interface SessionPrompt {
   readonly sessionID: Session.ID
   readonly messageID: SessionMessage.ID
+  readonly operation?: "submit" | "edit"
   prompt: Types.DeepMutable<PromptInput.Prompt>
   metadata?: Record<string, unknown>
   delivery: SessionInbox.Delivery
@@ -201,6 +205,7 @@ export interface SessionIdle {
 export interface SessionHooks {
   readonly fork: { readonly sessionID: Session.ID }
   readonly prompt: SessionPrompt
+  readonly "experimental.tools.prepare": SessionToolsPrepare
   readonly context: SessionContext
   readonly compaction: SessionCompaction
   readonly generate: SessionGenerate
@@ -236,4 +241,7 @@ export type SessionDomain = Pick<
 > &
   Pick<ExperimentalSessionApi, "wait" | "instructions"> & {
     readonly hook: ModelHooks<SessionHooks>
+    readonly experimental: {
+      readonly activePrompt: (input: { sessionID: string }) => Promise<SessionActivePrompt>
+    }
   }

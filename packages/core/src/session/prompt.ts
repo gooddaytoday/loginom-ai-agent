@@ -34,6 +34,7 @@ export type Input = {
 export const prepare = Effect.fn("SessionPrompt.prepare")(function* (request: {
   session: Session.Info
   messageID: SessionMessage.ID
+  operation?: "edit"
   input: Input
 }) {
   const fs = yield* FSUtil.Service
@@ -42,6 +43,7 @@ export const prepare = Effect.fn("SessionPrompt.prepare")(function* (request: {
   const event = yield* hooks.trigger("session", "prompt", {
     sessionID: request.session.id,
     messageID: request.messageID,
+    operation: request.operation ?? "submit",
     prompt: structuredClone({
       text: request.input.text,
       files: request.input.files?.slice(),

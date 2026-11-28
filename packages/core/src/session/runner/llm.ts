@@ -267,6 +267,7 @@ const layer = Layer.effect(
           tools: loaded.tools,
           initial: loaded.initial,
           messages: loaded.messages,
+          includeMetadataOnly: true,
         })
         const prepared = yield* context.request
           .primary({

@@ -123,6 +123,17 @@ await ctx.session.hook("retry", (event) => {
 })
 ```
 
+The `session.prompt` hook has an optional `event.operation` in both SDKs. The server sets it to `"submit"` for a
+new prompt and `"edit"` when a queued prompt is replaced in place. Hooks can still validate or transform an edit,
+but should not repeat side effects that belong to a new task. Treat a missing value as a normal submission.
+
+`session.experimental.activePrompt({ sessionID })` reads the latest delivered user prompt's ID, skills and metadata,
+the locally completed tool calls since that prompt, and whether a user steer is pending. It reads the durable history even
+when the model window has been compacted. Use `session.experimental.tools.prepare` to refresh dynamic direct tools
+before a primary request takes its tool snapshot, including after a restart or on a retry.
+In primary and compaction hooks, a user message that only carries stored metadata can have empty content. It is
+omitted from the model request unless a hook supplies content.
+
 When a Session finishes model work with no pending input, the `experimental.idle` hook runs just before it goes idle.
 It is experimental: its name and shape may still change. It does not run after interruption, failure, or control-only
 work such as a manual compaction. Input the hook admits runs in the same execution instead of the Session going idle,

@@ -46,6 +46,7 @@ import {
 import { Node } from "@opencode/util/effect/app-node"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { SessionEvent } from "./session/event.js"
+import type { SessionActivePrompt } from "@opencode/plugin/effect/session"
 import { SessionInbox } from "./session/inbox.js"
 import { InstructionState } from "./session/instruction-state.js"
 import { SessionGenerate } from "./session/generate.js"
@@ -146,6 +147,9 @@ export interface Interface {
   readonly messages: (
     input: SessionStore.MessagesInput,
   ) => Effect.Effect<SessionMessage.Info[], NotFoundError | MessageDecodeError>
+  readonly activePrompt: (
+    sessionID: SessionSchema.ID,
+  ) => Effect.Effect<SessionActivePrompt, NotFoundError | MessageDecodeError>
   readonly message: (input: {
     sessionID: SessionSchema.ID
     messageID: SessionMessage.ID
@@ -447,6 +451,32 @@ const layer = Layer.effect(
       messages: Effect.fn("Session.messages")(function* (input) {
         yield* result.get(input.sessionID)
         return yield* store.messages(input)
+      }),
+      activePrompt: Effect.fn("Session.activePrompt")(function* (sessionID) {
+        const session = yield* result.get(sessionID)
+        const steering = yield* SessionInbox.has(db, sessionID, "steer", "user")
+        const [user] = yield* store.messagesWithRefs({ sessionID, type: "user", limit: 1 })
+        if (user?.type !== "user") return { steering, inherited: false, tools: [] }
+        const assistants = yield* store.messagesWithRefs({
+          sessionID,
+          cursor: { id: user.id, direction: "next" },
+          order: "asc",
+          type: "assistant",
+        })
+        return {
+          user: { id: user.id, skills: user.skills, metadata: user.metadata },
+          steering,
+          inherited: !!session.fork && SessionProjector.isForkedMessageID(user.id),
+          tools: assistants.flatMap((message) =>
+            message.type === "assistant"
+              ? message.content.flatMap((part) =>
+                  part.type === "tool" && part.executed !== true && part.state.status === "completed"
+                    ? [{ name: part.name, input: part.state.input }]
+                    : [],
+                )
+              : [],
+          ),
+        }
       }),
       message: (input) => sessions.forSession(input.sessionID).message(input.messageID),
       messagesWithRefs: Effect.fn("Session.messagesWithRefs")(function* (input) {

@@ -2,6 +2,7 @@ export * as SessionContext from "./context.js"
 
 import { Model } from "../model.js"
 import { Permission } from "../permission.js"
+import { PluginHooks } from "../plugin/hooks.js"
 import { Context, Effect, Layer } from "effect"
 import { Agent } from "../agent.js"
 import type { SessionRequestKind } from "@opencode/plugin/effect/session"
@@ -90,6 +91,7 @@ const layer = Layer.effect(
     const skillInstructions = yield* SkillInstructions.Service
     const store = yield* SessionStore.Service
     const registry = yield* Tool.Service
+    const hooks = yield* PluginHooks.Service
 
     const resolveModel = (
       session: SessionSchema.Info,
@@ -177,6 +179,15 @@ const layer = Layer.effect(
 
     const load = Effect.fn("SessionContext.load")(function* (selection: Selection) {
       const model = yield* resolveModel(selection.session, { kind: "primary", agent: selection.agent.id })
+      let tools = selection.tools
+      if (yield* hooks.has("session", "experimental.tools.prepare", model.ref.providerID)) {
+        yield* hooks.trigger("session", "experimental.tools.prepare", {
+          sessionID: selection.session.id,
+          model: model.ref,
+        })
+        const permissions = Permission.merge(selection.agent.info.permissions, selection.session.permissions ?? [])
+        tools = yield* registry.snapshot(permissions)
+      }
       const history = yield* SessionHistory.entriesForRunner(
         db,
         selection.session.id,
@@ -189,7 +200,7 @@ const layer = Layer.effect(
         model,
         initial: history.initial,
         messages: history.entries.map((entry) => entry.message),
-        tools: selection.tools,
+        tools,
       }
     })
 
@@ -225,6 +236,7 @@ export const node = makeLocationNode({
     Location.node,
     McpInstructions.node,
     McpTool.node,
+    PluginHooks.node,
     ReferenceInstructions.node,
     SessionRunnerModel.node,
     SessionModelRequest.node,
