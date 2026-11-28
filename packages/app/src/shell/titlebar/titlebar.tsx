@@ -905,25 +905,12 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                             <div class="flex w-full shrink-0 flex-col gap-[3px]">
                               <Show when={!homeInSidebarHeader()}>{homeButton(true)}</Show>
                               {searchButton(true)}
-                              <Show
-                                when={managedConnection()}
-                                fallback={
-                                  <RecentlyClosedTabsMenu
-                                    vertical
-                                    onNewTab={openNewTab}
-                                    keybind={command.keybindParts("tab.new")}
-                                  />
-                                }
-                              >
-                                <button
-                                  type="button"
-                                  class="flex h-7 w-full items-center gap-2 rounded-md px-2 text-start text-sm hover:bg-v2-overlay-simple-overlay-hover"
-                                  onClick={openNewTab}
-                                >
-                                  <Icon name="plus" size="small" />
-                                  {newConversation()}
-                                </button>
-                              </Show>
+                              <RecentlyClosedTabsMenu
+                                vertical
+                                onNewTab={openNewTab}
+                                keybind={command.keybindParts("tab.new")}
+                                newTabTitle={managedConnection() ? newConversation() : undefined}
+                              />
                             </div>
                             <PluginPageNav />
                             <div class="h-4 w-full shrink-0" aria-hidden="true" />

@@ -21,12 +21,31 @@ import { sessionIDHasOpenTab, useTabs } from "@/shell/tabs/tabs"
 import { sessionTabTitle } from "./tab-title"
 import "./recently-closed-tabs-menu.css"
 
-export function RecentlyClosedTabsMenu(props: {
+type MenuProps = {
   onNewTab: () => void
   tooltip?: JSX.Element
   vertical?: boolean
   keybind?: string[]
-}) {
+}
+
+export function RecentlyClosedTabsMenu(props: MenuProps & { newTabTitle?: string }) {
+  return (
+    <Show when={props.newTabTitle} fallback={<RecentlyClosedMenu {...props} />}>
+      {(title) => (
+        <button
+          type="button"
+          class="flex h-7 w-full items-center gap-2 rounded-md px-2 text-start text-sm hover:bg-v2-overlay-simple-overlay-hover"
+          onClick={props.onNewTab}
+        >
+          <Icon name="plus" size="small" />
+          {title()}
+        </button>
+      )}
+    </Show>
+  )
+}
+
+function RecentlyClosedMenu(props: MenuProps) {
   const language = useLanguage()
   const tabs = useTabs()
   const global = useGlobal()
