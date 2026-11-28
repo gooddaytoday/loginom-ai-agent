@@ -39,6 +39,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       new URL("../../loginom-runtime/src/managed-resources-close.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/src/short-login-timeouts.mjs": await readFile(
+      new URL("../../loginom-runtime/src/short-login-timeouts.mjs", import.meta.url),
+      "utf8",
+    ),
     "runtime/src/call-timeout.mjs": await readFile(
       new URL("../../loginom-runtime/src/call-timeout.mjs", import.meta.url),
       "utf8",

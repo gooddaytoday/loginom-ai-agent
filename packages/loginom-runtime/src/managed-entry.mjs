@@ -1,6 +1,6 @@
 import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
-import { join } from "node:path"
+import { isAbsolute, join } from "node:path"
 import { tmpdir } from "node:os"
 import { appendFile, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { appendFileSync } from "node:fs"
@@ -9,6 +9,7 @@ import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { closeManagedResources } from "./managed-resources-close.mjs"
 import { dashboardStorage } from "./dashboard-storage.mjs"
+import { runtimeExitTimeout, shortLoginShutdownTimeout } from "./short-login-timeouts.mjs"
 import { runtimeCallTimeout } from "./call-timeout.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 import { loginBrowser, loginomAddress, reauthenticateReloadedPage } from "./connection-check.mjs"
@@ -25,6 +26,7 @@ const state = {
   starting: false,
   startupController: new AbortController(),
   startupCleanupFailed: false,
+  shortLogin: false,
   startupDiagnostics: [],
   startupPhase: "runtime.start",
   startupStarted: performance.now(),
@@ -109,9 +111,9 @@ const stop = (exitCode = 0) => {
   // Separate shutdown allowance, never an extension of an admitted operation.
   const timer = setTimeout(() => {
     terminalTrace("cleanup_budget_exhausted_lock_may_remain")
-    setTimeout(() => process.exit(1), 5000).unref()
+    setTimeout(() => process.exit(1), runtimeExitTimeout).unref()
     void Promise.resolve().then(() => state.browser?.close()).finally(() => process.exit(1))
-  }, 30000)
+  }, state.shortLogin ? shortLoginShutdownTimeout - runtimeExitTimeout : 30_000)
   void close().then(
     () => {
       clearTimeout(timer)
@@ -156,6 +158,15 @@ async function handle(message) {
       state.starting = true
       const input = message.input
       const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache, validationLogout } = validateStartInput(input)
+      state.shortLogin = validationLogout || input.packageFolder !== undefined
+      const packageReader = input.packageFolder === undefined ? undefined : await import("./package-folder.mjs")
+      if (input.packageQuery !== undefined && (!packageReader || typeof input.packageQuery !== "string" || input.packageQuery.length > 1024))
+        throw Error("LOGINOM_START_INVALID")
+      if (packageReader && (!packageReader.isPackageFolder(input.packageFolder) || input.validation === true
+          || acceptanceCleanupPackage || closeSavedPackageOnShutdown || browserRecovery)) throw Error("LOGINOM_START_INVALID")
+      if (input.packageBrowserProfile !== undefined && (!packageReader || process.platform !== "win32"
+          || typeof input.packageBrowserProfile !== "string" || !isAbsolute(input.packageBrowserProfile)))
+        throw Error("LOGINOM_START_INVALID")
       state.owner = { chat: input.chat, generation: input.generation, attempt: randomUUID() }
       state.startupStateDir = input.stateDir
       state.startupStarted = performance.now()
@@ -187,8 +198,9 @@ async function handle(message) {
       // state path is already close to MAX_PATH on Windows, so a valid profile
       // can otherwise fail before Loginom authentication even starts.
       const browserProfile =
-        process.platform === "win32" ? await mkdtemp(join(tmpdir(), "lb")) : join(directory, "browser-profile")
-      state.browserProfile = process.platform === "win32" ? browserProfile : undefined
+        process.platform === "win32" ? input.packageBrowserProfile ?? await mkdtemp(join(tmpdir(), "lb"))
+          : join(directory, "browser-profile")
+      state.browserProfile = process.platform === "win32" && !input.packageBrowserProfile ? browserProfile : undefined
       await startupPhase({ phase: "runtime.profile", status: "ready", duration_ms: Math.round(performance.now() - profileStarted) })
       const knownSecrets = [input.connection.apiKey, input.connection.password]
       const login = {
@@ -211,7 +223,22 @@ async function handle(message) {
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
-      // Connection validation never needs the executor's large dependency tree.
+      if (packageReader) {
+        const owner = { origin: new URL(input.connection.url).origin, username: input.connection.username }
+        const { readResult, readMs } = await loginBrowser({ ...login, validationLogout: true, reportSessionLimit: true,
+          readAuthenticated: async (page, readDeadline) => {
+            const started = performance.now()
+            const readResult = await packageReader.readPackageFolders(page, {
+              folder: input.packageFolder, query: input.packageQuery, ...owner,
+              signal: state.startupController.signal, deadline: readDeadline,
+            })
+            return { readResult, readMs: Math.round(performance.now() - started) }
+          } })
+        await startupPhase({ phase: "packages.read", status: "ready", duration_ms: readMs })
+        send({ id: message.id, result: { ...readResult, protocol: 1, generation: input.generation } })
+        return
+      }
+      // Connection validation and package listing do not load the executor.
       const { createSession } = await import("../client/lib/session.mjs")
       const { createBridge } = await import("../client/lib/bridge.mjs")
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),

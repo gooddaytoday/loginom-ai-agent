@@ -13,6 +13,7 @@ import { type DashboardRead, PublicationSource } from "@loginom-ai-agent/loginom
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import type { Loginom } from "@loginom-ai-agent/loginom-host/loginom"
 import { launchNodeHost, NodeHostStartupError } from "@loginom-ai-agent/loginom-host/node-client"
+import { decodeFolderListings, packageConnectionError, type ReadFolder } from "@loginom-ai-agent/loginom-host/package-folder"
 import { StepCheckRequest, StepCheckResult } from "@loginom-ai-agent/loginom-host/step-state"
 import type { Port } from "@loginom-ai-agent/loginom-host/transport"
 import { WriteOutcomeInput, WriteOutcomeResult } from "@loginom-ai-agent/loginom-host/write-outcomes"
@@ -41,7 +42,12 @@ const decodeRecord = Schema.decodeUnknownOption(
 const decodeStatus = Schema.decodeUnknownOption(
   Schema.Struct({ generation: Schema.Number, recoveries: Schema.optional(Schema.Array(Schema.String)) }),
 )
-const decodeView = Schema.decodeUnknownOption(Schema.Struct({ url: Schema.String, generation: Schema.Number }))
+const decodeView = Schema.decodeUnknownOption(Schema.Struct({
+  url: Schema.String,
+  generation: Schema.Number,
+  state: Schema.optional(Schema.String),
+  failure: Schema.optional(Schema.String),
+}))
 const decodePublication = Schema.decodeUnknownOption(Schema.NullOr(PublicationSource), { onExcessProperty: "error" })
 
 /**
@@ -133,11 +139,7 @@ export async function preflight(automation: boolean) {
  * rejects with `LOGINOM_HOST_NOT_READY`.
  */
 export const dashboard = {
-  status: async () => {
-    const view = Option.getOrUndefined(decodeView(await request("connection.status", {})))
-    if (!view) throw new Error("LOGINOM_REPLY_INVALID")
-    return view
-  },
+  status: connectionView,
   settled: async () => {
     await state.current?.ready
   },
@@ -172,6 +174,27 @@ export const connectionSettings = {
       await held
       await request("connection.settings.turn", { id, session, active: false }).catch(() => undefined)
     }
+  },
+}
+
+async function connectionView() {
+  const view = Option.getOrUndefined(decodeView(await request("connection.status", {})))
+  if (!view) throw new Error("LOGINOM_REPLY_INVALID")
+  return view
+}
+
+export const packageFolders = {
+  async generation() {
+    const view = await connectionView()
+    const reason = packageConnectionError(view)
+    if (reason) throw Error(reason)
+    return view.generation
+  },
+  async read(input: ReadFolder, signal: AbortSignal) {
+    signal.throwIfAborted()
+    const reply = await request("packages.list", input, undefined, signal)
+    signal.throwIfAborted()
+    return decodeFolderListings(reply, input)
   },
 }
 

@@ -200,11 +200,20 @@ function fixture(failure, error, authenticated = false, rejected = false) {
     waitFor: async options => { assert.deepEqual(options, {state:"visible",timeout:30000}); await run("submit", "wait") },
   }
   const page = {
-    waitForFunction: async (_fn, arg, options) => {
+    waitForFunction: async (fn, arg, options) => {
       assert.equal(arg, null)
       assert.deepEqual(options, {timeout:30000})
       if (!rejected) await run("submit", "wait")
-      return { jsonValue: async () => rejected ? "rejected" : "authenticated", dispose: async () => {} }
+      const context = createContext({
+        document: { querySelector: selector => selector.includes("btnAvatar")
+          ? rejected ? null : { getBoundingClientRect: () => ({ width: 10, height: 10 }) }
+          : { id: selector } },
+        getComputedStyle: () => ({ visibility: "visible" }),
+        Ext: { getCmp: () => ({ isVisible: () => true, getActiveErrors: () => [rejected] }) },
+      })
+      const status = runInContext(`(${fn})()`, context)
+      assert.ok(status)
+      return { jsonValue: async () => status, dispose: async () => {} }
     },
     goto: async (url, options) => { assert.equal(url, "https://example.test/app/?opaque=private-query&testable=true#private-fragment")
       assert.deepEqual(options, {waitUntil:"domcontentloaded",timeout:60000}); await run("goto", "navigate") },
@@ -245,12 +254,27 @@ for (const [failure, code] of [
 })
 
 test("an observed login form error remains rejected without retaining its text", async () => {
-  const f = fixture("submit:wait", Object.assign(Error("avatar timeout"), { name: "TimeoutError" }), false, true)
+  const f = fixture("submit:wait", Object.assign(Error("avatar timeout"), { name: "TimeoutError" }), false, "Неверный пароль")
   await assert.rejects(loginPage(f.page, candidate), error => {
     assert.equal(error.message, "LOGINOM_LOGIN_REJECTED")
     assert.equal(error.cause.login.phase, "submit")
     assert.equal(error.cause.login.original_name, "Error")
     return true
+  })
+})
+
+for (const native of [
+  "Превышено количество сессий, допустимых по вашей лицензии (private detail)",
+  "The maximum number of sessions allowed by your license has been exceeded (private detail)",
+]) test("the short session recognizes a localized license limit without copying the native message", async () => {
+  const f = fixture(undefined, undefined, false, native)
+  await assert.rejects(loginPage(f.page, candidate, { reportSessionLimit: true }), error => {
+    assert.equal(error.message, "LOGINOM_SESSION_LIMIT")
+    assert.ok(!JSON.stringify(error.cause).includes(native))
+    return true
+  })
+  await assert.rejects(loginPage(fixture(undefined, undefined, false, native).page, candidate), {
+    message: "LOGINOM_LOGIN_REJECTED",
   })
 })
 

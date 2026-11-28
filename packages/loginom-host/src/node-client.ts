@@ -3,6 +3,7 @@ import { isAbsolute } from "node:path"
 import { EventEmitter } from "node:events"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
+import { shortLoginShutdownTimeout } from "../../loginom-runtime/src/short-login-timeouts.mjs"
 import { runtimeEnvironment } from "./supervisor"
 import { transport, type Port } from "./transport"
 import { hostError } from "./errors"
@@ -124,6 +125,11 @@ export async function launchNodeHost(
     start() {},
   }
   const client = transport(port)
+  let guardedLoginUsed = false
+  function request(method: string, input: unknown, timeout?: number, signal?: AbortSignal) {
+    if (method === "packages.list" || method === "connection.settings.check") guardedLoginUsed = true
+    return client.request(method, input, timeout, undefined, undefined, signal)
+  }
   function waitForExit(timeout: number) {
     return new Promise<Awaited<typeof exited> | undefined>((resolve) => {
       const timer = setTimeout(() => resolve(undefined), Math.max(0, timeout))
@@ -136,14 +142,12 @@ export async function launchNodeHost(
   function close() {
     if (state.closing) return state.closing
     state.closing = (async () => {
-      // Saved-package cleanup needs the longer graceful budget without consuming
-      // the TERM/KILL and actual-exit observation allowance.
-      const deadline =
-        Date.now() + (timing.teardown ?? (input.closeSavedPackageOnShutdown === true ? 90_000 : 60_000))
-      const gracefulDeadline = Math.min(
-        deadline,
-        Date.now() + (timing.close ?? (input.closeSavedPackageOnShutdown === true ? 60_000 : 30_000)),
-      )
+      // Cancelling transport can settle the caller before the worker finishes logout and exits.
+      const gracefulTimeout = guardedLoginUsed ? shortLoginShutdownTimeout + 5000
+        : input.closeSavedPackageOnShutdown === true ? 60_000 : 30_000
+      const now = Date.now()
+      const deadline = now + (timing.teardown ?? (gracefulTimeout + 30_000))
+      const gracefulDeadline = Math.min(deadline, now + (timing.close ?? gracefulTimeout))
       try {
         const result = await client
           .request("close", {}, Math.max(0, gracefulDeadline - Date.now()))
@@ -225,8 +229,7 @@ export async function launchNodeHost(
   return {
     port,
     exited,
-    request: (method: string, input: unknown, timeout?: number, signal?: AbortSignal) =>
-      client.request(method, input, timeout, undefined, undefined, signal),
+    request,
     get alive() {
       return !state.closed
     },

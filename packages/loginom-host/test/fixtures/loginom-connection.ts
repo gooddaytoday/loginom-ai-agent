@@ -18,6 +18,7 @@ export async function loginomConnectionFixture(
   options: {
     packages?: Readonly<Record<string, { file: string; name: string }>>
     onOpen?: (path: string) => void
+    beforeLoginReply?: (username: string) => Promise<void>
   } = {},
 ) {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
@@ -46,7 +47,7 @@ export async function loginomConnectionFixture(
     }
     if (request.method === "POST" && path === "/login") {
       void text(request).then(
-        (body) => {
+        async (body) => {
           const fields = new URLSearchParams(body)
           const username = fields.get("username")
           if (
@@ -54,6 +55,7 @@ export async function loginomConnectionFixture(
             fields.get("password") !== "fixture-password"
           )
             return response.writeHead(403).end()
+          await options.beforeLoginReply?.(username)
           logins.push({
             username,
             cookie: `fixture-auth=${logins.length + 1}`,

@@ -12,17 +12,22 @@ test('validation reuses HTTP bytes with fresh cookies and authenticates every ne
   const root=await mkdtemp(join(tmpdir(),'login-http-cache-'));
   let assets=0,submits=0,logouts=0;
   const cookies=[];
+  const sessionEvents=[];
+  const submitted=Promise.withResolvers();
+  const completeLogin=Promise.withResolvers();
   const http=createServer(async(request,response)=>{
     if(request.url.startsWith('/static.js')){
       assets++;response.setHeader('Cache-Control','public, max-age=3600');response.setHeader('Content-Type','application/javascript');response.end('window.fixtureAsset=true;');return;
     }
     response.setHeader('Cache-Control','no-store');
     if(request.url==='/logout'){
-      logouts++;response.setHeader('Set-Cookie','fixture-auth=; Path=/; Max-Age=0');response.end('{}');return;
+      logouts++;sessionEvents.push('logout');response.setHeader('Set-Cookie','fixture-auth=; Path=/; Max-Age=0');response.end('{}');return;
     }
+    if(request.url==='/folders'){sessionEvents.push('read');response.end('[]');return;}
     if(request.url==='/login'){
       submits++;let body='';for await(const chunk of request)body+=chunk;
       if(JSON.parse(body).password!=='fixture-password'){response.statusCode=403;response.end('{}');return;}
+      if(submits===5){submitted.resolve();await completeLogin.promise;}
       response.setHeader('Set-Cookie','fixture-auth=1; Path=/; SameSite=Lax');response.end('{}');return;
     }
     if(!request.url.startsWith('/app/')){response.statusCode=404;response.end();return;}
@@ -38,9 +43,9 @@ test('validation reuses HTTP bytes with fresh cookies and authenticates every ne
       </script>`);
   });
   await new Promise(resolve=>http.listen(0,'127.0.0.1',resolve));
-  t.after(async()=>{http.closeAllConnections();await new Promise(resolve=>http.close(resolve));await rm(root,{recursive:true,force:true});});
+  t.after(async()=>{completeLogin.resolve();http.closeAllConnections();await new Promise(resolve=>http.close(resolve));await rm(root,{recursive:true,force:true});});
   const initialCookies=[],events=[];
-  const run=async(number,password='fixture-password',validationLogout=false)=>loginBrowser({browserPath:process.env.LOGINOM_DOCK_TEST_BROWSER,
+  const run=async(number,password='fixture-password',validationLogout=false,options={})=>loginBrowser({browserPath:process.env.LOGINOM_DOCK_TEST_BROWSER,
     profile:join(root,'profile-'+number),httpCachePath:join(root,'http-cache'),headless:true,
     candidate:{url:`http://127.0.0.1:${http.address().port}/app/`,username:'user',password},
     // This verifies cache/auth isolation, not Windows runner startup latency.
@@ -48,7 +53,7 @@ test('validation reuses HTTP bytes with fresh cookies and authenticates every ne
     // parallel CI load: a rejection is only reported once the form was submitted,
     // so a deadline that expires during startup turns it into UNAVAILABLE.
     deadline:Date.now()+20000,validationLogout,
-    onContextCreated:async context=>{initialCookies.push((await context.cookies()).length);},onPhase:event=>events.push(event)});
+    onContextCreated:async context=>{initialCookies.push((await context.cookies()).length);},onPhase:event=>events.push(event),...options});
   assert.deepEqual(await run(1),{authenticated:true});
   assert.deepEqual(await run(2),{authenticated:true});
   assert.equal(assets,1);
@@ -61,4 +66,22 @@ test('validation reuses HTTP bytes with fresh cookies and authenticates every ne
   assert.equal(logouts,0);
   assert.deepEqual(await run(4,'fixture-password',true),{authenticated:true});
   assert.equal(logouts,1);
+
+  const controller=new AbortController();
+  const cancelled=run(5,undefined,true,{
+    signal:AbortSignal.any([controller.signal,t.signal]),
+    readAuthenticated:()=>{throw Error('A cancelled read must not start');},
+  });
+  void cancelled.catch(()=>{});
+  await Promise.race([submitted.promise,cancelled.then(()=>{throw Error('Expected the login request');})]);
+  controller.abort(Error('picker closed'));
+  completeLogin.resolve();
+  await assert.rejects(cancelled,/picker closed/);
+  assert.deepEqual(sessionEvents,['logout','logout']);
+
+  const result=await run(6,undefined,true,{
+    readAuthenticated:page=>page.evaluate(async()=>(await fetch('/folders')).json()),
+  });
+  assert.deepEqual(result,[]);
+  assert.deepEqual(sessionEvents,['logout','logout','read','logout']);
 });

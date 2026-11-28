@@ -6,6 +6,7 @@ import { browserDownloadEnvironment, browserLaunch, prepareBrowserProfile } from
 import { createRedactor } from "../client/lib/redact.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 import { connectionTimelineScript } from "../client/lib/connection-recovery.mjs"
+import { loginSubmitTimeout, loginResponseTimeout, loginLogoutTimeout } from "./short-login-timeouts.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 
@@ -164,7 +165,7 @@ function trackPageNetwork(page) {
 
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
-export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reload, signal, sameOrigin = false } = {}) {
+export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reload, signal, sameOrigin = false, onSubmit, reportSessionLimit = false } = {}) {
   const started = performance.now()
   let phase = "goto", phaseStarted = started, original
   const emit = async event => { try { await onPhase?.(event) } catch { /* Diagnostics cannot change login. */ } }
@@ -267,10 +268,19 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
         requireLoginAddress()
         if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password, { timeout: remaining(30_000) })
       })
+      let submitted = false
       await measure("login.submit", () => {
         requireLoginAddress()
+        signal?.throwIfAborted()
         if (reload) reload.loginSubmitted = true
-        return field("btnLogin").click({ timeout: remaining(30_000) })
+        if (onSubmit) {
+          onSubmit()
+          submitted = true
+        }
+        return field("btnLogin").click({ timeout: remaining(onSubmit ? loginSubmitTimeout : 30_000) })
+      }).catch(error => {
+        // A failed click can already have delivered the credential submission.
+        if (!submitted) throw error
       })
       const response = await measure("login.response", () => page.waitForFunction(function loginResponse() {
         const avatar = document.querySelector('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
@@ -278,18 +288,23 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
         // ShowAuthError marks these native Loginom fields. Read only the
         // presence of an error, never return its text across the boundary.
         try {
-          return ["edtUsername", "edtPassword", "pnlLoginFormFields"].some(name => {
+          const errors = ["edtUsername", "edtPassword", "pnlLoginFormFields"].flatMap(name => {
             const element = document.querySelector(`[data-tid="LoginForm;Login;${name}"]`)
             const field = element && globalThis.Ext?.getCmp(element.id)
-            return field?.isVisible?.(true) === true && field.getActiveErrors?.().some(message => typeof message === "string" && message.trim().length > 0)
-          }) ? "rejected" : false
+            return field?.isVisible?.(true) === true ? field.getActiveErrors?.() ?? [] : []
+          }).filter(message => typeof message === "string" && message.trim().length > 0)
+          if (errors.some(message => /превышено количество сессий[, ]+допустимых по вашей лицензии|(?:too many|no more) (?:concurrent |active )?sessions|(?:maximum|limit|exceed)[^.!?]*sessions|sessions[^.!?]*(?:license|licence|limit|exceed)/iu.test(message)))
+            return "session_limit"
+          return errors.length ? "rejected" : false
         } catch { return false }
-      }, null, { timeout: remaining(30_000) })).catch(error => {
+      }, null, { timeout: remaining(loginResponseTimeout) })).catch(error => {
         original = error
         throw Error("LOGINOM_LOGIN_UNAVAILABLE")
       })
       try {
-        if (await response.jsonValue() === "rejected") throw Error("LOGINOM_LOGIN_REJECTED")
+        const status = await response.jsonValue()
+        if (status === "session_limit" && reportSessionLimit) throw Error("LOGINOM_SESSION_LIMIT")
+        if (status === "rejected" || status === "session_limit") throw Error("LOGINOM_LOGIN_REJECTED")
       } finally { await response.dispose() }
     }
     phase = "identity"; phaseStarted = performance.now()
@@ -302,7 +317,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     const ended = performance.now()
     // Only the sanitized diagnostic crosses the browser/host boundary. Never
     // retain the original Error/stack: Playwright call logs can echo inputs.
-    const code = ["LOGINOM_LOGIN_REJECTED", "LOGINOM_ACCOUNT_MISMATCH"].includes(error?.message) ? error.message : "LOGINOM_LOGIN_UNAVAILABLE"
+    const code = ["LOGINOM_LOGIN_REJECTED", "LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_SESSION_LIMIT"].includes(error?.message) ? error.message : "LOGINOM_LOGIN_UNAVAILABLE"
     throw Error(code, { cause: { login: loginFailure(original ?? error, candidate,
       phase, ended - phaseStarted, ended - started) } })
   } finally {
@@ -417,7 +432,7 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
 }
 
 export async function loginBrowser({ browserPath, profile, candidate, httpCachePath, headless = false, keepOpen = false, signal, onContextCreated, onWindowPage, downloadsPath, desktopWindow, windowBounds,
-  deadline = Date.now() + 150_000, onRetry, onPhase, validationLogout = false }) {
+  deadline = Date.now() + 150_000, onRetry, onPhase, validationLogout = false, readAuthenticated, reportSessionLimit = false }) {
   signal?.throwIfAborted()
   const phase = onPhase ?? (async () => {})
   const dependenciesStarted = performance.now()
@@ -488,7 +503,11 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
   await phase({ phase: "browser.cdp", status: "ready", attempt: attempt + 1 })
   const closing = { promise: undefined }
   const close = () => closing.promise ??= context.close()
-  const cancel = () => { void close().catch(() => undefined) }
+  let submitted = false
+  const loginDeadline = validationLogout ? deadline - loginLogoutTimeout : deadline
+  // After submission the browser owns a possibly admitted server session.
+  // Drain the login response and let the guarded logout run before closing it.
+  const cancel = () => { if (!submitted) void close().catch(() => undefined) }
   signal?.addEventListener("abort", cancel, { once: true })
   const timer = setTimeout(cancel, Math.max(1, deadline - Date.now()))
   try {
@@ -510,18 +529,25 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
     await phase({ phase: "login", status: "starting", attempt: attempt + 1 })
     const page = context.pages()[0] ?? (await context.newPage())
     if (!headless) await onWindowPage?.(page)
-    const result = await loginPage(page, candidate, { deadline, themeState, onThemeReload: record, onPhase: phase,
-      sameOrigin: validationLogout })
-      .then(async result => {
+    let rejected = false, result
+    try {
+      try {
+        result = await loginPage(page, candidate, { deadline: loginDeadline, themeState, onThemeReload: record, onPhase: phase,
+          sameOrigin: validationLogout, reportSessionLimit,
+          ...(validationLogout ? { signal, onSubmit: () => { submitted = true } } : {}) })
+        if (validationLogout) submitted = true
         await phase({ phase: "login", status: "ready", attempt: attempt + 1, duration_ms: Math.round(performance.now() - loginStarted) })
-        return result
-      }, async error => {
+      } catch (error) {
+        rejected = ["LOGINOM_LOGIN_REJECTED", "LOGINOM_SESSION_LIMIT", "LOGINOM_ACCOUNT_MISMATCH"].includes(error?.message)
         await phase({ phase: "login", status: "failed", attempt: attempt + 1, duration_ms: Math.round(performance.now() - loginStarted) })
         throw error
-      })
-    signal?.throwIfAborted()
+      }
+      signal?.throwIfAborted()
+      if (readAuthenticated) result = await readAuthenticated(page, loginDeadline)
+    } finally {
+      if (validationLogout && submitted && !rejected) await logoutValidation(page, candidate, deadline, phase)
+    }
     if (!keepOpen) {
-      if (validationLogout) await logoutValidation(page, candidate, deadline)
       await close()
       return result
     }
@@ -529,13 +555,14 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
     return { ...result, context }
   } catch (error) {
     await close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED", error?.cause?.login ? { cause: error.cause } : undefined) })
+    if (error?.message === "LOGINOM_LOGOUT_UNCONFIRMED") throw error
     signal?.throwIfAborted()
     // Only a classified transient login failure may retry, after confirmed close.
-    if (attempt === 0 && !themeState.failed && error?.message === "LOGINOM_LOGIN_UNAVAILABLE" && Date.now() < deadline) {
+    if (attempt === 0 && !themeState.failed && error?.message === "LOGINOM_LOGIN_UNAVAILABLE" && Date.now() < loginDeadline) {
       await record({ phase: "login_retry", attempt: 2, reason: error.message, login: error.cause?.login ?? null })
       continue
     }
-    if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED", "LOGINOM_FOCUS_SETUP_FAILED", "LOGINOM_LOGOUT_UNCONFIRMED"].includes(error?.message)) throw error
+    if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED", "LOGINOM_FOCUS_SETUP_FAILED", "LOGINOM_SESSION_LIMIT", "LOGINOM_PACKAGE_FOLDER_UNAVAILABLE"].includes(error?.message)) throw error
     throw Error("LOGINOM_LOGIN_UNAVAILABLE", error?.cause?.login ? { cause: error.cause } : undefined)
   } finally {
     clearTimeout(timer)
@@ -544,21 +571,28 @@ export async function loginBrowser({ browserPath, profile, candidate, httpCacheP
   }
 }
 
-// This context belongs to the check and has never opened a package.
-async function logoutValidation(page, candidate, deadline) {
+// This context belongs to a check or a folder read and has never opened a package.
+async function logoutValidation(page, candidate, deadline, onPhase) {
+  const started = performance.now()
   const at = tid => page.locator(`[data-tid="${tid}"]`)
+  const logoutDeadline = Math.min(Date.now() + loginLogoutTimeout, deadline)
   const timeout = () => {
-    const left = Math.min(10_000, deadline - Date.now())
+    const left = logoutDeadline - Date.now()
     if (left <= 0) throw Error("LOGINOM_LOGOUT_UNCONFIRMED")
     return left
   }
   try {
     if (new URL(page.url()).origin !== new URL(candidate.url).origin) throw Error("LOGINOM_LOGOUT_UNCONFIRMED")
     const avatar = at("MF;cntMain;tlbMainToolbar;btnAvatar")
+    const owner = await page.waitForFunction(({ origin, username }) => location.origin === origin
+      && globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName === username,
+    { origin: new URL(candidate.url).origin, username: candidate.username }, { timeout: timeout() })
+    await owner.dispose()
     await avatar.click({ timeout: timeout() })
     await at("MF;AppMenuForm;btnLogOut").click({ timeout: timeout() })
     await at("LoginForm;Login;edtUsername").waitFor({ state: "visible", timeout: timeout() })
     await avatar.waitFor({ state: "hidden", timeout: timeout() })
+    await onPhase({ phase: "login.logout", status: "ready", duration_ms: Math.round(performance.now() - started) })
   } catch {
     throw Error("LOGINOM_LOGOUT_UNCONFIRMED")
   }

@@ -8,6 +8,7 @@ import { chatId, loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
+import { ReadFolder } from "./package-folder"
 import { WindowChat, WindowPlacement } from "./browser-window"
 import { WriteOutcomeInput, WriteOutcomeResult, writeStep } from "./connection/write-outcomes"
 import { StepOperationId } from "./step-state"
@@ -18,7 +19,7 @@ if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
 const events = new EventEmitter()
 const operations = new Set<Promise<void>>()
-const settingsChecks = new Map<string, AbortController>()
+const cancellable = new Map<string, AbortController>()
 const stopped = Promise.withResolvers<void>()
 const state: {
   starting?: Promise<void>
@@ -45,7 +46,7 @@ const recover = Schema.decodeUnknownOption(Loginom.AcknowledgeRecovery)
 
 process.on("message", (message: unknown) => {
   if (message && typeof message === "object" && "cancel" in message && typeof message.cancel === "string") {
-    settingsChecks.get(message.cancel)?.abort()
+    cancellable.get(message.cancel)?.abort()
     return
   }
   const operation = dispatch(message)
@@ -162,6 +163,18 @@ async function dispatch(message: unknown) {
       reply({ id: message.id, result })
       return
     }
+    if (message.method === "packages.list") {
+      if (!Schema.is(ReadFolder)(input)) throw Error("LOGINOM_PACKAGE_FOLDER_INVALID")
+      const controller = new AbortController()
+      cancellable.set(message.id, controller)
+      try {
+        const result = await state.host.readPackageFolders(input, controller.signal)
+        reply({ id: message.id, result })
+      } finally {
+        cancellable.delete(message.id)
+      }
+      return
+    }
     if (message.method === "loginom.write-outcome.check") {
       reply({ id: message.id, result: await checkWriteOutcome(state.host, Schema.decodeUnknownSync(WriteOutcomeInput)(input)) })
       return
@@ -174,12 +187,12 @@ async function dispatch(message: unknown) {
       const value = candidate(input)
       if (Option.isNone(value)) throw new Error("LOGINOM_CANDIDATE_INVALID")
       const controller = new AbortController()
-      settingsChecks.set(message.id, controller)
+      cancellable.set(message.id, controller)
       try {
         const result = await state.host.api.check(value.value, true, controller.signal)
         reply({ id: message.id, result })
       } finally {
-        settingsChecks.delete(message.id)
+        cancellable.delete(message.id)
       }
       return
     }

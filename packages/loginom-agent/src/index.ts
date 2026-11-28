@@ -17,6 +17,8 @@ import { BrowserRecovery } from "./browser-recovery"
 import { connectionSettings } from "./connection-settings"
 import { Dashboard } from "./dashboard"
 import { DashboardTarget } from "./dashboard-target"
+import { Definition as Packages } from "./package-list-contract"
+import { packageListHandlers } from "./package-list"
 import { dashboardTools } from "./dashboard-tools"
 import { dockTools } from "./dock"
 import { fileTools } from "./file-profile"
@@ -576,6 +578,7 @@ export default Plugin.define({
         return url ? { url } : {}
       },
     })
+    await ctx.rpc.register(Packages, packageListHandlers())
     await ctx.rpc.register(writeOutcome, {
       check: async (input, call) => {
         await bound(input.sessionID)
