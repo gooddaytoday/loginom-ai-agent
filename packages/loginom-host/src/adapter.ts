@@ -4,6 +4,7 @@ export * as LoginomHost from "./adapter"
 
 import { randomUUID } from "node:crypto"
 import { transport, type Port } from "./transport"
+import type { CopyRequest } from "./package-copy"
 import { HostTaskScope } from "./task-scope"
 import { DashboardDelete, DashboardDeleteResult, DashboardOperation, DashboardVersionList, PublicationRef, PublicationSource, PublicationWrite, decodeDashboardDeleteResult } from "./dashboard"
 import type { DashboardStorageOperation } from "../../loginom-runtime/src/dashboard-storage.mjs"
@@ -120,6 +121,9 @@ export async function acquire(session: string) {
           await connection.request("scope", { run, mode, scope }, undefined, observe),
         )
       })
+    },
+    async packageCopy(input: CopyRequest) {
+      return queued(() => connection.request("packageCopy", { run, ...input }, 480_000, observe))
     },
     async tools() {
       return connection.request("tools", { run }, undefined, observe)

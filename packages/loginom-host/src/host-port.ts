@@ -6,6 +6,8 @@ import { hostException, hostFailure } from "./errors"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { HostTaskScope } from "./task-scope"
 import { DashboardDelete, DashboardRead, DashboardPublish } from "./dashboard"
+import { PackageRecheck } from "./package-access"
+import { CopyReply, CopyRequest } from "./package-copy"
 import { Schema } from "effect"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
 import { browserRecoveryToolName, isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
@@ -73,6 +75,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     string,
     {
       chat: string
+      sessionID: string
       lease?: NonNullable<ReturnType<typeof service.acquire>>
       calls: number
       dispatching: boolean
@@ -239,6 +242,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
           runs.set(input.run, {
             chat,
+            sessionID: input.session,
             calls: 0,
             dispatching: false,
             released: false,
@@ -360,6 +364,51 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         } finally {
           run.dashboardController = undefined
           run.dispatching = false
+          run.calls--
+          if (run.released && !run.calls) await release(input.run, run)
+        }
+        return
+      }
+      if (data.method === "packageCopy") {
+        const request = Schema.decodeUnknownSync(CopyRequest)(input)
+        if (run.scope?.profile === "loginom-dashboard" || run.applyingScope) throw Error("LOGINOM_SCOPE_DENIED")
+        if (run.browserDispatching) throw Error("LOGINOM_CALL_BUSY")
+        if (service.journal.pending().length) throw Error("LOGINOM_RECOVERY_REQUIRED")
+        run.browserDispatching = true
+        run.calls++
+        try {
+          const lease = await connectionLease(input.run, run)
+          const runtime = await service.runtime(lease.generation, run.chat, undefined, run.sessionID)
+          if (state.closed || run.released) throw Error("LOGINOM_RUN_ABORTED")
+          const id = await service.journal.begin(run.chat, lease.generation)
+          run.active.add(id)
+          const result = await runtime.request("packageCopy", request, 360_000)
+            .then(Schema.decodeUnknownSync(CopyReply))
+            .catch(() => undefined)
+          if (!result) {
+            await abandon(run)
+            service.markRuntimeStale(run.chat)
+            reply({ id: data.id, result: { failure: { code: "state_check_required", data: {} } } }, lease.generation)
+            return
+          }
+          // A reply acknowledges the command. The runtime's copy journal owns
+          // reconciliation and can read the original intent on the next call.
+          await service.journal.settle(id, true)
+          run.active.delete(id)
+          if ("failure" in result && result.failure.code === "package_busy") {
+            const candidate = { sessionID: run.sessionID, packagePath: result.failure.data.packagePath }
+            const access = Schema.is(PackageRecheck)(candidate)
+              ? await service.packageAccess(candidate, lease.generation, true).catch(() => undefined)
+              : undefined
+            if (access?.kind === "other_conversation") {
+              const dataForCopy = { packagePath: access.packagePath, kind: access.kind, sessionID: access.sessionId }
+              reply({ id: data.id, result: { failure: { code: "package_busy", data: dataForCopy } } }, lease.generation)
+              return
+            }
+          }
+          reply({ id: data.id, result }, lease.generation)
+        } finally {
+          run.browserDispatching = false
           run.calls--
           if (run.released && !run.calls) await release(input.run, run)
         }
@@ -607,7 +656,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             run.admitted.clear()
             run.catalog = new Set([prepareTool.name])
           }
-          const runtime = await service.runtime(lease.generation, run.chat, preparation)
+          const runtime = await service.runtime(lease.generation, run.chat, preparation, run.sessionID)
           if (packageAborted()) throw new Error("LOGINOM_RUN_ABORTED")
           const packageArtifact = packageAdmission
             ? await runtime.request("admit", packageAdmission).then((value) => {
@@ -683,7 +732,24 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             }
           }
           if (isBrowserRecoveryTool(input.name)) run.recovery = recoveryPhase(result.result, run.recovery)
-          reply({ id: data.id, result: result.result }, lease.generation)
+          const candidate = input.name === prepareTool.name && "packagePath" in result
+            ? { sessionID: run.sessionID, packagePath: result.packagePath }
+            : undefined
+          const packageAccess = Schema.is(PackageRecheck)(candidate)
+            ? await service.packageAccess(candidate, lease.generation).catch(() => undefined)
+            : undefined
+          const body = result.result
+          if (packageAccess && body && typeof body === "object") {
+            const meta = "_meta" in body && body._meta && typeof body._meta === "object" ? body._meta : {}
+            const fields =
+              "loginomFields" in meta && meta.loginomFields && typeof meta.loginomFields === "object"
+                ? meta.loginomFields
+                : {}
+            const enriched = { ...body, _meta: { ...meta, loginomFields: { ...fields, packageAccess } } }
+            reply({ id: data.id, result: enriched }, lease.generation)
+          } else {
+            reply({ id: data.id, result: body }, lease.generation)
+          }
         } catch (error) {
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
           // A journal write failure precedes runtime dispatch and cannot establish

@@ -20,6 +20,8 @@ import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
+import { packageAccessRpc, visiblePackageAccess } from "./package-access"
+import { registerPackageCopy } from "./package-copy"
 import {
   classify,
   declinedText,
@@ -526,6 +528,17 @@ export default Plugin.define({
       check: async (value) => {
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)
         return code ? { code } : {}
+      },
+    })
+    await registerPackageCopy(ctx, async (sessionID) =>
+      !dashboard() && !await rules({ sessionID }, "loginom_package_copy"),
+    )
+    await ctx.rpc.register(packageAccessRpc, {
+      recheck: async (input) => {
+        await ctx.session.get({ sessionID: input.sessionID })
+        const value = await ServiceHost.recheckPackage(input).catch(() => undefined)
+        return (await visiblePackageAccess(value, (sessionID) => ctx.session.get({ sessionID })))
+          ?? { packagePath: input.packagePath, kind: "unavailable" as const }
       },
     })
     // A dashboard's folder before its chat (B2.9h): Desktop and the CLI ask on the Location of their own working directory.

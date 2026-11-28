@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, unlink } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink } from "node:fs/promises"
 import { MessageChannel } from "node:worker_threads"
 import { Schema } from "effect"
 import { Agent } from "@opencode/schema/agent"
@@ -46,6 +46,14 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       new URL("../../loginom-runtime/src/dashboard-storage.mjs", import.meta.url),
       "utf8",
     ),
+    "runtime/src/package-copy-storage.mjs": await readFile(
+      new URL("../../loginom-runtime/src/package-copy-storage.mjs", import.meta.url),
+      "utf8",
+    ),
+    "runtime/client/lib/package-copy.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/package-copy.mjs", import.meta.url),
+      "utf8",
+    ),
     "runtime/src/resources.mjs": `export async function verifyResources() {
       return { manifestHash: 'fixture', manifest: { actionManifestSha256: 'fixture' } };
     }`,
@@ -56,7 +64,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         const context = Object.assign(new EventEmitter(), { pages: () => [], close: async () => {} });
         onContextCreated?.(context);
         context.emit('response', { url: () => 'http://example.test/app/', fromServiceWorker: () => false });
-        return { context };
+        return { context, page: { async evaluate() { return true; } } };
       };
       export const reauthenticateReloadedPage = async () => { throw Error('work state fixture does not log in again'); };`,
     "runtime/client/package.json": JSON.stringify({ type: "module" }),
@@ -74,6 +82,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     ),
     "runtime/client/lib/step-progress.mjs": await readFile(
       new URL("../../loginom-runtime/client/lib/step-progress.mjs", import.meta.url),
+      "utf8",
+    ),
+    "runtime/client/lib/loginom-feed-metadata.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/loginom-feed-metadata.mjs", import.meta.url),
       "utf8",
     ),
     "runtime/client/lib/catalog.mjs": await readFile(
@@ -95,12 +107,32 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
        export const artifactFailure=artifacts.artifactFailure ?? (()=>null);`,
     "runtime/client/lib/bridge.mjs": `
       import { readFileSync } from 'node:fs';
+      import { mkdir, readFile, writeFile } from 'node:fs/promises';
+      import { dirname } from 'node:path';
+      import { withLoginomMetadata } from './loginom-feed-metadata.mjs';
+      import { loginomFeedMetadata } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/user-results.mjs", import.meta.url).href)};
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
-      export async function createBridge() { return {
+      export async function createBridge(_config, _session, { packageCopy, presentNodeReply }) { return {
         server: { connect: async () => {} }, close: async () => ({
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
+        async packageCopy(action, input, signal) {
+          signal.throwIfAborted();
+          if (action === 'save-version') return JSON.parse(await readFile(packageCopy.file, 'utf8'));
+          if (action !== 'replace-original' || input.confirmed !== true) throw Error('unexpected copy action');
+          if (!await packageCopy.storage.exists('/user/Plan.lgp')) throw Error('wrong Loginom window');
+          const replacement = { path:'/user/Plan.lgp', backupPath:'/user/Plan — до правки.lgp' };
+          await mkdir(dirname(packageCopy.file), { recursive:true });
+          await writeFile(packageCopy.file, JSON.stringify(replacement));
+          return replacement;
+        },
+        applyWithScanReceipt: reply => presentNodeReply(
+          withLoginomMetadata(reply, {operationId:reply.structuredContent.operation_id, state:'settled', verificationStale:true}),
+          options => {
+            if (reply.structuredContent.projectionError) throw Error('Projection error with password: private-password');
+            return loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'});
+          }),
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -113,6 +145,16 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
         async callTool(input, _unused, { signal }) {
           if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
+          if (input.arguments.packageFacts) return {
+            content: [{ type: 'text', text: 'package prepared' }],
+            _meta: {
+              loginom: { v: 1, operationId: 'prepare-operation', state: 'settled', verificationStale: true },
+              loginomFields: {
+                agentCopy: { originalPath: '/original.lgp', path: '/copy.lgp' },
+                packageAccess: { packagePath: '/copy.lgp', kind: 'writable' },
+              },
+            },
+          };
           if (input.arguments.progressFixture) {
             const { stepPhase } = await import('../../../../lib/step-progress.mjs');
             stepPhase('configuring', 'transform.group_data', { kind: 'fields', index: 2, total: 3 });
@@ -140,16 +182,17 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     await Bun.write(target, contents)
   }
   await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false }))
-  const runtime = await supervise({
+  const start = (generation: number, url = "http://example.test") => supervise({
     node,
     entry: join(src, "managed-entry.mjs"),
     resources: directory,
     stateDir: join(directory, "state"),
-    generation: 1,
+    generation,
     chat: "chat",
-    connection: { url: "http://example.test", username: "user", apiKey: "fixture", password: "" },
+    connection: { url, username: "user", apiKey: "fixture", password: "private-password" },
     environment: {},
   })
+  const runtime = await start(1)
   try {
     expect(await readFile(join(src, "managed-entry.mjs"), "utf8")).toBe(
       await readFile(new URL("../../loginom-runtime/src/managed-entry.mjs", import.meta.url), "utf8"),
@@ -176,6 +219,70 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       recoveryPending: false,
       activeWork: false,
     })
+    expect(await runtime.request("packageCopy", { action: "replace-original", confirmed: true })).toEqual({
+      output: { path: "/user/Plan.lgp", backupPath: "/user/Plan — до правки.lgp" },
+    })
+    const receipt = {
+      result_version: "user-v1",
+      operation_id: "test-operation",
+      state: "settled",
+      status: "SUCCEEDED",
+      node: { node_id: "node-guid", label: "test node", type: "transform.filter_data" },
+      output: {
+        ports: [
+          {
+            port: 0,
+            port_guid: "port-guid",
+            fresh: true,
+            row_count: 3,
+            sample_complete: true,
+            schema: [{ index: 0, name: "test_name", type: "string" }],
+            sample: ["contest result", "fixture", "private-password"].map((value) => [{ type: "string", value }]),
+          },
+        ],
+      },
+    }
+    const content = [{ type: "text", text: JSON.stringify(receipt) }]
+    expect(
+      await runtime.request("call", {
+        name: "dock_node_apply",
+        arguments: { content, structuredContent: receipt },
+        scanReceipt: {},
+      }),
+    ).toMatchObject({
+      result: {
+        content,
+        _meta: {
+          loginom: {
+            operationId: "test-operation",
+            node: { label: "test node" },
+            verificationStale: true,
+            ports: [
+              {
+                preview: {
+                  schema: [{ name: "test_name" }],
+                  sample: [[{ value: "contest result" }], [{ value: "[redacted]" }], [{ value: "[redacted]" }]],
+                },
+              },
+            ],
+          },
+        },
+      },
+    })
+    const projectionFailure = await runtime.request("call", {
+      name: "dock_node_apply",
+      arguments: { content, structuredContent: { ...receipt, projectionError: true } },
+      scanReceipt: {},
+    })
+    expect(projectionFailure).toMatchObject({ result: { content } })
+    const attempts = join(directory, "state/generations/1/chats/chat/attempts")
+    const [attempt] = await readdir(attempts)
+    const journal = await readFile(join(attempts, attempt, "execution-events.jsonl"), "utf8")
+    expect(journal).not.toContain("private-password")
+    expect(JSON.parse(journal.trim())).toMatchObject({
+      phase: "feed_projection_failed",
+      error: { message: "Projection error with password: [redacted]" },
+    })
     const call = runtime
       .request("call", { name: "fixture", arguments: { hold: true } })
       .catch((error: unknown) => error)
@@ -186,6 +293,14 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
   } finally {
     await runtime.close()
     expect(await runtime.exited).toEqual({ code: 0, signal: null })
+    const updated = await start(2, "http://example.test/?testable=true")
+    try {
+      expect(await updated.request("packageCopy", { action: "save-version" })).toEqual({
+        output: { path: "/user/Plan.lgp", backupPath: "/user/Plan — до правки.lgp" },
+      })
+    } finally {
+      await updated.close()
+    }
   }
   // All error-producing admission, managed entry, supervision, HostPort,
   // transport and adapter code is production code. Only browser/Help are fixtures.
@@ -263,7 +378,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
           reload: async () => undefined,
         },
         model: { list: async () => { throw Error("No model access in fixture") } },
-        session: { context: async () => [] },
+        session: { context: async () => [], get: async () => { throw Error("Unexpected session lookup") } },
       },
       files: { ask: async () => undefined, snapshot: async () => { throw Error("Unexpected file snapshot") } },
       profiles: directory,
@@ -293,6 +408,18 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       { loginomStep: { version: 1, phase: "configuring", nodeType: "transform.group_data", substep: { kind: "fields", index: 2, total: 3 }, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
       { loginomStep: { version: 1, phase: "reading", nodeType: "transform.group_data", substep: null, startedAt: expect.any(Number), lastReplyAt: expect.any(Number), stalledSince: null } },
     ])
+    expect(await tool.execute({ packageFacts: true }, {
+      sessionID, messageID, agent: Agent.ID.make("fixture"), id: Tool.CallID.make("package-facts"),
+      signal: new AbortController().signal,
+      progress: async () => undefined,
+    })).toEqual({
+      content: "package prepared",
+      metadata: { generation: 1, loginom: {
+        v: 1, operationId: "prepare-operation", state: "settled", verificationStale: true,
+        agentCopy: { originalPath: "/original.lgp", path: "/copy.lgp" },
+        packageAccess: { packagePath: "/copy.lgp", kind: "writable" },
+      } },
+    })
     await Bun.sleep(1_600)
     expect(updates).toHaveLength(2)
     for (const [name, code] of [
@@ -316,7 +443,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       expect(error).toMatchObject({ message: code })
       if (name === "oversize")
         expect(error).toMatchObject({ details: { actual: 16 * 1024 * 1024 + 1, limit: 16 * 1024 * 1024 } })
-      const text = error instanceof Error ? error.message + JSON.stringify("details" in error ? error.details : undefined) : String(error)
+      const text =
+        error instanceof Error
+          ? error.message + JSON.stringify("details" in error ? error.details : undefined)
+          : String(error)
       expect(text).toContain(code)
       expect(text).not.toMatch(/secret|sourcePath|\/private|stack|AAAA/)
       expect(host.journal.pending()).toEqual([])

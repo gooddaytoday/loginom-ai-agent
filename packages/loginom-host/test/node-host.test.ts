@@ -8,7 +8,7 @@ import { launchNodeHost, NodeHostStartupError } from "../src/node-client"
 import { verifyInstallationResources } from "../src/host"
 import { connectionStore } from "../src/connection/connection-store"
 import { cliCredentials } from "../src/connection/cli-credentials"
-import { stageHeldKnowledge } from "./fixtures/knowledge"
+import { stageHeldKnowledge, stageKnowledgeFixture } from "./fixtures/knowledge"
 import { constants } from "node:fs"
 
 const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_TEST_NODE ?? "" }
@@ -134,6 +134,143 @@ test("bundled Node host handshakes without Electron, manages its profile and clo
   expect(host.alive).toBe(false)
   expect(await host.exited).toEqual({ code: 0, signal: null })
   await expect(host.request("connection.status", {})).rejects.toThrow("LOGINOM_HOST_CLOSED")
+}, 15_000)
+
+test("package recheck distinguishes a live app conversation, an external marker and release", async () => {
+  const directory = await mkdtemp(join(fixture.directory, "package-recheck-"))
+  const resources = join(directory, "resources")
+  const root = join(directory, "profile")
+  const stateFile = join(directory, "packages.json")
+  const startupGate = join(directory, "startup-release")
+  const packagePath = "/user/shared/plan.lgp"
+  const writer = "ses_writer"
+  const reader = "ses_reader"
+  const writerChat = createHash("sha256").update(writer).digest("hex")
+  const starting = "ses_starting"
+  const startingChat = createHash("sha256").update(starting).digest("hex")
+  await stageKnowledgeFixture(resources)
+  await mkdir(join(resources, "bin"))
+  await symlink(fixture.node, join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"))
+  await writeFile(join(resources, "resource-manifest.json"), JSON.stringify({ endpoint: "http://example.test" }))
+  await writeFile(join(resources, "runtime/src/managed-entry.mjs"), `
+    import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+    let writer = false;
+    const packagePath = ${JSON.stringify(packagePath)};
+    process.on('message', m => {
+      const send = result => process.send({id:m.id,result});
+      switch (m.operation) {
+        case 'start': {
+          writer = m.input.chat === ${JSON.stringify(writerChat)};
+          const ready = () => send({protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true});
+          if (m.input.chat !== ${JSON.stringify(startingChat)}) return ready();
+          const gate = ${JSON.stringify(startupGate)};
+          writeFileSync(gate + '.entered', '');
+          const timer = setInterval(() => {
+            if (!existsSync(gate)) return;
+            clearInterval(timer);
+            ready();
+          }, 5);
+          return;
+        }
+        case 'call':
+          return send({result:{content:[],_meta:{existing:true,loginomFields:{verificationStale:true,agentCopy:{originalPath:'/original.lgp',path:packagePath}}}}, recoveryPending:false,
+            ...(!writer && {packagePath})});
+        case 'packageCopy': {
+          if (m.input.action === 'discard') return send({ failure: { code:'not_applied', data:{} } });
+          if (m.input.action === 'save-version') return send({ failure: { code:'state_check_required', data:{} } });
+          if (m.input.action !== 'replace-original' || m.input.confirmed !== true)
+            return send({ failure: { code:'copy_missing', data:{} } });
+          return send({ failure: { code:'package_busy', data:{packagePath,kind:'other_loginom_session'} } });
+        }
+        case 'packageAccess': {
+          const state = JSON.parse(readFileSync(${JSON.stringify(stateFile)}, 'utf8'));
+          return send(writer
+            ? {packages:state.writer ? [{path:state.writer,readOnly:false}] : []}
+            : {packages:[{path:packagePath,readOnly:!state.writable}],lockMarker:state.marker});
+        }
+        case 'interrupt': return send({interrupted:true});
+        case 'close': return process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      }
+    });
+  `)
+  await mkdir(root, { recursive: true, mode: 0o700 })
+  if (process.platform === "darwin") await buildKeychain(join(resources, "bin"))
+  const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources }))
+  await store.stage({
+    generation: 1, revision: 1, url: "http://example.test", username: "user", apiKey: "", password: "",
+  })
+  await store.activate(1)
+  const host = await launchNodeHost({ node: fixture.node, entry: fixture.entry, root, resources, headless: true })
+  const recheck = (path = packagePath) => host.request("package.recheck", { sessionID: reader, packagePath: path })
+  const setPackages = (writer: string | null, marker: string, writable = false) =>
+    writeFile(stateFile, JSON.stringify({ writer, marker, writable }))
+  const prepare = async (session: string) => {
+    await host.request("acquire", { run: session, session })
+    await host.request("scope", {
+      run: session, mode: "bind", scope: { taskMessageID: "msg_original", profile: "loginom-automation" },
+    })
+    try {
+      return await host.request("call", { run: session, name: "dock_prepare", args: {}, userMessage: "msg_original" })
+    } finally {
+      await host.request("release", { run: session })
+    }
+  }
+  try {
+    await host.request("connection.ready", {})
+    expect(await recheck()).toEqual({ packagePath, kind: "unavailable" })
+    await setPackages(packagePath, "present")
+    await prepare(writer)
+    const owned = { packagePath, kind: "other_conversation", sessionId: writer }
+    await host.request("acquire", { run: reader, session: reader })
+    try {
+      expect(await host.request("packageCopy", { run: reader, action: "discard" }))
+        .toEqual({ failure: { code: "not_applied", data: {} } })
+      expect(await host.request("packageCopy", { run: reader, action: "save-version" }))
+        .toEqual({ failure: { code: "state_check_required", data: {} } })
+      expect(await host.request("packageCopy", {run:reader, action:"replace-original", confirmed:true}))
+        .toEqual({failure:{code:"package_busy", data:{packagePath, kind:"other_conversation", sessionID:writer}}})
+    } finally {
+      await host.request("release", { run: reader })
+    }
+    expect(await prepare(reader)).toEqual({
+      content: [],
+      _meta: { existing: true, loginomFields: {
+        verificationStale: true,
+        agentCopy: { originalPath: "/original.lgp", path: packagePath },
+        packageAccess: owned,
+      } },
+    })
+    const pending = prepare(starting)
+    try {
+      const signal = AbortSignal.timeout(2_000)
+      while (!(await Bun.file(startupGate + ".entered").exists())) {
+        signal.throwIfAborted()
+        await Bun.sleep(5)
+      }
+      const timeout = Promise.withResolvers<undefined>()
+      const timer = setTimeout(() => timeout.resolve(undefined), 2_000)
+      try {
+        expect(await Promise.race([recheck(), timeout.promise])).toEqual(owned)
+      } finally {
+        clearTimeout(timer)
+      }
+    } finally {
+      await writeFile(startupGate, "")
+      await pending
+    }
+
+    await setPackages("/another-folder/plan.lgp", "present")
+    expect(await recheck()).toEqual({ packagePath, kind: "other_loginom_session" })
+    await setPackages(null, "not_observed")
+    expect(await recheck()).toEqual({ packagePath, kind: "read_only", lockMarker: "not_observed" })
+    await setPackages(null, "unknown", true)
+    expect(await recheck()).toEqual({ packagePath, kind: "writable" })
+    const otherPath = "/user/other.lgp"
+    const unrelated = await recheck(otherPath)
+    expect(unrelated).toEqual({ packagePath: otherPath, kind: "unavailable" })
+  } finally {
+    await host.close()
+  }
 }, 15_000)
 
 test("host startup permits readiness after 30 seconds and still closes completely", async () => {

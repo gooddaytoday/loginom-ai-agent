@@ -1,5 +1,7 @@
+import { packageCopyStorage } from './package-copy-storage.mjs'
+import { PackageCopyError } from '../client/lib/package-copy.mjs'
 import { createRequire } from "node:module"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { appendFile, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
@@ -16,6 +18,7 @@ import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
 import { observeLoginomReplies, withStepProgress } from "../client/lib/step-progress.mjs"
+import { withLoginomMetadata } from "../client/lib/loginom-feed-metadata.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -33,6 +36,7 @@ const state = {
   controller: undefined,
   session: undefined,
   browser: undefined,
+  windowPage: undefined,
   browserProfile: undefined,
   browserServer: undefined,
   lastLoginomReplyAt: null,
@@ -182,6 +186,7 @@ async function handle(message) {
         process.platform === "win32" ? await mkdtemp(join(tmpdir(), "lb")) : join(directory, "browser-profile")
       state.browserProfile = process.platform === "win32" ? browserProfile : undefined
       await startupPhase({ phase: "runtime.profile", status: "ready", duration_ms: Math.round(performance.now() - profileStarted) })
+      const knownSecrets = [input.connection.apiKey, input.connection.password]
       const login = {
         browserPath: resources.browserPath,
         profile: browserProfile,
@@ -192,7 +197,7 @@ async function handle(message) {
         signal: state.startupController.signal,
         deadline,
         onPhase: startupPhase,
-        onRetry: createExecutionJournal({ directory, metadata: { sessionId: input.chat,
+        onRetry: createExecutionJournal({ directory, knownSecrets, metadata: { sessionId: input.chat,
           clientRevision: resources.manifestHash, actionManifestDigest: resources.manifest.actionManifestSha256 } }),
       }
       if (input.validation === true) {
@@ -211,11 +216,17 @@ async function handle(message) {
           })
         } })
       state.browser = authenticated.context
-      state.owner.origin = new URL(input.connection.url).origin
+      state.windowPage = authenticated.page
+      const loginomUrl = loginomAddress(input.connection.url)
+      const address = new URL(loginomUrl)
+      state.owner.origin = address.origin
+      state.owner.pathname = address.pathname
+      state.owner.account = input.connection.username
+      const copyScope = createHash("sha256").update(JSON.stringify([address.origin, address.pathname, state.owner.account])).digest("hex")
       const config = {
         resources: input.resources,
         // Preparation must bind to the same canonical path used by private login.
-        loginomUrl: loginomAddress(input.connection.url),
+        loginomUrl,
         stateDir: input.stateDir,
         agent: "loginom-ai-agent",
         adapterRevision: "1",
@@ -254,7 +265,23 @@ async function handle(message) {
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
       state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+        packageCopy: {
+          file: join(input.stateDir, "package-copies", copyScope, input.chat, "package-copy.json"),
+          root: state.uploadDirectory,
+          storage: packageCopyStorage(state.windowPage, {url:config.loginomUrl, account:input.connection.username}),
+        },
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
+        presentNodeReply: async (reply, project) => {
+          const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
+          let result = reply
+          try {
+            result = withLoginomMetadata(reply, { receipt: project({ outputFiles, knownSecrets }) })
+          } catch (error) {
+            await login.onRetry({ phase: "feed_projection_failed", error: startupDiagnostic(error, knownSecrets) })
+              .catch(() => { session.metadata.localDiagnosticsIncomplete = true })
+          }
+          return outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result
+        },
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
           state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,
             [input.connection.apiKey, input.connection.password, input.connection.username]) })
@@ -285,6 +312,32 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "packageCopy") {
+      const { action, ...input } = message.input ?? {}
+      if (!["save-version", "undo-save", "replace-original", "restore-previous", "discard"].includes(action))
+        throw Error("LOGINOM_REQUEST_INVALID")
+      if (state.controller) throw Error("LOGINOM_CALL_BUSY")
+      const controller = new AbortController()
+      state.controller = controller
+      try {
+        const output = await state.bridge.packageCopy(action, input, controller.signal)
+        send({ id:message.id, result:{ output } })
+      } catch (error) {
+        send({ id:message.id, result:{ failure:error instanceof PackageCopyError
+          ? {code:error.code, data:error.data} : {code:"state_check_required", data:{}} } })
+      } finally {
+        state.controller = undefined
+      }
+      return
+    }
+    if (message.operation === "packageAccess") {
+      const { observePackages } = await import("./package-access.mjs")
+      const page = state.windowPage
+      const binding = { origin: state.owner.origin, pathname: state.owner.pathname, account: state.owner.account }
+      const result = page ? await observePackages(page, binding, message.input?.packagePath) : null
+      send({ id: message.id, result })
+      return
+    }
     if (["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"].includes(message.operation)) {
       if (message.operation === "dashboardVersions" || message.operation === "dashboardDelete") {
         if (message.input?.generation !== state.owner.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
@@ -384,11 +437,17 @@ async function handle(message) {
         : message.input.scanReceipt !== undefined
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
           : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options))
-      const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
+      const outputFiles = result._meta?.loginom && Array.isArray(result._meta.outputFiles)
+        ? result._meta.outputFiles : await state.session.artifactStore.outputFiles(result.structuredContent)
+      const pkg = state.session.metadata.workspacePreparation?.state?.package_ref
+      const packagePath = message.input.name === "dock_prepare" && result.isError !== true
+        && state.session.metadata.workspaceReady === true && pkg?.persisted === true && pkg.read_only === true
+        ? pkg.path : undefined
       send({
         id: message.id,
         result: {
           result: outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result,
+          ...(typeof packagePath === "string" ? { packagePath } : {}),
           recoveryPending: state.bridge.hasUnsettledWork(),
           activeWork: state.bridge.hasActiveWork(),
         },

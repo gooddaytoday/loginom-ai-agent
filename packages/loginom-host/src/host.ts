@@ -2,7 +2,9 @@ import { inputStore, type InputFile } from "./inputs"
 import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
+import { SessionID } from "@opencode/schema/session-id"
+import { PackageObservation, type PackageAccess, type PackageRecheck } from "./package-access"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
@@ -237,6 +239,7 @@ export async function createLoginomHost(options: {
   const restarts = new Map<string, number>()
   const lost = new Set<string>()
   const stale = new Set<string>()
+  const conversations = new WeakMap<Promise<Runtime>, SessionID>()
   const startupCleanup = { failed: false }
   const shutdown = { failed: false }
   const validationCache = {
@@ -812,6 +815,51 @@ export async function createLoginomHost(options: {
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
     },
+    async packageAccess(input: typeof PackageRecheck.Type, expectedGeneration?: number, observedBusy = false): Promise<PackageAccess> {
+      const { sessionID, packagePath } = input
+      const unavailable = { packagePath, kind: "unavailable" } as const
+      const { generation } = await service.api.status()
+      if (expectedGeneration !== undefined && generation !== expectedGeneration) return unavailable
+      const children = generations.get(generation)?.children
+      if (!children) return unavailable
+      const chat = createHash("sha256").update(sessionID).digest("hex")
+      const current = children.get(chat)
+      const live = (key: string, child: Promise<Runtime>) =>
+        children.get(key) === child && !lost.has(key) && !stale.has(key)
+      if (!current || !live(chat, current) || conversations.get(current) !== sessionID) return unavailable
+      const observe = async (child: Promise<Runtime>, path?: string) => {
+        try {
+          const runtime = await child
+          return Schema.decodeUnknownSync(PackageObservation)(
+            await runtime.request("packageAccess", path ? { packagePath: path } : undefined, 5_000),
+          )
+        } catch {
+          return null
+        }
+      }
+      const observed = observedBusy ? null : await observe(current, packagePath)
+      if ((await service.api.status()).generation !== generation || !live(chat, current)) return unavailable
+      const target = observed?.packages.find((pkg) => pkg.path === packagePath)
+      if (!target && !observedBusy) return unavailable
+      if (target?.readOnly === false) return { packagePath, kind: "writable" }
+      const peers = [...children.entries()].flatMap(([key, child]) => {
+        const id = conversations.get(child)
+        return key !== chat && id && live(key, child) ? [{ key, child, id }] : []
+      })
+      const owners = await Promise.all(
+        peers.map(async (peer) => ({
+          ...peer,
+          writes: (await observe(peer.child))?.packages.some((pkg) => pkg.path === packagePath && !pkg.readOnly),
+        })),
+      )
+      if ((await service.api.status()).generation !== generation || !live(chat, current)) return unavailable
+      const holders = owners.filter((peer) => peer.writes && live(peer.key, peer.child))
+      const holder = holders.length === 1 ? holders[0] : undefined
+      if (holder) return { packagePath, kind: "other_conversation", sessionId: holder.id }
+      const lockMarker = observed?.lockMarker ?? "unknown"
+      if (observedBusy || lockMarker === "present") return { packagePath, kind: "other_loginom_session" }
+      return { packagePath, kind: "read_only", lockMarker }
+    },
     async workState(generation: number, chat: string) {
       // Inspect only the existing owner. Losing it is uncertainty, not evidence of idle work.
       if (lost.has(chat) || stale.has(chat)) throw new Error("LOGINOM_RUNTIME_UNAVAILABLE")
@@ -831,7 +879,12 @@ export async function createLoginomHost(options: {
         throw new Error("LOGINOM_REPLY_INVALID")
       return { activeWork: result.activeWork, unsettledWork: result.unsettledWork, dispatching: result.dispatching }
     },
-    async runtime(generation: number, chat: string, startup?: { deadline: number; signal: AbortSignal }) {
+    async runtime(
+      generation: number,
+      chat: string,
+      startup?: { deadline: number; signal: AbortSignal },
+      sessionID?: string,
+    ) {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       const previous = current.children.get(chat)
@@ -842,7 +895,7 @@ export async function createLoginomHost(options: {
         restarts.set(chat, count + 1)
         lost.delete(chat)
       }
-      return retain(
+      const child = retain(
         current,
         chat,
         launch(current.connection, chat, "chat", startup?.signal, startup?.deadline).then(
@@ -857,6 +910,11 @@ export async function createLoginomHost(options: {
           },
         ),
       )
+      if (Schema.is(SessionID)(sessionID)) {
+        // Index ready windows so a recheck does not wait for another chat to log in.
+        void child.then(() => conversations.set(child, sessionID), () => undefined)
+      }
+      return child
     },
   }
 }

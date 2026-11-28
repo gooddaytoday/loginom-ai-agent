@@ -7,6 +7,7 @@ import { chatId, loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"
 import { hostFailure } from "./errors"
 import { DashboardRead } from "./dashboard"
+import { PackageRecheck } from "./package-access"
 
 if (!process.send) throw new Error("LOGINOM_PRIVATE_IPC_REQUIRED")
 
@@ -135,6 +136,11 @@ async function dispatch(message: unknown) {
       return
     }
     if (!state.host) throw new Error("LOGINOM_HOST_NOT_READY")
+    if (message.method === "package.recheck") {
+      const result = await state.host.packageAccess(Schema.decodeUnknownSync(PackageRecheck)(input))
+      reply({ id: message.id, result })
+      return
+    }
     if (message.method === "dashboard.read") {
       const result = await state.host.readDashboard(Schema.decodeUnknownSync(DashboardRead)(input))
       reply({ id: message.id, result })
