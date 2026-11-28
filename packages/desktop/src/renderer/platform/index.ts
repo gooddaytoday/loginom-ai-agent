@@ -25,7 +25,6 @@ export function createDesktopPlatform(api: ElectronAPI, windowState: DesktopWind
     ...createDesktopFiles(api, os),
     ...createDesktopStorage(api),
     exportDebugLogs: () => api.exportDebugLogs(),
-    showLoginomWindow: (sessionID) => api.showLoginomWindow(sessionID),
     setForceFocus: (enabled) => api.setForceFocus(enabled),
     recordFatalRendererError: (error) => api.recordFatalRendererError(error),
     restart: async () => api.relaunch(),

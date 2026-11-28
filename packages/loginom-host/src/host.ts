@@ -18,7 +18,7 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
-import type { WindowBounds, WindowPlacement } from "./browser-window"
+import { startupWindowBounds, type WindowBounds, type WindowPlacement } from "./browser-window"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -211,6 +211,7 @@ export async function createLoginomHost(options: {
   codec: CredentialCodec
   environment?: NodeJS.ProcessEnv
   headless?: boolean
+  desktopWindow?: boolean
   preflightHeadless?: boolean
   strictRecovery?: boolean
   closeSavedPackageOnShutdown?: boolean
@@ -457,6 +458,8 @@ export async function createLoginomHost(options: {
     const manifest = JSON.parse(await readFile(join(resources, "resource-manifest.json"), "utf8"))
     // Mutate cache state only after the existing resource-verification admission.
     const httpCache = validationHttpCache && await prepareValidationCache(connection)
+    const desktopWindow = purpose === "chat" && options.desktopWindow === true && !options.headless
+    const windowBounds = desktopWindow ? await startupWindowBounds(root, chat) : undefined
     return supervise(
       {
         node: join(resources, "bin", process.platform === "win32" ? "node.exe" : "node"),
@@ -470,7 +473,8 @@ export async function createLoginomHost(options: {
         validationHttpCache: httpCache,
         // CLI supplies its explicit browser policy for background launches too.
         headless: purpose === "chat" ? options.headless === true : (options.preflightHeadless ?? true),
-        desktopWindow: purpose === "chat" && environment.LOGINOM_AI_AGENT_SERVICE_IDENTITY === "desktop",
+        desktopWindow,
+        windowBounds,
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
         browserRecovery: !validation && options.browserRecovery === true,
         environment,
@@ -650,9 +654,10 @@ export async function createLoginomHost(options: {
     const chat = createHash("sha256").update(sessionID).digest("hex")
     const child = current?.children.get(chat)
     if (!child || stale.has(chat)) return "no-window"
-    const runtime = await Promise.race([child.catch(() => undefined), setTimeout(1000, undefined, { ref: false })])
-    if (!runtime || current?.children.get(chat) !== child || stale.has(chat)) return "no-window"
-    return runtime.request(operation, bounds, 2000).catch(() => "no-window")
+    const runtime = await Promise.race([child.catch(() => undefined), setTimeout(250, "starting" as const, { ref: false })])
+    if (current?.children.get(chat) !== child || stale.has(chat) || !runtime) return "no-window"
+    if (runtime === "starting") return runtime
+    return runtime.request(operation, bounds, 2700).catch(() => operation === "placeWindow" ? "layout-unavailable" : "manual")
   }
   return {
     ...service,

@@ -212,6 +212,7 @@ function nodeHost(root: string, resources: string) {
       // recovery holds for a server of a CLI profile started with it, as for each process of 0.4's CLI; never for
       // Desktop's (`loginom-host/AGENTS.md`).
       headless: process.env.LOGINOM_AI_AGENT_HEADLESS === "1",
+      desktopWindow: process.env.LOGINOM_AI_AGENT_SERVICE_IDENTITY === "desktop",
       // Desktop's service gets the application version (B4.9), as 0.4's Desktop Host did; a built CLI's Host reads its
       // version from `cli-manifest.json`, so a profile's service ignores the value a Desktop terminal passed down.
       resourceVersion:

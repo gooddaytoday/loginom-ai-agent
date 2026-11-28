@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { createHash } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { access, mkdir, mkdtemp, readFile, readdir, rm, symlink } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -30,7 +30,7 @@ test("work state of an unconfigured chat is local and never creates a runtime", 
   }
 })
 
-async function fixture() {
+async function fixture(desktopWindow = false) {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "loginom-work-state-"))
@@ -55,7 +55,9 @@ async function fixture() {
       if (message.operation === 'start') {
         chat = message.input.chat;
         appendFileSync(${JSON.stringify(launches)}, JSON.stringify({ chat, bounds: message.input.windowBounds }) + '\\n');
-        send({ protocol: 1, generation: message.input.generation, chat: message.input.chat, ready: true });
+        const ready = () => send({ protocol: 1, generation: message.input.generation, chat: message.input.chat, ready: true });
+        if (message.input.windowBounds) setTimeout(ready, 600);
+        else ready();
       }
       if (message.operation === 'showWindow') {
         appendFileSync(${JSON.stringify(launches)}, JSON.stringify({ shown: chat }) + '\\n');
@@ -86,7 +88,7 @@ async function fixture() {
     password: "",
   })
   await store.activate(1)
-  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {} })
+  const host = await createLoginomHost({ root, resources, codec: credentials("linux"), environment: {}, desktopWindow })
   await host.settled()
   await waitForKnowledge(host)
   return {
@@ -151,17 +153,29 @@ test("malformed work status is rejected instead of authorizing an idle transitio
 })
 
 test("window placement and show apply only to the named chat and show never starts Chromium", async () => {
-  const f = await fixture()
+  const f = await fixture(true)
   const sessionID = "ses_desktop"
   const desktop = createHash("sha256").update(sessionID).digest("hex")
   const cli = createHash("sha256").update("ses_cli").digest("hex")
   const bounds = { x: 1000, y: -100, width: 620, height: 880 }
+  const token = randomUUID()
+  const endpoint = Bun.serve({
+    hostname: "127.0.0.1", port: 0,
+    fetch(request) {
+      if (new URL(request.url).pathname !== `/${desktop}` || request.headers.get("authorization") !== `Bearer ${token}`)
+        return new Response(null, { status: 404 })
+      return Response.json(bounds)
+    },
+  })
   try {
+    await Bun.write(join(f.root, "window-layout.json"), JSON.stringify({ port: endpoint.port, token }))
     expect(await f.host.placeWindow({ sessionID, bounds })).toBe("no-window")
     expect(await f.host.showWindow(sessionID)).toBe("no-window")
     await expect(access(f.launches)).rejects.toMatchObject({ code: "ENOENT" })
     await f.host.runtime(1, cli)
-    const runtime = await f.host.runtime(1, desktop)
+    const starting = f.host.runtime(1, desktop)
+    expect(await f.host.showWindow(sessionID)).toBe("starting")
+    const runtime = await starting
     expect(await f.host.placeWindow({ sessionID, bounds })).toBe("placed")
     expect(await f.host.showWindow(sessionID)).toBe("focused")
     await runtime.request("fixture.exit")
@@ -169,9 +183,10 @@ test("window placement and show apply only to the named chat and show never star
     expect(await f.host.showWindow(sessionID)).toBe("no-window")
     const log = await readFile(f.launches, "utf8")
     expect(log.trim().split("\n").map((line) => JSON.parse(line))).toEqual([
-      { chat: cli }, { chat: desktop }, { placed: desktop, bounds }, { shown: desktop },
+      { chat: cli }, { chat: desktop, bounds }, { placed: desktop, bounds }, { shown: desktop },
     ])
   } finally {
+    await endpoint.stop(true)
     await f.close()
   }
 })

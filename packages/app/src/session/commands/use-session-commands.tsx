@@ -312,20 +312,6 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     if (sessionID) exporter.export({ server: server.key, sessionID })
   }
 
-  const showLoginomWindow = async () => {
-    const sessionID = actions.session.identity.params.id
-    if (!sessionID || !platform.showLoginomWindow) return
-    const status = await platform.showLoginomWindow(sessionID).catch(() => "request-failed" as const)
-    if (status === "focused") return
-    const hint = {
-      "no-window": "command.session.showLoginomWindow.missing",
-      "focus-unconfirmed": "command.session.showLoginomWindow.focusUnconfirmed",
-      "layout-unavailable": "command.session.showLoginomWindow.layoutUnavailable",
-      "request-failed": "common.requestFailed",
-    } as const
-    showToast({ title: language.t(hint[status]) })
-  }
-
   const copySessionID = async () => {
     const sessionID = actions.session.identity.params.id
 
@@ -494,16 +480,6 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   }
 
   const sessionCmds = () => [
-    ...(platform.showLoginomWindow && server.conn.type === "sidecar"
-      ? [
-          sessionCommand({
-            id: "session.showLoginomWindow",
-            title: language.t("command.session.showLoginomWindow"),
-            disabled: !actions.session.identity.params.id,
-            onSelect: showLoginomWindow,
-          }),
-        ]
-      : []),
     sessionCommand({
       id: "session.new",
       title: language.t("command.session.new"),

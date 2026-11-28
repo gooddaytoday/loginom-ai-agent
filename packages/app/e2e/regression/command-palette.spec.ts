@@ -6,42 +6,10 @@ import {
   openPaletteWorkspace,
   paletteSession,
 } from "../utils/command-palette"
-import { REMOTE_SERVER, SERVER, sessionHref } from "../utils/app"
-import { fixture, mockStressTimeline } from "../utils/session-fixture"
-import { APP_READY_TIMEOUT } from "../utils/waits"
+import { REMOTE_SERVER, SERVER } from "../utils/app"
 import { mockRemoteServer, mockWorkspace } from "../utils/workspace"
 
 test.use({ serviceWorkers: "block", permissions: ["clipboard-read", "clipboard-write"] })
-
-for (const width of [1440, 640]) {
-  test(`Show Loginom Window addresses the current chat and explains unavailable layout at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 })
-    await mockStressTimeline(page)
-    const params = new URLSearchParams({
-      server: fixture.serverKey,
-      path: sessionHref(fixture.targetID, "sidecar"),
-      loginomWindow: "1",
-    })
-    await page.goto(`/e2e/utils/windows-menu.html?${params}`)
-    await expect(page.locator('[data-component="composer-editor"]')).toBeEditable({ timeout: APP_READY_TIMEOUT })
-    await page.keyboard.press("ControlOrMeta+Shift+P")
-    const dialog = page.getByRole("dialog")
-    await dialog.getByRole("combobox").fill("show loginom")
-    const command = dialog.getByRole("option", { name: "Show Loginom Window", exact: true })
-    await expect(command).toBeVisible()
-    const screenshot = test.info().outputPath(`show-loginom-${width}.png`)
-    await page.screenshot({ path: screenshot, animations: "disabled" })
-    await test.info().attach(`show-loginom-${width}`, { path: screenshot, contentType: "image/png" })
-    await command.click()
-    await expect(dialog).toHaveCount(0)
-    await expect(page.getByRole("status", { name: "Shown Loginom chat", exact: true })).toHaveText(
-      JSON.stringify([fixture.targetID]),
-    )
-    await expect(
-      page.getByText("Could not arrange the windows automatically. Position the Loginom window manually.", { exact: true }),
-    ).toBeVisible()
-  })
-}
 
 test("copies the session ID while file and session searches are still pending", async ({ page }) => {
   const warnings = captureConsoleWarnings(page)

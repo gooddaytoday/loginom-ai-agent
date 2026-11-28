@@ -96,6 +96,7 @@ async function dispatch(message: unknown) {
         !isAbsolute(input.resources) ||
         !("headless" in input) ||
         typeof input.headless !== "boolean" ||
+        ("desktopWindow" in input && typeof input.desktopWindow !== "boolean") ||
         ("resourceVersion" in input && typeof input.resourceVersion !== "string") ||
         ("strictRecovery" in input && typeof input.strictRecovery !== "boolean") ||
         ("closeSavedPackageOnShutdown" in input && typeof input.closeSavedPackageOnShutdown !== "boolean") ||
@@ -106,6 +107,7 @@ async function dispatch(message: unknown) {
         root: input.root,
         resources: input.resources,
         headless: input.headless,
+        desktopWindow: "desktopWindow" in input && input.desktopWindow === true,
         preflightHeadless: input.headless,
         resourceVersion:
           "resourceVersion" in input && typeof input.resourceVersion === "string" ? input.resourceVersion : undefined,

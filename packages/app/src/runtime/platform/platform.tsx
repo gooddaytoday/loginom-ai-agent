@@ -131,8 +131,6 @@ type PlatformBase = {
   /** Export collected diagnostic logs (desktop only) */
   exportDebugLogs?(): Promise<string>
 
-  showLoginomWindow?(sessionID: string): Promise<"focused" | "focus-unconfirmed" | "no-window" | "layout-unavailable">
-
   /** Force focus styles on interactive elements through desktop devtools (desktop only) */
   setForceFocus?(enabled: boolean): Promise<void>
 

@@ -69,7 +69,6 @@ export const api: ElectronAPI = {
   onWindowFullscreenChanged: (cb) => listen("WindowFullscreenChanged", (event) => cb(event.fullscreen)),
   setWindowFocus: () => invoke("WindowSetFocus"),
   showWindow: () => invoke("WindowShow"),
-  showLoginomWindow: (sessionID) => invoke("WindowShowLoginom", { sessionID }),
   relaunch: () => send("AppRelaunch"),
   getZoomFactor: () => invoke("WindowGetZoomFactor"),
   setZoomFactor: (factor) => invoke("WindowSetZoomFactor", { factor }),

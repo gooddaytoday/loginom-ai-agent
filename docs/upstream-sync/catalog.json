@@ -25,6 +25,7 @@
       "title": "Upstream endpoints: updates, installer, sharing",
       "paths": [
         "packages/gui-plugins/src/updater/main.ts", "packages/gui-plugins/src/updater/platform.ts",
+        "packages/gui-plugins/src/updater/signed-feed*.ts", "packages/desktop/src/main/plugin/storage.test.ts",
         "packages/gui-plugins/src/updater/whats-new.tsx", "packages/desktop/src/renderer/platform/notifications.ts",
         "packages/desktop/src/renderer/platform/notifications.test.ts", "packages/cli/src/services/updater.ts",
         "packages/cli/test/updater-install.test.ts"
@@ -97,28 +98,25 @@
         "packages/ui/src/i18n/en.ts"
       ]
     },
+    { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     {
-      "id": "CAT-09",
-      "title": "Desktop main process, preload, renderer",
-      "paths": ["packages/desktop/**"],
-      "notes": "S10-2a: WindowShowLoginom in src/shared/ipc-rpc/window.ts, src/main/ipc-handlers/window.ts and src/renderer/{api.ts,api-types.ts,platform/index.ts} bridges explicit chat commands to Electron window placement."
-    },
-    {
-      "id": "CAT-14",
+      "id": "CAT-21",
       "title": "Built-in plugin top-level pages",
       "paths": [
         "packages/app/src/shell/routes/routes.tsx", "packages/app/src/shell/state/layout.tsx",
         "packages/app/src/shell/state/layout.test.ts", "packages/app/vite.config.ts",
+        "packages/app/src/runtime/platform/pwa.ts", "packages/app/test-browser/pwa-route.test.ts",
+        "packages/app/src/runtime/plugin/pages.tsx",
         "packages/app/component-tests/plugin-host.fixture.tsx", "packages/app/component-tests/plugin-host.spec.ts"
       ]
     },
-    {
-      "id": "CAT-10",
-      "title": "Web app, UI kit, session UI",
-      "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],
-      "notes": "S10-2a: src/session/commands/use-session-commands.tsx adds the local Desktop action via src/runtime/platform/platform.tsx and src/runtime/i18n/{en,ru}.ts; e2e/regression/command-palette.spec.ts covers it with the windows-menu fixture."
-    },
+    { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
     { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
+    {
+      "id": "CAT-22",
+      "title": "Loginom GUI built-in registration (S10-2a)",
+      "paths": ["packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts"]
+    },
     { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**"] }
   ]
 }

@@ -1,5 +1,4 @@
 import { desktopZoomLevels } from "@opencode/app/desktop-menu"
-import { DesktopWindowStatus, WindowChat } from "@loginom-ai-agent/loginom-host/browser-window"
 import { Schema } from "effect"
 import { Rpc, RpcGroup } from "effect/rpc"
 
@@ -16,8 +15,6 @@ export const WindowGetFullscreen = Rpc.make("WindowGetFullscreen", { success: Sc
 export const WindowSetFocus = Rpc.make("WindowSetFocus")
 
 export const WindowShow = Rpc.make("WindowShow")
-
-export const WindowShowLoginom = Rpc.make("WindowShowLoginom", { payload: WindowChat, success: DesktopWindowStatus })
 
 export const WindowGetZoomFactor = Rpc.make("WindowGetZoomFactor", { success: Schema.Number })
 
@@ -60,7 +57,6 @@ export const WindowRpcs = RpcGroup.make(
   WindowGetFullscreen,
   WindowSetFocus,
   WindowShow,
-  WindowShowLoginom,
   WindowGetZoomFactor,
   WindowSetZoomFactor,
   WindowGetZoomLevel,

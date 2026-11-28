@@ -16,7 +16,7 @@ test("window RPC forwards the conversation and preserves distinct outcomes", asy
       async request(method, input) {
         calls.push({ method, input })
         if (method === "window.place") return "placed"
-        return "focus-unconfirmed"
+        return "starting"
       },
     }),
   })
@@ -24,7 +24,7 @@ test("window RPC forwards the conversation and preserves distinct outcomes", asy
   const placement = { sessionID: "ses_current", bounds: { x: 1280, y: -100, width: 720, height: 900 } }
   try {
     expect(await windowHandlers.place(placement)).toBe("placed")
-    expect(await windowHandlers.show(chat)).toBe("focus-unconfirmed")
+    expect(await windowHandlers.show(chat)).toBe("starting")
     expect(calls).toEqual([
       { method: "window.place", input: placement },
       { method: "window.show", input: chat },

@@ -15,7 +15,8 @@ import { loginBrowser, loginomAddress, reauthenticateReloadedPage } from "./conn
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
-import { placeBrowserWindow, showBrowserWindow } from "./browser-window.mjs"
+import { placeBrowserWindow, readWindowBounds, showBrowserWindow } from "./browser-window.mjs"
+import { observeLoginomReplies, withStepProgress } from "../client/lib/step-progress.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -34,8 +35,12 @@ const state = {
   session: undefined,
   browser: undefined,
   windowPage: undefined,
+  windowBaseline: undefined,
+  windowPlaced: false,
+  placingWindow: undefined,
   browserProfile: undefined,
   browserServer: undefined,
+  lastLoginomReplyAt: null,
   inputs: new Map(),
   owner: undefined,
   uploadDirectory: undefined,
@@ -140,7 +145,7 @@ process.on("message", (message) => {
     })
 })
 async function handle(message) {
-  if (!message || typeof message !== "object" || typeof message.id !== "string") return
+  if (!message || typeof message !== "object" || typeof message.id !== "string" || typeof message.operation !== "string") return
   try {
     if (state.closing && message.operation !== "close") throw Error("LOGINOM_RUNTIME_CLOSING")
     if (message.operation === "start") {
@@ -190,6 +195,7 @@ async function handle(message) {
         candidate: input.connection,
         headless: input.headless === true,
         desktopWindow: input.desktopWindow,
+        windowBounds: input.windowBounds,
         signal: state.startupController.signal,
         deadline,
         onPhase: startupPhase,
@@ -205,9 +211,18 @@ async function handle(message) {
       const { createSession } = await import("../client/lib/session.mjs")
       const { createBridge } = await import("../client/lib/bridge.mjs")
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),
-        onContextCreated: context => { state.browser = context } })
+        onWindowPage: input.desktopWindow ? async (page) => {
+          state.windowPage = page
+          if (login.windowBounds) await placeBrowserWindow(page, login.windowBounds)
+          state.windowBaseline = await readWindowBounds(page)
+        } : undefined,
+        onContextCreated: context => {
+          state.browser = context
+          observeLoginomReplies(context, new URL(input.connection.url).origin, () => {
+            state.lastLoginomReplyAt = Date.now()
+          })
+        } })
       state.browser = authenticated.context
-      if (!login.headless) state.windowPage = authenticated.page
       state.owner.origin = new URL(input.connection.url).origin
       const config = {
         resources: input.resources,
@@ -288,8 +303,28 @@ async function handle(message) {
       return
     }
     if (message.operation === "placeWindow") {
-      send({ id: message.id, result: await placeBrowserWindow(state.windowPage, message.input) })
+      if (state.controller || state.bridge.hasActiveWork() || state.windowPlaced || state.placingWindow) {
+        send({ id: message.id, result: "unchanged" })
+        return
+      }
+      if (!state.windowBaseline) {
+        send({ id: message.id, result: state.windowPage ? "layout-unavailable" : "no-window" })
+        return
+      }
+      const placing = placeBrowserWindow(state.windowPage, message.input, state.windowBaseline)
+      state.placingWindow = placing
+      try {
+        const result = await placing
+        if (result === "placed" || result === "unchanged") state.windowPlaced = true
+        send({ id: message.id, result })
+      } finally {
+        state.placingWindow = undefined
+      }
       return
+    }
+    if (state.placingWindow && (message.operation === "call" || message.operation.startsWith("dashboard"))) {
+      await state.placingWindow
+      if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     }
     if (["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"].includes(message.operation)) {
       if (message.operation === "dashboardVersions" || message.operation === "dashboardDelete") {
@@ -378,13 +413,18 @@ async function handle(message) {
         signal: controller.signal,
         timeout: runtimeCallTimeout(message.input.name, message.input.arguments),
       }
-      const result = message.input.packageArtifact !== undefined
+      const result = await withStepProgress({
+        name: message.input.name,
+        signal: controller.signal,
+        lastReply: () => state.lastLoginomReplyAt,
+        send: message.input.stepProgress === true ? progress => send({ id: message.id, progress }) : undefined,
+      }, async () => message.input.packageArtifact !== undefined
         ? await state.bridge.prepareLocalPackage(message.input.arguments, message.input.packageArtifact, {
             signal: AbortSignal.any([controller.signal, AbortSignal.timeout(options.timeout)]),
           })
         : message.input.scanReceipt !== undefined
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
-          : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options)
+          : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options))
       const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
       send({
         id: message.id,

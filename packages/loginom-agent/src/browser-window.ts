@@ -1,4 +1,4 @@
-import { PlacementStatus, WindowChat, WindowPlacement, WindowStatus } from "@loginom-ai-agent/loginom-host/browser-window"
+import { BrowserPID, PlacementStatus, WindowChat, WindowPlacement, WindowStatus } from "@loginom-ai-agent/loginom-host/browser-window"
 import { Schema } from "effect"
 import { ServiceHost } from "./host"
 
@@ -46,6 +46,11 @@ export const windowHandlers = {
   async show(value: unknown) {
     const input = Schema.decodeUnknownSync(WindowChat)(value)
     const result = await ServiceHost.windowRequest("window.show", input)
+    if (process.platform === "win32" && Schema.is(BrowserPID)(result)) {
+      const owned = await import("./foreground-windows").then(({ foregroundChromium }) => foregroundChromium(result.pid)).catch(() => false)
+      return owned ? "focused" : "taskbar"
+    }
+    if (process.platform === "win32" && result === "manual") return "taskbar"
     return Schema.is(WindowStatus)(result) ? result : "no-window"
   },
 }

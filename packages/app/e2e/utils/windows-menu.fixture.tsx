@@ -8,14 +8,7 @@ import { PlatformProvider, type Platform } from "../../src/runtime/platform/plat
 // The app on a Windows desktop platform, so the titlebar shows the app menu. Menu actions are listed in an output.
 // `path` opens a route other than Home. `holdOpen` records an opened path but never answers, like an editor that keeps
 // the launch running until it exits.
-export function mount(input: {
-  server: string
-  path?: string
-  os?: "macos"
-  openApps?: boolean
-  holdOpen?: boolean
-  loginomWindow?: boolean
-}) {
+export function mount(input: { server: string; path?: string; os?: "macos"; openApps?: boolean; holdOpen?: boolean }) {
   const root = document.getElementById("root")
 
   if (!root) throw new Error("Missing fixture root")
@@ -27,11 +20,9 @@ export function mount(input: {
       actions: string[]
       opened: { path: string; app?: string }[]
       trafficLights?: { x: number; y: number }
-      shownLoginom: string[]
     }>({
       actions: [],
       opened: [],
-      shownLoginom: [],
     })
 
     const unused = async () => {
@@ -70,12 +61,6 @@ export function mount(input: {
       setTrafficLightsPosition: async (position) => void setStore("trafficLights", { x: position.x, y: position.y }),
     }
 
-    if (input.loginomWindow)
-      platform.showLoginomWindow = async (sessionID) => {
-        setStore("shownLoginom", (shown) => [...shown, sessionID])
-        return "layout-unavailable"
-      }
-
     if (input.openApps) {
       platform.checkAppExists = async (app) => app === "Visual Studio Code" || app === "code"
       platform.openPath = (path, app) => {
@@ -96,9 +81,6 @@ export function mount(input: {
           </output>
           <output aria-label="Traffic lights" class="sr-only">
             {JSON.stringify(store.trafficLights ?? null)}
-          </output>
-          <output aria-label="Shown Loginom chat" class="sr-only">
-            {JSON.stringify(store.shownLoginom)}
           </output>
           <AppInterface
             servers={[{ type: "sidecar", variant: "base", displayName: "Local Server", http: { url: input.server } }]}

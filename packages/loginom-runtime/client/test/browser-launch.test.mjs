@@ -28,15 +28,18 @@ test('browser launch normalizes headed DPI without incompatible viewport emulati
   assert.equal(browserLaunch(false, 'linux', {}).args.length,3);
 });
 
-test('Desktop launch leaves placement to Show and Windows DPI to the OS', () => {
+test('Desktop launches a normal window in physical bounds and retains device scale 1', () => {
   assert.deepEqual(browserLaunch(false, 'win32', {}, true), {
-    args:[], viewport:null, windowMode:'normal',
+    args:['--force-device-scale-factor=1'], viewport:null, windowMode:'normal',
   });
   const linux = {XDG_CURRENT_DESKTOP:'GNOME'};
   assert.deepEqual(browserLaunch(false, 'linux', linux, true), {
     args:['--force-device-scale-factor=1'], viewport:null, windowMode:'normal',
   });
-  assert.deepEqual(browserLaunch(false, 'linux', {}, true), browserLaunch(false, 'linux', {}));
+  for (const platform of ['win32', 'linux', 'darwin'])
+    assert.deepEqual(browserLaunch(false, platform, {}, true, { x: -1200, y: 50, width: 600, height: 900 }), {
+      args:['--force-device-scale-factor=1','--window-position=-1200,50','--window-size=600,900'], viewport:null, windowMode:'normal',
+    });
   assert.deepEqual(browserLaunch(true, 'win32', {}, true), browserLaunch(true, 'win32', {}));
 });
 

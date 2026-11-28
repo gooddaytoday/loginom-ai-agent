@@ -1,9 +1,9 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { placeBrowserWindow, showBrowserWindow } from "../src/browser-window.mjs"
+import { placeBrowserWindow, readWindowBounds, showBrowserWindow } from "../src/browser-window.mjs"
 
 test("show restores and raises the owning target and reports only confirmed focus", async () => {
-  for (const outcome of ["focused", "focus-unconfirmed", "no-window"]) {
+  for (const outcome of ["focused", "manual", "no-window"]) {
     let closed = false
     const calls = []
     const cdp = {
@@ -25,7 +25,7 @@ test("show restores and raises the owning target and reports only confirmed focu
         return { async dispose() {} }
       },
     }
-    assert.equal(await showBrowserWindow(page), outcome)
+    assert.equal(await showBrowserWindow(page, "linux"), outcome)
     assert.deepEqual(calls, [
       ["Browser.getWindowForTarget", undefined],
       ["Browser.setWindowBounds", { windowId: 25, bounds: { windowState: "normal" } }],
@@ -55,11 +55,19 @@ test("explicit placement checks real CDP readback and Show does not reset a maxi
     async waitForFunction() { return { async dispose() {} } },
   }
   const requested = { x: 800, y: -40, width: 800, height: 860 }
-  assert.equal(await showBrowserWindow(page), "focused")
+  assert.equal(await showBrowserWindow(page, "linux"), "focused")
   assert.deepEqual(bounds, original)
   assert.equal(await placeBrowserWindow(page, requested), "placed")
   assert.deepEqual(bounds, { windowState: "normal", left: 800, top: -40, width: 800, height: 860 })
   allowPlacement = false
-  assert.equal(await placeBrowserWindow(page, { ...requested, x: -500 }), "layout-unavailable")
+  const baseline = await readWindowBounds(page)
+  const next = { ...requested, x: -500 }
+  assert.equal(await placeBrowserWindow(page, next, baseline), "layout-unavailable")
   assert.equal(bounds.left, 800)
+  allowPlacement = true
+  assert.equal(await placeBrowserWindow(page, next, baseline), "placed")
+  assert.equal(bounds.left, -500)
+  bounds = { ...bounds, left: -400 }
+  assert.equal(await placeBrowserWindow(page, next, baseline), "unchanged")
+  assert.equal(bounds.left, -400)
 })
