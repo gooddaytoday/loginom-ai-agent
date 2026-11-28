@@ -1,10 +1,24 @@
 import { expect, test } from "bun:test"
-import { withLoginomMetadata } from "../../loginom-runtime/client/lib/loginom-feed-metadata.mjs"
+import { Schema } from "effect"
+import {
+  LOGINOM_METADATA_FIELD_MAX_BYTES,
+  withLoginomMetadata,
+} from "../../loginom-runtime/client/lib/loginom-feed-metadata.mjs"
 import { dockToolResult } from "../src/dock"
+import { LoginomMetadata, type LoginomMetadataFields } from "../src/loginom-metadata"
 
 const receipt = { operation_id: "operation", state: "settled", status: "SUCCEEDED" }
 const node = { guid: "node-guid", label: "Фильтр", type: "transform.filter_data" }
 const feed = { v: 1, operationId: "operation", state: "settled", status: "SUCCEEDED", node }
+const exportFile = {
+  artifactId: "file",
+  verificationId: "operation:export-download",
+  destination: "/exports/отчёт.csv",
+  name: "отчёт.csv",
+  bytes: 42,
+  sha256: "a".repeat(64),
+  node: { documentId: "document", workflowId: "workflow", nodeId: node.guid },
+}
 const reply = (value: typeof receipt, loginom?: unknown) => ({
   content: [{ type: "text", text: JSON.stringify(value) }],
   structuredContent: value,
@@ -79,7 +93,7 @@ test("Dock retains all scenario 10 fields written by independent feed producers"
     saveOperationId: "save",
     packagePath: "/package.lgp",
     status: "compared",
-    scope: "active_workflow",
+    scope: "activeWorkflow",
     savedLabels: [{ nodeId: node.guid, label: "Новый фильтр" }],
     changes: [
       { kind: "node_missing", nodeId: "missing", before: "Источник" },
@@ -97,41 +111,140 @@ test("Dock retains all scenario 10 fields written by independent feed producers"
     uncheckedSorting: ["another-sort"],
     renameAttribution: "observed_during_save",
   }
-  const updates = [{ busy }, { step }, { manualEdits, verificationStale: true }, { savedPackageGraph }]
+  const runtimeEvidence = [
+    { kind: "tableRead", port: 0, portGuid: "port-guid", rowsRead: 2, rowCount: 5, executionId: "exec" },
+    { kind: "executed", executionId: "exec", scope: "activeWorkflow" },
+    { kind: "saved", path: "/package.lgp" },
+    { kind: "reopenedGraphRead", nodeCount: 2, scope: "activeWorkflow" },
+  ]
+  const receiptWindow = {
+    runtimeId: "e27791d5-b776-4f78-8fea-a93aefc13028",
+    documentId: "document",
+    startSequence: 8,
+    confirmedSequence: 9,
+  }
+  const host = {
+    evidence: [
+      {
+        kind: "savedFileRead",
+        nodeCount: 2,
+        scope: "package",
+        workflowGuidMatch: true,
+        file: { mtime: "2026-11-27T15:00:00.000Z", size: 1024, hash: "b".repeat(64) },
+      },
+    ],
+    packageAccess: { packagePath: "/package.lgp", kind: "read_only", lockMarker: "unknown" },
+    packageVariables: {
+      source: "saved",
+      definitionsCoverage: "complete",
+      defaultsCoverage: "unavailable",
+      usagesCoverage: "partial",
+      definitions: [{ name: "Region", type: "String" }],
+      defaults: null,
+      usages: [],
+    },
+  } as const
+  const agentCopy = { originalPath: "/original.lgp", path: "/package.lgp" }
+  const updates = [
+    { busy },
+    { step },
+    { manualEdits, verificationStale: true },
+    { savedPackageGraph },
+    { kind: "save", evidence: runtimeEvidence, receiptWindow },
+  ]
   const result = updates.reduce((current, update) => withLoginomMetadata(current, update), reply(receipt, feed))
-  expect(await dockToolResult(result, 4)).toEqual({
+  const loginom = {
+    ...feed,
+    busy,
+    step,
+    manualEdits,
+    verificationStale: true,
+    savedPackageGraph,
+    ...host,
+    kind: "save",
+    evidence: [...runtimeEvidence, ...host.evidence],
+    receiptWindow,
+    agentCopy,
+    export: exportFile,
+  }
+  const combined = await dockToolResult(result, 4, {
+    toolCallId: "call_other",
+    host,
+    agent: { agentCopy, export: exportFile },
+  })
+  expect(combined).toEqual({
     content: JSON.stringify(receipt),
-    metadata: { generation: 4, loginom: { ...feed, busy, step, manualEdits, verificationStale: true, savedPackageGraph } },
+    metadata: { generation: 4, loginom },
+  })
+  expect(Buffer.byteLength(JSON.stringify(combined.metadata?.loginom))).toBeLessThanOrEqual(16 * 1024)
+})
+
+test("Dock keeps the export under its own UTF-8 budget and marks a shortened destination", async () => {
+  const destination = `/exports/${"📁".repeat(979)}/${exportFile.name}`
+  const result = await dockToolResult(reply(receipt, feed), 4, {
+    toolCallId: "call_export",
+    agent: { export: { ...exportFile, destination } },
+  })
+  const loginom = Schema.decodeUnknownSync(LoginomMetadata)(result.metadata?.loginom)
+  expect(loginom.export).toMatchObject({
+    ...exportFile,
+    destination: expect.stringMatching(/^\/exports\/📁+…📁+\/отчёт\.csv$/u),
+  })
+  expect(loginom.omitted?.["export.destination"]).toBeGreaterThan(0)
+  expect(Buffer.byteLength(JSON.stringify(loginom.export))).toBeLessThanOrEqual(LOGINOM_METADATA_FIELD_MAX_BYTES.export)
+})
+
+test("Dock uses the explicit tool call ID for package metadata without a runtime receipt", async () => {
+  const agent = { agentCopy: { originalPath: "/original.lgp", path: "/copy.lgp" } } satisfies LoginomMetadataFields
+  const host = { packageAccess: { kind: "writable", packagePath: "/copy.lgp" } }
+  const input = { toolCallId: "call_prepare", host, agent }
+  const result = await dockToolResult({ content: [{ type: "text", text: "prepared" }] }, 4, input)
+  expect(result).toEqual({
+    content: "prepared",
+    metadata: { generation: 4, loginom: { v: 1, operationId: "call_prepare", state: "settled", ...host, ...agent } },
   })
 })
 
-test("Dock rejects a field that exceeds its own UTF-8 budget even when the block fits", async () => {
-  const invalid = [
-    { busy: { version: 1, windowId: "32ef40ff-08d2-476a-ad73-1ef3feb17ce8", operationId: "a".repeat(256), active: true } },
+test("Dock discards invalid fields individually and lists their names", async () => {
+  const busy = { version: 1, windowId: "32ef40ff-08d2-476a-ad73-1ef3feb17ce8", operationId: "operation", active: true }
+  const ports = [
     {
-      step: {
-        outcome: "completed",
-        retryAvailable: false,
-        persistence: "saved_through",
-        save: { operationId: "save", path: "Ж".repeat(1024), throughStep: { operationId: "operation", label: "" } },
+      index: 0,
+      guid: "port",
+      rowCount: 1,
+      columnCount: 1,
+      preview: {
+        schema: [{ index: 0, name: "Amount", type: "integer" }],
+        sample: [[{ type: "integer", value: 42 }]],
+        sampleComplete: true,
       },
     },
-    { manualEdits: [{ kind: "node_renamed", guid: node.guid, from: "", to: "Ж".repeat(2048) }] },
-    { verificationStale: "invalid" },
-    { savedPackageGraph: { status: "unavailable", saveOperationId: "save", packagePath: "Ж".repeat(4096) } },
   ]
-  for (const field of invalid) {
-    const loginom = { ...feed, ...field }
-    expect(Buffer.byteLength(JSON.stringify(loginom))).toBeLessThan(16 * 1024)
-    expect(await dockToolResult(reply(receipt, loginom), 4)).toEqual({
-      content: JSON.stringify(receipt),
-      metadata: { generation: 4 },
-    })
+  const oversizedGraph = { status: "unavailable", saveOperationId: "save", packagePath: "Ж".repeat(4096) }
+  const loginom = {
+    ...feed,
+    busy,
+    ports,
+    verificationStale: null,
+    step: { outcome: "done" },
+    savedPackageGraph: oversizedGraph,
   }
+  expect(Buffer.byteLength(JSON.stringify(loginom))).toBeLessThan(16 * 1024)
+  expect(await dockToolResult(reply(receipt, loginom), 4)).toEqual({
+    content: JSON.stringify(receipt),
+    metadata: {
+      generation: 4,
+      loginom: { ...feed, busy, ports, dropped: ["step", "verificationStale", "savedPackageGraph"] },
+    },
+  })
+  expect(await dockToolResult(reply(receipt, { ...feed, ports: [{ rowCount: -1 }] }), 4)).toEqual({
+    content: JSON.stringify(receipt),
+    metadata: { generation: 4, loginom: { ...feed, dropped: ["ports"] } },
+  })
 })
 
-test("Dock accepts older or malformed private metadata without affecting the tool result", async () => {
-  for (const loginom of [undefined, { ...feed, v: 2 }, { ...feed, ports: [{ rowCount: -1 }] }]) {
+test("Dock keeps tool text on missing or unsupported feed identities", async () => {
+  for (const loginom of [undefined, { ...feed, v: 2 }]) {
     expect(await dockToolResult(reply(receipt, loginom), 4)).toEqual({
       content: JSON.stringify(receipt),
       metadata: { generation: 4 },
@@ -153,6 +266,6 @@ test("Dock enforces the metadata byte budget for multibyte JSON", async () => {
   })
   expect(await dockToolResult(reply(receipt, oversized), 4)).toEqual({
     content: JSON.stringify(receipt),
-    metadata: { generation: 4 },
+    metadata: { generation: 4, loginom: { ...feed, limitations: [], omitted: { limitations: 1 } } },
   })
 })

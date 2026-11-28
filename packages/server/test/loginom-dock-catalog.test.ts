@@ -22,6 +22,7 @@ import { tmpdirScoped } from "../../core/test/fixture/tmpdir"
 import { it } from "../../core/test/lib/effect"
 import { ServiceHost } from "../../loginom-agent/src/host"
 import { declinedText, deniedKindsText, deniedText, policyDeniedText, table } from "../../loginom-agent/src/permissions"
+import { withLoginomMetadata } from "../../loginom-runtime/client/lib/loginom-feed-metadata.mjs"
 import { nodeResultReply } from "../../loginom-runtime/client/lib/node-result-reply.mjs"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { createEmbeddedRoutes } from "../src/routes"
@@ -608,16 +609,18 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
               },
               { userProfile: true },
             )
+            const receipt = { operationId: id, state: "settled", status: "SUCCEEDED" } as const
             return tool === "dock_node_read"
               ? reply
-              : {
-                  ...reply,
-                  _meta: {
-                    loginom: { v: 1, operationId: id, state: "settled", status: "SUCCEEDED" },
-                    loginomStep: { v: 1, operationId: id, state: "settled", step },
-                    outputFiles: [{ artifact_id: file.artifact_id, path: "/runtime/private.csv", name }],
+              : withLoginomMetadata(
+                  {
+                    ...reply,
+                    _meta: {
+                      outputFiles: [{ artifact_id: file.artifact_id, path: "/runtime/private.csv", name }],
+                    },
                   },
-                }
+                  { receipt, step },
+                )
           },
         })
         const test = yield* boot(host)
@@ -632,7 +635,20 @@ describe("loginom.product Dock calls (B2.5d, 0.4 toolContributor execute)", () =
         expect(calls.map((part) => part.state.status)).toEqual(Array(8).fill("completed"))
         const feed = calls.map((part) => part.state.status === "completed" && part.state.metadata?.loginom)
         expect(feed[1]).toEqual({
-          v: 1, operationId: "first", state: "settled", status: "SUCCEEDED", step, export: expected("first"),
+          v: 1,
+          operationId: "first",
+          state: "settled",
+          status: "SUCCEEDED",
+          step,
+          export: {
+            artifactId: "artifact-first",
+            verificationId: "first:export-download",
+            node: { documentId: "doc", workflowId: "flow", nodeId: "node-first" },
+            destination,
+            name: "отчёт.csv",
+            bytes: 24,
+            sha256: "a".repeat(64),
+          },
         })
         expect(feed[3]).toEqual({ v: 1, operationId: "first", state: "settled", status: "SUCCEEDED", step })
         expect(feed.filter((item) => item && typeof item === "object" && "export" in item)).toHaveLength(3)
