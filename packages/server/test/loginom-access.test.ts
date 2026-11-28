@@ -882,6 +882,71 @@ describe("loginom.product access and tool gate (G1)", () => {
   )
 
   it.live(
+    "editing a queued skill mention changes only the delivered task's Loginom grant",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const sessionID = yield* test.create("edit queued skill")
+        const skill = { id: Skill.ID.make("loginom-automation") }
+        const edit = (inboxID: string, body: { text: string; skills: Array<typeof skill> }) =>
+          Effect.promise(async () => {
+            const response = await test.handler(
+              new Request(`http://opencode.local/api/session/${sessionID}/inbox/${inboxID}`, {
+                method: "PUT",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(body),
+              }),
+            )
+            expect(response.status).toBe(204)
+          })
+        const run = yield* test
+          .wizard(sessionID, "loginom-automation", script({ tool: probe, gated: true }, { text: "active end" }))
+          .pipe(Effect.forkScoped)
+        const first = yield* until(() => test.requests(sessionID).pipe(Effect.map((all) => all[0])))
+        expect(names(first)).toContain(probe)
+
+        const mention = "@loginom-automation"
+        const row = yield* test.sessions.prompt({
+          sessionID,
+          text: `${mention} initial request`,
+          skills: [{ ...skill, mention: { text: mention, start: 0, end: mention.length } }],
+          delivery: "queue",
+          resume: false,
+        })
+        const removed = script({ tool: probe }, { text: "removed skill end" })
+        yield* edit(row.id, { text: removed, skills: [] })
+        const [edited] = yield* test.sessions.inbox(sessionID)
+        expect(edited).toMatchObject({ id: row.id, type: "user", payload: { text: removed } })
+        expect(edited?.type === "user" && edited.payload.skills).toBeUndefined()
+        yield* Deferred.succeed(test.gate, undefined)
+        yield* Fiber.join(run)
+        if ((yield* test.sessions.inbox(sessionID)).some((item) => item.id === row.id))
+          yield* test.sessions.resume(sessionID)
+
+        const requestWith = (input: string) =>
+          until(() =>
+            test.requests(sessionID).pipe(
+              Effect.map((requests) =>
+                requests.find((request) => request.messages.some((message) => text(message).includes(input))),
+              ),
+            ),
+          )
+        expect(names(yield* requestWith(removed))).not.toContain(probe)
+        yield* test.sessions.wait(sessionID)
+        expect(test.ran(sessionID)).toBe(1)
+
+        const ungranted = yield* test.sessions.prompt({ sessionID, text: "no skill", delivery: "queue", resume: false })
+        const added = script({ tool: probe }, { text: "added skill end" })
+        yield* edit(ungranted.id, { text: added, skills: [skill] })
+        yield* test.sessions.resume(sessionID)
+        expect(names(yield* requestWith(added))).toContain(probe)
+        yield* test.sessions.wait(sessionID)
+        expect(test.ran(sessionID)).toBe(2)
+      }).pipe(Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
     "a prompt admitted during a granted step revokes the grant for the calls that step still makes",
     () =>
       Effect.gen(function* () {

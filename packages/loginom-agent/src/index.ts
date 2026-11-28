@@ -113,8 +113,8 @@ export default Plugin.define({
   setup: async (ctx) => {
     // Access grants (G1), keyed by the exact session ID: a subsession, a fork and a scheduled wake run in another
     // session or arrive as a new prompt, so none of them inherits a grant. A grant lives for one task, as in 0.4: from the
-    // prompt or skill activation that issued it until the session admits its next prompt. It is not tied to an execution:
-    // a scheduled wake joins a running execution as a steer prompt. Memory only, so a restart drops every grant.
+    // prompt or skill activation that issued it until the next task (a steer on admission, a queued prompt on delivery).
+    // It is not tied to an execution. Memory only, so a restart drops every grant.
     const granted = new Map<string, Profile>()
     const pending = new Map<string, { sessionID: string; profile: Grant }>()
     // A dashboard's work folder confines every session of its Location to `loginom-dashboard` for good (B2.9b, 0.4
@@ -209,9 +209,15 @@ export default Plugin.define({
       await current?.endTurn()
     }
 
-    // The task's user message, which a Host input belongs to: the latest admitted prompt, as for grants. A session this
-    // process has not seen a prompt for (resumed after a restart) uses its latest user message.
+    // The task's user message, which a Host input belongs to. A session resumed after a restart uses its latest user message.
     const tasks = new Map<string, string>()
+    const queuedTasks = new Map<string, Set<string>>()
+    const forgetQueued = (sessionID: string, messageID: string) => {
+      const ids = queuedTasks.get(sessionID)
+      const found = ids?.delete(messageID) ?? false
+      if (ids?.size === 0) queuedTasks.delete(sessionID)
+      return found
+    }
     const task = async (sessionID: string) =>
       tasks.get(sessionID) ??
       (await ctx.session.context({ sessionID })).findLast((message) => message.type === "user")?.id ??
@@ -380,15 +386,44 @@ export default Plugin.define({
         "session.execution.succeeded",
         "session.execution.failed",
         "session.execution.interrupted",
+        "session.inbox.cancelled",
+        "session.deleted",
       ] as const
       for await (const event of ctx.event.subscribe({ types: [...types], signal: stop.signal })) {
         if (event.type === "session.execution.started") void hold(event.data.sessionID)
+        else if (event.type === "session.inbox.cancelled") forgetQueued(event.data.sessionID, event.data.inboxID)
+        else if (event.type === "session.deleted") queuedTasks.delete(event.data.sessionID)
         else {
           repeats.reset(event.data.sessionID)
           await drop(event.data.sessionID)
         }
       }
     })().catch(() => undefined)
+
+    const setTask = (sessionID: string, messageID: string, requested: Profile) => {
+      tasks.set(sessionID, messageID)
+      repeats.reset(sessionID)
+      if (requested === "default") granted.delete(sessionID)
+      else granted.set(sessionID, requested)
+    }
+    const promptProfile = (skills: ReadonlyArray<{ id: string }> | undefined) =>
+      (skills ?? []).reduce<Profile>((current, skill) => next(current, skill.id), "default")
+    const deliverTask = async (sessionID: SessionContext["sessionID"]) => {
+      if (!queuedTasks.has(sessionID) && !granted.has(sessionID)) return
+      const history = await ctx.session.context({ sessionID })
+      const latest = history.findLast((message) => message.type === "user")
+      if (!latest) return
+      const ids = queuedTasks.get(sessionID)
+      const queued = ids?.has(latest.id)
+      if (ids) {
+        for (const message of history) ids.delete(message.id)
+        if (ids.size === 0) queuedTasks.delete(sessionID)
+      }
+      const active = tasks.get(sessionID)
+      if (queued) setTask(sessionID, latest.id, promptProfile(latest.skills))
+      else if (latest.id !== active && history.some((message) => message.id === active))
+        setTask(sessionID, latest.id, "default")
+    }
 
     // Hide what the task may not use, in every request that offers tools, and reject a call that names it anyway.
     const hide = (event: SessionContext) => {
@@ -406,6 +441,7 @@ export default Plugin.define({
         return
       }
       await bound(event.sessionID)
+      await deliverTask(event.sessionID)
       // The execution's lease, without waiting for a Host still in its handshake. `session.execution.started` cannot be
       // relied on for it: an execution that starts while the Location's plugins are still activating (a synthetic wake,
       // a resume) publishes it before this plugin's `setup` subscribes; its first step waits for the activation (B2.6a2).
@@ -421,6 +457,7 @@ export default Plugin.define({
     })
     await ctx.session.hook("compaction", async (event) => {
       await bound(event.sessionID)
+      await deliverTask(event.sessionID)
       hide(event)
     })
     await ctx.session.hook("generate", async (event) => {
@@ -484,8 +521,7 @@ export default Plugin.define({
         await dock.refresh(event.sessionID, profile(event.sessionID), undefined, true)
     })
 
-    // Every admitted prompt starts a new task. It holds a grant only when the user attached a bundled product skill or
-    // the wizard issued it; a scheduled wake and a subagent prompt carry text only.
+    // A task holds a grant only when the user attached a bundled product skill or the wizard issued it.
     await ctx.session.hook("prompt", async (event) => {
       await bound(event.sessionID)
       // An attached agent asks for a subagent, which a dashboard session does not run (0.4 refused its subtask).
@@ -494,15 +530,16 @@ export default Plugin.define({
       const value = event.metadata?.[token]
       if (event.metadata) delete event.metadata[token]
       if (event.operation === "edit") return
-      tasks.set(event.sessionID, event.messageID)
-      repeats.reset(event.sessionID)
+      if (event.delivery === "queue") {
+        const ids = queuedTasks.get(event.sessionID) ?? new Set<string>()
+        ids.add(event.messageID)
+        queuedTasks.set(event.sessionID, ids)
+        return
+      }
       const wizard = typeof value === "string" ? pending.get(value) : undefined
       const requested =
-        wizard?.sessionID === event.sessionID
-          ? wizard.profile
-          : (event.prompt.skills ?? []).reduce<Profile>((current, skill) => next(current, skill.id), "default")
-      if (requested === "default") granted.delete(event.sessionID)
-      else granted.set(event.sessionID, requested)
+        wizard?.sessionID === event.sessionID ? wizard.profile : promptProfile(event.prompt.skills)
+      setTask(event.sessionID, event.messageID, requested)
       await dock.refresh(event.sessionID, requested, undefined, true)
     })
     await ctx.session.hook("fork", async (event) => {
