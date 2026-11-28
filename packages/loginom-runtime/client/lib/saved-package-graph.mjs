@@ -62,7 +62,7 @@ async function inSavedFileTab(page, options) {
     return {verify, workspace, card, isFiles, inventory, openedFiles, path: options.path, limit: options.limit};
   }, options);
   const tab = page.locator('[data-tid='+JSON.stringify(options.tabTid)+']');
-  let files, attempted = false;
+  let files, readTimer, attempted = false;
   try {
     if (await tab.count() !== 1 || !await tab.evaluate((element, owner) =>
       owner.card.tab?.el?.dom === element && element.classList.contains('x-tab-active'), owner))
@@ -74,7 +74,7 @@ async function inSavedFileTab(page, options) {
       const card = owner.workspace.getActiveTab(), controller = card?.Controller?.FController;
       return controller?.constructor?.name === 'FileStorageForm' && controller.FFileStorage ? card : null;
     }, owner, {timeout: 2500});
-    return await page.evaluate(async ({owner, files}) => {
+    const read = page.evaluate(async ({owner, files}) => {
       const verify = () => {
         owner.verify();
         if (owner.workspace.getActiveTab() !== files) throw Error('Saved package Files tab changed');
@@ -104,7 +104,12 @@ async function inSavedFileTab(page, options) {
         if (!downloader.IsStreamReleased() || !downloader.IsDisposed) throw Error('Saved package stream did not close');
       }
     }, {owner, files});
+    const deadline = new Promise((_, reject) => {
+      readTimer = setTimeout(() => reject(Error('Saved package read timed out')), 9000);
+    });
+    return await Promise.race([read, deadline]);
   } finally {
+    clearTimeout(readTimer);
     try {
       if (attempted) {
         const opened = await owner.evaluateHandle((owner, files) => {

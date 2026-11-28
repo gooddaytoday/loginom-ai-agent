@@ -903,7 +903,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                     const intent=actionRuntime.saveNodeIntent(prepared.document_id,workflow.workflow_id);
                     const code=makeSavedPackageGraphCode({origin:new URL(config.loginomUrl).origin,build:session.metadata.targetIdentity.loginom_build,
                       path:admission.path,tabTid:workflow.tab_tid,documentId:prepared.document_id,sessionId:session.metadata.sessionId,account:savedState.account});
-                    const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:15000});
+                    const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:21000});
                     const graph=await compareSavedPackageGraph({bytes:parseSavedPackageBytes(response),before,...intent});
                     admission.savedGraph={...identity,status:'compared',...graph,
                       rename_attribution:savedState.modified?'unconfirmed':'observed_during_save'};

@@ -79,7 +79,7 @@ test('saved-file read closes only its own Files tab, even if read or workflow re
     await page.route('**/*',route=>route.fulfill({contentType:'text/html',body:
       '<div data-tid="fixture-workflow" class="x-tab-active">Workflow</div><button data-tid="MF;cntMain;tlbMainToolbar;btnFilestorage">Files</button>'}));
     const execute=Function('return '+makeSavedPackageGraphCode({origin,path,tabTid,build:'7.4.2',documentId:'doc',sessionId:'session',account:'account'}))();
-    for (const scenario of ['success','read failed','return failed','existing']) {
+    for (const scenario of ['success','read failed','return failed','read stalled','existing']) {
       await page.goto(origin);
       await page.evaluate(({scenario,path,tabTid})=>{
         const workflow=document.querySelector('[data-tid="'+tabTid+'"]');
@@ -90,17 +90,21 @@ test('saved-file read closes only its own Files tab, even if read or workflow re
         filesTab.dataset.tid='fixture-files';
         filesTab.innerHTML='Files <button data-ref="closeEl">Close</button>';
         const files={Controller:{FController:new FileStorageForm()},tab:{el:{dom:filesTab}}};
-        let active=card, disposed=0;
+        let active=card, release, disposed=0;
         const cards=[card];
         const mount=()=>{if(!cards.includes(files)){cards.push(files);document.body.append(filesTab);}};
         if(scenario==='existing')mount();
-        filesTab.querySelector('button').onclick=()=>{cards.splice(cards.indexOf(files),1);filesTab.remove();active=card;};
+        filesTab.querySelector('button').onclick=()=>{cards.splice(cards.indexOf(files),1);filesTab.remove();active=card;release?.();};
         workflow.onclick=()=>{if(scenario!=='return failed')active=card;};
         document.querySelector('[data-tid$="btnFilestorage"]').onclick=()=>{mount();active=files;};
         class FileDownloader {
           constructor(name,dir){this.FullFilename=dir+name;}
           GetFileSize(){return 1;}
-          GetFileStream(){return {ReadBuffer(chunk){if(scenario==='read failed')throw Error('Read refused');chunk[0]=42;}};}
+          GetFileStream(){return {ReadBuffer(chunk){
+            if(scenario==='read failed')throw Error('Read refused');
+            if(scenario==='read stalled')return new Promise(resolve=>{release=resolve;});
+            chunk[0]=42;
+          }};}
           Dispose(){disposed++;this.IsDisposed=true;}
           IsStreamReleased(){return this.IsDisposed;}
         }
@@ -112,8 +116,9 @@ test('saved-file read closes only its own Files tab, even if read or workflow re
           {phase:'verified',packageNode:pack,request:'{"session":"session"}'}]])};
         globalThis.observedTabs=()=>({active:active===card?'workflow':'files', files:cards.includes(files), disposed});
       },{scenario,path,tabTid});
-      if (scenario.endsWith('failed')) await assert.rejects(execute(page), /Read refused|Timeout/);
+      if (scenario.endsWith('failed') || scenario==='read stalled') await assert.rejects(execute(page), /Read refused|Timeout|timed out/);
       else assert.deepEqual(await execute(page), {base64:'Kg=='});
+      await page.waitForFunction(()=>globalThis.observedTabs().disposed===1);
       assert.deepEqual(await page.evaluate(()=>globalThis.observedTabs()),{active:'workflow',files:scenario==='existing',disposed:1},scenario);
     }
   } finally { await browser.close(); }
