@@ -208,7 +208,6 @@ export function createSessionQueue(input: {
   const run = async (operation: ActiveOperation, progress: MutationProgress) => {
     const attempt = operation.attempt
 
-    // SSE retracts and updates materialized timeline messages for a steer or removal, so neither re-syncs the queue.
     if (operation.type === "steer") {
       const background = input.background()
 
@@ -223,20 +222,61 @@ export function createSessionQueue(input: {
         )
     }
 
-    if (operation.type === "remove")
-      return server.api.session.inbox.cancel({ sessionID: input.sessionID, inboxID: operation.id, strict: true }).then(
-        () => dispatch({ type: "mutation.succeeded", attempt }),
-        (error) => {
-          const conflict = error instanceof Error && error.name === "ConflictError"
+    if (operation.type === "remove") {
+      const { sessionID } = input
+      const inboxID = operation.id
+      const signal = progress.controller.signal
+      let observed: "session.inbox.delivered" | "session.inbox.cancelled" | undefined
 
-          dispatch({ type: "mutation.failed", attempt, hidden: conflict ? [operation.id] : [], conflict })
+      const stop = server.event.listen((event) => {
+        if (
+          (event.type === "session.inbox.delivered" || event.type === "session.inbox.cancelled") &&
+          event.data.sessionID === sessionID &&
+          event.data.inboxID === inboxID
+        )
+          observed = event.type
+      })
 
-          if (conflict) {
-            data.session.pending.invalidate(input.sessionID)
-            void data.session.pending.sync(input.sessionID).catch(() => undefined)
+      try {
+        await server.api.session.inbox.cancel({ sessionID, inboxID }, { signal })
+        progress.hidden.push(inboxID)
+
+        let delivered = observed === "session.inbox.delivered"
+
+        if (!observed) {
+          try {
+            const message = await server.api.session.message.get({ sessionID, messageID: inboxID }, { signal })
+            delivered = message.type === "user"
+          } catch (error) {
+            if (!(error instanceof Error && error.name === "MessageNotFoundError")) throw error
           }
-        },
-      )
+        }
+
+        dispatch(
+          delivered
+            ? { type: "mutation.failed", attempt, hidden: progress.hidden, conflict: "delivered" }
+            : { type: "mutation.succeeded", attempt },
+        )
+      } catch {
+        dispatch({ type: "mutation.failed", attempt, hidden: progress.hidden })
+      } finally {
+        stop()
+
+        if (!observed && progress.hidden.length) {
+          data.session.pending.invalidate(sessionID)
+          void data.session.pending
+            .sync(sessionID)
+            .then(() => {
+              data.session.message.invalidate(sessionID)
+
+              return data.session.message.sync(sessionID)
+            })
+            .catch(() => undefined)
+        }
+      }
+
+      return
+    }
 
     if (operation.type === "undo") {
       const source = { id: operation.item.id, ...operation.item.payload }
@@ -272,7 +312,7 @@ export function createSessionQueue(input: {
         type: "mutation.failed" as const,
         attempt,
         hidden: progress.hidden,
-        conflict: error instanceof Error && error.name === "ConflictError",
+        conflict: error instanceof Error && error.name === "ConflictError" ? ("unavailable" as const) : undefined,
       }),
     )
 

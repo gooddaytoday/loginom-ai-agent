@@ -670,6 +670,7 @@ export const dict = {
   "session.queue.edit": "Edit queued message",
   "session.queue.label": "Queued messages",
   "session.queue.waiting": "Will send after the next successful turn",
+  "session.queue.alreadySent": "This message has already been sent",
   "session.queue.noLongerPending": "This message has already been sent or removed from the queue",
   "session.queue.undo": "Undo",
   "session.queue.undoShell": "Leave shell mode before undoing a queued prompt",

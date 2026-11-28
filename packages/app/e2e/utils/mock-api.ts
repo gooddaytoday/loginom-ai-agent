@@ -62,6 +62,12 @@ export class MockInboxConflict extends Schema.TaggedError<MockInboxConflict>()(
   { httpApiStatus: 409 },
 ) {}
 
+export class MockMessageNotFound extends Schema.TaggedError<MockMessageNotFound>()(
+  "MessageNotFoundError",
+  { sessionID: Schema.String, messageID: Schema.String, message: Schema.String },
+  { httpApiStatus: 404 },
+) {}
+
 export class MockInternal extends Schema.TaggedError<MockInternal>()("MockInternal", {
   message: Schema.String,
 }) {}
@@ -488,9 +494,7 @@ const Group = HttpApiGroup.make("mock")
   .add(
     HttpApiEndpoint.delete("sessionInboxCancel", "/api/session/:sessionID/inbox/:inboxID", {
       params: { ...SessionParams, inboxID: Schema.String },
-      query: { strict: Schema.optional(Schema.String) },
       success: NoContent,
-      error: MockInboxConflict,
     }),
   )
   .add(
@@ -566,7 +570,7 @@ const Group = HttpApiGroup.make("mock")
     HttpApiEndpoint.get("messageGet", "/api/session/:sessionID/message/:messageID", {
       params: { ...SessionParams, messageID: Schema.String },
       success: Json,
-      error: MockNotFound.pipe(HttpApiSchema.status(404)),
+      error: MockMessageNotFound,
     }),
   )
   .add(

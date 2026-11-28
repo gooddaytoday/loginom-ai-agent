@@ -305,11 +305,7 @@ export type SessionInboxListOperation<E = never> = (
   input: SessionInboxListInput,
 ) => Effect.Effect<SessionInboxListOutput, E>
 
-export type SessionInboxCancelInput = {
-  readonly sessionID: Session.ID
-  readonly inboxID: SessionMessage.ID
-  readonly strict?: boolean | undefined
-}
+export type SessionInboxCancelInput = { readonly sessionID: Session.ID; readonly inboxID: SessionMessage.ID }
 export type SessionInboxCancelOutput = void
 export type SessionInboxCancelOperation<E = never> = (
   input: SessionInboxCancelInput,

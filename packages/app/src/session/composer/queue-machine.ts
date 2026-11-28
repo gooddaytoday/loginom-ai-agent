@@ -153,7 +153,7 @@ export type QueueEvent =
       readonly type: "mutation.failed"
       readonly attempt: number
       readonly hidden: readonly string[]
-      readonly conflict?: boolean
+      readonly conflict?: "delivered" | "unavailable"
     }
   // `hidden` as for a failure: what the operation withdrew or cancelled before the bound ran out.
   | {
@@ -167,9 +167,15 @@ export type QueueEvent =
 
 export type QueueToastKey =
   | "common.requestFailed"
+  | "session.queue.alreadySent"
   | "session.queue.noLongerPending"
   | "session.queue.reverted"
   | "session.queue.undoShell"
+
+const CONFLICT_TOAST = {
+  delivered: "session.queue.alreadySent",
+  unavailable: "session.queue.noLongerPending",
+} as const
 
 export type QueueEffect =
   | { readonly type: "draft.load"; readonly prompt: Prompt; readonly cursor: number }
@@ -282,7 +288,9 @@ export function transitionQueue(state: QueueState, event: QueueEvent): QueueTran
     // start. An undo stops before its cancel if it can: nothing would show the restored prompt.
     return changed(returning ? { status: "disposed", returning } : { status: "disposed" }, [
       ...(edit ? [restore(edit, false)] : []),
-      ...(active?.type === "undo" ? [{ type: "mutation.abort" as const, attempt: active.attempt }] : []),
+      ...(active?.type === "undo" || active?.type === "remove"
+        ? [{ type: "mutation.abort" as const, attempt: active.attempt }]
+        : []),
       { type: "timer.clearAll" },
     ])
   }
@@ -655,7 +663,7 @@ function settle(
   const next = advance(restored, {})
 
   return changed(next.state, [
-    { type: "toast", key: event.conflict ? "session.queue.noLongerPending" : "common.requestFailed" },
+    { type: "toast", key: event.conflict ? CONFLICT_TOAST[event.conflict] : "common.requestFailed" },
     ...(returned && restored.status === "mutating"
       ? [{ type: "draft.merge" as const, prompt: active.prompt, context: [] }]
       : []),
@@ -727,7 +735,7 @@ function start(operation: ActiveOperation): QueueEffect[] {
 }
 
 function bounded(operation: ActiveOperation) {
-  return operation.type !== "steer" && operation.type !== "remove"
+  return operation.type !== "steer"
 }
 
 function enqueue(state: LiveQueueState, operation: QueuedOperation, effects: QueueEffect[] = []): QueueTransition {

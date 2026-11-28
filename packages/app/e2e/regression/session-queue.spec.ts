@@ -314,23 +314,59 @@ for (const width of [1280, 390]) {
   })
 }
 
-test("removing a row that crossed the turn boundary reports the conflict and keeps the next row", async ({ page }) => {
-  const mock = createQueueMock(["Already sent", "Still waiting"])
-  const view = await openQueue(page, mock)
-  const row = view.rows.filter({ hasText: "Already sent" })
+for (const delivery of ["SSE", "no SSE"] as const) {
+  test(`removing a delivered row reports the conflict and keeps the next row (${delivery})`, async ({ page }) => {
+    const mock = createQueueMock(["Already sent", "Still waiting"])
+    const view = await openQueue(page, mock)
+    const row = view.rows.filter({ hasText: "Already sent" })
+    const path = `/api/session/${sessionID}/inbox/inb_seed_1`
+    const removal = await holdRoute(page, new RegExp(`${path}([?]|$)`), { method: "DELETE" })
 
-  const removal = await holdRoute(page, new RegExp(`/api/session/${sessionID}/inbox/[^/?]+(\\?|$)`), {
-    method: "DELETE",
+    await row.hover()
+    await row.getByRole("button", { name: "Remove", exact: true }).click()
+    const request = await removal.arrived
+    expect(new URL(request.url()).searchParams.has("strict")).toBe(false)
+
+    const [delivered] = mock.rows.splice(0, 1)
+    mock.messages.push({ id: delivered.id, type: "user", text: delivered.payload.text, time: { created: Date.now() } })
+
+    if (delivery === "SSE") {
+      mock.emit("session.inbox.delivered", { sessionID, inboxID: delivered.id })
+      const message = userRow(page, delivered.id).locator('[data-component="user-message"]')
+      await expect(message).toBeVisible()
+      await expect(message).not.toHaveAttribute("data-pending", "true")
+    }
+
+    const cancelled = page.waitForResponse(
+      (response) => response.request().method() === "DELETE" && new URL(response.url()).pathname === path,
+    )
+
+    removal.release()
+    expect((await cancelled).status()).toBe(204)
+    await expect(page.getByText("This message has already been sent", { exact: true })).toBeVisible()
+    await expect(view.rows.locator('[data-action="session-queue-edit"]')).toHaveText(["Still waiting"])
+    await expect(userRow(page, delivered.id)).toContainText("Already sent")
   })
+}
+
+test("removing a queued row without an SSE acknowledgement does not report delivery", async ({ page }) => {
+  const mock = createQueueMock(["Remove me", "Still waiting"])
+  const view = await openQueue(page, { ...mock, events: () => [] })
+  const row = view.rows.filter({ hasText: "Remove me" })
+
+  const lookup = page.waitForResponse(
+    (response) =>
+      response.request().method() === "GET" &&
+      new URL(response.url()).pathname === `/api/session/${sessionID}/message/inb_seed_1`,
+  )
 
   await row.hover()
   await row.getByRole("button", { name: "Remove", exact: true }).click()
-  await removal.arrived
-  mock.rows.shift()
-  removal.release()
-
-  await expect(page.getByText("This message has already been sent or removed from the queue")).toBeVisible()
+  expect((await lookup).status()).toBe(404)
   await expect(view.rows.locator('[data-action="session-queue-edit"]')).toHaveText(["Still waiting"])
+  await expect(userRow(page, "inb_seed_1")).toHaveCount(0)
+  await expect(page.getByText("This message has already been sent", { exact: true })).toHaveCount(0)
+  await expect(page.getByText("Request failed", { exact: true })).toHaveCount(0)
 })
 
 test("follow-up preference controls Enter while Mod+Enter uses the alternate delivery", async ({ page }) => {

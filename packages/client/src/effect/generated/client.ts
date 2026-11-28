@@ -651,10 +651,9 @@ const EndpointSessionInboxList = (raw: RawClient["server.session"]) => (input: S
 
 const EndpointSessionInboxCancel = (raw: RawClient["server.session"]) => (input: SessionInboxCancelInput) =>
   preserveEffect<SessionInboxCancelOutput>()(
-    raw["session.inbox.cancel"]({
-      params: { sessionID: input["sessionID"], inboxID: input["inboxID"] },
-      query: { strict: input["strict"] },
-    }).pipe(Effect.mapError(mapClientError)),
+    raw["session.inbox.cancel"]({ params: { sessionID: input["sessionID"], inboxID: input["inboxID"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
   )
 
 const EndpointSessionInboxEdit = (raw: RawClient["server.session"]) => (input: SessionInboxEditInput) =>

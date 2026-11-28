@@ -715,6 +715,7 @@ export const dict = {
   "session.queue.edit": "Изменить поправку",
   "session.queue.label": "Очередь поправок",
   "session.queue.waiting": "Отправятся после следующего хода",
+  "session.queue.alreadySent": "Эта поправка уже отправлена",
   "session.queue.noLongerPending": "Эта поправка уже отправлена или удалена из очереди",
   "session.queue.reorder": "Изменить порядок запроса в очереди",
   "session.new.worktree.creating": "Создание worktree",

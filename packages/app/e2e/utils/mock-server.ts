@@ -13,6 +13,7 @@ import {
   MockBadRequest,
   MockInternal,
   MockInboxConflict,
+  MockMessageNotFound,
   MockNotFound,
   MockPtyFeatureUnsupported,
   MockPtyNotFound,
@@ -1345,11 +1346,9 @@ function mockHandlers(
             },
           })),
         sessionInboxCancel: (ctx) => {
-          const cancelled = config.onInboxChange?.({ ...ctx.params, action: "cancel" })
+          config.onInboxChange?.({ ...ctx.params, action: "cancel" })
 
-          return cancelled === false && ctx.query.strict === "true"
-            ? new MockInboxConflict({ resource: ctx.params.inboxID, message: "Inbox item is no longer pending" })
-            : noContent
+          return noContent
         },
         sessionInboxEdit: (ctx) =>
           config.onInboxEdit?.({ ...ctx.params, body: ctx.payload }) === false
@@ -1453,7 +1452,7 @@ function mockHandlers(
                 .pageMessages(ctx.params.sessionID, Number.MAX_SAFE_INTEGER)
                 .items.find((item) => item.id === ctx.params.messageID)
 
-            if (!message) return yield* new MockNotFound({ message: "Message not found" })
+            if (!message) return yield* new MockMessageNotFound({ ...ctx.params, message: "Message not found" })
 
             return { data: message }
           }),

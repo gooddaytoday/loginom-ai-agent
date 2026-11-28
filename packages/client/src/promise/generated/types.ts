@@ -3567,11 +3567,7 @@ export type SessionInboxListInput = { readonly sessionID: string }
 
 export type SessionInboxListOutput = { data: Array<SessionInboxInfo> }["data"]
 
-export type SessionInboxCancelInput = {
-  readonly sessionID: string
-  readonly inboxID: string
-  readonly strict?: boolean | undefined
-}
+export type SessionInboxCancelInput = { readonly sessionID: string; readonly inboxID: string }
 
 export type SessionInboxCancelOutput = void
 
