@@ -347,7 +347,6 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       lease: async () => run,
       task: async () => messageID,
       failure: () => undefined,
-      wrap: (tool) => tool,
     })
     await dock.refresh(sessionID, "loginom-automation", undefined)
     type Editor = Parameters<NonNullable<typeof captured.transform>>[0]
