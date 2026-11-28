@@ -12,8 +12,8 @@ function fixture() {
   const data = { time: 100, modified: false, onRead: () => {} };
   const session = {
     async IsPackageModified(proxy) {
-      assert.equal(proxy, owned.Package);
-      data.onRead();
+      assert.equal(proxy, packages[0].Package);
+      await data.onRead();
       return data.modified;
     },
   };
@@ -46,8 +46,8 @@ function fixture() {
   const page = { url: () => origin, evaluate: (read, input) => runInNewContext(`(${read})(input)`, { ...globals, input, setTimeout, clearTimeout }) };
   const read = createPackageStateReader(metadata, origin, () => data.time);
   const snapshot = (save, busy) => read({ pages: () => [page] }, save, busy);
-  const stepRefresh = (tabTid = 'owned') => {
-    const { phase, request, packageNode, stepSession } = receipt;
+  const stepRefresh = (tabTid = 'owned', packageNode = owned) => {
+    const { phase, request, stepSession } = receipt;
     globals.__loginomDockPreparationV1.receipts.set('refresh', { phase, request, packageNode, stepSession, stepRefresh: true });
     metadata.workspacePreparation = {
       operation_id: 'refresh',
@@ -137,19 +137,71 @@ test('returns the last confirmed observation with its age while the runtime is b
 });
 
 test('an incomplete read preserves the last confirmed dirty state and its age', async () => {
-  const { snapshot, data } = fixture();
+  const { snapshot, data, owned } = fixture();
+  owned.PackageFileName = 'user/result.lgp';
   data.modified = true;
   const confirmed = await snapshot();
+  const lastSave = { path: '/user/result.lgp', confirmedAt: 1500 };
   data.time = 1600;
   data.modified = undefined;
-  assert.deepEqual(await snapshot(), {
-    ...confirmed, modified: null, modifiedDetectedAt: null,
-  });
+  assert.deepEqual(await snapshot(lastSave), { ...confirmed, lastSave, staleForSeconds: 1 });
   data.time = 2650;
+  assert.deepEqual(await snapshot(), { ...confirmed, staleForSeconds: 2 });
   assert.deepEqual(await snapshot(undefined, true), { ...confirmed, staleForSeconds: 2 });
   data.modified = false;
-  await snapshot();
-  assert.equal((await snapshot(undefined, true)).modified, false);
+  const clean = await snapshot();
+  assert.equal(clean.modified, false);
+  assert.equal(clean.modifiedDetectedAt, null);
+  assert.equal(clean.staleForSeconds, null);
+  data.time = 4000;
+  data.modified = undefined;
+  assert.deepEqual(await snapshot(), { ...clean, staleForSeconds: 1 });
+  owned.PackageFileName = 'user/another.lgp';
+  assert.deepEqual(await snapshot(), { ...clean, path: '/user/another.lgp', modified: null });
+});
+
+test('does not attach an old dirty confirmation to a different pathless draft', async () => {
+  const { snapshot, data, owned, packages, stepRefresh } = fixture();
+  data.modified = true;
+  assert.equal((await snapshot()).modified, true);
+  packages[0] = { ...owned, Package: {} };
+  stepRefresh('another-workflow', packages[0]);
+  data.modified = undefined;
+  assert.deepEqual(await snapshot(), {
+    open: true, path: null, modified: null, modifiedDetectedAt: null, lastSave: null, staleForSeconds: null,
+  });
+});
+
+test('times out a native read without starting another until the native reply settles', async t => {
+  const { snapshot, data, stepRefresh } = fixture();
+  data.modified = true;
+  const confirmed = await snapshot();
+  const blocked = Promise.withResolvers();
+  let reads = 0;
+  data.onRead = () => {
+    reads++;
+    return blocked.promise;
+  };
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  data.time = 3200;
+  const first = snapshot();
+  t.mock.timers.tick(3000);
+  const timedOut = await first;
+  stepRefresh('another-workflow');
+  data.time = 4500;
+  const retry = snapshot();
+  t.mock.timers.tick(3000);
+  const whilePending = await retry;
+  assert.equal(reads, 1);
+  assert.deepEqual(timedOut, { ...confirmed, staleForSeconds: 3 });
+  assert.deepEqual(whilePending, { ...confirmed, staleForSeconds: 4 });
+
+  blocked.reject(new Error('Native read failed'));
+  await new Promise(resolve => setImmediate(resolve));
+  data.onRead = () => { reads++; };
+  data.modified = false;
+  assert.deepEqual(await snapshot(), { ...confirmed, modified: false, modifiedDetectedAt: null });
+  assert.equal(reads, 2);
 });
 
 test('times out a stalled evaluation and does not poll again until it settles', async t => {

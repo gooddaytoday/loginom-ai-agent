@@ -154,6 +154,8 @@ export async function createBridge(config, session, { browserTransport: managedB
   const saveAdmissions = new Map();
   let saveSequence=0;
   let lastSavedPackage = null;
+  // The conversation retains Save evidence after the old document loses ownership.
+  let lastConfirmedSave = null;
   let ownedUnsavedDraft = null;
   // Save As closes the package and reopens it in a new tab. Until a new
   // preparation, the original receipt no longer owns that tab for cleanup.
@@ -804,10 +806,11 @@ export async function createBridge(config, session, { browserTransport: managedB
             if(admission&&confirmedSave.status==='SUCCEEDED'&&confirmedSave.action_key===admission.action_key
               &&confirmedSave.output?.package_ref?.path===admission.path
               &&admission.document_id===session.metadata.workspacePreparation?.state?.document_id
-              &&(!lastSavedPackage||admission.sequence>lastSavedPackage.sequence)) {
+              &&(!lastConfirmedSave||admission.sequence>lastConfirmedSave.sequence)) {
               savedPackages.set(admission.path,confirmedSave.operation_id);
               lastSavedPackage={path:admission.path,operation_id:confirmedSave.operation_id,
                 document_id:admission.document_id,sequence:admission.sequence,confirmedAt:Date.now()};
+              lastConfirmedSave=lastSavedPackage;
               if(confirmedSave.output?.reopened===true||confirmedSave.trace?.some(e=>e.event==='save_continuations_observed'
                 &&e.recovered_reopen===true&&e.native_identity_verified===true))
                 reopenedSave={path:admission.path,preparation:session.metadata.workspacePreparation};
@@ -969,7 +972,7 @@ export async function createBridge(config, session, { browserTransport: managedB
     });
     return { server, catalog,
       packageState(context, busy) {
-        return readPackageState(context, lastSavedPackage, busy);
+        return readPackageState(context, lastConfirmedSave, busy);
       },
       applyWithScanReceipt(args,receipt,extra) {
         return callTool({params:{name:'dock_node_apply',arguments:args}},extra,null,receipt);

@@ -21,18 +21,24 @@ export async function readPackageState({ origin, build, documentId, operationId,
     const path = open && typeof node.PackageFileName === 'string' && node.PackageFileName
       ? '/' + node.PackageFileName.replaceAll('\\', '/').replace(/^\/+/, '')
       : null;
-    return { receipt, connection, session: connection.Session, proxy: open ? node.Package : null, open, path };
+    return { preparation, receipt, node, connection, session: connection.Session, proxy: open ? node.Package : null, open, path };
   };
 
   const before = snapshot();
   if (!before) return null;
   if (!before.open) return { open: false, path: null, modified: null };
+  const { preparation } = before;
   let modified = null;
-  if (before.proxy) {
+  // The RPC deadline only bounds the wait. Keep the native read registered
+  // until Loginom settles it, even when a new preparation receipt is active.
+  if (before.proxy && !preparation.packageStateRead) {
     let timer;
     try {
+      const pending = Promise.resolve(before.session.IsPackageModified(before.proxy))
+        .finally(() => { delete preparation.packageStateRead; });
+      preparation.packageStateRead = pending;
       const value = await Promise.race([
-        before.session.IsPackageModified(before.proxy),
+        pending,
         new Promise(resolve => { timer = setTimeout(resolve, 3000); }),
       ]);
       if (typeof value === 'boolean') modified = value;
@@ -44,7 +50,11 @@ export async function readPackageState({ origin, build, documentId, operationId,
   }
   const after = snapshot();
   if (!after || Object.keys(before).some(key => before[key] !== after[key])) return null;
-  return { open: true, path: before.path, modified };
+  // A pathless draft and a replacement node can have identical paths.
+  if (preparation.packageStateIdentity?.node !== before.node) {
+    preparation.packageStateIdentity = { node: before.node, id: (preparation.packageStateIdentity?.id ?? 0) + 1 };
+  }
+  return { open: true, path: before.path, modified, packageId: preparation.packageStateIdentity.id };
 }
 
 export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
@@ -52,13 +62,14 @@ export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
   let evaluation;
   let dirty;
   let lastConfirmed;
-  return async (context, lastSavedPackage, busy) => {
-    const lastSave = lastSavedPackage ? { path: lastSavedPackage.path, confirmedAt: lastSavedPackage.confirmedAt } : null;
-    if (busy && lastConfirmed) return {
+  return async (context, lastConfirmedSave, busy) => {
+    const lastSave = lastConfirmedSave ? { path: lastConfirmedSave.path, confirmedAt: lastConfirmedSave.confirmedAt } : null;
+    const cachedSnapshot = () => ({
       ...lastConfirmed.snapshot,
       lastSave,
       staleForSeconds: Math.floor(Math.max(0, now() - lastConfirmed.at) / 1000),
-    };
+    });
+    if (busy && lastConfirmed) return cachedSnapshot();
 
     const preparation = metadata.workspacePreparation;
     const prepared = preparation?.state;
@@ -91,7 +102,9 @@ export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
       if (metadata.workspacePreparation !== preparation || metadata.workspaceReady !== true) observation = null;
     }
 
-    const identity = JSON.stringify([prepared?.document_id, observation?.path]);
+    const identity = JSON.stringify([prepared?.document_id, prepared?.loginom_account, observation?.packageId, observation?.path]);
+    if (observation?.open && observation.modified === null && lastConfirmed?.identity === identity
+      && typeof lastConfirmed.snapshot.modified === 'boolean') return cachedSnapshot();
     if (observation?.open === false || observation?.modified === false) dirty = undefined;
     const at = now();
     if (observation?.modified === true && dirty?.identity !== identity) dirty = { identity, at };
@@ -103,9 +116,7 @@ export function createPackageStateReader(metadata, loginomUrl, now = Date.now) {
       lastSave,
       staleForSeconds: null,
     };
-    const cachedModified = lastConfirmed?.identity === identity ? lastConfirmed.snapshot.modified : null;
-    if (observation && (!observation.open || observation.modified !== null || cachedModified === null))
-      lastConfirmed = { snapshot, at, identity };
+    if (observation) lastConfirmed = { snapshot, at, identity };
     return snapshot;
   };
 }
