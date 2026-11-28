@@ -74,6 +74,7 @@ const MobilePanelDrawer = lazy(async () => {
 type ComposerMode = "normal" | "shell"
 
 const COMPOSER_SUGGESTION_MAX_HEIGHT = 320
+const COMPOSER_SUGGESTION_GAP = 8
 
 const COMPOSER_SUGGESTION_ROW_HEIGHT = 28
 
@@ -1285,8 +1286,10 @@ function ComposerEditorPopover(props: {
   let container: HTMLDivElement | undefined
   const [store, setStore] = createStore({
     maxHeight: COMPOSER_SUGGESTION_MAX_HEIGHT,
-    available: COMPOSER_SUGGESTION_MAX_HEIGHT,
+    spaceAbove: COMPOSER_SUGGESTION_MAX_HEIGHT,
+    spaceBelow: 0,
   })
+  const opensBelow = () => store.spaceAbove < store.maxHeight && store.spaceBelow > store.spaceAbove
 
   const resize = (height: number) =>
     setStore(
@@ -1333,20 +1336,23 @@ function ComposerEditorPopover(props: {
 
   createEffect(() => {
     const viewport = props.viewport?.()
+    const anchor = container?.offsetParent
 
-    if (!viewport) {
-      setStore("available", COMPOSER_SUGGESTION_MAX_HEIGHT)
+    if (!viewport || !(anchor instanceof HTMLElement)) {
+      setStore({ spaceAbove: COMPOSER_SUGGESTION_MAX_HEIGHT, spaceBelow: 0 })
       return
     }
 
     const measure = () => {
-      if (!container) return
-
-      const available = container.getBoundingClientRect().bottom - viewport.getBoundingClientRect().top
-      setStore("available", Math.max(0, available))
+      const panel = viewport.getBoundingClientRect()
+      const composer = anchor.getBoundingClientRect()
+      setStore({
+        spaceAbove: Math.max(0, composer.top - panel.top - COMPOSER_SUGGESTION_GAP),
+        spaceBelow: Math.max(0, panel.bottom - composer.bottom - COMPOSER_SUGGESTION_GAP),
+      })
     }
 
-    createResizeObserver(viewport, measure)
+    createResizeObserver([viewport, anchor], measure)
     makeEventListener(viewport, "scroll", measure, { passive: true })
     measure()
   })
@@ -1355,9 +1361,16 @@ function ComposerEditorPopover(props: {
     <div
       ref={container}
       data-component="composer-suggestions"
-      class="absolute inset-x-0 -top-2 z-40 flex -translate-y-full scroll-pb-[18px] flex-col rounded-xl bg-v2-background-bg-base p-1.5 shadow-[var(--v2-elevation-raised)] no-scrollbar"
-      classList={{ "overflow-auto": !props.history, "overflow-hidden": !!props.history }}
-      style={{ "max-height": `${Math.min(store.maxHeight, store.available)}px` }}
+      class="absolute inset-x-0 -top-2 z-40 flex max-h-(--suggestions-height-above) -translate-y-full scroll-pb-[18px] flex-col rounded-xl bg-v2-background-bg-base p-1.5 shadow-[var(--v2-elevation-raised)] no-scrollbar"
+      classList={{
+        "@max-xl:top-full @max-xl:mt-2 @max-xl:max-h-(--suggestions-height-below) @max-xl:translate-y-0": opensBelow(),
+        "overflow-auto": !props.history,
+        "overflow-hidden": !!props.history,
+      }}
+      style={{
+        "--suggestions-height-above": `${Math.min(store.maxHeight, store.spaceAbove)}px`,
+        "--suggestions-height-below": `${Math.min(store.maxHeight, store.spaceBelow)}px`,
+      }}
       onMouseDown={(event) => event.preventDefault()}
     >
       <Show when={props.history}>

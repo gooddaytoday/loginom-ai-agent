@@ -75,7 +75,7 @@
     },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
     {
-      "id": "CAT-14",
+      "id": "CAT-16",
       "title": "New-session GUI slot (C1.3)",
       "paths": [
         "packages/plugin/src/gui/builtin.ts",
