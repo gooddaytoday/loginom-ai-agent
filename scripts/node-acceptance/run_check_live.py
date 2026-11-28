@@ -427,9 +427,10 @@ class LiveChain:
         self.log('submitted', case=folder.name, sessionID=expected_session, browser_pid=self.browser[0] if self.browser else None)
         assistants, parts = [], []
         finished_session = None
+        model_failed = False
         try:
             def completed():
-                nonlocal assistants, parts
+                nonlocal assistants, parts, model_failed
                 self.verify_owner()
                 try:
                     messages, parts, activity = transcript(self.profile)
@@ -455,14 +456,16 @@ class LiveChain:
                 busy, idle, outcome = activity[session]
                 previous_idle = activity_before.get(session, (None, None, None))[1]
                 if idle and idle > (previous_idle or 0) and idle >= (busy or 0) and idle >= user['time']['created']:
-                    if outcome != 'succeeded' or any(m.get('error') for m in assistants):
-                        raise RuntimeError('LIVE_CHAIN_MODEL_ERROR: ' + str(folder / 'model.stdout'))
-                    assert assistants and assistants[-1]['time'].get('completed'), 'LIVE_CHAIN_ASSISTANT_MISSING'
+                    model_failed = outcome != 'succeeded' or any(m.get('error') for m in assistants)
+                    if not model_failed:
+                        assert assistants and assistants[-1]['time'].get('completed'), 'LIVE_CHAIN_ASSISTANT_MISSING'
                     return session
 
             finished_session = self.wait_for(completed, deadline, 'MODEL')
         finally:
             failure = write_events(folder, assistants, parts, finished_session=finished_session)
+        if model_failed and not failure:
+            raise RuntimeError('LIVE_CHAIN_MODEL_ERROR: ' + str(folder / 'model.stdout'))
         current_browser = browser_owner(self.child.pid, self.profile, self.browser_executable)
         if current_browser:
             assert self.browser in (None, current_browser), 'LIVE_CHAIN_BROWSER_OWNER_CHANGED'

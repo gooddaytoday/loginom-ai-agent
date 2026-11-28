@@ -185,6 +185,34 @@ class LiveChainTest(unittest.TestCase):
                          if event['type'] == 'interaction_required')
             self.assertEqual((event['type'], event['part']['tool']), ('interaction_required', 'question'))
 
+    def test_idle_provider_failure_preserves_workspace_refusal(self):
+        for workspace_changed in (True, False):
+            with self.subTest(workspace_changed=workspace_changed), TemporaryDirectory() as directory:
+                profile = Path(directory)
+                chain = LiveChain(profile, profile, profile, 'worker', '/worker/sample.lgp', 'p/m', '',
+                                  lambda: 99, Path(sys.executable))
+                chain.child = Mock(pid=42)
+                chain.child.poll.return_value = None
+                chain.verify_owner = Mock()
+                chain.send = Mock()
+                chain.pump = Mock()
+                messages = [dict(id='user', sessionID='chat', type='user', text='Prompt', time=dict(created=1)),
+                            dict(id='answer', sessionID='chat', type='assistant', model=dict(providerID='p', id='m'),
+                                 time=dict(created=2, completed=3), error=dict(type='provider.http', message='ECONNRESET'))]
+                refusal = dict(workspace=dict(status='NOT_READY', reason='WORKFLOW_CHANGED'))
+                parts = [(1, 2, dict(type='tool', tool='loginom_dock_prepare', id='prepare', sessionID='chat',
+                    messageID='answer', state=dict(status='completed', output=json.dumps(refusal))))] if workspace_changed else []
+                with patch('run_check_live.transcript', side_effect=[([], [], {}), (messages, parts, {'chat': (1, 3, 'failed')})]), \
+                        patch('run_check_live.browser_owner', return_value=None):
+                    if workspace_changed:
+                        self.assertEqual(chain.turn(profile, 'unused', {}, None, 'Prompt', [], time.monotonic() + 1), 'chat')
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, 'LIVE_CHAIN_MODEL_ERROR'):
+                            chain.turn(profile, 'unused', {}, None, 'Prompt', [], time.monotonic() + 1)
+                errors = [event['error']['name'] for event in map(json.loads, (profile / 'model.stdout').read_text().splitlines())
+                          if event['type'] == 'error']
+                self.assertEqual(errors, ['APIError', 'WORKFLOW_CHANGED'] if workspace_changed else ['APIError'])
+
     def test_live_close_requires_fresh_runtime_ack_even_with_native_receipt(self):
         runner_module = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'run-check.py'))
         runner = runner_module['Runner'].__new__(runner_module['Runner'])
