@@ -202,6 +202,12 @@ It then falls back to the quote's composer tile without closing the editor or di
 | `bindPlugin(component)`                          | One contract component under its provider's context; data methods stay plain   |
 | `onIdle(fn)` (built-ins only)                    | Preloading a lazy chunk while the app is idle                                  |
 
+Built-in window plugins can import `ToolRenderer` from `@opencode/plugin/gui/builtin` and call
+`ctx.add(ToolRenderer, { tool, title, separate, render })` in setup for a tool they own. The host rejects native or
+already registered tool names and withdraws the renderer when the plugin unloads. `separate: true` gives visible calls
+their own row in grouped timelines. The renderer receives live data, including partial input. The timeline shows a tool
+error card if rendering throws and retries rendering at the next call status.
+
 [Lifetimes](#lifetimes) shows `createKeyed` in files.
 
 ```ts
@@ -332,13 +338,14 @@ to the displayed repository or worktree instead of adding a second menu item.
 | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `onIdle(fn)`                                            | Runs work while the main thread is idle, e.g. a lazy chunk's preload                           |
 | `BuiltinPanel`, `BuiltinPanelTab`                       | `legacy` stored keys of a panel; `first` and stable `dom` ids of a tab                         |
+| `Page`                                                  | Top-level plugin pages with optional navigation entries                                        |
 | `BuiltinCommand`                                        | `follows`: share another command's shortcut inside `scope`                                     |
 | `BuiltinStore`, `BuiltinStoreFrom`                      | Window stores imported from parts of the app's own keys                                        |
 | `builtinContext(ctx)`                                   | `ctx.desktop.forceFocus`, `ctx.locale.setDirection`                                            |
 | `builtinMainContext(ctx)`, `MainStoreFrom`, `Lifecycle` | Main stores imported from settings files or other namespaces, and `lifecycle.restart(handoff)` |
 | `builtinCatalog(catalog)`, `BuiltinCatalog`             | Locales other than English as loaders, loaded when the user picks the locale                   |
 
-Each registry token has the same id as the public one, so the host reads every item through it. The host builds every context with the built-in members; `builtinContext` and `builtinMainContext` only type them. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
+Registry tokens that extend a public registry share its id, so the host reads every item through it. The host accepts `Page` registrations only from built-in plugins. The host builds every context with the built-in members; `builtinContext` and `builtinMainContext` only type them. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
 
 ```ts
 i18n: builtinCatalog({ en, de: () => import("./i18n/de") }),

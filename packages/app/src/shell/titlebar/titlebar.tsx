@@ -45,6 +45,7 @@ import { ActivityRing } from "@opencode/ui/activity-ring"
 import { RecentlyClosedTabsMenu } from "./recently-closed-tabs-menu"
 import { useSettingsDialog } from "@/settings/command"
 import { TitlebarItems, useTitlebarItems } from "@/runtime/plugin/titlebar-items"
+import { PluginPageNav, useActivePluginPage } from "@/runtime/plugin/pages"
 import { createRouteTabSync } from "./route-sync"
 import {
   INITIAL_MOBILE_TABS_STATE,
@@ -232,6 +233,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
             const preparing = routeSync.preparing
             const session = routeSync.session
             const currentTab = routeSync.currentTab
+            const pluginPage = useActivePluginPage()
             const managedConnection = createMemo(() => {
               const server = currentTab()?.server ?? layout.home.selection().server
               const connections = global.servers.list()
@@ -329,6 +331,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                 case "settings":
                 case "connect":
                 case "components":
+                case "page":
                 case "home": {
                   const selection = layout.home.selection()
 
@@ -337,7 +340,12 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                     global.servers.list()[0]
 
                   const projects = conn ? global.serverCtx(ServerConnection.key(conn))?.projects : undefined
-                  if (conn && openNavigationDraft(ServerConnection.key(conn), draftID, selection.directory)) return true
+                  if (route.type === "page") {
+                    const local = global.servers.list().find((item) => item.type === "sidecar")
+                    if (local && openNavigationDraft(ServerConnection.key(local), draftID)) return true
+                  } else if (conn && openNavigationDraft(ServerConnection.key(conn), draftID, selection.directory)) {
+                    return true
+                  }
 
                   const project =
                     projects?.list().find((item) => item.worktree === selection.directory) ??
@@ -602,6 +610,9 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
             })
 
             const currentTitle = () => {
+              if (layout.route().type === "page")
+                return pluginPage()?.value.title ?? language.t("plugin.page.unavailable")
+
               const tab = currentTab()
 
               if (!tab) return language.t("home.title")
@@ -743,6 +754,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                             {managedConnection() ? newConversation() : language.t("command.session.new")}
                           </button>
                           <div class="flex shrink-0 flex-col gap-1 border-t border-v2-border-border-muted pt-2">
+                            <PluginPageNav onNavigate={closeMobileTabs} />
                             <button
                               type="button"
                               data-action="mobile-tabs-home"
@@ -790,6 +802,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                     when={props.verticalTabs}
                     fallback={
                       <>
+                        <PluginPageNav horizontal />
                         <TitlebarTabStrip
                           tabs={tabsStore}
                           currentTab={currentTab()}
@@ -881,6 +894,7 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
                                 </button>
                               </Show>
                             </div>
+                            <PluginPageNav />
                             <div class="h-4 w-full shrink-0" aria-hidden="true" />
                             <div class="flex min-h-0 flex-1 flex-col gap-1">
                               <Switch fallback={verticalTabStrip()}>

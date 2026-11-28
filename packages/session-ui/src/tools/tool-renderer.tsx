@@ -436,6 +436,7 @@ export function CurrentContextToolGroup(props: {
   patchGroupKey?: (tools: SessionMessageAssistantTool[]) => string
 }) {
   const i18n = useI18n()
+  const toolRenderers = useData().toolRenderers
   const tools = createMemo(() => props.parts.filter((part) => part.type === "tool"))
 
   const pending = createMemo(
@@ -448,7 +449,11 @@ export function CurrentContextToolGroup(props: {
         props.parts.flatMap((part) => {
           if (part.type !== "tool" && part.type !== "shell") return []
 
-          return [part.type === "tool" ? toolTitle(part, i18n) : i18n.t("ui.tool.shell")]
+          return [
+            part.type === "tool"
+              ? (toolRenderers?.find(part.name)?.title ?? toolTitle(part, i18n))
+              : i18n.t("ui.tool.shell"),
+          ]
         }),
       ),
     ]),
@@ -1183,6 +1188,30 @@ export const ToolRegistry = {
   render: getTool,
 }
 
+export function useToolDisplayRenderer(
+  name: () => string,
+  fallback: (title: string) => JSX.Element,
+  native?: (name: string) => ToolComponent | undefined,
+) {
+  const renderers = useData().toolRenderers
+  const item = createMemo(() => renderers?.find(name()))
+
+  const render = createMemo(() => {
+    const tool = name()
+    const contribution = item()
+
+    return (
+      native?.(tool) ??
+      ToolRegistry.render(tool) ??
+      (contribution
+        ? (props: ToolProps) => contribution.render(props, () => fallback(contribution.title))
+        : GenericTool)
+    )
+  })
+
+  return { render, title: () => item()?.title }
+}
+
 export function FileTool(props: ToolProps & { title: string; count: number; children?: JSX.Element }) {
   const i18n = useI18n()
 
@@ -1368,7 +1397,20 @@ export function ToolDisplay(
   const errorSubtitle = createMemo(() => toolErrorSubtitle(props, i18n))
   const error = createMemo(() => toolDisplayError(props))
   const stopped = createMemo(() => stoppedShell({ ...props, metadata: toolMetadata(props.metadata) }))
-  const render = createMemo(() => ToolRegistry.render(props.tool) ?? GenericTool)
+
+  const renderer = useToolDisplayRenderer(
+    () => props.tool,
+    (title) => (
+      <ToolErrorCard
+        tool={props.tool}
+        title={title}
+        error={i18n.t("ui.toolErrorCard.rendererFailed")}
+        defaultOpen={props.defaultOpen}
+        open={props.open}
+        onOpenChange={props.onOpenChange}
+      />
+    ),
+  )
 
   return (
     <Show when={!hideQuestion()}>
@@ -1377,7 +1419,7 @@ export function ToolDisplay(
           <Match when={stopped()}>
             {(stopped) => (
               <>
-                <Dynamic component={render()} {...props} output={stopped().output} />
+                <Dynamic component={renderer.render()} {...props} output={stopped().output} />
                 <ToolErrorCard tool={props.tool} error={stopped().notice} subtitle={errorSubtitle()} />
               </>
             )}
@@ -1403,7 +1445,7 @@ export function ToolDisplay(
                   title={
                     props.tool === "websearch"
                       ? webSearchProviderLabel(toolMetadata(props.metadata).provider, i18n)
-                      : undefined
+                      : renderer.title()
                   }
                   defaultOpen={props.defaultOpen}
                   open={props.open}
@@ -1425,7 +1467,7 @@ export function ToolDisplay(
             }}
           </Match>
           <Match when={true}>
-            <Dynamic component={render()} {...props} />
+            <Dynamic component={renderer.render()} {...props} />
           </Match>
         </Switch>
       </div>

@@ -9,6 +9,7 @@ import {Client as AgentClient} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import * as executor from '../../lib/executor.mjs';
 import * as workspace from '../../lib/workspace.mjs';
+import {serverDownloadTools} from '../../lib/storage-policy.mjs';
 import {createBundledSkillFixture} from './bundled-skill-fixture.mjs';
 import {createActionCatalogFixture} from './action-catalog-fixture.mjs';
 import {Page,runtime} from './executor-fixture.mjs';
@@ -52,7 +53,8 @@ class ExternalClient {
       await this.f.finishPreparation?.promise;
       value={status:'READY',authenticated:true,target_verified:true,
       target,loginom_account:'test-2',document_id:'own-doc',created_draft:!this.f.scenario.startsWith('opened-'),ownership_verified:!this.f.scenario.startsWith('opened-'),effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:this.f.scenario.startsWith('opened-')?{path,persisted:true}:{path:null,...(this.f.finishPreparation?{persisted:false}:{})}};
-      if(this.f.scenario.startsWith('draft-navigated')||this.f.scenario.startsWith('draft-nav-refused'))value.package_ref={path:null,persisted:false};
+      if(this.f.scenario==='opened-read-only')value.package_ref.read_only=true;
+      if(['draft-navigated','draft-nav-refused','draft-nav-exit'].some(p=>this.f.scenario.startsWith(p)))value.package_ref={path:null,persisted:false};
       if(this.f.native)value={status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',phase:'exact_workflow_ready',
         target,authenticated:true,created_draft:false,effect_possible:true,operation_id:'prepare',session_id:'own-session'};
       if(this.f.failedDraft)value={...value,reason:'NATIVE_MESSAGE_BOX_BLOCKED',created_draft:true};
@@ -149,7 +151,9 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
       }})});
     return f.runtime;
   }
-  return {tools:executor.executorTools,describe:()=>({available_node_types:[],actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
+  return {tools:f.storageReturn?[...executor.executorTools,...serverDownloadTools]:executor.executorTools,
+    serverDownload:async(_args,_name,{onWorkflowReturn})=>{onWorkflowReturn?.(f.storageReturn);return f.storageReceipt;},
+    describe:()=>({available_node_types:[],actions:[],node_types:[],available_node_types:[]}),assertPreparationAllowed(){if(f.busy)throw Error('busy');},hasUnsettledWork:()=>f.unsettled || (f.scenario==='product-gate-unsettled' && ++f.workChecks>1),async cleanupServerCache(){},closeArtifactDeliveries:async()=>{},
     requestFailure:error=>{
       f.failureMessages??=[];f.failureMessages.push(error.message);
       return {status:'NOT_APPLIED',operation_id:'refused-save',effect_possible:false,cleanup_complete:true};
@@ -393,7 +397,7 @@ test('managed shutdown records the native connection timeline before closing the
  }finally{await bridge.close();await rm(directory,{recursive:true,force:true});}
 });
 
-for(const scenario of ['opened-clean','opened-dirty','opened-path-mismatch','opened-busy','opened-unsettled','opened-not-persisted'])
+for(const scenario of ['opened-clean','opened-read-only','opened-dirty','opened-path-mismatch','opened-busy','opened-unsettled','opened-not-persisted'])
  test('normal shutdown of an opened package without Save: '+scenario,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-opened-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
@@ -415,13 +419,14 @@ for(const scenario of ['opened-clean','opened-dirty','opened-path-mismatch','ope
     const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
     assert.equal(result.browser_transport_closed,true);assert.equal(f.saves,0);
     assert.equal(cleanup.save_operation_id,null);
-    assert.equal(cleanup.status,scenario==='opened-clean'?'SUCCEEDED':'BLOCKED');
-    assert.equal(f.events.includes('package-cleanup'),['opened-clean','opened-dirty'].includes(scenario));
+    const closed=['opened-clean','opened-read-only'].includes(scenario);
+    assert.equal(cleanup.status,closed?'SUCCEEDED':'BLOCKED');
+    assert.equal(f.events.includes('package-cleanup'),closed||scenario==='opened-dirty');
     if(scenario==='opened-dirty')assert.equal(cleanup.reason,'UNSAVED_CHANGES');
-    if(scenario==='opened-clean'){
+    if(closed){
       assert.equal(cleanup.package_closed,true);assert.equal(cleanup.logged_out,true);
       assert.equal(cleanup.policy,'opened_saved_package');assert.equal(cleanup.package_path,path);
-      assert.equal(f.cleanupOptions.diagnosticDiscard,false);assert.equal(f.cleanupOptions.diagnosticReadOnly,false);
+      assert.equal(f.cleanupOptions.diagnosticDiscard,false);assert.equal(f.cleanupOptions.diagnosticReadOnly,scenario==='opened-read-only');
       assert.equal(f.cleanupOptions.documentId,'own-doc');assert.equal(f.cleanupOptions.tabTid,'own-tab');
     }
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
@@ -514,6 +519,37 @@ for(const action_key of ['package.save_checkpoint','package.save_as'])
    assert.equal(cleanup.status,'SUCCEEDED');assert.equal(cleanup.save_operation_id,saved.operation_id);
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
+
+test('storage return refusal is only an extra MCP text block',async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'storage-return-bridge-'));
+  t.after(()=>rm(directory,{recursive:true,force:true}));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario:'storage-return',events:[],catalog,storageReturn:'refused'};
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+    artifactStore:{list:()=>[],async releaseUploads(){}}};
+  const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+    mode:'executor-replay',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2'},session);
+  const client=new AgentClient({name:'test',version:'1'});
+  const [a,b]=InMemoryTransport.createLinkedPair();
+  try{
+    await bridge.server.connect(b);await client.connect(a);
+    assert.notEqual((await client.callTool({name:'dock_prepare',arguments:{}})).isError,true);
+    for(const [name,action_key,output,args] of [
+      ['dock_storage_source','storage.source',{source:{server_source_ref:'file-ref'}},{path:'/test-2/full.csv'}],
+      ['dock_storage_list','storage.list',{entries:[{server_source_ref:'file-ref'}]},{path:'/test-2'}],
+      ['dock_storage_download_wait','storage.download',{path:'/cache/full.csv'},{timeout_ms:1000}],
+    ]){
+      f.storageReceipt={result_version:'user-v1',operation_id:'storage',status:'SUCCEEDED',action_key,
+        effect_possible:false,cleanup_complete:true,output};
+      const reply=await client.callTool({name,arguments:{operation_id:'storage',...args}});
+      assert.deepEqual(reply.structuredContent,f.storageReceipt);
+      assert.deepEqual(reply.content,[{type:'text',text:JSON.stringify(f.storageReceipt)},
+        {type:'text',text:'The original workflow tab was not restored, so call dock_prepare(intent="existing_workflow") before Save.'}]);
+    }
+  }finally{await client.close();await bridge.close();}
+});
 
 const cases=['success','unprepared','no-save','native-blocked','busy','dirty-after-save','state-unavailable'];
 const productCases=['product-success','product-unsettled','product-gate-unsettled','product-native-blocked','product-evidence-directory','product-journal-directory','product-no-save','product-multiple-paths','product-busy','product-native-error','product-native-malformed'];
@@ -794,7 +830,7 @@ for(const scenario of ['generated-id','reconciled-own','reconciled-older','recon
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
  });
 
-for(const scenario of ['draft-clean','draft-navigated','draft-navigated-ordinary','draft-navigated-foreign','draft-nav-refused','draft-nav-refused-effect','draft-nav-refused-foreign','draft-nav-refused-dirty','draft-dirty','draft-busy','draft-unsettled','draft-not-owned','draft-persisted','draft-cancelled-unverified','draft-cancelled-not-owned','draft-cancelled-no-tab','draft-cancelled-persisted'])
+for(const scenario of ['draft-clean','draft-navigated','draft-navigated-ordinary','draft-nav-exit','draft-nav-exit-foreign','draft-navigated-foreign','draft-nav-refused','draft-nav-refused-effect','draft-nav-refused-foreign','draft-nav-refused-dirty','draft-dirty','draft-busy','draft-unsettled','draft-not-owned','draft-persisted','draft-cancelled-unverified','draft-cancelled-not-owned','draft-cancelled-no-tab','draft-cancelled-persisted'])
  test('normal shutdown of an unsaved draft without Save: '+scenario,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-draft-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
@@ -817,6 +853,13 @@ for(const scenario of ['draft-clean','draft-navigated','draft-navigated-ordinary
       state.created_draft=false;
       if(scenario==='draft-navigated-foreign')state.document_id='foreign-document';
     }
+    // LAB-2054: the NEW existing_workflow admitted after a no-effect Submodel
+    // refusal keeps that refusal's owned-draft cleanup; ordinary ones do not.
+    if(scenario.startsWith('draft-nav-exit')){
+      session.metadata.workspacePreparation.identity=JSON.stringify({operation_id:'parent',intent:'existing_workflow',workflow_ref:state.workflow_ref});
+      session.metadata.workspacePreparation.after_refused_navigation=true;state.created_draft=false;
+      if(scenario==='draft-nav-exit-foreign')state.document_id='foreign-document';
+    }
     if(scenario.startsWith('draft-nav-refused')){
       const ref={document_id:state.document_id,...structuredClone(state.workflow_ref)};
       if(scenario==='draft-nav-refused-foreign')ref.document_id='foreign-document';
@@ -838,8 +881,8 @@ for(const scenario of ['draft-clean','draft-navigated','draft-navigated-ordinary
     f.busy=scenario==='draft-busy';f.unsettled=scenario==='draft-unsettled';
     const result=await bridge.close();
     assert.equal(result.browser_transport_closed,true);assert.equal(f.saves,0);
-    assert.equal(result.package_cleanup.status,['draft-clean','draft-navigated','draft-nav-refused'].includes(scenario)?'SUCCEEDED':'BLOCKED');
-    assert.equal(f.events.includes('package-cleanup'),['draft-clean','draft-navigated','draft-dirty','draft-nav-refused','draft-nav-refused-dirty'].includes(scenario));
+    assert.equal(result.package_cleanup.status,['draft-clean','draft-navigated','draft-nav-refused','draft-nav-exit'].includes(scenario)?'SUCCEEDED':'BLOCKED');
+    assert.equal(f.events.includes('package-cleanup'),['draft-clean','draft-navigated','draft-dirty','draft-nav-refused','draft-nav-refused-dirty','draft-nav-exit'].includes(scenario));
     if(scenario==='draft-navigated-ordinary')assert.equal(result.package_cleanup.reason,'CONFIRMED_SAVE_REQUIRED');
     if(f.cleanupOptions){
       assert.equal(f.cleanupOptions.unsavedDraft,true);assert.equal(f.cleanupOptions.packagePath,null);

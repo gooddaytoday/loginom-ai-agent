@@ -67,10 +67,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "העומס על Gemini גבוה מדי כרגע",
   "ui.sessionTurn.error.freeUsageExceeded": "חריגה מהשימוש בחינם",
   "ui.sessionTurn.error.addCredits": "הוסף קרדיטים",
-  "dialog.usageExceeded.freeTier.title": "הגעת למגבלה החינמית",
-  "dialog.usageExceeded.freeTier.description":
-    "הירשם ל-OpenCode Go לקבלת גישה אמינה למודלי הקוד הפתוח הטובים ביותר, החל מ-$5 לחודש.",
-  "dialog.usageExceeded.freeTier.actionLabel": "הירשם",
   "ui.sessionTurn.status.delegating": "מעביר את העבודה לסוכן אחר",
   "ui.sessionTurn.status.planning": "תכנון השלבים הבאים",
   "ui.sessionTurn.status.gatheringContext": "בודק את הפרויקט",

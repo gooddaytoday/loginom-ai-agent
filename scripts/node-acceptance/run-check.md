@@ -497,8 +497,9 @@ intermediate cached Helper, reorder); only the task and `fixtures/modes.csv` rea
 keep the machine available and collect it with `wait` before handing off the
 task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown/incomplete batch, or 2
 for its own timeout. A timeout does not cancel the worker; repeat `wait`.
-The result directory is private (0700); `summary.md` and atomic `results.json`
-contain the report. Configs, profiles and raw logs stay private there.
+The result directory is private (0700) and must be outside any Git checkout.
+`summary.md` and atomic `results.json` contain the report. Configs, retained
+profiles and raw logs stay private there.
 Results default to `~/.cache/loginom-runs/<timestamp>/`. The worker and its
 children use the result directory's `tmp/` for `TMPDIR`, `TMP` and `TEMP`;
 task-owned `CODEX_*` settings are not inherited. On Linux, keep an explicit
@@ -508,9 +509,26 @@ The pair must contain `worker.json` and `reviewer.json` with the established
 `loginom` and either `package_directory` or `personal_folder` fields (when both
 exist, `package_directory` wins). Unknown formats fail before detach and name
 the file, required fields and supplied keys; credential values are never printed.
-Runs use the worker account. The model is `deepseek/deepseek-flash` (constant
-`MODEL` in `run-check.py`, no variant); the key is read from `DEEPSEEK_API_KEY`
-in the environment, shared OAuth is not used. `make-pair.py` builds the pair in a
+Runs use the worker account. The default is `deepseek/deepseek-flash` without a
+variant, using `DEEPSEEK_API_KEY`. Set `RUN_CHECK_MODEL` to select another model
+and `RUN_CHECK_VARIANT` for a `run` variant (not supported by the two-turn TUI
+cases). A variant on a two-turn TUI case or an unreadable `RUN_CHECK_AUTH` file
+is rejected before detach. `RUN_CHECK_AUTH` points to a legacy `auth.json`.
+The path is private to the runner and is not passed in the phase environment.
+The runner copies the file with mode `0600` into the fresh CLI profile for
+import and unlinks it as soon as the first model phase succeeds. On success,
+failure, or worker SIGTERM, cleanup removes any remaining copy and the entire
+OAuth profile, including its database, sidecars, and `execution-events.jsonl`.
+If the worker is forcibly killed before cleanup (for example with SIGKILL),
+remove that run's OAuth profile manually before sharing any evidence.
+Without `RUN_CHECK_AUTH`, no copy is made and the profile is retained.
+
+The source file is never updated. If the provider rotates the refresh token,
+the next copy (even in a sequential batch) can be stale, and reusing it can
+revoke the OAuth session. The runner warns on OAuth starts: do not run scenarios
+in parallel with the same file. If a run rotates the token, obtain fresh OAuth
+credentials before reusing the account for another scenario.
+`make-pair.py` builds the pair in a
 0700 temporary directory from `LOGINOM_{WORKER,REVIEWER}_{USER,PASS}` (see its
 docstring); remove it with `make-pair.py --remove DIR` after `wait`. Requires git, Python 3.9+, the pinned Bun/Node/browser bootstrap cache,
 and network access for the locked dependencies. Build inputs can be overridden
@@ -656,8 +674,7 @@ A private case may add `case.json` with `base` (another case in the same
 `bughunt-audit.py`). The first turn of a private case attaches every file in
 `data/`, any format; a continuation attaches only its `input_files`.
 
-The model under test is the constant `MODEL` of `run-check.py` (`deepseek/deepseek-flash`, no variant); it is
-recorded per run in `results.json`.
+The model and any explicit variant are recorded per run in `results.json`.
 
 Each output may declare `header: false` in private `expected.json` for a CSV
 without a header (including a single JSON cell). Columns then declare CSV

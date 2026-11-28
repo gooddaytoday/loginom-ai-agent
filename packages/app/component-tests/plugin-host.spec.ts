@@ -41,6 +41,86 @@ story.beforeEach(async ({ mount }) => {
   await mount("ui-line-comment--editor")
 })
 
+story(
+  "a plugin page uses its contribution context and becomes unavailable when its plugin is disabled",
+  async ({ page }) => {
+    const host = await page.evaluateHandle(async (fixture) => {
+      const { mountPluginPages } = await import(fixture)
+
+      return mountPluginPages()
+    }, fixture)
+    const nav = page.getByRole("navigation", { name: "Plugin pages" })
+    const entry = nav.getByRole("button", { name: "Example plugin page", exact: true })
+
+    await entry.click()
+    await expect(page.getByRole("heading", { name: "Example plugin page" })).toBeVisible()
+    await expect(page.getByText("@acme/opencode-gui", { exact: true })).toBeVisible()
+    await expect(entry).toHaveAttribute("aria-current", "page")
+
+    await host.evaluate((host) => host.disable())
+    await expect(nav).toHaveCount(0)
+    await expect(page.getByRole("heading", { name: "Plugin page unavailable" })).toBeVisible()
+    await page.getByRole("button", { name: "Back to Home" }).click()
+    await expect(page.getByRole("heading", { name: "Fixture Home" })).toBeVisible()
+    await host.evaluate((host) => host.unmount())
+  },
+)
+
+story("a plugin page that fails to render shows a way back to Home", async ({ page }) => {
+  const host = await page.evaluateHandle(async (fixture) => {
+    const { mountPluginPages } = await import(fixture)
+
+    return mountPluginPages({ failRender: true })
+  }, fixture)
+
+  await page.getByRole("button", { name: "Example plugin page", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "Plugin page unavailable" })).toBeVisible()
+  await page.getByRole("button", { name: "Back to Home" }).click()
+  await expect(page.getByRole("heading", { name: "Fixture Home" })).toBeVisible()
+  await host.evaluate((host) => host.unmount())
+})
+
+story("a restored plugin page shows a loader while waiting for settings and while loading", async ({ page }) => {
+  const host = await page.evaluateHandle(async (fixture) => {
+    const { mountLoadingPluginPage } = await import(fixture)
+
+    return mountLoadingPluginPage()
+  }, fixture)
+
+  const loader = page.getByRole("img", { name: "Loading", exact: true })
+  const unavailable = page.getByRole("heading", { name: "Plugin page unavailable" })
+  expect(await host.evaluate((host) => host.status())).toBeUndefined()
+  expect(await loader.isVisible()).toBe(true)
+  await expect(unavailable).toHaveCount(0)
+
+  await host.evaluate((host) => host.releaseSettings())
+  await expect(loader).toBeVisible()
+  await expect(unavailable).toHaveCount(0)
+
+  await host.evaluate((host) => host.fail(0, new Error("Fixture load failed")))
+  await expect(unavailable).toBeVisible()
+  await expect(loader).toHaveCount(0)
+  await host.evaluate((host) => host.unmount())
+})
+
+story("a third-party plugin cannot register a page with a public registry token", async ({ page }) => {
+  const result = await page.evaluate(async (fixture) => {
+    const { mountPluginHost, Registry, until } = await import(fixture)
+    const host = mountPluginHost()
+
+    try {
+      host.load((ctx: Context) => ctx.add(Registry.define("page"), { id: "overview", title: "Third-party page" }))
+      await until(() => host.status() === "failed" || host.status() === "active")
+
+      return { status: host.status(), pages: host.entries("page") }
+    } finally {
+      host.unmount()
+    }
+  }, fixture)
+
+  expect(result).toEqual({ status: "failed", pages: 0 })
+})
+
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {
   const setups = await page.evaluate(async (fixture) => {
     const { mountPluginHost } = await import(fixture)

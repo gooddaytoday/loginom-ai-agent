@@ -164,7 +164,7 @@ function trackPageNetwork(page) {
 
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
-export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, sameOrigin = false } = {}) {
+export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload, onPhase, reload, signal, sameOrigin = false } = {}) {
   const started = performance.now()
   let phase = "goto", phaseStarted = started, original
   const emit = async event => { try { await onPhase?.(event) } catch { /* Diagnostics cannot change login. */ } }
@@ -185,9 +185,16 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     if (left <= 0) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
     return Math.min(limit, left)
   }
+  const requireLoginAddress = () => {
+    if (!reload) return
+    signal?.throwIfAborted()
+    const expected = new URL(loginomAddress(candidate.url))
+    const current = new URL(page.url())
+    if (current.origin !== expected.origin || current.pathname !== expected.pathname) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+  }
   const network = await trackLoginNetwork(page)
   try {
-    const response = await measure("login.navigation", () => page.goto(loginomAddress(candidate.url),
+    const response = reload ? null : await measure("login.navigation", () => page.goto(loginomAddress(candidate.url),
       { waitUntil: "domcontentloaded", timeout: remaining(60_000) }))
     try {
       const timing = response?.request?.()?.timing?.()
@@ -220,7 +227,7 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
       }))
       if (missing !== true && missing !== "interacted") break
       themeState.failed = true
-      if (themeState.reloaded || missing === "interacted" || await avatar.isVisible()) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+      if (reload || themeState.reloaded || missing === "interacted" || await avatar.isVisible()) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
       // No credential or workspace gesture has happened. Never reload a page
       // handed to MCP, and never give this recovery a fresh time allowance.
       remaining(60_000)
@@ -240,18 +247,31 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     phase = "form"; phaseStarted = performance.now()
     if (sameOrigin && new URL(page.url()).origin !== new URL(candidate.url).origin)
       throw Error("LOGINOM_LOGIN_UNAVAILABLE")
-    if (!(await avatar.isVisible())) {
+    let alreadyAuthenticated = false
+    if (reload) {
+      const fresh = await observeReloadedLoginPage(page, candidate.url, reload)
+      if (!fresh || fresh.account && fresh.account !== candidate.username
+        || !fresh.account && (!fresh.formVisible || fresh.interacted)) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+      alreadyAuthenticated = fresh.account === candidate.username
+    }
+    if (!alreadyAuthenticated && !(await avatar.isVisible())) {
       phase = "submit"; phaseStarted = performance.now()
       await measure("login.username", async () => {
+        requireLoginAddress()
         await field("edtUsername").locator("input").fill(candidate.username, { timeout: remaining(30_000) })
         await field("edtUsername").locator("input").press("Tab", { timeout: remaining(30_000) })
       })
       const password = field("edtPassword").locator("input")
       // Passwordless accounts may make an already empty field readonly after username lookup.
       await measure("login.password", async () => {
+        requireLoginAddress()
         if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password, { timeout: remaining(30_000) })
       })
-      await measure("login.submit", () => field("btnLogin").click({ timeout: remaining(30_000) }))
+      await measure("login.submit", () => {
+        requireLoginAddress()
+        if (reload) reload.loginSubmitted = true
+        return field("btnLogin").click({ timeout: remaining(30_000) })
+      })
       const response = await measure("login.response", () => page.waitForFunction(function loginResponse() {
         const avatar = document.querySelector('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
         if (avatar && avatar.getBoundingClientRect().width > 0 && avatar.getBoundingClientRect().height > 0 && getComputedStyle(avatar).visibility !== "hidden") return "authenticated"
@@ -288,6 +308,53 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
   } finally {
     await network.close()
   }
+}
+
+async function observeReloadedLoginPage(page, url, reload) {
+  const { origin, pathname } = new URL(loginomAddress(url))
+  return page.evaluate(({ origin, pathname, timeOrigin, openDispatched }) => {
+    if (location.origin !== origin || location.pathname !== pathname
+      || performance.getEntriesByType("navigation")[0]?.type !== "reload"
+      || !Number.isFinite(performance.timeOrigin) || timeOrigin !== undefined && performance.timeOrigin !== timeOrigin
+      || globalThis.__loginomDockPreparationV1?.document === document && !openDispatched) return null
+    const element = document.querySelector('[data-tid="LoginForm;Login;edtUsername"]')
+    return { timeOrigin: performance.timeOrigin,
+      account: globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName || null,
+      interacted: globalThis.__loginomThemeStartupInteracted === true,
+      formVisible: !!element && element.getBoundingClientRect().width > 0 && getComputedStyle(element).visibility !== "hidden" }
+  }, { origin, pathname, timeOrigin: reload.timeOrigin, openDispatched: reload.openDispatched })
+}
+
+export async function reauthenticateReloadedPage(context, candidate, { origin, account, packagePath, deadline, signal, reload = {} }) {
+  const target = new URL(loginomAddress(candidate.url))
+  signal?.throwIfAborted()
+  if (target.origin !== origin || candidate.username !== account) return false
+  const pages = context.pages().filter(page => !page.isClosed())
+  if (pages.length !== 1) return false
+  const page = pages[0]
+  // The old call can fail as soon as the new document commits. loginPage
+  // waits for the new form and checks it again immediately before filling it.
+  const observed = await observeReloadedLoginPage(page, candidate.url, reload)
+  if (!observed) return false
+  reload.timeOrigin = observed.timeOrigin
+  signal?.throwIfAborted()
+  if (observed.account && observed.account !== account) return false
+  if (!observed.account && !observed.interacted && !reload.loginSubmitted)
+    await loginPage(page, candidate, { deadline, reload, signal })
+  signal?.throwIfAborted()
+  const receipt = await page.waitForFunction(({ origin, pathname, account, packagePath, timeOrigin }) => {
+    const form = globalThis.bg?.app?.Application?.FInstance?.FMainForm, map = form?.FMapTree
+    if (location.origin !== origin || location.pathname !== pathname || performance.timeOrigin !== timeOrigin
+      || map?.FServerConnection?.Connected !== true || form.FReconnecting === true
+      || map.FServerConnection.UserName !== account) return false
+    if (map.PackageNodes?.Count === 0) return true
+    const file = map.PackageNodes?.Count === 1 && map.PackageNodes.Items?.(0)?.PackageFileName
+    return typeof file === "string" && "/" + file.replaceAll("\\", "/").replace(/^\/+/, "") === packagePath
+  }, { origin, pathname: target.pathname, account, packagePath, timeOrigin: reload.timeOrigin },
+  { timeout: Math.max(1, Math.min(8000, deadline - Date.now())) })
+  await receipt.dispose()
+  signal?.throwIfAborted()
+  return Date.now() < deadline
 }
 
 function loginFailure(error, candidate, phase, duration, elapsed) {

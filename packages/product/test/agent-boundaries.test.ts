@@ -10,13 +10,14 @@ const boundaries = workflow.split("\n## Границы действий\n")[1] ?
 // computed totals in local Python, converted data without consent, and created a doomed 70-column Import.
 test("entry keeps the action boundaries visible before any reference is read", () => {
   const entry = skill.split("\n## ")[0]
-  expect(entry).toContain("Итоги считает Loginom, не локальный Python/bash")
-  expect(entry).toContain("`loginom_file_profile`")
+  expect(entry).toContain("Считай и сверяй итоги в Loginom")
+  expect(entry).toContain("`loginom_file_profile` проверяет допуск файла к загрузке")
   expect(entry).toContain("только его `next_step`/recovery, затем отчёт о блокере")
   expect(entry).toContain("без чтения\nжурналов, diagnostics и исходников продукта")
   expect(entry).toContain("Конвертация и производные файлы — с\nсогласия")
   expect(entry).toContain("[границы](references/workflow.md#границы-действий)")
-  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(36_298 + 2_000)
+  // The 39 000 B internal limit leaves headroom under the owner's 40 000 B budget.
+  expect(Buffer.byteLength(skill)).toBeLessThanOrEqual(39_000)
 })
 
 test("workflow reference defines Loginom-only results, standard recovery and consent", () => {
@@ -51,4 +52,18 @@ test("workflow reference allows waiting only through Loginom tools and keeps fil
   expect(boundaries).toMatch(/Приложенный `\.lgp` открывай `loginom_dock_prepare`[\s\S]*?не распаковывай/)
   expect(boundaries).toMatch(/вне рабочего каталога и вложений[\s\S]*?не читай и не создавай/)
   expect(boundaries).toContain("справку этого skill")
+})
+
+test("description asks to activate the skill for each scenario request, not for Help", () => {
+  const description = skill
+    .split("\n---\n")[0]
+    .split(/\ndescription: >-\n/)[1]
+    ?.split(/\n[a-z]+:/)[0]
+    .replace(/\s+/g, " ")
+  expect(description).toBeDefined()
+  expect(description).toContain("Каждый запрос о сценарии или пакете Loginom начинай с активации этого skill")
+  expect(description).toContain("разрешение действует только на текущий запрос")
+  expect(description).toContain("обычные справочные вопросы используют Help без этого skill")
+  expect(description!.length).toBeLessThanOrEqual(1024)
+  expect(skill).toContain("`existing_workflow` — только со ссылкой, выданной этим runtime, не из истории чата.")
 })

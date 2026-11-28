@@ -164,7 +164,8 @@ const wideLabel=async({visible=true}={})=>{
  const page={evaluateHandle:async()=>({dispose(){}}),evaluate:async()=>true,locator,waitForTimeout:ms=>new Promise(r=>setTimeout(r,Math.min(ms,5))),
   mouse:{click:async(x,y)=>{calls.push({x,y});throw Error('stop after first click');}}};
  const flow={workflow_id:'flow',tab_tid:'tab',prefix:'MF;TF-1',navigation_path:[{tid,label:'Module'},{tid:'flow',label:'Flow'}]};
- try{return {calls,result:await databaseConnectionCapability(page,{deadline:Date.now()+300,document_id:'doc',workflow_ref:flow,connection:{name:'/x.db',database_path:'/x.db'}})};}
+ const readGraph=async()=>({complete:true,interaction_ready:true,document_id:'doc',workflow_ref:flow,nodes:[]});
+ try{return {calls,result:await databaseConnectionCapability(page,{deadline:Date.now()+300,document_id:'doc',workflow_ref:flow,connection:{name:'/x.db',database_path:'/x.db'}},readGraph)};}
  finally{Object.assign(globalThis,saved);}
 };
 test('a control wider than its clipping panel is clicked inside its visible part',async()=>{

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
-import {createTextImportNodeSupport} from '../lib/text-import-node.mjs';
+import {createTextImportNodeSupport,textImportTitleRequest} from '../lib/text-import-node.mjs';
 import {finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from '../lib/node-import-continuation.mjs';
 import {releaseNodeTarget} from '../lib/node-target.mjs';
 
@@ -190,17 +190,17 @@ for(const running of [false,true])test('actual bound finish retains the identifi
   node_outputs:{verified:true,node_context:context,ports:[{index:0,port_guid:'output',active:!running}]},
   ui:{elements:[{tid:'N;Label;Label',graph_node:{part:'label',label_text:'Bound'}}]}};
  const execution={node,execution_id:'execution',root_id:'root',group_id:'group',group_record_id:'record'};
- const operation={parameters:{},nodeApply:{request:{}},importBinding:{},nodeTargetAdapter:{observe:async()=>({})}};
+ const operation={parameters:{},nodeApply:{request:{target:{kind:'existing'},parameters:{}}},importBinding:{},nodeTargetAdapter:{observe:async()=>({})}};
  let launches=0,identified=false,captured=false;
  // Run the actual factory method body with its boundary dependencies. This
  // preserves the bound/sourceSwitch branch instead of fabricating a finish.
  const method=createTextImportNodeSupport({}).nodeApplyDriverFactory({operation}).finish.toString();
- const run=new Function('f',`return (async()=>{const {operation,channel,executionDriver,read,readImportBindings,finishedImportSurface,ctx}=f;
+ const run=new Function('f',`return (async()=>{const {operation,channel,executionDriver,read,readImportBindings,textImportTitleRequest,finishedImportSurface,ctx}=f;
   const sourceSwitch=null,configured=null,enter=()=>{},requireValue=(v,m)=>{if(!v)throw Error(m)},one=(xs,m)=>{requireValue(xs.length===1,m);return xs[0]},verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
   return ({${method}}).finish('execute',ctx);})()`);
  const finish=await run({operation,ctx:{document_id:'doc',workflow_ref:{workflow_id:'wf'},node,deadline:Date.now()+60000},
   read:async()=>({wizard:{root_tid:'W'},ui:{elements:[{tid:'W;btnDone',ref:'done',allowed_actions:['finish_wizard']} ]}}),
-  readImportBindings:async()=>[],finishedImportSurface,
+  readImportBindings:async()=>[],textImportTitleRequest,finishedImportSurface,
   executionDriver:{launchGraph:async()=>{launches++;},identify:async()=>{identified=true;return execution;}},
   channel:{perform:async()=>{},observe:async o=>{if(o.readProcesses){assert.equal(identified,true);assert.equal(o.readOutputs,true);captured=true;assert.ok(o.ready(surface));}return structuredClone(surface);}}});
  assert.equal(captured,true);assert.equal(launches,1);assert.equal(verifyFinishedImportContinuation({node,finish,surface}),!running);
@@ -211,4 +211,65 @@ for(const running of [false,true])test('actual bound finish retains the identifi
  assert.equal(verifyWaitingExecutionContinuation({node,finish,surface:completed,checkpoint}),true);
  const changed=structuredClone(surface);changed.dom_epoch.document='other';
  assert.equal(verifyWaitingExecutionContinuation({node,finish,surface:changed,checkpoint}),false);
+});
+
+for(const mode of ['done','execute'])test('Text Import '+mode+' verifies the native 128-character caption with double spaces',async()=>{
+ const node={document_id:'doc',workflow_id:'wf',node_id:'import'},workflow_ref={workflow_id:'wf'};
+ const label='Продажи  '+'X'.repeat(119);
+ assert.equal(label.length,128);
+ const steps=[],context={...node,verified:true,surface:'graph',tid:'N'};
+ const surface={prepared_node_context:context,ui:{elements:[{tid:'N;Label;Label',
+  graph_node:{part:'label',label_text:'Продажи '+ 'X'.repeat(118)}}]}};
+ const request={target:{kind:'new',label},parameters:{}};
+ const operation={nodeApply:{request},nodeTargetAdapter:{observe:async()=>{
+  steps.push('native label');
+  return {complete:true,document_id:node.document_id,workflow_ref,nodes:[{ref:node,type:'imports.text',label}]};
+ }}};
+ const method=createTextImportNodeSupport({}).nodeApplyDriverFactory({operation}).finish.toString();
+ const run=new Function('f',`return (async()=>{
+  const {operation,channel,executionDriver,read,finishedImportSurface,textImportTitleRequest,configureNodeTitle,ctx,mode}=f;
+  const sourceSwitch=null,enter=()=>{},requireValue=(v,m)=>{if(!v)throw Error(m)},one=xs=>xs[0],verified=v=>v;
+  return ({${method}}).finish(mode,ctx);
+ })()`);
+ const result=await run({mode,operation,textImportTitleRequest,ctx:{document_id:node.document_id,workflow_ref,node,deadline:1000},
+  configureNodeTitle:async(_,title)=>assert.equal(title.label,label),
+  read:async()=>({wizard:{root_tid:'W'},ui:{elements:[{tid:'W;btn'+(mode==='execute'?'Execute':'Done')}]}}),
+  channel:{perform:async()=>steps.push(mode),observe:async()=>surface},
+  executionDriver:{identify:async()=>{steps.push('identify');return {execution_id:'run'};}},
+  finishedImportSurface:()=>null});
+ assert.equal(result.node_label,label);
+ assert.deepEqual(steps,mode==='execute'?['execute','identify','native label']:['done','native label']);
+ assert.equal(result.execution_id,mode==='execute'?'run':undefined);
+});
+
+// LAB-2050: the custom caption is checked against the saved native node after
+// Done/Execute. A changed caption is refused; Execute identifies its started
+// run before that check, so the refusal never loses the execution identity.
+for(const mode of ['done','execute'])for(const [fault,mutate] of [
+ ['collapsed spaces',n=>{n.label=n.label.replace('  ',' ');}],
+ ['another type',n=>{n.type='imports.excel';}],
+ ['foreign workflow',n=>{n.ref={...n.ref,workflow_id:'other'};}],
+])test('Text Import '+mode+' refuses a saved caption that differs from target.label: '+fault,async()=>{
+ const node={document_id:'doc',workflow_id:'wf',node_id:'import'},workflow_ref={workflow_id:'wf'};
+ const label='Продажи  '+'X'.repeat(119),steps=[];
+ const context={...node,verified:true,surface:'graph',tid:'N'};
+ const surface={prepared_node_context:context,ui:{elements:[{tid:'N;Label;Label',graph_node:{part:'label',label_text:label}}]}};
+ const saved={ref:{...node},type:'imports.text',label};mutate(saved);
+ const operation={nodeApply:{request:{target:{kind:'new',label},parameters:{}}},nodeTargetAdapter:{observe:async()=>{
+  steps.push('native label');
+  return {complete:true,document_id:node.document_id,workflow_ref,nodes:[saved]};
+ }}};
+ const method=createTextImportNodeSupport({}).nodeApplyDriverFactory({operation}).finish.toString();
+ const run=new Function('f',`return (async()=>{
+  const {operation,channel,executionDriver,read,finishedImportSurface,textImportTitleRequest,configureNodeTitle,ctx,mode}=f;
+  const sourceSwitch=null,enter=()=>{},requireValue=(v,m)=>{if(!v)throw Error(m)},one=xs=>xs[0],verified=v=>v;
+  return ({${method}}).finish(mode,ctx);
+ })()`);
+ await assert.rejects(run({mode,operation,textImportTitleRequest,ctx:{document_id:node.document_id,workflow_ref,node,deadline:1000},
+  configureNodeTitle:async()=>{},
+  read:async()=>({wizard:{root_tid:'W'},ui:{elements:[{tid:'W;btn'+(mode==='execute'?'Execute':'Done')}]}}),
+  channel:{perform:async()=>steps.push(mode),observe:async()=>surface},
+  executionDriver:{identify:async()=>{steps.push('identify');return {execution_id:'run'};}},
+  finishedImportSurface:()=>assert.fail('a refused caption has no continuation')}),/NODE_LABEL_NOT_PRESERVED/);
+ assert.deepEqual(steps,mode==='execute'?['execute','identify','native label']:['done','native label']);
 });

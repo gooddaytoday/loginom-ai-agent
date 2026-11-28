@@ -1,4 +1,5 @@
 import {resolveGroupingParameters,supportedGroupingMeasure} from './grouping-parameters.mjs';
+import {stepPhase} from './step-progress.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const control=(s,suffix,verb='click')=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+suffix&&e.allowed_actions.includes(verb));need(es.length===1,'Unique grouping control required: '+suffix);return es[0];};
@@ -59,7 +60,11 @@ export async function configureGrouping(channel,p){
    const e=s.ui.elements.find(e=>e.grouping_field?.field_key===f.name&&e.grouping_field.role===role&&e.allowed_actions.includes('press'));need(e,'Selected grouping field absent');return {verb:'press',ref:e.ref,key:'Delete'};}});
   const after=await observe('grouping field returned to available list');need(after.node_grouping.input_fields.find(x=>x.name===f.name)?.disposition===0,'Grouping removal not applied');
  }
+ const total=plan.keys.length+plan.field_order.length+plan.functions.length;
+ let fieldStep=0;
+ const reportField=()=>stepPhase('configuring','transform.group_data',{kind:'fields',index:++fieldStep,total});
  for(const [names,disposition,role] of [[plan.keys.map(f=>f.name),6,'group'],[plan.field_order,7,'measure']])for(const [index,name] of names.entries()){
+  reportField();
   let s=await observe('requested grouping membership');let f=s.node_grouping.input_fields.find(f=>f.name===name);
   if(f.disposition!==disposition){need(f.disposition===0,'Unexpected grouping role');s=await select(name,'available');
    await channel.perform({condition:'move field into grouping '+role,initialObservation:s,ready,identity:()=>({name,record_id:f.record_id,role}),resolve:s=>({verb:'click',ref:control(s,';GroupDataWizard;frmMoveButtons;btnMove'+(disposition===6?'0':'1')).ref})});
@@ -73,6 +78,7 @@ export async function configureGrouping(channel,p){
   need(f.order===index,'Grouping order mismatch');
  }
  for(const desired of plan.functions){
+  reportField();
   let s=await select(desired.name,'measure'),field=s.node_grouping.input_fields.find(f=>f.name===desired.name);
   const concat=plan.measures.find(m=>m.input.name===desired.name&&m.function==='concat')?.concat;
   const concatMatches=f=>!concat||f.concat.separator===concat.separator&&f.concat.wrapper===concat.wrapper&&f.concat.unique===concat.unique
