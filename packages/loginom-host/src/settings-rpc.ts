@@ -69,3 +69,25 @@ export const ConnectionSettingsRpc = Rpc.define({
 
 export type StatusResult = typeof ConnectionSettingsRpc.methods.status.output.Type
 export type CheckResult = typeof ConnectionSettingsRpc.methods.check.output.Type
+
+const instructions = Schema.toStandardSchemaV1(Schema.Struct({ text: Schema.String }))
+export const instructionsMaxBytes = 16 * 1024
+export const instructionsBytes = (text: string) => new TextEncoder().encode(text).byteLength
+const saveInstructions = Schema.toStandardSchemaV1(
+  Schema.Struct({
+    text: Schema.String.check(
+      Schema.makeFilter(
+        (text) => instructionsBytes(text) <= instructionsMaxBytes || "Instructions must not exceed 16 KiB (UTF-8)",
+      ),
+    ),
+  }),
+)
+
+export const InstructionsDefinition = Rpc.define({
+  id: "loginom.instructions",
+  methods: {
+    read: { input: Schema.toStandardSchemaV1(Schema.Struct({})), output: instructions },
+    save: { input: saveInstructions, output: instructions },
+  },
+  events: {},
+})

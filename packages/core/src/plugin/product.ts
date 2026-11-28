@@ -2,14 +2,31 @@ export * as PluginProduct from "./product.js"
 
 // Fork seam U1 (catalog CAT-07): the Loginom AI Agent product plugin is built in, runs last in `post`, and its ID is
 // guarded against config removals and reserved against packages that claim it.
-import LoginomAgent, { Dashboard } from "@loginom-ai-agent/loginom-agent"
+import LoginomAgent, { Dashboard, instructionsKey, profileInstructions } from "@loginom-ai-agent/loginom-agent"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { Context, Effect, Layer } from "effect"
 import { Formatter } from "../formatter.js"
+import type { KV } from "../kv.js"
+import { InstructionEntry } from "../session/instruction-entry.js"
 import type { InternalPlugin } from "./internal.js"
 import { PluginPromise } from "./promise.js"
+import { storageNamespace } from "./storage.js"
 
 const product = PluginPromise.fromPromise(LoginomAgent)
+
+const profileEntry = InstructionEntry.Key.make("loginom-profile")
+
+export const initialInstructions = Effect.fn("PluginProduct.initialInstructions")(function* (
+  kv: KV.Interface,
+  parent?: InstructionEntry.Snapshot,
+): Effect.fn.Return<InstructionEntry.Snapshot | undefined> {
+  if (parent) {
+    const entry = parent.find((item) => item.key === profileEntry && !item.removed)
+    return entry ? [entry] : undefined
+  }
+  const text = profileInstructions(yield* kv.get(storageNamespace(product.id) + instructionsKey))
+  if (text) return [{ key: profileEntry, value: text, removed: false }]
+})
 
 // No formatter runs in a dashboard's work folder, whatever the config says (B2.9d, guarantee G1): a formatter loads
 // its own config from the folder of the file it formats (Prettier runs `src/.prettierrc.cjs`), and there the model

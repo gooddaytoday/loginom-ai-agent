@@ -70,6 +70,16 @@
     },
     { "id": "CAT-05", "title": "Session, tools, attachments, permissions, server", "paths": [], "pending": "B2.5, B2.6, B2.9" },
     {
+      "id": "CAT-19",
+      "title": "Initial profile instruction entries",
+      "paths": [
+        "packages/core/src/session.ts", "packages/core/src/session/projector.ts", "packages/schema/src/session-event.ts",
+        "packages/core/src/plugin/product.ts", "packages/core/src/plugin/host.ts", "packages/core/src/plugin/storage.ts",
+        "packages/protocol/openapi.json", "packages/client/src/effect/api/api.ts", "packages/client/src/promise/generated/types.ts",
+        "packages/server/test/loginom-instructions.test.ts"
+      ]
+    },
+    {
       "id": "CAT-06",
       "title": "Skills and commands",
       "paths": [

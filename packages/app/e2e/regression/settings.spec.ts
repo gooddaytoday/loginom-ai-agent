@@ -27,6 +27,71 @@ const contributors = "https://api.github.com/repos/anomalyco/opencode/contributo
 
 test.use({ serviceWorkers: "block" })
 
+test("profile instructions retain an unsaved draft after a failed save and enforce the UTF-8 limit", async ({ page }, testInfo) => {
+  const draft = "Новые инструкции"
+  const serviceDirectory = "/service"
+  let saved = "Исходные инструкции"
+  let rejectRead = true
+  let reject = true
+  await mockWorkspace(page, {
+    name: "Profile instructions",
+    directory: serviceDirectory,
+    sessions: [],
+    seed: { locale: "ru" },
+    onRpc: ({ rpcID, method, body, directory }) => {
+      if (rpcID !== "loginom.instructions") return
+      expect(directory).toBe(serviceDirectory)
+      if (method === "read") return rejectRead ? { unavailable: true } : { output: { text: saved } }
+      if (method !== "save") return
+      expect(body).toEqual({ input: { text: draft } })
+      if (reject) return { unavailable: true }
+      saved = draft
+      return { output: { text: saved } }
+    },
+  })
+  const loading = await holdRoute(page, (url) => url.pathname === "/api/rpc/loginom.instructions/read", { method: "POST" })
+  await page.goto("/settings")
+  const settings = page.getByTestId("settings-screen")
+  await settings.getByRole("tab", { name: "Инструкции", exact: true }).click()
+  try {
+    await expect(settings.getByRole("status", { name: "", exact: true }).filter({ hasText: "Загружаем инструкции…" })).toBeVisible()
+  } finally {
+    loading.release()
+  }
+  await expect(settings.getByRole("alert").filter({ hasText: "Не удалось загрузить инструкции." })).toBeVisible()
+  rejectRead = false
+  await settings.getByRole("button", { name: "Повторить", exact: true }).click()
+  const text = settings.getByRole("textbox", { name: "Инструкции", exact: true })
+  const save = settings.getByRole("button", { name: "Сохранить", exact: true })
+  const unsaved = settings.getByText("Не сохранено", { exact: true })
+  await expect(text).toHaveValue(saved)
+  await expect(save).toBeDisabled()
+  await text.fill("я".repeat(8192) + "a")
+  await expect(settings.getByText("16385 / 16384 байт (UTF-8)", { exact: false })).toBeVisible()
+  await expect(settings.getByText("Чтобы сохранить инструкции, сократите их до 16 КиБ.")).toBeVisible()
+  await expect(save).toBeDisabled()
+
+  await text.fill(draft)
+  await expect(unsaved).toBeVisible()
+  await save.click()
+  const failure = settings.getByRole("alert").filter({ hasText: "Не удалось сохранить инструкции" })
+  await expect(failure).toBeVisible()
+  await expect(text).toHaveValue(draft)
+  await expect(unsaved).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath("instructions-desktop.png") })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(save).toBeEnabled()
+  await page.screenshot({ path: testInfo.outputPath("instructions-narrow.png") })
+
+  reject = false
+  await save.click()
+  await expect(failure).toBeHidden()
+  await expect(unsaved).toBeHidden()
+  await expect(save).toBeDisabled()
+  await page.reload()
+  await expect(text).toHaveValue(draft)
+})
+
 // One project with 12 worktrees, each with one session, and a configured zsh shell.
 function open(page: Page, input: Partial<WorkspaceInput> = {}) {
   return openSettings(page, {

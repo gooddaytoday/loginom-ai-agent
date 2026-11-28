@@ -27888,6 +27888,9 @@
               "permissions": {
                 "$ref": "#/components/schemas/Permission.Ruleset"
               },
+              "instructionEntries": {
+                "$ref": "#/components/schemas/InstructionEntry.Snapshot"
+              },
               "version": {
                 "type": "string"
               }

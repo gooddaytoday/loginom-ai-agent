@@ -31,6 +31,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
   })
 
   const Settings = lazy(() => import("./page"))
+  const Instructions = lazy(() => import("./instructions"))
 
   ctx.add(SettingsPage, {
     id: "loginom",
@@ -41,6 +42,19 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     render: () => (
       <Suspense>
         <Settings />
+      </Suspense>
+    ),
+  })
+
+  ctx.add(SettingsPage, {
+    id: "instructions",
+    icon: "file-document",
+    get title() {
+      return ctx.t("instructionsTitle")
+    },
+    render: () => (
+      <Suspense>
+        <Instructions />
       </Suspense>
     ),
   })

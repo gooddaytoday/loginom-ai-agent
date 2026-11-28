@@ -3,7 +3,12 @@
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
-import { ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import {
+  ConnectionSettingsRpc,
+  InstructionsDefinition,
+  instructionsBytes,
+  instructionsMaxBytes,
+} from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
@@ -41,6 +46,12 @@ import { repeatGuard } from "./repeat-guard"
 import { apply, bundled, hub } from "./skills"
 
 export { Dashboard }
+
+export const instructionsKey = "profile-instructions"
+
+export function profileInstructions(text: unknown) {
+  return typeof text === "string" && text.trim() && instructionsBytes(text) <= instructionsMaxBytes ? text : undefined
+}
 
 // The wizard's RPC: grant a profile to one prompt and admit it. The UI is stage C.
 const runner = {
@@ -111,6 +122,10 @@ const permission = {
 export default Plugin.define({
   id: "loginom.product",
   setup: async (ctx) => {
+    const readInstructions = async () => {
+      const text = await ctx.storage.get(instructionsKey)
+      return { text: typeof text === "string" ? text : "" }
+    }
     // Access grants (G1), keyed by the exact session ID: a subsession, a fork and a scheduled wake run in another
     // session or arrive as a new prompt, so none of them inherits a grant. A grant lives for one task, as in 0.4: from the
     // prompt or skill activation that issued it until the session admits its next prompt. It is not tied to an execution:
@@ -522,6 +537,13 @@ export default Plugin.define({
       },
     })
     const settingsRpc = await ctx.rpc.register(ConnectionSettingsRpc, connectionSettings())
+    await ctx.rpc.register(InstructionsDefinition, {
+      read: readInstructions,
+      save: async ({ text }) => {
+        await ctx.storage.set(instructionsKey, text)
+        return { text }
+      },
+    })
     await ctx.rpc.register(preflight, {
       check: async (value) => {
         const code = await ServiceHost.preflight((value as { automation: boolean }).automation)

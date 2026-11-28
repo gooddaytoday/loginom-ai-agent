@@ -38,6 +38,7 @@ import { WorktreeStrategies } from "../worktree/strategies.js"
 import { Generate } from "../generate.js"
 import { Permission } from "../permission.js"
 import { PluginHooks } from "./hooks.js"
+import { storageNamespace } from "./storage.js"
 import type { Interface } from "../plugin.js"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 
@@ -674,10 +675,7 @@ export const requirements = LayerNode.group([
 ])
 
 export function storage(kv: KV.Interface, pluginID: string): Plugin.Context["storage"] {
-  const namespace = `plugin:${pluginID
-    .split("")
-    .map((value) => value.charCodeAt(0).toString(16).padStart(4, "0"))
-    .join("")}:`
+  const namespace = storageNamespace(pluginID)
   return {
     get: (key) => kv.get(namespace + key),
     set: (key, value) => kv.set(namespace + key, value),

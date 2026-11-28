@@ -656,6 +656,7 @@ export type ExperimentalSessionLogOutput =
             readonly model?: Model.Ref | undefined
             readonly metadata?: Session.Metadata | undefined
             readonly permissions?: Permission.Ruleset | undefined
+            readonly instructionEntries?: InstructionEntry.Snapshot | undefined
             readonly version: string
           }
         }
