@@ -11,7 +11,7 @@ const digest = value => createHash('sha256').update(JSON.stringify(canonical(val
 // The native output boundary follows the diagram's right extent on repaint.
 // Its horizontal layout is not a graph edit; GUID, role, ports and y remain bound.
 const domainNode=({dom_epoch,...value})=>value.type==='control.supernode_output'&&value.boundary_role==='output'&&Number.isFinite(value.position?.x)?{...value,position:{...value.position,x:0}}:value;
-const sameDomainGraph=(a,b)=>same({...a,nodes:a.nodes.map(domainNode)},{...b,nodes:b.nodes.map(domainNode)});
+export const sameDomainGraph=(a,b)=>same({...a,nodes:a.nodes.map(domainNode)},{...b,nodes:b.nodes.map(domainNode)});
 
 export function proveReloadedNode(operation, first, second, {readOnly=false}={}) {
   const state=operation.nodeApply, target=operation.targetPhase;
@@ -47,6 +47,7 @@ export function normalizeGraphRefusal(effect,receipt){
    return {...receipt,status:'NOT_APPLIED',native_status:'FAILED'};
  return receipt;
 }
+const conflict = message => Object.assign(Error(message), {code:'NODE_GRAPH_CONFLICT'});
 const edgeKey = e => [e.source, e.output, e.target, e.input,...(e.kind?[e.kind]:[])].join('|');
 const node = (graph, id) => {
   const matches = graph.nodes.filter(n => n.ref.node_id === id);
@@ -291,10 +292,13 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
   };
   const change = async (kind, parameters, verify = () => true) => {
     let original = await observe();
+    const checkpoint=state.last_graph??state.baseline;
+    if(checkpoint&&!sameDomainGraph(checkpoint,original))
+      throw conflict('Graph changed since the last verified target checkpoint');
     for(let refresh=0;refresh<3;refresh++){
       budget();
       const before=refresh===0?original:await observe();
-      if(!same(before,original))throw new Error('Graph target changed before local refresh');
+      if(!same(before,original))throw conflict('Graph target changed before local refresh');
       if(addOnly&&kind==='remove_link'&&![...before.links,...before.variable_links??[],...before.rest_connection_links??[]]
         .some(edge=>same(edge,parameters.edge)))throw Error('Owned add-only link identity changed before deletion');
       if(['remove_link','connect'].includes(kind)&&state.replacements?.some(r=>r.created.target===parameters.edge.target&&r.created.input===parameters.edge.input)){
@@ -321,11 +325,14 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         // Confirm the same live graph before accepting a pre-dispatch refusal.
         // An unrelated change or lost observation keeps this effect pending.
         const after=await observe();
-        if(!sameDomainGraph(before,after))throw new Error('Graph changed after refused gesture');
+        const changed=!sameDomainGraph(before,after)||(receipt.error_code??receipt.error?.code)==='NODE_GRAPH_CONFLICT'
+          ||['connect_graph_changed','connect_binding_graph_changed'].includes(receipt.reason);
+        if(changed&&!after.interaction_ready)throw conflict('Graph changed after refused gesture and is still busy');
         await save('node_target_refusal_observed',{refusal:{effect,receipt:structuredClone(receipt),after_graph:after}});
         (state.refusals??=[]).push({id:effect.id,kind,receipt:structuredClone(receipt)});
         state.pending = null; state.last_graph=structuredClone(after);state.effect_possible=priorEffect;
         await commit();
+        if(changed)throw conflict('Graph changed after refused gesture');
         // New receipt ID, same graph identity and original deadline. No retry
         // is allowed unless this exact gesture was proved not dispatched.
         // A refused deletion is reported, never re-dispatched under a new receipt.
@@ -348,6 +355,9 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
           try{await record({operation_id:effect.id,phase:'node_target_link_graph_refused',internal_provenance:'node_target_v1',before:snapshot(before),after:snapshot(after)});}
           catch{/* Keep the original reconciliation refusal if evidence is unavailable. */}
         }
+        if(!receipt?.create_mismatch && ((receipt?.error_code??receipt?.error?.code)==='NODE_GRAPH_CONFLICT'
+          || receipt?.status==='SUCCEEDED'&&!sameDomainGraph(before,after) || receipt?.output?.reason==='unrelated graph changed'))
+          throw conflict('Graph effect needs reconciliation');
         throw new Error(receipt?.create_mismatch?receipt.error:'Graph effect needs reconciliation');
       }
       state.receipts.push({ id: effect.id, kind, parameters: effect.parameters, verified: true, receipt: structuredClone(receipt),...(kind==='move'?{before:effect.before}:{}) });
@@ -608,7 +618,7 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
       const quiet=await observe();
       if(!quiet.interaction_ready||!sameDomainGraph(graph,quiet)
         ||['links','variable_links','foreign_links','rest_connection_links'].some(key=>!same(quiet[key]??[],state.baseline[key]??[])))
-        throw Error('Complete quiet graph without new connections required');
+        throw conflict('Complete quiet graph without new connections required');
       graph=quiet;
     }
     state.completed=true;state.final_graph=structuredClone(graph);
@@ -620,7 +630,8 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
   } catch (error) {
     if(state.move_mismatch)return structuredClone(state.result);
     return { status: state.effect_possible ? 'AMBIGUOUS' : 'NOT_APPLIED', phase: 'target_incomplete',
-      error: String(error?.message ?? error), node_id: state.targetId, partial_effect: state.effect_possible,
+      error: String(error?.message ?? error), ...(error?.code==='NODE_GRAPH_CONFLICT'?{error_code:error.code}:{}),
+      node_id: state.targetId, partial_effect: state.effect_possible,
       cleanup_complete: !state.pending,
       pending: state.pending?.id ?? null, effects: state.receipts.map(({ id, kind, verified }) => ({ id, kind, verified })),
       configured: false, executed: false, package_saved: false };

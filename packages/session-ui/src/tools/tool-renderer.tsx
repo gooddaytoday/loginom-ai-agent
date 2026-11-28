@@ -1,3 +1,5 @@
+import { ToolGroupRow } from "../components/tool-group-row"
+import { toolGroupSummary } from "../message/tool-group"
 // Current Session tool presentation grouped by visual family.
 import {
   Component,
@@ -23,7 +25,7 @@ import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { Effect, Option, Schema } from "effect"
 import { createTwoFilesPatch, diffLines } from "diff"
 import { Dynamic } from "solid-js/web"
-import { type SessionSummary, type ToolRenderContribution, useData } from "../context"
+import { type SessionSummary, useData } from "../context"
 import { useFileComponent } from "@opencode/ui/context/file"
 import { type UiI18n, useI18n } from "@opencode/ui/context/i18n"
 import { BasicTool, GenericTool } from "../components/basic-tool"
@@ -1179,18 +1181,8 @@ function registerTool(input: { name: string; render?: ToolComponent }) {
   return input
 }
 
-function getTool(
-  name: string,
-  contribution?: { item: ToolRenderContribution; fallback: () => JSX.Element },
-  native?: ToolComponent,
-) {
-  const renderer = native ?? state[name]?.render
-
-  if (renderer) return renderer
-
-  if (contribution) return (props: ToolProps) => contribution.item.render(props, contribution.fallback)
-
-  return undefined
+function getTool(name: string) {
+  return state[name]?.render
 }
 
 export const ToolRegistry = {
@@ -1211,11 +1203,11 @@ export function useToolDisplayRenderer(
     const contribution = item()
 
     return (
-      ToolRegistry.render(
-        tool,
-        contribution && { item: contribution, fallback: () => fallback(contribution.title) },
-        native?.(tool),
-      ) ?? GenericTool
+      native?.(tool) ??
+      ToolRegistry.render(tool) ??
+      (contribution
+        ? (props: ToolProps) => contribution.render(props, () => fallback(contribution.title))
+        : GenericTool)
     )
   })
 
@@ -1426,6 +1418,9 @@ export function ToolDisplay(
     <Show when={!hideQuestion()}>
       <div data-component="tool-part-wrapper" data-timeline-part-id={props.id}>
         <Switch>
+          <Match when={toolGroupSummary(props.metadata)}>
+            {(summary) => <ToolGroupRow summary={summary()} detail={error() ?? props.output} />}
+          </Match>
           <Match when={stopped()}>
             {(stopped) => (
               <>

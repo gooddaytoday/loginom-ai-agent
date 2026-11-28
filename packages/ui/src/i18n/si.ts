@@ -67,10 +67,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "මිථුන ලග්නය දැන් උණුසුම් වැඩියි",
   "ui.sessionTurn.error.freeUsageExceeded": "නිදහස් භාවිතය ඉක්මවා ඇත",
   "ui.sessionTurn.error.addCredits": "ණය එකතු කරන්න",
-  "dialog.usageExceeded.freeTier.title": "නිදහස් සීමාව ළඟා විය",
-  "dialog.usageExceeded.freeTier.description":
-    "හොඳම විවෘත මූලාශ්‍ර ආකෘති වෙත විශ්වාසනීය ප්‍රවේශය සඳහා මසකට $10 බැගින් OpenCode Go වෙත දායක වන්න.",
-  "dialog.usageExceeded.freeTier.actionLabel": "දායක වන්න",
   "ui.sessionTurn.status.delegating": "වැඩ පැවරීම",
   "ui.sessionTurn.status.planning": "ඉදිරි පියවර සැලසුම් කිරීම",
   "ui.sessionTurn.status.gatheringContext": "ගවේෂණය",

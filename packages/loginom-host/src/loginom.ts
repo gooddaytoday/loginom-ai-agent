@@ -24,12 +24,20 @@ export const BrowserFailure = Schema.Literals([
   "LOGINOM_ACCOUNT_MISMATCH",
   "LOGINOM_LOGIN_UNAVAILABLE",
   "LOGINOM_BROWSER_START_FAILED",
+  "LOGINOM_LOGOUT_UNCONFIRMED",
 ])
 export const BrowserStatus = Schema.Union([
   Schema.Struct({ state: Schema.Literals(["unknown", "verified"]) }),
   Schema.Struct({ state: Schema.Literal("failed"), failure: BrowserFailure }),
 ]).annotate({ identifier: "Loginom.BrowserStatus" })
 export type BrowserStatus = typeof BrowserStatus.Type
+export const ConnectionApplication = Schema.Struct({ revision: NonNegativeInt, generation: NonNegativeInt })
+export type ConnectionApplication = typeof ConnectionApplication.Type
+export type ConnectionApplicationListener = (outcome: "applied" | "failed", event: ConnectionApplication) => void
+const Application = Schema.Union([
+  Schema.Struct({ state: Schema.Literal("pending"), tasks: NonNegativeInt }),
+  Schema.Struct({ state: Schema.Literal("applied") }),
+])
 export const View = Schema.Struct({
   revision: NonNegativeInt,
   generation: NonNegativeInt,
@@ -40,6 +48,7 @@ export const View = Schema.Struct({
   folder: Schema.String,
   hasPassword: Schema.Boolean,
   state: State,
+  application: Schema.optionalKey(Application),
   browser: optional(BrowserStatus),
   failure: Schema.optionalKey(Schema.String),
   recoveries: Schema.optionalKey(Schema.Array(Schema.String)),
@@ -57,8 +66,8 @@ export const AcknowledgeRecovery = Schema.Struct({ revision: NonNegativeInt, ids
 export type API = {
   read(): Promise<View>
   status(): Promise<View>
-  check(candidate: Candidate): Promise<typeof Validation.Type>
-  save(input: typeof Save.Type): Promise<View>
+  check(candidate: Candidate, settings?: boolean, signal?: AbortSignal): Promise<typeof Validation.Type>
+  save(input: typeof Save.Type, settings?: boolean): Promise<View>
   cancelPending(input: typeof Cancel.Type): Promise<View>
   acknowledgeRecovery(input: typeof AcknowledgeRecovery.Type): Promise<View>
 }

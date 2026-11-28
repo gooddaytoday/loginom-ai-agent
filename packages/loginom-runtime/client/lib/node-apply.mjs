@@ -1,4 +1,5 @@
 import {validateVariableBindings} from './variable-binding-parameters.mjs';
+import {stepPhase} from './step-progress.mjs';
 import {validateVariablePortMapping} from './variable-port-mapping.mjs';
 import {calculatorVariableMappingRefusal,restVariableMappingNoEffectRefusal,unionWizardOpeningRefusal,variablesCalculatorDeactivationRefusal} from './node-pending-release.mjs';
 import {createHash} from 'node:crypto';
@@ -279,6 +280,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
     const deadline=Math.min(state.deadline,now()+budget,configuration?state.configure_deadline:Infinity,
       executionPhase&&state.execution_wait?.phase===name?state.execution_wait.deadline:Infinity);
     requireValue(now()<deadline,'node.apply configuration deadline elapsed');
+    stepPhase(name==='read'?'reading':executionPhase||name==='materialization_start'
+      ||name==='finish'&&request.finish==='execute'?'executing':configuration?'configuring':'waiting',request.target.type);
     const oldConfigure=continuingConfigure&&name==='configure',oldOpen=continuingOpen&&name==='open',oldFinish=continuingFinish&&name==='finish';
     const pending=oldConfigure||oldOpen||oldFinish?state.pending:{phase:name,receipt_id:operation.id+':'+name,deadline,
       effect_possible:mutation,before_node:structuredClone(state.node)};
@@ -757,7 +760,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         instruction:'FS/Fetch scripts need declared output columns before execution. Submit a NEW operation_id: configure a NEW JavaScript node with parameters.schema_mode:"declared" and complete columns, retaining the intended source and inputs, then finish:"execute". Existing-node requests cannot change schema mode. Alternatively configure the SAME target with finish:"done", read:{ports:[],sample_rows:0,require_exact_numbers:false} and no coverage. Other import admission rules still apply.'}}:{}),
       pending_phase:state.pending?.phase??null,error:state.javascript_wizard_refusal&&state.verified_refusal
         ?{code:'JAVASCRIPT_WIZARD_SOURCE_REJECTED',message:String(error.message).slice(0,1000),native:state.javascript_wizard_refusal.native}
-        :{code:state.existing_read_refusal?error.code:state.javascript_declared_output_required?JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT:error.nodeExecutionFailure?.code??/^(BINDING_PARAMETER_UNSUPPORTED|BINDING_CONFLICT|BINDING_VARIABLE_MISSING|BINDING_TYPE_MISMATCH|BINDING_NULL_UNSUPPORTED|BINDING_VALUE_INVALID|BINDING_PORT_MISMATCH|BINDING_SOURCE_UNVERIFIED|UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED|NODE_LABEL_NOT_PRESERVED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
+        :{code:state.existing_read_refusal||error.code==='NODE_GRAPH_CONFLICT'?error.code:state.javascript_declared_output_required?JAVASCRIPT_EFFECTS_REQUIRE_DECLARED_OUTPUT:error.nodeExecutionFailure?.code??/^(BINDING_PARAMETER_UNSUPPORTED|BINDING_CONFLICT|BINDING_VARIABLE_MISSING|BINDING_TYPE_MISMATCH|BINDING_NULL_UNSUPPORTED|BINDING_VALUE_INVALID|BINDING_PORT_MISMATCH|BINDING_SOURCE_UNVERIFIED|UNION_AUTO_MATCH_AMBIGUOUS|LOGINOM_IMPORT_SCHEMA_CHANGED|LOGINOM_ROW_COUNT_MISMATCH|LOGINOM_ROW_COUNT_UNAVAILABLE|LOGINOM_FILE_CHANGED|NODE_LABEL_NOT_PRESERVED):/.exec(String(error.message))?.[1]??'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000),
         ...(typeof error.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};
   }

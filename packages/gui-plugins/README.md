@@ -202,6 +202,12 @@ It then falls back to the quote's composer tile without closing the editor or di
 | `bindPlugin(component)`                          | One contract component under its provider's context; data methods stay plain   |
 | `onIdle(fn)` (built-ins only)                    | Preloading a lazy chunk while the app is idle                                  |
 
+Built-in window plugins can import `ToolRenderer` from `@opencode/plugin/gui/builtin` and call
+`ctx.add(ToolRenderer, { tool, title, separate, render })` in setup for a tool they own. The host rejects native or
+already registered tool names and withdraws the renderer when the plugin unloads. `separate: true` gives visible calls
+their own row in grouped timelines. The renderer receives live data, including partial input. The timeline shows a tool
+error card if rendering throws and retries rendering at the next call status.
+
 [Lifetimes](#lifetimes) shows `createKeyed` in files.
 
 ```ts
@@ -264,10 +270,16 @@ SDK icon fields take an `IconName` from `@opencode/plugin/gui`: the names of the
 | [`ComposerPill`](../plugin/src/gui/registries.ts)    | window  | A pill in the row above a session's composer, optionally opening a menu of rows or a popover of your own content                                                                                                                     |
 | [`CodeBlock`](../plugin/src/gui/registries.ts)       | window  | Your UI in place of the highlighted code of complete fenced code blocks of the languages you list, such as a diagram or a table                                                                                                      |
 | [`CodeBlockAction`](../plugin/src/gui/registries.ts) | window  | A button beside the Copy button of complete fenced code blocks of the languages you list, such as "Run in terminal"                                                                                                                  |
-| [`Slot`](../plugin/src/gui/registries.ts)            | window  | Content for `window.bottom`, `session.header`, `session.location.menu`, `session.panel.end`; built-ins also fill `session.location.workspace`, `session.location.branch.menu` and `session.location.path.menu` through `BuiltinSlot` |
+| [`Slot`](../plugin/src/gui/registries.ts)            | window  | Content for `window.bottom`, `session.header`, `session.location.menu`, `session.panel.end`; built-ins also fill the [built-in slots](../plugin/src/gui/builtin.ts) |
 | [`Style`](../plugin/src/gui/registries.ts)           | window  | CSS imported with `?inline`                                                                                                                                                                                                          |
 | [`Theme`](../plugin/src/gui/registries.ts)           | window  | A color theme in the app's theme file format, listed in Settings › Appearance › Theme                                                                                                                                                |
 | [`MenubarItem`](../plugin/src/gui/main.ts)           | main    | An item of the native app menu                                                                                                                                                                                                       |
+
+`BuiltinSlot` has separate draft-screen slots: `session.new.heading`, `session.new.composer.placeholder`,
+`session.new.composer.project`, `session.new.composer.add.menu` and `session.new.below`. Render Add-menu rows with
+`ctx.ui.MenuItem`. In `session.new.below`, `insertPrompt(text, origin)` replaces the draft text without submitting it;
+`onStarted` reports the captured origin once the draft becomes a session. Use a plugin-prefixed origin and dispose
+the listener with the contribution.
 
 `session.location.menu` contributes items after the project menu's location details. It receives the owning `screen`,
 the live `session`, and `shown`; keep data subscriptions active only while `shown` is true. Loading headers without an
@@ -332,13 +344,15 @@ to the displayed repository or worktree instead of adding a second menu item.
 | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `onIdle(fn)`                                            | Runs work while the main thread is idle, e.g. a lazy chunk's preload                           |
 | `BuiltinPanel`, `BuiltinPanelTab`                       | `legacy` stored keys of a panel; `first` and stable `dom` ids of a tab                         |
+| `Page`                                                  | Top-level plugin pages with optional navigation entries                                        |
+| `QuestionRenderer`                                      | Renders matching forms through the window host’s form reply and draft controls                |
 | `BuiltinCommand`                                        | `follows`: share another command's shortcut inside `scope`                                     |
 | `BuiltinStore`, `BuiltinStoreFrom`                      | Window stores imported from parts of the app's own keys                                        |
 | `builtinContext(ctx)`                                   | `ctx.desktop.forceFocus`, `ctx.locale.setDirection`                                            |
 | `builtinMainContext(ctx)`, `MainStoreFrom`, `Lifecycle` | Main stores imported from settings files or other namespaces, and `lifecycle.restart(handoff)` |
 | `builtinCatalog(catalog)`, `BuiltinCatalog`             | Locales other than English as loaders, loaded when the user picks the locale                   |
 
-Each registry token has the same id as the public one, so the host reads every item through it. The host builds every context with the built-in members; `builtinContext` and `builtinMainContext` only type them. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
+Registry tokens that extend a public registry share its id, so the host reads every item through it. The host accepts `Page` and `QuestionRenderer` registrations only from built-in plugins. A question renderer matches form metadata in its owning plugin. The underlying form remains usable in clients without the custom renderer. The host builds every context with the built-in members; `builtinContext` and `builtinMainContext` only type them. A plugin bundle's catalog holds every locale inline, and the host rejects a bundle whose catalog has a loader.
 
 ```ts
 i18n: builtinCatalog({ en, de: () => import("./i18n/de") }),
@@ -768,6 +782,7 @@ export const builtins = compose({
   "microsoft-office": microsoftOffice,
   sources,
   goal,
+  "loginom-gui": { ...loginom, mainEntry: () => import("./loginom-gui/main") },
 })
 ```
 
@@ -791,8 +806,12 @@ export const builtins = compose({
   "microsoft-office": { ...microsoftOffice, windowEntry: eager(microsoftOfficeRenderer) },
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
   goal: { ...goal, windowEntry: eager(goalRenderer) },
+  "loginom-gui": { ...loginom, windowEntry: eager(loginomRenderer) },
 })
 ```
+
+The Loginom connection page manages the desktop sidecar’s profile. The web page uses its own origin and can use a single
+local service in development. If neither target is available, the page shows that the service is unavailable.
 
 Your own plugin takes the same steps:
 

@@ -3,7 +3,7 @@ import en from "./en"
 type Keys = keyof typeof en
 
 export const dict = {
-  "desktop.menu.app": "OpenCode",
+  "desktop.menu.app": "Loginom AI Agent",
   "desktop.menu.file": "Dosya",
   "desktop.menu.edit": "Düzen",
   "desktop.menu.view": "Görünüm",
@@ -43,15 +43,15 @@ export const dict = {
   "desktop.menu.nextProject": "Sonraki proje",
   "desktop.menu.minimize": "Simge durumuna küçült",
   "desktop.menu.maximize": "Ekranı kapla",
-  "desktop.menu.documentation": "OpenCode belgeleri",
+  "desktop.menu.documentation": "Loginom AI Agent belgeleri",
   "desktop.menu.supportForum": "Destek forumu",
   "desktop.menu.shareFeedback": "Geri bildirim paylaş",
   "desktop.menu.reportBug": "Hata bildir",
-  "desktop.menu.ariaLabel": "OpenCode menüsü",
+  "desktop.menu.ariaLabel": "Loginom AI Agent menüsü",
 
   "desktop.cli.installed.title": "CLI yüklendi",
   "desktop.cli.installed.message":
-    "CLI, {{path}} konumuna yüklendi.\n\n'opencode2' komutunu kullanmak için terminalinizi yeniden başlatın.",
+    "CLI, {{path}} konumuna yüklendi.\n\n'loginom-ai-agent' komutunu kullanmak için terminalinizi yeniden başlatın.",
   "desktop.cli.failed.title": "Yükleme başarısız oldu",
   "desktop.cli.failed.message": "CLI yüklenemedi: {{error}}",
 
@@ -59,9 +59,9 @@ export const dict = {
   "desktop.recovery.action.exportLogs": "Günlükleri dışa aktar",
   "desktop.recovery.action.keepWaiting": "Beklemeye devam et",
   "desktop.recovery.action.quit": "Çık",
-  "desktop.recovery.loadFailed": "OpenCode yüklenemedi",
-  "desktop.recovery.terminated": "OpenCode penceresi beklenmedik şekilde sonlandırıldı",
-  "desktop.recovery.unresponsive": "OpenCode yanıt vermiyor",
+  "desktop.recovery.loadFailed": "Loginom AI Agent yüklenemedi",
+  "desktop.recovery.terminated": "Loginom AI Agent penceresi beklenmedik şekilde sonlandırıldı",
+  "desktop.recovery.unresponsive": "Loginom AI Agent yanıt vermiyor",
   "desktop.recovery.unresponsive.detail":
     "Uygulamayı yeniden başlatabilir, günlükleri açabilir veya beklemeye devam edebilirsiniz.",
   "desktop.recovery.loadFailed.detail": "Pencere: {{window}}\nURL: {{url}}\nHata: {{code}} {{description}}",
@@ -153,7 +153,6 @@ export const dict = {
   "dialog.provider.tag.recommended": "Önerilen",
   "dialog.provider.opencode.note": "Claude, GPT, Gemini ve daha fazlasını içeren seçilmiş modeller",
   "dialog.provider.opencode.tagline": "Güvenilir, optimize edilmiş modeller",
-  "dialog.provider.opencodeGo.tagline": "Herkes için düşük maliyetli abonelik",
   "dialog.provider.copilot.note": "GitHub Copilot üzerinden kodlama yardımı için yapay zekâ modelleri",
   "dialog.provider.openai.note": "Hızlı ve yetenekli genel yapay zekâ görevleri için GPT modelleri",
   "dialog.provider.google.note": "Hızlı ve yapılandırılmış yanıtlar için Gemini modelleri",
@@ -167,8 +166,6 @@ export const dict = {
   "dialog.model.manage.description": "Model seçicide hangi modellerin görüneceğini özelleştirin.",
 
   "dialog.model.unpaid.freeModels.title": "OpenCode tarafından sunulan ücretsiz modeller",
-  "dialog.model.unpaid.addMore.title": "Popüler sağlayıcılardan daha fazla model ekleyin",
-  "dialog.model.unpaid.viewMoreProviders": "70'ten fazla sağlayıcı daha görüntüle",
 
   "dialog.provider.viewAll": "Daha fazla sağlayıcı göster",
 
@@ -178,7 +175,7 @@ export const dict = {
   "provider.connect.status.waiting": "Yetkilendirme bekleniyor…",
   "provider.connect.status.failed": "Yetkilendirme başarısız: {{error}}",
   "provider.connect.apiKey.description":
-    "{{provider}} hesabınızı bağlamak ve OpenCode'da {{provider}} modellerini kullanmak için API anahtarınızı girin.",
+    "{{provider}} hesabınızı bağlamak ve Loginom AI Agent'da {{provider}} modellerini kullanmak için API anahtarınızı girin.",
   "provider.connect.apiKey.label": "{{provider}} API anahtarı",
   "provider.connect.apiKey.placeholder": "API anahtarı",
   "provider.connect.apiKey.required": "API anahtarı gerekli",
@@ -282,8 +279,6 @@ export const dict = {
   "dialog.project.edit.worktree.startup": "Çalışma alanı başlatma betiği",
   "dialog.project.edit.worktree.startup.placeholder": "örneğin bun install",
 
-  "dialog.usageExceeded.dontShowAgain": "Bir daha gösterme",
-
   "toast.permissions.autoaccept.on.title": "İzinler otomatik kabul ediliyor",
   "toast.permissions.autoaccept.on.description": "İzin istekleri otomatik olarak onaylanacak",
   "toast.permissions.autoaccept.off.title": "İzinleri otomatik kabul etme durduruldu",
@@ -311,7 +306,7 @@ export const dict = {
   "error.page.action.checking": "Kontrol ediliyor…",
   "error.page.action.checkUpdates": "Güncellemeleri kontrol et",
   "error.page.action.updateTo": "{{version}} sürümüne güncelle",
-  "error.page.report.prefix": "Lütfen bu hatayı OpenCode ekibine",
+  "error.page.report.prefix": "Lütfen bu hatayı Loginom AI Agent ekibine",
   "error.page.report.discord": "Discord üzerinden bildirin",
   "error.page.version": "Sürüm: {{version}}",
 
@@ -330,7 +325,7 @@ export const dict = {
   "error.chain.modelNotFound": "Model bulunamadı: {{provider}}/{{model}}",
   "error.chain.checkConfig": "Yapılandırma dosyanızdaki (loginom-ai-agent.json) sağlayıcı/model adlarını kontrol edin",
   "error.chain.mcpFailed":
-    'MCP sunucusu "{{name}}" çalıştırılamadı. Not: OpenCode henüz MCP kimlik doğrulamasını desteklemiyor.',
+    'MCP sunucusu "{{name}}" çalıştırılamadı. Not: Loginom AI Agent henüz MCP kimlik doğrulamasını desteklemiyor.',
   "error.chain.providerAuthFailed": "Sağlayıcı kimlik doğrulaması başarısız ({{provider}}): {{message}}",
   "error.chain.providerInitFailed":
     '"{{provider}}" sağlayıcısı başlatılamadı. Kimlik bilgilerini ve yapılandırmayı kontrol edin.',
@@ -425,7 +420,7 @@ export const dict = {
   "settings.general.section.sounds": "Ses efektleri",
 
   "settings.general.row.language.title": "Dil",
-  "settings.general.row.language.description": "OpenCode'un görünüm dilini değiştirin",
+  "settings.general.row.language.description": "Loginom AI Agent'un görünüm dilini değiştirin",
   "settings.general.row.shell.title": "Terminal Kabuğu",
   "settings.general.row.shell.description":
     "Terminalinizde kullanılacak kabuğu seçin. Uyumlu kabuklar, ajan araç çağrılarında da kullanılır.",
@@ -433,9 +428,9 @@ export const dict = {
   "settings.general.row.shell.terminalOnly": "yalnızca terminal",
   "settings.general.row.colorScheme.title": "Renk şeması",
   "settings.general.row.colorScheme.description":
-    "OpenCode'un sistem, açık veya koyu temayı takip etip etmeyeceğini seçin",
+    "Loginom AI Agent'un sistem, açık veya koyu temayı takip etip etmeyeceğini seçin",
   "settings.general.row.theme.title": "Tema",
-  "settings.general.row.theme.description": "OpenCode'un temasını özelleştirin.",
+  "settings.general.row.theme.description": "Loginom AI Agent'un temasını özelleştirin.",
   "settings.general.row.font.title": "Kod yazı tipi",
   "settings.general.row.font.description": "Kod bloklarında kullanılan yazı tipini özelleştirin",
   "settings.general.row.terminalFont.title": "Terminal yazı tipi",
@@ -749,8 +744,7 @@ export const dict = {
   "settings.about.otherContributor.other": "{{count}} diğerleri",
   "settings.about.firstPublished": "İlk olarak Missouri, ABD'de yayınlandı",
   "settings.about.firstIllustrated": "İlk kez Londra, İngiltere'de resmedildi",
-  "settings.about.website": "www.opencode.ai",
-  "settings.about.description": "OpenCode, açık kaynak kodlama aracısı",
+  "settings.about.website": "loginom.ru",
   "settings.about.trademark": "OpenCode, Anomaly Innovations, Inc.'in tescilli ticari markasıdır.",
   "settings.about.typeset": "Inter ve IBM Plex Mono'da dizgi",
   "settings.about.tagline": "Yapay zeka siz olmadan mükemmel yazılım geliştiremez",
@@ -829,18 +823,18 @@ export const dict = {
     "Temsilcilerin web'de arama yapmak için kullanacağı arama sağlayıcısını seçin",
   "settings.projects.search.placeholder": "Proje ara",
   "project.settings.name.title": "Proje adı",
-  "project.settings.name.description": "OpenCode genelinde bu proje için gösterilen ad",
+  "project.settings.name.description": "Loginom AI Agent genelinde bu proje için gösterilen ad",
   "project.settings.icon.description": "Önerilen: 128×128 piksel. Bir görseli yüklemek için tıklayın veya sürükleyin.",
   "project.settings.color.description": "Özel bir görüntü ayarlanmadığında proje simgesi için kullanılır",
   "project.settings.worktree.startup.description": "Yeni bir çalışma ağacı oluşturulduktan sonra bir kez çalıştırılır",
   "project.settings.worktree.startup.hint.base": "Temel çalışma ağacı için $LOGINOM_AI_AGENT_WORKTREE_BASE kullanın.",
   "project.settings.worktree.startup.hint.new": "Yeni çalışma ağacı için $LOGINOM_AI_AGENT_WORKTREE_PATH'yi kullanın.",
   "project.settings.extensions.empty.mcps.title": "Henüz MCPs yok",
-  "project.settings.extensions.empty.mcps.description": "OpenCode tarafından kullanılabilen MCPs burada görünecek",
+  "project.settings.extensions.empty.mcps.description": "Loginom AI Agent tarafından kullanılabilen MCPs burada görünecek",
   "project.settings.extensions.empty.plugins.title": "Henüz eklenti yok",
-  "project.settings.extensions.empty.plugins.description": "OpenCode'de kullanılabilen eklentiler burada görünecek",
+  "project.settings.extensions.empty.plugins.description": "Loginom AI Agent'de kullanılabilen eklentiler burada görünecek",
   "project.settings.extensions.empty.skills.title": "Henüz beceri yok",
-  "project.settings.extensions.empty.skills.description": "OpenCode'nin kullanabileceği beceriler burada görünecek",
+  "project.settings.extensions.empty.skills.description": "Loginom AI Agent'nin kullanabileceği beceriler burada görünecek",
   "project.settings.extensions.lsp.configured": "Yapılandırılmış dil sunucuları",
   "project.settings.extensions.lsp.status.enabled": "Yapılandırmada etkinleştirildi",
   "project.settings.extensions.lsp.status.disabled": "Yapılandırmada devre dışı bırakıldı",
@@ -860,7 +854,7 @@ export const dict = {
   "settings.timeline.collapsed.label": "{{activity}} çöktü",
   "session.new.workspace.search.empty": "Eşleşen çalışma ağacı yok",
   "settings.workspaces.description": "Çalışma ağaçlarını inceleyin ve disk kullanımını yönetin",
-  "settings.workspaces.empty.description": "OpenCode'de oluşturulan çalışma ağaçları burada görünecek",
+  "settings.workspaces.empty.description": "Loginom AI Agent'de oluşturulan çalışma ağaçları burada görünecek",
   "settings.workspaces.sessions.filtered.one": "{{count}} oturumu",
   "settings.workspaces.sessions.filtered.other": "{{count}} oturumları",
   "settings.workspaces.deleteAll.confirm.one": "Bu, {{count}} seçili çalışma ağacını kalıcı olarak silecektir.",

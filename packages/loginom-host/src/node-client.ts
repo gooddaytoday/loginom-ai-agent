@@ -1,9 +1,13 @@
 import { fork } from "node:child_process"
 import { isAbsolute } from "node:path"
 import { EventEmitter } from "node:events"
+import { Option, Schema } from "effect"
+import { Loginom } from "./loginom"
 import { runtimeEnvironment } from "./supervisor"
 import { transport, type Port } from "./transport"
 import { hostError } from "./errors"
+
+const decodeApplication = Schema.decodeUnknownOption(Loginom.ConnectionApplication)
 
 export class NodeHostStartupError extends Error {
   constructor(
@@ -32,8 +36,10 @@ export async function launchNodeHost(
     // The version that keys the resource verification cache; without it the Host reads the CLI artifact's manifest.
     resourceVersion?: string
     strictRecovery?: boolean
+    desktopWriteOutcomes?: boolean
     closeSavedPackageOnShutdown?: boolean
     browserRecovery?: boolean
+    onConnectionApplication?: Loginom.ConnectionApplicationListener
   },
   timing: { start?: number; close?: number; terminate?: number; teardown?: number } = {},
 ) {
@@ -80,7 +86,21 @@ export async function launchNodeHost(
     events.emit("close")
   }
   child.on("disconnect", closePort)
-  child.on("message", (data) => events.emit("message", { data }))
+  child.on("message", (data: unknown) => {
+    if (
+      data &&
+      typeof data === "object" &&
+      "event" in data &&
+      "data" in data &&
+      (data.event === "connection.applied" || data.event === "connection.failed")
+    ) {
+      const event = decodeApplication(data.data)
+      if (Option.isSome(event))
+        input.onConnectionApplication?.(data.event === "connection.applied" ? "applied" : "failed", event.value)
+      return
+    }
+    events.emit("message", { data })
+  })
   const port: Port = {
     postMessage(value) {
       if (state.closed || !child.connected) throw new Error("LOGINOM_HOST_CLOSED")
@@ -168,6 +188,7 @@ export async function launchNodeHost(
         headless: input.headless,
         ...(input.resourceVersion !== undefined ? { resourceVersion: input.resourceVersion } : {}),
         ...(input.strictRecovery !== undefined ? { strictRecovery: input.strictRecovery } : {}),
+        ...(input.desktopWriteOutcomes !== undefined ? { desktopWriteOutcomes: input.desktopWriteOutcomes } : {}),
         ...(input.closeSavedPackageOnShutdown !== undefined
           ? { closeSavedPackageOnShutdown: input.closeSavedPackageOnShutdown }
           : {}),
@@ -200,7 +221,8 @@ export async function launchNodeHost(
   return {
     port,
     exited,
-    request: client.request,
+    request: (method: string, input: unknown, timeout?: number, signal?: AbortSignal) =>
+      client.request(method, input, timeout, undefined, undefined, signal),
     get alive() {
       return !state.closed
     },

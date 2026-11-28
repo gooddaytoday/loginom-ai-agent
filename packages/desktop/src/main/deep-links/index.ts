@@ -2,13 +2,13 @@ export * as DeepLinks from "./index"
 
 import type { BrowserWindow } from "electron"
 import { Effect } from "effect"
-import { DeepLinksOpened } from "../../shared/ipc-rpc/events"
+import { DeepLinksOpened, type DeepLinkPayload } from "../../shared/ipc-rpc/events"
 import { emitIpcEvent } from "../ipc-events"
 import { getWindowByID, onMainWindow } from "../windows"
 import { createDeepLinkState, transitionDeepLinks, type DeepLinkEvent } from "./machine"
 
 export interface Interface {
-  readonly receive: (urls: readonly string[]) => void
+  readonly receive: (urls: readonly DeepLinkPayload[]) => void
   readonly ready: (windowID: string, clientID: number) => void
   readonly acknowledge: (clientID: number, attempt: number) => void
   readonly disconnect: (clientID: number) => void

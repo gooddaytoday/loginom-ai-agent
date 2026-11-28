@@ -1,13 +1,14 @@
 import { randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "../loginom"
+import { Address, settingsAddress } from "../settings-rpc"
 import { Product } from "@loginom-ai-agent/product"
 import { connectionStore, type ActiveConnection } from "./connection-store"
 import type { recoveryStore } from "./recovery-store"
 
 export type RuntimeHandle = { close(): Promise<void>; reset?(): Promise<void>; ready?: Promise<void> }
 export type ConnectionRuntime = {
-  check(candidate: ActiveConnection, signal?: AbortSignal): Promise<void | Loginom.BrowserStatus>
+  check(candidate: ActiveConnection, signal?: AbortSignal, settings?: boolean): Promise<void | Loginom.BrowserStatus>
   prepare(candidate: ActiveConnection): Promise<RuntimeHandle>
 }
 const decodeCandidate = Schema.decodeUnknownOption(Loginom.Candidate)
@@ -16,6 +17,7 @@ export async function connectionService(
   store: ReturnType<typeof connectionStore>,
   runtime: ConnectionRuntime,
   recovery?: Pick<Awaited<ReturnType<typeof recoveryStore>>, "pending" | "acknowledge">,
+  onApplication?: Loginom.ConnectionApplicationListener,
 ) {
   // Both Desktop and CLI cross this boundary before preparing any runtime.
   await store.initialize()
@@ -26,6 +28,7 @@ export async function connectionService(
     generation: number
     setupRequired?: true
     pending?: ActiveConnection
+    applied?: true
     browser: Loginom.BrowserStatus
     pendingBrowser?: Loginom.BrowserStatus
     phase: Loginom.View["state"]
@@ -43,11 +46,14 @@ export async function connectionService(
     {
       candidate: ActiveConnection
       browser: Loginom.BrowserStatus
+      settings: boolean
       expiresAt: number
       timer: ReturnType<typeof setTimeout>
     }
   >()
-  const leases = new Map<string, { generation: number; recovery: boolean; active: boolean }>()
+  const leases = new Map<string, { generation: number; task: string; recovery: boolean; active: boolean }>()
+  const turns = new Map<string, string>()
+  let applyAfter = new Map<string, string>()
   const checks = new Map<AbortController, Promise<void | Loginom.BrowserStatus>>()
   function loadProfile() {
     if (state.loading) return state.loading
@@ -99,11 +105,18 @@ export async function connectionService(
     if (state.failure === "LOGINOM_STORE_READ_FAILED") throw Error(state.failure)
   }
 
-  function observeReadiness(handle: RuntimeHandle) {
+  function finishApplication(candidate: ActiveConnection, outcome: "applied" | "failed") {
+    if (state.closing || state.revision !== candidate.revision) return
+    if (outcome === "applied") state.applied = true
+    onApplication?.(outcome, { revision: candidate.revision, generation: candidate.generation })
+  }
+
+  function observeReadiness(handle: RuntimeHandle, candidate?: ActiveConnection) {
     const ready = () => {
       state.readiness = "ready"
       state.phase = state.pending ? "pending" : "ready"
       if (!state.failure) state.setupRequired = undefined
+      if (candidate) finishApplication(candidate, "applied")
     }
     if (!handle.ready) return ready()
     state.readiness = "starting"
@@ -116,8 +129,9 @@ export async function connectionService(
       () => {
         if (state.closing || state.handle !== handle) return
         state.readiness = "recoverable-error"
-        state.failure = "LOGINOM_RUNTIME_START_FAILED"
+        if (!state.pending) state.failure = "LOGINOM_RUNTIME_START_FAILED"
         state.phase = state.pending ? "pending" : "recoverable-error"
+        if (candidate) finishApplication(candidate, "failed")
       },
     )
   }
@@ -134,34 +148,42 @@ export async function connectionService(
   }
   function view(): Loginom.View {
     const current = state.active
+    let application: Loginom.View["application"]
+    if (state.pending) {
+      const tasks = new Set(applyAfter.values())
+      for (const lease of leases.values()) if (lease.active) tasks.add(lease.task)
+      application = { state: "pending", tasks: tasks.size }
+    } else if (state.applied) application = { state: "applied" }
     return {
       revision: state.revision,
       generation: current?.generation ?? 0,
       ...(state.setupRequired ? { setupRequired: state.setupRequired } : {}),
-      url: settingsAddress(current?.url ?? Product.connection.url),
+      url: legacyAddress(current?.url ?? Product.connection.url),
       username: current?.username ?? Product.connection.username,
       folder: `/${current?.username ?? Product.connection.username}`,
       hasPassword: !!current?.password,
       browser: { ...state.browser },
       state: recovery?.pending().length ? "recoverable-error" : state.phase,
+      ...(application ? { application } : {}),
       ...(recovery?.pending().length ? { recoveries: recovery.pending() } : {}),
       ...(state.failure ? { failure: state.failure } : {}),
     }
   }
   function progress() {
-    if (state.closing || !state.pending || leases.size || state.applying || state.writing || recovery?.pending().length)
-      return
+    if (
+      state.closing || !state.pending || leases.size || applyAfter.size || state.applying || state.writing ||
+      recovery?.pending().length
+    ) return
     const candidate = state.pending
     state.phase = "starting"
     state.applying = (async () => {
-      const prepared = await runtime.prepare(candidate).catch(() => {
-        state.failure = "LOGINOM_RUNTIME_START_FAILED"
-        return undefined
-      })
+      const prepared = await runtime.prepare(candidate).catch(() => undefined)
       if (!prepared) {
         if (state.pending === candidate) {
+          state.failure = "LOGINOM_RUNTIME_START_FAILED"
           state.pending = undefined
           state.phase = state.handle ? state.readiness : "recoverable-error"
+          finishApplication(candidate, "failed")
         }
         return
       }
@@ -171,6 +193,7 @@ export async function connectionService(
         await prepared.close().catch(() => undefined)
         return
       }
+      let durable = true
       const committed = await store
         .staged(candidate.generation)
         .then((previous) => {
@@ -191,7 +214,7 @@ export async function connectionService(
           async () => {
             // A directory fsync can fail after rename has already changed the active pointer.
             // Keep the live runtime aligned with that pointer; report the durability failure.
-            state.failure = "LOGINOM_STORE_WRITE_FAILED"
+            durable = false
             const persisted = await store.read().catch(() => undefined)
             return (
               persisted?.generation === candidate.generation &&
@@ -204,10 +227,11 @@ export async function connectionService(
           },
         )
       if (!committed) {
-        state.failure = "LOGINOM_STORE_WRITE_FAILED"
         await prepared.close().catch(() => undefined)
+        state.failure = "LOGINOM_STORE_WRITE_FAILED"
         state.pending = undefined
         state.phase = state.handle ? state.readiness : "recoverable-error"
+        finishApplication(candidate, "failed")
         return
       }
       const previous = state.handle
@@ -218,9 +242,11 @@ export async function connectionService(
       state.pending = undefined
       // Finish the store writes before a window can observe successful activation.
       await store.clearPending().catch(() => {
-        state.failure = "LOGINOM_STORE_WRITE_FAILED"
+        durable = false
       })
-      observeReadiness(prepared)
+      state.failure = durable ? undefined : "LOGINOM_STORE_WRITE_FAILED"
+      observeReadiness(prepared, durable ? candidate : undefined)
+      if (!durable) finishApplication(candidate, "failed")
       await previous?.close().catch(() => undefined)
     })().finally(() => {
       state.applying = undefined
@@ -267,7 +293,8 @@ export async function connectionService(
     async status() {
       return view()
     },
-    async check(input) {
+    async check(input, settings = false, signal) {
+      signal?.throwIfAborted()
       requireProfile()
       const decoded = decodeCandidate(input)
       if (Option.isNone(decoded)) throw new Error("LOGINOM_CANDIDATE_INVALID")
@@ -275,16 +302,27 @@ export async function connectionService(
       if (candidate.revision !== state.revision) throw new Error("LOGINOM_REVISION_CONFLICT")
       if (state.applying || state.writing) throw new Error("LOGINOM_APPLICATION_PENDING")
       validateAddress(candidate.url, candidate.username)
+      if (settings && !Schema.is(Address)(candidate.url)) throw new Error("LOGINOM_URL_INVALID")
+      const url = settings ? settingsAddress(candidate.url) : legacyAddress(candidate.url)
+      const stored = state.pending ?? state.active
+      if (
+        settings &&
+        candidate.password.operation === "preserve" &&
+        (!stored?.password ||
+          stored.username !== candidate.username ||
+          settingsAddress(stored.url) !== url)
+      )
+        throw new Error("LOGINOM_PASSWORD_REQUIRED")
       const password =
         candidate.password.operation === "preserve"
-          ? ((state.pending ?? state.active)?.password ?? "")
+          ? (stored?.password ?? "")
           : candidate.password.operation === "empty"
             ? ""
             : candidate.password.value
       const record = {
         generation: state.generation + 1,
         revision: state.revision + 1,
-        url: settingsAddress(candidate.url),
+        url,
         // Retain private provenance for the validated user choice. Startup
         // preserves saved URLs independently of this marker.
         urlSource: "explicit" as const,
@@ -294,13 +332,14 @@ export async function connectionService(
         password,
       }
       const controller = new AbortController()
-      const checking = Promise.resolve().then(() => runtime.check(record, controller.signal))
+      const checkSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
+      const checking = Promise.resolve().then(() => runtime.check(record, checkSignal, settings))
       checks.set(controller, checking)
       const browser = (await checking
         .catch((error: unknown) => {
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
             state.checkCleanupFailed = true
-          controller.signal.throwIfAborted()
+          checkSignal.throwIfAborted()
           const code =
             error instanceof Error &&
             [
@@ -310,12 +349,14 @@ export async function connectionService(
               "LOGINOM_ACCOUNT_MISMATCH",
               "LOGINOM_LOGIN_UNAVAILABLE",
               "LOGINOM_BROWSER_START_FAILED",
+              "LOGINOM_LOGOUT_UNCONFIRMED",
             ].includes(error.message)
               ? error.message
               : "LOGINOM_CONNECTION_CHECK_FAILED"
           throw new Error(code, { cause: error })
         })
         .finally(() => checks.delete(controller))) ?? { state: "unknown" as const }
+      checkSignal.throwIfAborted()
       if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
       if (candidate.revision !== state.revision || state.applying || state.writing)
         throw new Error("LOGINOM_REVISION_CONFLICT")
@@ -325,6 +366,8 @@ export async function connectionService(
         state.active.password === record.password
       )
         state.browser = { ...browser }
+      if (settings && browser.state !== "verified")
+        throw new Error(browser.state === "failed" ? browser.failure : "LOGINOM_CONNECTION_CHECK_FAILED")
       const validationId = randomUUID()
       const expiresAt = Date.now() + 5 * 60_000
       validations.forEach((entry, key) => {
@@ -332,15 +375,16 @@ export async function connectionService(
       })
       const timer = setTimeout(() => validations.delete(validationId), 5 * 60_000)
       timer.unref()
-      validations.set(validationId, { candidate: record, browser, expiresAt, timer })
+      validations.set(validationId, { candidate: record, browser, settings, expiresAt, timer })
       return { validationId, expiresAt, browser: { ...browser } }
     },
-    async save(input) {
+    async save(input, settings = false) {
       requireProfile()
       if (input.revision !== state.revision) throw new Error("LOGINOM_REVISION_CONFLICT")
       if (state.applying || state.writing) throw new Error("LOGINOM_APPLICATION_PENDING")
       const validation = validations.get(input.validationId)
-      if (!validation || validation.expiresAt <= Date.now()) throw new Error("LOGINOM_VALIDATION_EXPIRED")
+      if (!validation || validation.settings !== settings || validation.expiresAt <= Date.now())
+        throw new Error("LOGINOM_VALIDATION_EXPIRED")
       clearValidations()
       state.writing = true
       const candidate = { ...validation.candidate, generation: state.generation + 1, revision: state.revision + 1 }
@@ -350,11 +394,14 @@ export async function connectionService(
         state.writing = false
       }
       state.failure = undefined
+      state.applied = undefined
       state.generation = candidate.generation
       state.revision = candidate.revision
       state.pending = candidate
       state.pendingBrowser = validation.browser
       state.phase = "pending"
+      // Even a turn without a Loginom lease must finish before this generation can activate.
+      applyAfter = new Map(turns)
       progress()
       return view()
     },
@@ -372,6 +419,7 @@ export async function connectionService(
       }
       state.pending = undefined
       state.pendingBrowser = undefined
+      applyAfter.clear()
       state.revision++
       clearValidations()
       state.phase = state.handle ? state.readiness : state.active ? "recoverable-error" : "unconfigured"
@@ -389,11 +437,19 @@ export async function connectionService(
       }
     },
     api,
+    turn(id: string, task: string, active: boolean) {
+      if (active) turns.set(id, task)
+      else {
+        turns.delete(id)
+        applyAfter.delete(id)
+        progress()
+      }
+    },
     browserStatus(generation: number, browser: Loginom.BrowserStatus) {
       if (state.closing || generation !== state.active?.generation) return
       state.browser = { ...browser }
     },
-    acquire(run: string) {
+    acquire(run: string, task = run) {
       if (
         state.closing ||
         state.pending ||
@@ -404,7 +460,7 @@ export async function connectionService(
         leases.has(run)
       )
         return
-      const lease = { generation: state.active.generation, recovery: false, active: true }
+      const lease = { generation: state.active.generation, task, recovery: false, active: true }
       leases.set(run, lease)
       return {
         generation: lease.generation,
@@ -448,7 +504,7 @@ export async function connectionService(
 }
 
 // The browser adds its automation flag privately; old saved URLs may contain it.
-function settingsAddress(value: string) {
+function legacyAddress(value: string) {
   const url = new URL(value)
   if (!url.searchParams.has("testable")) return value
   url.searchParams.delete("testable")

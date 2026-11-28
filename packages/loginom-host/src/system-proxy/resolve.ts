@@ -23,7 +23,7 @@ import { parseWindowsSettings } from "./windows"
 
 export type ChromiumResolution = { url: string; resolution: string }
 
-export type ProxyProbe = (url: string) => Promise<"http" | "other" | "closed" | "timeout">
+export type ProxyProbe = (url: string, signal?: AbortSignal) => Promise<"http" | "other" | "closed" | "timeout">
 
 export type ResolveSystemProxyInput = {
   platform?: NodeJS.Platform
@@ -31,6 +31,7 @@ export type ResolveSystemProxyInput = {
   environment?: NodeJS.ProcessEnv
   hostname?: string
   deadlineMs?: number
+  signal?: AbortSignal
   windows?: unknown
   macos?: string
   gnome?: string
@@ -52,6 +53,7 @@ export async function resolveSystemProxy(input: ResolveSystemProxyInput = {}): P
 }
 
 async function resolveSystemProxyUnsafe(input: ResolveSystemProxyInput): Promise<SystemProxyResult> {
+  if (input.signal?.aborted) return failedResult("timeout")
   const platform = input.platform ?? process.platform
   const environment = input.environment ?? {}
   if (systemProxyDisabled(environment, input.enabled))
@@ -76,6 +78,7 @@ async function resolveSystemProxyUnsafe(input: ResolveSystemProxyInput): Promise
     }
 
   const loaded = await loadSettings(input)
+  if (input.signal?.aborted) return failedResult("timeout")
   if (loaded.ok === false) return failedResult(loaded.code)
   if (loaded.settings?.invalid && !input.chromium) return failedResult("internal")
   const settings = settingsFor(loaded.settings, input)
@@ -94,6 +97,7 @@ async function resolveSystemProxyUnsafe(input: ResolveSystemProxyInput): Promise
   else if (pac?.ambiguous && !settings.http && !settings.https) settings.issues.push({ code: "automatic-unsupported" })
 
   const chromium = await chromiumView(input)
+  if (input.signal?.aborted) return failedResult("timeout")
   if (chromium.failed) settings.issues.push({ code: "internal" })
   if (chromium.timedOut && !settings.http && !settings.https) settings.issues.push({ code: "timeout" })
   const directHosts = chromium.directHosts
@@ -107,7 +111,7 @@ async function resolveSystemProxyUnsafe(input: ResolveSystemProxyInput): Promise
   }
 
   if (!settings.http && !settings.https && settings.socks) {
-    const mixed = input.probe ? await probeSafe(input.probe, settings.socks) : "other"
+    const mixed = input.probe ? await probeSafe(input.probe, settings.socks, input.signal) : "other"
     if (mixed === "http") {
       settings.http = settings.socks
       settings.https = settings.socks
@@ -158,7 +162,7 @@ async function resolveSystemProxyUnsafe(input: ResolveSystemProxyInput): Promise
   if (input.probe) {
     const probe = input.probe
     const routes = [...new Set([settings.http, settings.https].filter(Boolean))]
-    const statuses = await Promise.all(routes.map((route) => probeSafe(probe, route)))
+    const statuses = await Promise.all(routes.map((route) => probeSafe(probe, route, input.signal)))
     const closed = routes.find((_, index) => statuses[index] === "closed" || statuses[index] === "timeout")
     if (closed) notices.push({ code: "unreachable", detail: proxyHostPort(closed) })
   }
@@ -203,8 +207,9 @@ async function loadSettings(
   if (injected) return { ok: true, settings: injected }
   if (input.read) return loadRead(input.read, input)
   const read = await deadline(
-    readSystemProxy({ platform: input.platform, environment: input.environment, timeoutMs: input.deadlineMs }),
+    readSystemProxy({ platform: input.platform, environment: input.environment, timeoutMs: input.deadlineMs, signal: input.signal }),
     input.deadlineMs ?? ((input.platform ?? process.platform) === "win32" ? WINDOWS_POWERSHELL_TIMEOUT_MS : 8000),
+    input.signal,
   )
   if (read.ok === false) return { ok: false, code: read.reason === "timeout" ? "timeout" : "read-failed" }
   if (!read.value.ok) return { ok: false, code: read.value.code }
@@ -218,7 +223,7 @@ async function loadRead(read: () => Promise<SystemProxySnapshot | undefined>, in
   } catch {
     return { ok: false as const, code: "read-failed" as const }
   }
-  const waited = await deadline(reading, input.deadlineMs ?? ((input.platform ?? process.platform) === "win32" ? WINDOWS_POWERSHELL_TIMEOUT_MS : 8000))
+  const waited = await deadline(reading, input.deadlineMs ?? ((input.platform ?? process.platform) === "win32" ? WINDOWS_POWERSHELL_TIMEOUT_MS : 8000), input.signal)
   if (waited.ok === false)
     return { ok: false as const, code: waited.reason === "timeout" ? ("timeout" as const) : ("read-failed" as const) }
   if (!waited.value) return { ok: true as const }
@@ -248,8 +253,9 @@ function snapshotSettings(snapshot: SystemProxySnapshot, input: ResolveSystemPro
   })
 }
 
-async function deadline<T>(work: Promise<T>, timeoutMs: number) {
+async function deadline<T>(work: Promise<T>, timeoutMs: number, signal?: AbortSignal) {
   let timer: ReturnType<typeof setTimeout> | undefined
+  let abort: (() => void) | undefined
   try {
     return await Promise.race([
       work.then(
@@ -257,11 +263,15 @@ async function deadline<T>(work: Promise<T>, timeoutMs: number) {
         () => ({ ok: false as const, reason: "error" as const }),
       ),
       new Promise<{ ok: false; reason: "timeout" }>((resolve) => {
-        timer = setTimeout(() => resolve({ ok: false, reason: "timeout" }), timeoutMs)
+        abort = () => resolve({ ok: false, reason: "timeout" })
+        timer = setTimeout(abort, timeoutMs)
+        if (signal?.aborted) abort()
+        else signal?.addEventListener("abort", abort, { once: true })
       }),
     ])
   } finally {
     if (timer) clearTimeout(timer)
+    if (abort) signal?.removeEventListener("abort", abort)
   }
 }
 
@@ -341,14 +351,15 @@ async function chromiumRows(input: ResolveSystemProxyInput) {
       })),
     ),
     input.chromiumTimeoutMs ?? 3000,
+    input.signal,
   )
   if (waited.ok === false) return undefined
   return waited.value
 }
 
-async function probeSafe(probe: ProxyProbe, url: string) {
+async function probeSafe(probe: ProxyProbe, url: string, signal?: AbortSignal) {
   try {
-    return await probe(url)
+    return await probe(url, signal)
   } catch {
     return "other" as const
   }

@@ -57,6 +57,13 @@ export default defineConfig({
       },
   use: {
     baseURL,
+    // Regression selectors use English. Locale tests can seed a different preference.
+    storageState: {
+      cookies: [],
+      origins: [
+        { origin: url.origin, localStorage: [{ name: "opencode.global.dat:language", value: '{"locale":"en"}' }] },
+      ],
+    },
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     // CI retries failures, so the retry records the video; local runs have no retries.

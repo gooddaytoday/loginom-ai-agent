@@ -1,6 +1,6 @@
 export * as ServiceRegistration from "./service-registration"
 
-import { Service, type Info } from "@opencode/client/effect/service"
+import { Service, withRegistrationLock, type Info } from "@opencode/client/effect/service"
 import path from "node:path"
 import { Effect, FileSystem, Schedule, Schema } from "effect"
 import { HttpServer } from "effect/http"
@@ -41,7 +41,10 @@ export const register = Effect.fnUntraced(function* (options: {
     .pipe(
       // Windows rename can fail with EPERM while a contender or test polls the registration file.
       Effect.andThen(
-        fs.rename(temp, options.file).pipe(Effect.retry({ times: 20, schedule: Schedule.spaced("10 millis") })),
+        withRegistrationLock(
+          options.file,
+          fs.rename(temp, options.file).pipe(Effect.retry({ times: 20, schedule: Schedule.spaced("10 millis") })),
+        ),
       ),
     )
   yield* current.pipe(
@@ -72,8 +75,8 @@ export const register = Effect.fnUntraced(function* (options: {
     Effect.andThen(options.shutdown),
     Effect.forkScoped,
   )
-  return current.pipe(
-    Effect.flatMap((found) => (owns(found) ? fs.remove(options.file) : Effect.void)),
-    Effect.ignore,
-  )
+  return withRegistrationLock(
+    options.file,
+    current.pipe(Effect.flatMap((found) => (owns(found) ? fs.remove(options.file) : Effect.void))),
+  ).pipe(Effect.ignore)
 })

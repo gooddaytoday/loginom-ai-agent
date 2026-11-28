@@ -184,6 +184,7 @@
       "dependencies": {
         "@opencode/protocol": "workspace:*",
         "@opencode/schema": "workspace:*",
+        "@opencode/util": "workspace:*",
       },
       "devDependencies": {
         "@effect/platform-node": "catalog:",
@@ -385,6 +386,7 @@
         "@opencode/plugin": "workspace:*",
         "@opencode/schema": "workspace:*",
         "@opencode/ui": "workspace:*",
+        "@playwright/test": "catalog:",
         "@sentry/solid": "catalog:",
         "@solidjs/router": "catalog:",
         "@types/bun": "catalog:",
@@ -422,6 +424,7 @@
         "@betteroffice/xlsx": "0.3.0",
         "@effect/platform-node": "catalog:",
         "@kobalte/core": "catalog:",
+        "@loginom-ai-agent/loginom-host": "workspace:*",
         "@loginom-ai-agent/product": "workspace:*",
         "@opencode/client": "workspace:*",
         "@opencode/plugin": "workspace:*",
@@ -552,6 +555,9 @@
       "version": "0.1.0",
       "dependencies": {
         "acorn": "8.15.0",
+      },
+      "devDependencies": {
+        "yaml": "2.9.1",
       },
     },
     "packages/merman": {
@@ -949,6 +955,7 @@
         "@tsconfig/bun": "catalog:",
         "@types/bun": "catalog:",
         "@types/cross-spawn": "catalog:",
+        "@types/mime-types": "3.0.1",
         "@types/node": "catalog:",
         "@types/npm-package-arg": "6.1.4",
         "@types/npmcli__arborist": "6.3.3",

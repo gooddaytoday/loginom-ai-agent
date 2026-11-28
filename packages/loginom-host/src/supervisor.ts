@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import { appendFile, mkdir, writeFile } from "node:fs/promises"
 import { isAbsolute, join } from "node:path"
 import { hostError, hostException } from "./errors"
+import { runtimeNoProxyKey } from "./system-proxy/environment"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { recordLocalDiagnostics } from "../../loginom-runtime/client/lib/local-diagnostics.mjs"
 
@@ -19,6 +20,7 @@ export type Launch = {
   validation?: boolean
   // Host-owned HTTP cache only; browser profiles and authentication remain fresh.
   validationHttpCache?: boolean
+  validationLogout?: boolean
   headless?: boolean
   environment?: NodeJS.ProcessEnv
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
@@ -78,6 +80,32 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
     "NODE_USE_ENV_PROXY",
     "LOGINOM_AI_AGENT_ACCEPTANCE_VIEWPORT",
   ]
+  const runtimeNoProxy = environment[runtimeNoProxyKey]
+  const runtimeProxy = () => {
+    if (!runtimeNoProxy) return env
+    let marker: unknown
+    try {
+      marker = JSON.parse(runtimeNoProxy)
+    } catch {
+      return env
+    }
+    if (!Array.isArray(marker) || marker.length !== 4) return env
+    const [http, https, systemBypass, userBypass] = marker
+    if (typeof http !== "string" || typeof https !== "string" || typeof systemBypass !== "string" || typeof userBypass !== "string") return env
+    let removed = false
+    for (const [key, value] of Object.entries(env)) {
+      const name = key.toUpperCase()
+      if ((name === "HTTP_PROXY" && value === http) || (name === "HTTPS_PROXY" && value === https)) {
+        delete env[key]
+        removed = true
+      }
+    }
+    if (!removed) return env
+    for (const key of ["NO_PROXY", "no_proxy"]) if (env[key] === systemBypass) env[key] = userBypass
+    if (env.NODE_USE_ENV_PROXY === "1" && !["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"].some((key) => env[key]))
+      delete env.NODE_USE_ENV_PROXY
+    return env
+  }
   if (platform === "linux")
     keys.push(
       "DISPLAY",
@@ -99,12 +127,12 @@ export function runtimeEnvironment(environment: NodeJS.ProcessEnv, platform = pr
         const name = key.toUpperCase()
         if (allowed.has(name) && environment[key] && !(name in env)) env[name] = environment[key]
       })
-    return env
+    return runtimeProxy()
   }
   keys.forEach((key) => {
     if (environment[key]) env[key] = environment[key]
   })
-  return env
+  return runtimeProxy()
 }
 
 // One browser child per generation/chat; knowledge has one child per generation.
@@ -179,7 +207,7 @@ async function superviseProcess(
   })
   const pending = new Map<
     string,
-    { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }
+    { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout>; progress?(value: unknown): void }
   >()
   const startupFailure: { value?: ReturnType<typeof knowledgeStartupFailure> } = {}
   const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) => {
@@ -200,6 +228,10 @@ async function superviseProcess(
     if (!message || typeof message !== "object" || !("id" in message) || typeof message.id !== "string") return
     const request = pending.get(message.id)
     if (!request) return
+    if ("progress" in message) {
+      request.progress?.(message.progress)
+      return
+    }
     pending.delete(message.id)
     clearTimeout(request.timer)
     // Setup may close an admitted knowledge child while its background catalog
@@ -235,7 +267,7 @@ async function superviseProcess(
     }
     request.resolve("result" in message ? message.result : undefined)
   })
-  function request(operation: string, value?: unknown, timeout = 120_000) {
+  function request(operation: string, value?: unknown, timeout = 120_000, progress?: (value: unknown) => void) {
     if (!child.connected) return Promise.reject(new Error("LOGINOM_RUNTIME_DISCONNECTED"))
     const id = randomUUID()
     return new Promise<unknown>((resolve, reject) => {
@@ -243,7 +275,7 @@ async function superviseProcess(
         pending.delete(id)
         reject(new Error("LOGINOM_RUNTIME_TIMEOUT"))
       }, timeout)
-      pending.set(id, { resolve, reject, timer })
+      pending.set(id, { resolve, reject, timer, progress })
       child.send({ id, operation, input: value }, (error) => {
         if (error) fail()
       })

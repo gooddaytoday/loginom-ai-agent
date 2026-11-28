@@ -9,7 +9,8 @@
 import { randomUUID } from "node:crypto"
 import { mkdir, writeFile } from "node:fs/promises"
 import { extname, join, resolve } from "node:path"
-import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { hostErrorText, hostFailure } from "@loginom-ai-agent/loginom-host/errors"
+import { StepMetadata, uncertainStep } from "@loginom-ai-agent/loginom-host/step-state"
 import { SessionV1 } from "@loginom-ai-agent/loginom-host/session-v1"
 import type { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
@@ -18,7 +19,7 @@ import { Identifier } from "@opencode/schema/identifier"
 import type { Model } from "@opencode/schema/model"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
-import { Schema } from "effect"
+import { Option, Schema } from "effect"
 import { local, type Profile } from "./access"
 import { exactScanReceipt } from "./file-profile-core"
 import type { ServiceHost } from "./host"
@@ -46,6 +47,7 @@ const Reply = Schema.Struct({
 })
 const decodeCatalog = Schema.decodeUnknownSync(Catalog)
 const decodeReply = Schema.decodeUnknownSync(Reply)
+const decodeStep = Schema.decodeUnknownOption(StepMetadata)
 
 // The product's own tools that 0.4 offered only beside a prepared Dock: the catalog then describes Dock actions.
 const prepared = ["loginom_file_admit", "loginom_file_profile", "loginom_file_scan", "loginom_file_sample"]
@@ -60,8 +62,13 @@ const unavailable = (failure: string) =>
   "). No new Loginom action was dispatched by this failed preparation. Report this concrete failure and preserve the existing scenario. Attachment admission is not confirmed by the presence of a chat attachment; do not claim input_artifacts were admitted or uploaded. After connection/recovery is resolved, continue in the same chat. Never ask for credentials in chat or substitute fabricated results."
 
 export async function dockTools(input: {
-  plugin: Pick<Plugin.Context, "tool" | "location" | "model" | "session">
-  files: Files
+  plugin: {
+    tool: Pick<Plugin.Context["tool"], "transform" | "reload">
+    location: Pick<Plugin.Context["location"], "directory">
+    model: Pick<Plugin.Context["model"], "list">
+    session: Pick<Plugin.Context["session"], "context">
+  }
+  files: Pick<Files, "ask" | "snapshot">
   profiles: string
   /** The execution's Host lease (B2.3) and why it is missing, if acquiring it failed. */
   lease: (sessionID: string) => Promise<Lease | undefined>
@@ -69,6 +76,7 @@ export async function dockTools(input: {
   ready: () => boolean
   failure: (sessionID: string) => string | undefined
   task: (sessionID: string) => Promise<string>
+  wrap: (tool: Info) => Info
 }) {
   const plugin = input.plugin
   // Every Dock tool of the current connection generation that a session of this Location was offered. A new generation
@@ -80,7 +88,9 @@ export async function dockTools(input: {
   // The task and profile each Host run is bound to; a new run is bound to nothing.
   const bound = new WeakMap<Lease, { task: string; profile: Profile }>()
 
-  await plugin.tool.transform((editor) => registry.tools.forEach((definition) => editor.add(tool(definition))))
+  await plugin.tool.transform((editor) =>
+    registry.tools.forEach((definition) => editor.add(input.wrap(tool(definition)))),
+  )
 
   // A run serves one task with one profile (`loginom-host/src/host-port.ts`). Its first binding may name the task's
   // profile, as 0.4 bound the profile it derived from history; a later task binds as `default` and then requests and
@@ -264,20 +274,36 @@ export async function dockTools(input: {
         : undefined
     // The task the run is bound to, as 0.4 dispatched with the turn's task.
     const task = bound.get(lease)?.task ?? (await input.task(call.sessionID))
+    const signal = call.signal
+    let publishing = Promise.resolve()
     const result = await lease
       .call(
         name,
         forwarded,
         task,
-        call.signal,
+        signal,
         // Help and connection diagnostics carry no attachments (0.4 `toolPolicy.isLocalLoginom`).
         local.has(key) ? undefined : await admissions(call.sessionID),
         packageInput,
         scanReceipt,
+        (update) => {
+          publishing = publishing
+            .then(async () => {
+              if (!signal.aborted) await call.progress({ loginomStep: update })
+            })
+            .catch(() => undefined)
+        },
+        { turn: call.messageID, call: call.id },
       )
+      .finally(() => publishing)
       .then(decodeReply)
       .catch((error) => {
-        throw Error(hostErrorText(error))
+        const message = hostErrorText(error)
+        const { details } = hostFailure(error)
+        if (details && "operationId" in details && details.operationId) throw new Tool.Error({
+          message, metadata: { generation: lease.generation, isError: true, loginom: uncertainStep(details.operationId) },
+        })
+        throw Error(message)
       })
     const text = result.content
       .flatMap((block) => (block.type === "text" && typeof block.text === "string" ? [block.text] : []))
@@ -291,10 +317,12 @@ export async function dockTools(input: {
       summary && outputPath
         ? `${summary}\n\nTable data and verbose details were omitted by the backend response limit. The complete original result is retained at ${outputPath}. Do not infer unread data or repeat mutations solely to retrieve omitted text.`
         : text
+    const loginom = Option.getOrUndefined(decodeStep(result._meta?.loginomStep))
+    const metadata = { generation: lease.generation, ...(loginom ? { loginom } : {}) }
     if (state === "failed")
       throw new Tool.Error({
         message: content || "LOGINOM_TOOL_FAILED",
-        metadata: { generation: lease.generation, isError: true },
+        metadata: { ...metadata, isError: true },
       })
     const images = result.content.flatMap((block) =>
       block.type === "image" && typeof block.data === "string" && typeof block.mimeType === "string"
@@ -304,7 +332,7 @@ export async function dockTools(input: {
     return {
       content: images.length ? [{ type: "text", text: content }, ...images] : content,
       metadata: {
-        generation: lease.generation,
+        ...metadata,
         ...(Array.isArray(result._meta?.outputFiles) ? { outputFiles: result._meta.outputFiles } : {}),
         // A reply within OpenCode's limits is left to it; a larger one with a control summary was shortened here.
         ...(outputPath ? { truncated: true, outputPath } : {}),

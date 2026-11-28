@@ -42,6 +42,31 @@ function fixture() {
   }};
  return {adapter,operation,calls,events,get graph(){return graph;},run:(r=request())=>prepareNodeTarget({request:r,operation,adapter,record:async e=>{events.push(e);return e;}})};
 }
+test('manual graph edit after baseline and before the first gesture refuses the step without a write',async()=>{
+ const f=fixture();
+ const result=await prepareNodeTarget({request:request(),operation:f.operation,adapter:f.adapter,record:async e=>{
+  if(e.phase==='node_target_checkpoint')f.graph.nodes[0].label='Edited by hand';
+  return e;
+ }});
+ assert.equal(result.status,'NOT_APPLIED');
+ assert.equal(result.error_code,'NODE_GRAPH_CONFLICT');
+ assert.equal(result.partial_effect,false);
+ assert.deepEqual(f.calls,[]);
+ assert.equal(f.graph.nodes[0].label,'Edited by hand');
+});
+test('manual graph edit after an admitted create retains the new node and stops before any later gesture',async()=>{
+ const f=fixture(),mutate=f.adapter.mutate;
+ f.adapter.mutate=async effect=>{
+  const receipt=await mutate(effect);
+  f.graph.nodes[0].label='Edited by hand';
+  return receipt;
+ };
+ const result=await f.run();
+ assert.equal(result.status,'AMBIGUOUS');
+ assert.equal(result.error_code,'NODE_GRAPH_CONFLICT');
+ assert.deepEqual(f.calls,['create']);
+ assert.deepEqual(f.graph.nodes.map(node=>node.label),['Edited by hand','Union']);
+});
 test('failed native marker records fresh topology privately without node labels or URLs',async()=>{
  const f=fixture();f.graph.nodes[0].label='https://private.invalid/?token=secret';
  const mutate=f.adapter.mutate;

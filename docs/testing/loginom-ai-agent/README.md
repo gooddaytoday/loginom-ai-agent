@@ -1,5 +1,35 @@
 # Приёмка Loginom AI Agent на отдельных машинах
 
+**Шлюз C, сценарии 1, 2 и 4**
+
+Нужны Linux x64 (например, Ubuntu 24.04), Bun 1.4.4, Node.js 24.19.0 с npm в `PATH` и рабочий Chromium sandbox для обычного пользователя. Host запускает копию закреплённого Chromium 1246 из временного каталога. Политика хоста должна разрешать этому процессу создание пользовательского пространства имён или предоставлять рабочий setuid sandbox.
+
+Выполните из корня репозитория. Если на поддерживаемом Playwright дистрибутиве ещё нет системных библиотек Chromium, после `bun install` установите их командой `bun run --cwd packages/app playwright install-deps chromium`. Для неё могут понадобиться права администратора. На Ubuntu 26.04 с установленными библиотеками сначала выполните `export PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64`, чтобы Playwright 1.60 загрузил совместимую сборку.
+
+```bash
+(
+  set -e
+  export LOGINOM_AI_AGENT_TEST_NODE="$(node -p 'process.execPath')"
+  gate_root="$(mktemp -d)"
+  export HOME="$gate_root" TMPDIR="$gate_root/tmp"
+  export XDG_CONFIG_HOME="$gate_root/config" XDG_CACHE_HOME="$gate_root/cache"
+  export XDG_DATA_HOME="$gate_root/data" XDG_STATE_HOME="$gate_root/state" XDG_RUNTIME_DIR="$gate_root/runtime"
+  mkdir -m 700 "$TMPDIR" "$XDG_RUNTIME_DIR"
+  export PLAYWRIGHT_BROWSERS_PATH="$gate_root/browsers"
+
+  bun install --frozen-lockfile
+  npm ci --ignore-scripts --prefix packages/loginom-runtime/client
+  bun run --cwd packages/app playwright install --only-shell chromium
+  node packages/loginom-runtime/client/node_modules/playwright/cli.js install --no-shell chromium
+  export LOGINOM_DOCK_TEST_BROWSER="$PLAYWRIGHT_BROWSERS_PATH/chromium-1246/chrome-linux64/chrome"
+
+  test -x "$LOGINOM_DOCK_TEST_BROWSER"
+  bun run --cwd packages/app test:e2e:gate
+)
+```
+
+Отчёт со снимками 1280 и 390 px сохраняется в `packages/app/e2e/playwright-report/gate`.
+
 Самостоятельный CLI из ветки `loginom-cli` проверяется по отдельному
 [runbook IND-01…14](standalone-cli.md). Его текущая спецификация —
 [standalone CLI](../../superpowers/specs/2026-09-17-loginom-cli-standalone-design.md);
@@ -30,6 +60,8 @@ Dashboard M5 «Release в контейнерах»: [runbook](dashboard-m5.md#и
 Dashboard M6 «Эксплуатация и безопасность» — управление службами, журналы и границы установленной приёмки. См. [runbook M6](dashboard-m6.md).
 
 Dashboard M7 «Удобство и качество» — условия и результаты проверки интерфейса Studio, офлайн-комплекта и самостоятельного пользовательского прохода. См. [runbook M7](dashboard-m7.md).
+
+Сценарии 7–10 шлюза C с подставной моделью и хостом Loginom запускаются командой `bun run --cwd packages/app test:e2e:gate:b` после установки Chromium Playwright (`bun run --cwd packages/app playwright install chromium`). Отчёт со снимками 1280 и 390 px находится в `packages/app/e2e/playwright-report/gate-b/index.html`. Рядом с пропущенными шагами в тесте указаны номера карточек или решений продукта.
 
 ## Границы приёмки
 
@@ -109,6 +141,7 @@ Beta,1,1
 | --- | --- | --- |
 | PKG-01 | На чистой машине установить пакет без Node, Bun, Python, npm и отдельно установленного Chrome/Chromium; отключить сеть для первого открытия | Открывается мастер. Приложение не требует установки runtime и не скачивает Chromium. Отсутствие связи с сервисом обозначено отдельно |
 | PKG-02 | Вернуть доступ к тестовым сервисам; запустить Loginom | Node/исполнитель и Chromium запускаются из путей manifest; системный Edge/Safari не используется вместо комплектного Chromium |
+| PKG-03 | На отдельной Linux-ВМ без `libfuse.so.2` запустить исполняемый AppImage кандидата из терминала без извлечения | AppImage завершается с ненулевым кодом до открытия окна; в stderr `dlopen(): error loading libfuse.so.2`. Это ожидаемый отказ при отсутствии [FUSE 2](linux.md#требования) |
 | UI-01 | Первый запуск в чистом профиле | Три поля: URL `https://app.loginom.ai`; имя `user`; пустой пароль **без placeholder**. Поля ключа нет: ключ сервиса знаний встроен в сборку. Нет шага выбора LLM и поля папки |
 | UI-01a | Проверить и сохранить исходные значения без редактирования. Открыть ещё одно окно во время активации | «Сохранить и закрыть» доступна после загрузки. Отдельная проверка не создаёт файл подключения. Все окна открывают рабочий интерфейс после успешной активации. При ошибке мастер предлагает повторить сохранение. Выход из приложения доступен |
 | UI-01b | В изолированном профиле временно сделать сохранённое подключение недоступным для чтения и запустить Desktop. Восстановить доступ и нажать «Обновить настройки» | До успешного чтения профиль нельзя перезаписать. Повторное чтение открывает рабочий интерфейс с прежним подключением |
@@ -132,6 +165,8 @@ Beta,1,1
 | UPDATE-01 | Из версии N запросить и установить N+1 из собственного тестового feed | Запросы обновления идут только в канал Loginom AI Agent; сохраняются настройки и данные; приложение не заменяется OpenCode; повторно пройти CON-01 и FLOW-01 |
 | REMOVE-01 | Удалить тестовую установку и установить заново согласно политике manifest | Удалены зарегистрированные приложением компоненты; пользовательские данные обработаны по явно описанной политике. Чужие OpenCode/Dock/браузеры не удалены |
 | LOG-01 | Экспортировать диагностику успеха и ошибок | Есть версии, platform/arch, стадии отказа, chat ID и operation ID; нет ключа, пароля, cookie, auth header и содержимого секретного хранилища |
+
+Автотесты окна Desktop на Linux с Bun 1.4.4 и Node 24.19.0: из корня репозитория выполните `bun run --cwd packages/desktop install-electron`, затем `xvfb-run -a bun run --cwd packages/desktop test:electron`. Скрипт собирает приложение во временном каталоге и запускает локальную службу без настоящего Loginom и запросов к модели.
 
 REC-01/CON-07 выполняются на одноразовом тестовом пакете с управляемой сетевой точкой отказа. В отчёте фиксируется, в какой момент произошёл разрыв. Простой таймаут до отправки запроса не доказывает обработку неопределённого исхода. Для CON-08 передаётся поддерживаемый тестовой сборкой способ инъекции отказа; при его отсутствии сценарий `BLOCKED`. Повреждать рабочие runtime-файлы или отключать общий сервер для проверки не нужно.
 

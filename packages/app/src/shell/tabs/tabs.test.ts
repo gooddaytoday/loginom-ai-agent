@@ -33,13 +33,14 @@ function sessionTab(sessionId: string): SessionTab {
 }
 
 describe("tab migration", () => {
-  test("round trips draft MCP choices without changing older drafts", () => {
+  test("round trips draft MCP choices and prompt origin without changing older drafts", () => {
     const legacy: Tab = { type: "draft", draftID: "legacy-draft", server, directory: "/project" }
 
     const draft: Tab = {
       ...legacy,
       draftID: "mcp-draft",
       worktree: "create",
+      promptOrigin: "fixture.example",
       mcp: { target: "new-worktree", states: { first: true, second: false } },
     }
 

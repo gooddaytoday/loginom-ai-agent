@@ -16,6 +16,8 @@ export function scriptedHost(
   options: {
     catalog?: (generation: number) => Tool[]
     call?: (request: Record<string, unknown>) => unknown
+    admit?: (files: { name: string }[]) => unknown
+    interrupt?: () => void
     acquire?: () => string | undefined
     tools?: () => string | undefined
     /** Runs start with a browser runtime, as after `dock_prepare`. */
@@ -43,6 +45,7 @@ export function scriptedHost(
     }
     const run = runs.get(input.run)
     if (!run) return fail("LOGINOM_RUN_INVALID")
+    if (request.method === "interrupt") options.interrupt?.()
     if (request.method === "release" || request.method === "interrupt") return reply(true)
     if (request.method === "scope") {
       const mode = input.mode
@@ -85,7 +88,10 @@ export function scriptedHost(
     if (request.method === "admit") {
       if (run.scope?.profile !== "loginom-automation" || !run.prepared) return fail("LOGINOM_SCOPE_DENIED")
       const files = input.files as { name: string }[]
-      return reply(files.map((file, index) => ({ artifact_id: `artifact-${index + 1}`, name: file.name })))
+      return reply(
+        options.admit?.(files) ??
+          files.map((file, index) => ({ artifact_id: `artifact-${index + 1}`, name: file.name })),
+      )
     }
     if (dashboardMethods.includes(request.method)) {
       // As `host-port.ts`: only a run bound to the dashboard's profile reaches the publications.
@@ -98,9 +104,9 @@ export function scriptedHost(
     }
     if (request.method === "call") {
       if (input.name === "dock_prepare") run.prepared = true
-      return reply(
+      return void Promise.resolve(
         options.call?.(input) ?? { content: [{ type: "text", text: JSON.stringify({ called: input.name }) }] },
-      )
+      ).then(reply, (error: unknown) => fail(error instanceof Error ? error.message : String(error)))
     }
     return fail("LOGINOM_HOST_REQUEST_FAILED")
   }

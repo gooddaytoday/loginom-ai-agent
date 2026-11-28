@@ -15,6 +15,7 @@ import { loginBrowser, loginomAddress, reauthenticateReloadedPage } from "./conn
 import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { startupDiagnostic } from "../client/lib/catalog.mjs"
 import { browserDownloadsPath } from "../client/lib/browser-downloads.mjs"
+import { observeLoginomReplies, withStepProgress } from "../client/lib/step-progress.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 process.umask(0o077)
@@ -34,6 +35,7 @@ const state = {
   browser: undefined,
   browserProfile: undefined,
   browserServer: undefined,
+  lastLoginomReplyAt: null,
   inputs: new Map(),
   owner: undefined,
   uploadDirectory: undefined,
@@ -145,8 +147,8 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache } = validateStartInput(input)
-      state.owner = { chat: input.chat, generation: input.generation }
+      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, validationHttpCache, validationLogout } = validateStartInput(input)
+      state.owner = { chat: input.chat, generation: input.generation, attempt: randomUUID() }
       state.startupStateDir = input.stateDir
       state.startupStarted = performance.now()
       state.uploadDirectory = `/${input.connection.username}`
@@ -170,7 +172,7 @@ async function handle(message) {
         "chats",
         input.chat,
         "attempts",
-        randomUUID(),
+        state.owner.attempt,
       )
       await mkdir(directory, { recursive: true, mode: 0o700 })
       // Chromium creates nested files below user-data-dir. The normal Desktop
@@ -194,7 +196,7 @@ async function handle(message) {
           clientRevision: resources.manifestHash, actionManifestDigest: resources.manifest.actionManifestSha256 } }),
       }
       if (input.validation === true) {
-        await loginBrowser(login)
+        await loginBrowser({ ...login, validationLogout })
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
@@ -202,7 +204,12 @@ async function handle(message) {
       const { createSession } = await import("../client/lib/session.mjs")
       const { createBridge } = await import("../client/lib/bridge.mjs")
       const authenticated = await loginBrowser({ ...login, keepOpen: true, downloadsPath:browserDownloadsPath(directory),
-        onContextCreated: context => { state.browser = context } })
+        onContextCreated: context => {
+          state.browser = context
+          observeLoginomReplies(context, new URL(input.connection.url).origin, () => {
+            state.lastLoginomReplyAt = Date.now()
+          })
+        } })
       state.browser = authenticated.context
       state.owner.origin = new URL(input.connection.url).origin
       const config = {
@@ -278,6 +285,30 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "write-outcome.prepare") {
+      if (state.controller) throw Error("LOGINOM_CALL_BUSY")
+      const { writeIntent } = await import("../client/lib/write-outcome.mjs")
+      const pair = message.input.packageArtifact
+      const uploadPath = pair && state.session.artifactStore.getUploadGrant(pair.artifactID, pair.uploadGrantID).upload.destination
+      const workspace = state.session.metadata.workspacePreparation?.state
+      const intent = writeIntent(message.input, workspace, {
+        owner: state.owner.attempt, uploadPath, knownOperation: state.bridge.knowsWriteOperation,
+      })
+      if (intent.effect === "save") {
+        const { savedCopyDigest } = await import("./saved-copy-readback.mjs")
+        intent.baseline.savedDigest = await savedCopyDigest(state.browser, intent.baseline.packagePath)
+      }
+      send({ id: message.id, result: intent })
+      return
+    }
+    if (message.operation === "write-outcome.readback") {
+      const { savedCopyDigest } = await import("./saved-copy-readback.mjs")
+      const { packagePath, savedDigest } = message.input
+      const digest = await savedCopyDigest(state.browser, packagePath)
+      const result = !digest ? "unavailable" : !savedDigest ? "observed" : digest === savedDigest ? "unchanged" : "changed"
+      send({ id: message.id, result })
+      return
+    }
     if (["dashboardRead", "dashboardPublish", "dashboardVersions", "dashboardDelete"].includes(message.operation)) {
       if (message.operation === "dashboardVersions" || message.operation === "dashboardDelete") {
         if (message.input?.generation !== state.owner.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
@@ -353,6 +384,25 @@ async function handle(message) {
       send({ id: message.id, result: { interrupted: true } })
       return
     }
+    if (message.operation === "checkStepState") {
+      if (message.input.owner !== undefined && message.input.owner !== state.owner.attempt) {
+        send({ id: message.id, result: "owner_lost" })
+        return
+      }
+      if (state.controller) {
+        send({ id: message.id, result: { state: "busy", retryAvailable: false } })
+        return
+      }
+      const controller = new AbortController()
+      state.controller = controller
+      try {
+        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)])
+        send({ id: message.id, result: await state.bridge.checkStepState(message.input.operationId, signal) })
+      } finally {
+        state.controller = undefined
+      }
+      return
+    }
     if (message.operation !== "call" || state.controller) throw Error("LOGINOM_REQUEST_INVALID")
     if (message.input.packageArtifact !== undefined && message.input.name !== "dock_prepare")
       throw Error("LOGINOM_REQUEST_INVALID")
@@ -365,20 +415,31 @@ async function handle(message) {
         signal: controller.signal,
         timeout: runtimeCallTimeout(message.input.name, message.input.arguments),
       }
-      const result = message.input.packageArtifact !== undefined
-        ? await state.bridge.prepareLocalPackage(message.input.arguments, message.input.packageArtifact, {
+      const { name, arguments: args, packageArtifact, scanReceipt, writeReceipt, observeOnly } = message.input
+      const result = await withStepProgress({
+        name,
+        signal: controller.signal,
+        lastReply: () => state.lastLoginomReplyAt,
+        send: message.input.stepProgress === true ? progress => send({ id: message.id, progress }) : undefined,
+      }, () => state.bridge.trackedStep(name, args, () => {
+        if (packageArtifact !== undefined)
+          return state.bridge.prepareLocalPackage(args, packageArtifact, {
             signal: AbortSignal.any([controller.signal, AbortSignal.timeout(options.timeout)]),
           })
-        : message.input.scanReceipt !== undefined
-          ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
-          : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options)
+        if (scanReceipt !== undefined) return state.bridge.applyWithScanReceipt(args, scanReceipt, options)
+        if (observeOnly === true && name === "dock_operation_inspect") return state.bridge.inspectWithoutRecovery(args, options)
+        return state.client.callTool({ name, arguments: args }, undefined, options)
+      }, controller.signal))
       const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
+      const writeVerdict = writeReceipt ? (await import("../client/lib/write-outcome.mjs")).writeReplyVerdict(result, name, args) : undefined
       send({
         id: message.id,
         result: {
           result: outputFiles.length ? { ...result, _meta: { ...result._meta, outputFiles } } : result,
           recoveryPending: state.bridge.hasUnsettledWork(),
           activeWork: state.bridge.hasActiveWork(),
+          ...(writeVerdict ? { writeVerdict } : {}),
+          ...(observeOnly ? { writeOwner: state.owner.attempt } : {}),
         },
       })
     } finally {

@@ -7,6 +7,12 @@ import { mockRemoteServer, mockWorkspace, openSession, openSettings, type Worksp
 import { CONSOLE_URL, consoleGateway, consoleSignIn } from "../utils/console"
 import { recordNotifications } from "../utils/notifications"
 import { installSseTransport } from "../utils/sse-transport"
+import {
+  loginomAddress,
+  loginomDiagnosticKey,
+  loginomSettingsFixture,
+  openLoginomSettings,
+} from "../utils/loginom-settings"
 
 const directory = "C:/Projects/settings-demo"
 
@@ -46,6 +52,81 @@ function open(page: Page, input: Partial<WorkspaceInput> = {}) {
   })
 }
 
+const loginomPassword = "fixture-wrong-password"
+
+for (const [issue, text, address] of [
+  ["knowledgeAuthFailed", "The knowledge service rejected its access key.", loginomAddress],
+  [
+    "loginUnavailable",
+    "The Loginom sign-in page is unavailable. Check the address and network.",
+    "https://offline.example/app/",
+  ],
+  ["credentialsRejected", "Loginom rejected the sign-in. Check the username and password.", loginomAddress],
+] as const) {
+  test(`Loginom shows ${issue} without exposing credentials or saving`, async ({ page }) => {
+    const fixture = loginomSettingsFixture(issue)
+    const journal: string[] = []
+    page.on("console", (message) => journal.push(message.text()))
+    page.on("pageerror", (error) => journal.push(error.message))
+    const form = await openLoginomSettings(page, fixture.onRpc)
+    const connected = form.getByText("Connected as analyst · folder /analyst", { exact: true })
+    await expect(connected).toBeVisible()
+    await form.getByLabel("Address", { exact: true }).fill(address)
+    await form.getByLabel("Password", { exact: true }).fill(loginomPassword)
+    await form.getByRole("button", { name: "Save", exact: true }).click()
+    await expect(form.getByText(text, { exact: true })).toBeVisible()
+    await expect(connected).toBeVisible()
+    expect(fixture.checks).toEqual([
+      {
+        input: {
+          revision: 7,
+          url: address,
+          username: "analyst",
+          password: { operation: "replace", value: loginomPassword },
+        },
+      },
+    ])
+    expect(fixture.saves).toEqual([])
+    for (const secret of [loginomPassword, loginomDiagnosticKey]) {
+      await expect(form).not.toContainText(secret)
+      expect(journal.join("\n")).not.toContain(secret)
+    }
+  })
+}
+
+test("Loginom sends preserve, replace and passwordless operations through the settings RPC", async ({ page }) => {
+  const fixture = loginomSettingsFixture()
+  const form = await openLoginomSettings(page, fixture.onRpc)
+  const password = form.getByLabel("Password", { exact: true })
+  const check = form.getByRole("button", { name: "Check", exact: true })
+  const checked = form.getByText("Checked, not yet saved", { exact: true })
+  await expect(password).toHaveAttribute("placeholder", "Password saved")
+  await expect(password).toHaveValue("")
+  await check.click()
+  await expect(checked).toBeVisible()
+  await password.fill("fixture-new-password")
+  await check.click()
+  await expect(checked).toBeVisible()
+  await form.getByText("No password required", { exact: true }).click()
+  await expect(form.getByRole("checkbox", { name: "No password required", exact: true })).toBeChecked()
+  await expect(password).toBeDisabled()
+  await check.click()
+  await expect(checked).toBeVisible()
+  const saved = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/save",
+  )
+  await form.getByRole("button", { name: "Save", exact: true }).click()
+  expect((await saved).ok()).toBe(true)
+  await expect(checked).toBeHidden()
+  const identity = { revision: 7, url: loginomAddress, username: "analyst" }
+  expect(fixture.checks).toEqual([
+    { input: { ...identity, password: { operation: "preserve" } } },
+    { input: { ...identity, password: { operation: "replace", value: "fixture-new-password" } } },
+    { input: { ...identity, password: { operation: "empty" } } },
+  ])
+  expect(fixture.saves).toEqual([{ input: { revision: 7, validationId: "fixture-validation" } }])
+})
+
 async function openProject(page: Page, name = "Settings demo") {
   const settings = page.getByTestId("settings-screen")
   await settings.getByRole("tab", { name: "Projects", exact: true }).click()
@@ -57,6 +138,171 @@ const patched = (page: Page) =>
   page.waitForRequest(
     (request) => request.method() === "PATCH" && new URL(request.url()).pathname === `/api/project/${projectID}`,
   )
+
+test("Loginom settings use the service Location and recover an unconfirmed Save", async ({ page }) => {
+  const serviceDirectory = "/service"
+  const loginom = "https://loginom.example/app/"
+  let username = "user"
+  let revision = 0
+  const checks: unknown[] = []
+  await mockWorkspace(page, {
+    name: "Loginom",
+    sessions: [],
+    directory: serviceDirectory,
+    provider: NO_PROVIDER,
+    onRpc: (request) => {
+      if (request.rpcID !== "loginom.connection") return
+      expect(request.directory).toBe(serviceDirectory)
+      switch (request.method) {
+        case "status":
+          return {
+            output: {
+              ok: true,
+              value: {
+                revision,
+                generation: revision,
+                url: loginom,
+                username,
+                folder: `/${username}`,
+                hasPassword: false,
+                failed: false,
+                state: revision ? "ready" : "unconfigured",
+              },
+            },
+          }
+        case "check":
+          checks.push(request.body)
+          return { output: { ok: true, value: { validationId: "checked", expiresAt: 4102444800000 } } }
+        case "save":
+          expect(request.body).toMatchObject({ input: { revision: 0, validationId: "checked" } })
+          username = "analyst"
+          revision = 1
+          return { unavailable: true }
+      }
+    },
+  })
+  await page.goto("/settings?tab=loginom")
+  const settings = page.getByRole("tabpanel", { name: "Loginom", exact: true })
+  const user = settings.getByRole("textbox", { name: "Username" })
+  await expect(user).toHaveValue("user")
+  await user.fill("analyst")
+  await settings.getByRole("button", { name: "Save", exact: true }).click()
+  await expect(settings.getByText("Connected as analyst · folder /analyst")).toBeVisible()
+  await settings.getByRole("button", { name: "Check", exact: true }).click()
+  await expect(settings.getByText("Checked, not yet saved")).toBeVisible()
+  expect(checks).toMatchObject([
+    { input: { revision: 0, url: loginom, username: "analyst" } },
+    { input: { revision: 1, url: loginom, username: "analyst" } },
+  ])
+})
+
+for (const outcome of ["applied", "failed"] as const) {
+  test(`Loginom settings count draining tasks and refresh on ${outcome}`, ({ page }) =>
+    loginomApplication(page, outcome),
+  )
+}
+
+async function loginomApplication(page: Page, outcome: "applied" | "failed") {
+  const directory = "/service"
+  const oldUrl = "https://old.example/app/"
+  const newUrl = "https://new.example/app/"
+  let generation = 1
+  let revision = 1
+  let tasks = 2
+  let state: "ready" | "pending" | "starting" | "recoverable-error" = "ready"
+
+  function status() {
+    return {
+      revision,
+      generation,
+      url: generation === 1 ? oldUrl : newUrl,
+      username: "analyst",
+      folder: "/analyst",
+      hasPassword: false,
+      failed: state === "recoverable-error",
+      state,
+      ...(state === "pending" && { application: { state: "pending", tasks } }),
+      ...(state === "ready" && generation === 2 && { application: { state: "applied" } }),
+    }
+  }
+
+  const { push } = await mockWorkspace(page, {
+    name: "Loginom",
+    sessions: [],
+    directory,
+    provider: NO_PROVIDER,
+    seed: { locale: "ru" },
+    onRpc: (request) => {
+      if (request.rpcID !== "loginom.connection") return
+
+      switch (request.method) {
+        case "status":
+          return { output: { ok: true, value: status() } }
+        case "check":
+          expect(request.body).toMatchObject({ input: { url: newUrl, revision: 1 } })
+
+          return { output: { ok: true, value: { validationId: "checked", expiresAt: 4102444800000 } } }
+        case "save":
+          expect(request.body).toMatchObject({ input: { revision: 1, validationId: "checked" } })
+          revision = 2
+          state = "pending"
+
+          return { output: { ok: true, value: status() } }
+      }
+    },
+  })
+
+  await page.clock.install()
+  await page.goto("/settings?tab=loginom")
+  const settings = page.getByRole("tabpanel", { name: "Loginom", exact: true })
+  const address = settings.getByRole("textbox", { name: "Адрес" })
+  const notice = settings.getByRole("status")
+  await expect(address).toHaveValue(oldUrl)
+  await address.fill(newUrl)
+
+  // Freeze before Save so each clock step starts exactly one status poll.
+  const now = await page.evaluate(() => Date.now())
+  await page.clock.pauseAt(now + 1_000)
+  await settings.getByRole("button", { name: "Сохранить", exact: true }).click()
+  await expect(notice).toHaveText("Новые параметры применятся после завершения 2 задач")
+
+  async function pollStatus(duration: number) {
+    const [response] = await Promise.all([
+      page.waitForResponse((response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/status"),
+      page.clock.fastForward(duration),
+    ])
+    expect(response.ok()).toBe(true)
+  }
+
+  tasks = 1
+  await pollStatus(16_000)
+  await expect(notice).toHaveText("Новые параметры применятся после завершения 1 задачи")
+
+  generation = 2
+  state = "starting"
+  await pollStatus(1_000)
+  await expect(notice).toHaveText("Применяем подключение…")
+  await expect(notice.getByText("Применено", { exact: true })).toHaveCount(0)
+
+  // Leave the clock frozen. The event must refresh the status for the same generation.
+  state = outcome === "applied" ? "ready" : "recoverable-error"
+  await push([
+    {
+      id: `evt_loginom_connection_${outcome}`,
+      created: 1,
+      type: `rpc.loginom.connection.${outcome}`,
+      location: { directory },
+      data: { revision, generation },
+    },
+  ])
+  if (outcome === "failed") {
+    await expect(notice).toHaveText("Служба не применила подключение. Проверьте настройки и попробуйте снова.")
+    await expect(notice.getByText("Применено", { exact: true })).toHaveCount(0)
+  } else {
+    await expect(notice.getByText("Применено", { exact: true })).toBeVisible()
+    await expect(address).toHaveValue(newUrl)
+  }
+}
 
 test("settings has its own route and returns through app history", async ({ page }) => {
   const { settings } = await open(page)
@@ -1810,6 +2056,59 @@ test("providers: OpenCode Console signs in from its method list", async ({ page,
   await expect(signIn.getByRole("button", { name: "Copy sign-in link", exact: true })).toBeVisible()
 })
 
+for (const width of [1280, 480]) {
+  test(`providers: Desktop completes device sign-in without a Console return link (${width}px)`, async ({
+    page,
+    context,
+  }) => {
+    const url = "https://auth.example.test/device?user_code=ABCD-EFGH&client_id=opencode-cli"
+    let authorized = false
+    await context.route("https://auth.example.test/**", (route) => route.fulfill({ body: "Device sign-in" }))
+    await mockOpenCodeServer(page, {
+      directory,
+      project: project({ id: projectID, directory, name: "Settings demo" }),
+      provider: () =>
+        authorized
+          ? {
+              all: [{ id: "console-google", integrationID: "opencode", name: "Workspace / Google", models: {} }],
+              connected: ["console-google"],
+              default: {},
+            }
+          : NO_PROVIDER,
+      sessions: [],
+      pageMessages: () => ({ items: [] }),
+      integrations: consoleIntegrations,
+      onIntegrationOAuth: () => ({ url }),
+      onIntegrationOAuthStatus: () => (authorized ? "complete" : "pending"),
+    })
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto(`/e2e/utils/settings-wsl.html?${new URLSearchParams({ server: SERVER, mode: "ready" })}`)
+
+    const settings = page.getByTestId("settings-screen")
+
+    if (width === 480) {
+      await settings.getByRole("button", { name: "Preferences", exact: true }).click()
+      await page.getByRole("menuitemradio", { name: "Providers", exact: true }).click()
+    } else {
+      await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+    }
+
+    await settings
+      .locator(".settings-provider-row", { hasText: "OpenCode Console" })
+      .getByRole("button", { name: "Connect", exact: true })
+      .click()
+    const methods = page.getByRole("dialog", { name: "Connect OpenCode Console", exact: true })
+    const popup = context.waitForEvent("page")
+    await methods.getByRole("button", { name: "OpenCode Console account", exact: true }).click()
+    await expect(await popup).toHaveURL(url)
+
+    const signIn = page.getByRole("dialog", { name: "Connecting to OpenCode Console", exact: true })
+    await expect(signIn.getByRole("group", { name: "Device code: ABCD-EFGH", exact: true })).toBeVisible()
+    authorized = true
+    await expect(page.getByText("OpenCode Console connected", { exact: true })).toBeVisible()
+  })
+}
+
 test("providers: OpenCode Go connects with its own methods, not the Console sign-in", async ({ page }) => {
   const attempts: string[] = []
 
@@ -1906,33 +2205,42 @@ test("providers: Back during a pending API key request does not report the provi
   await expect(dialog.getByPlaceholder("API key")).toHaveValue("")
 })
 
-test("providers: the free tier upsell opens Go on its own, sized to its content", async ({ page }) => {
+test("providers: the free model picker lists Go without a subscription offer", async ({ page }) => {
   const view = await openSession(page, { name: "FreeTier", integrations: consoleIntegrations })
-  await view.push([
-    {
-      id: "evt_free_tier_limit",
-      created: 1700000000000,
-      type: "session.step.failed",
-      location: { directory: view.directory },
-      durable: { aggregateID: view.session.id, seq: 1, version: 1 },
-      data: {
-        sessionID: view.session.id,
-        assistantMessageID: "msg_free_tier_assistant",
-        error: { type: "provider.free-limit", message: "Free usage limit reached.", status: 429 },
-      },
-    },
-  ])
-  await page
-    .getByRole("dialog", { name: "Free limit reached" })
-    .getByRole("button", { name: "Subscribe", exact: true })
-    .click()
+  await expect(view.editor).toBeVisible()
+  await page.locator('[data-action="composer-model"]').click()
+  const models = page.getByRole("dialog", { name: "Select model", exact: true })
+  await expect(models.getByText("Free models provided by OpenCode", { exact: true })).toBeVisible()
+  await expect(models.getByRole("button", { name: "OpenCode Go", exact: true })).toBeVisible()
+  await models.getByRole("button", { name: "More providers", exact: true }).click()
+  const providers = page.getByRole("dialog", { name: "Connect provider", exact: true })
+  await expect(providers).toContainText("Connect a provider to use its models in Loginom AI Agent.")
+  await expect(providers.getByText("OpenCode Go", { exact: true })).toBeVisible()
+})
 
-  const dialog = page.getByRole("dialog", { name: "Connect OpenCode Go", exact: true })
-  const container = page.locator('[data-slot="dialog-container"]')
-  await expect(dialog.getByPlaceholder("API key")).toBeVisible()
-  // Nothing to go back to: the upsell opened the dialog straight on Go.
-  await expect(dialog.getByRole("button", { name: "Navigate back", exact: true })).toHaveCount(0)
-  await expect.poll(async () => (await container.boundingBox())?.height).toBeLessThan(512)
+test("providers: settings and the connect dialog list popular providers in the same order", async ({ page }) => {
+  const popular = [
+    { id: "opencode", name: "OpenCode Console" },
+    { id: "opencode-go", name: "OpenCode Go" },
+    { id: "openai", name: "OpenAI" },
+    { id: "github-copilot", name: "GitHub Copilot" },
+    { id: "anthropic", name: "Anthropic" },
+    { id: "google", name: "Google" },
+  ]
+  const { settings } = await open(page, {
+    integrations: popular.toReversed().map((item) => ({ ...item, methods: [{ type: "key" }], connections: [] })),
+  })
+  const names = popular.map((item) => item.name)
+
+  await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+  const section = settings.locator(".settings-section").filter({
+    has: page.getByRole("heading", { name: "Popular providers", exact: true }),
+  })
+  await expect(section.locator(".settings-provider-name")).toHaveText(names)
+
+  await settings.getByRole("button", { name: "Show more providers", exact: true }).click()
+  const dialog = page.getByRole("dialog", { name: "Connect provider", exact: true })
+  await expect(dialog.locator("[data-provider-id]")).toHaveText(names)
 })
 
 test("providers: the connect dialog lists connected providers and manages their accounts", async ({ page }) => {
@@ -2072,7 +2380,7 @@ test("providers: adding an account starts a lone method once", async ({ page, co
 
   await dialog.getByRole("button", { name: "Navigate back", exact: true }).click()
   await expect(dialog.getByRole("radio", { name: "Go key", exact: true })).toBeVisible()
-  await dialog.getByRole("button", { name: "Integrations", exact: true }).click()
+  await dialog.getByRole("button", { name: "Connect provider", exact: true }).click()
   await dialog.locator('[data-provider-id="github-copilot"]').click()
   const popup = page.waitForEvent("popup")
   await dialog.getByRole("button", { name: "Add account", exact: true }).click()

@@ -54,13 +54,12 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
         sessionID: error.sessionID,
         message: `Session is busy: ${error.sessionID}`,
       })
+    const inboxConflict = (conflict: string) => (error: Session.InboxConflictError) =>
+      new ConflictError({ resource: error.inboxID, message: `${conflict}: ${error.inboxID}` })
     const pendingMutation = (effect: ReturnType<typeof session.cancelInbox>, conflict: string) =>
       effect.pipe(
         Effect.catchTag("Session.NotFoundError", missingSession),
-        Effect.catchTag(
-          "Session.InboxConflictError",
-          (error) => new ConflictError({ resource: error.inboxID, message: `${conflict}: ${error.inboxID}` }),
-        ),
+        Effect.catchTag("Session.InboxConflictError", inboxConflict(conflict)),
         Effect.as(HttpApiSchema.NoContent.make()),
       )
 
@@ -549,6 +548,20 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
           )
           return HttpApiSchema.NoContent.make()
         }),
+      )
+      .handle("session.inbox.edit", (ctx) =>
+        session.editInbox({ ...ctx.params, ...ctx.payload }).pipe(
+          Effect.catchTag("Session.NotFoundError", missingSession),
+          Effect.catchTag("Session.InboxConflictError", inboxConflict("Pending prompt cannot be edited")),
+          Effect.catchTag("Session.AttachmentError", (error) =>
+            Effect.fail(new InvalidRequestError({ message: error.message, field: "files" })),
+          ),
+          Effect.catchTag("Session.SkillNotFoundError", (error) =>
+            Effect.fail(new InvalidRequestError({ message: `Skill not found: ${error.skill}`, field: "skills" })),
+          ),
+          locationErrors,
+          Effect.as(HttpApiSchema.NoContent.make()),
+        ),
       )
       .handle(
         "session.inbox.update",
