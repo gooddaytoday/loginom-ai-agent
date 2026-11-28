@@ -238,6 +238,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
             busy,
             node: { label: "test node" },
             verificationStale: true,
+            evidence: [{ kind: "tableRead", port: 0, portGuid: "port-guid", rowsRead: 3, rowCount: 3 }],
             ports: [
               {
                 preview: {

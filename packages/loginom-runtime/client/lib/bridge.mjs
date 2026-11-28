@@ -33,7 +33,7 @@ import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory, userActionKeys } from './user-workflow.mjs';
 import { makePackageCleanupCode, makeFailedOpenCleanupCode, parseFailedOpenBinding, parsePackageCleanupResult } from './package-cleanup.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,readSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
-import {compareSavedPackageGraph,makeSavedPackageGraphCode,parseSavedPackageBytes,savedGraphMessage} from './saved-package-graph.mjs';
+import {compareSavedPackageGraph,makeSavedPackageGraphCode,readSavedPackageFacts,savedGraphMessage} from './saved-package-graph.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity,isServerDownloadTool } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
 import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
@@ -152,7 +152,9 @@ export async function createBridge(config, session, { browserTransport: managedB
   const heldLeases = new Set();
   const savedPackages = new Map();
   const saveAdmissions = new Map();
-  let saveSequence=0;
+  const receiptRuntimeId=randomUUID();
+  let receiptSequence=0;
+  const nextReceiptSequence=()=>++receiptSequence;
   let lastSavedPackage = null;
   let ownedUnsavedDraft = null;
   // Save As closes the package and reopens it in a new tab. Until a new
@@ -270,6 +272,7 @@ export async function createBridge(config, session, { browserTransport: managedB
       Object.assign(session.metadata, pinned.pins);
       actionRuntime = createActionRuntime({ pinned,
         protectOperation,
+        receiptRuntimeId,nextReceiptSequence,
         cacheDirectory:join(session.directory,'server-cache'),
         ...(replay?createCandidateNodeSupport({targetOrigin:config.loginomUrl?new URL(config.loginomUrl).origin:undefined,targetBuild:pinned.compatibility?.loginom_build,storageDirectories:config.storageDirectories,redactor}):{}),
         getStorageBinding: () => session.metadata.storageBinding ?? null,
@@ -769,7 +772,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             const operationId=saveRequest&&args.operation_id===undefined?randomUUID():args.operation_id;
             const newSave=saveRequest&&!saveAdmissions.has(operationId);
             const saveAdmission=newSave?{
-              sequence:saveSequence++,action_key:args.action_key,path:args.parameters?.path,
+              sequence:nextReceiptSequence(),action_key:args.action_key,path:args.parameters?.path,
               document_id:session.metadata.workspacePreparation?.state?.document_id}:null;
             const outcome = request.params.name === 'dock_workspace_observe' ? await actionRuntime.observe({ signal: extra.signal, scope: args.scope, cursor: args.cursor, rootRef: args.root_ref, observationId: args.observation_id, storageName: args.storage_name })
               : request.params.name === 'dock_operation_inspect' ? await actionRuntime.inspect({ operationId: args.operation_id, signal: extra.signal })
@@ -799,6 +802,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               &&outcome.output.cleanup_confirmed===true&&outcome.output.outcome?.operation_id===args.operation_id
                 ?outcome.output.outcome:null;
             const admission=confirmedSave&&saveAdmissions.get(confirmedSave.operation_id);
+            if(admission&&confirmedSave.status==='SUCCEEDED')admission.confirmedSequence??=nextReceiptSequence();
             // Reconciliation confirms the original admission, not a new Save.
             // An older receipt can never supersede a later confirmed mutation.
             if(admission&&confirmedSave.status==='SUCCEEDED'&&confirmedSave.action_key===admission.action_key
@@ -896,15 +900,18 @@ export async function createBridge(config, session, { browserTransport: managedB
                   const identity={save_operation_id:savedOutcome.operation_id,package_path:admission.path};
                   try {
                     const before=actionRuntime.savedGraphBefore(savedOutcome.operation_id);
-                    if(!before||!savedState||workspaceBindingAdvice||prepared?.document_id!==admission.document_id
+                    if(!savedState||workspaceBindingAdvice||prepared?.document_id!==admission.document_id
                       ||savedOutcome.cleanup_complete!==true) throw Error('Saved graph binding unavailable');
                     if(config.storageDirectories)requireStorageDestination(admission.path,config.storageDirectories,'packages');
                     const workflow=normalizedWorkspace?.workflow_ref??prepared.workflow_ref;
-                    const intent=actionRuntime.saveNodeIntent(prepared.document_id,workflow.workflow_id);
                     const code=makeSavedPackageGraphCode({origin:new URL(config.loginomUrl).origin,build:session.metadata.targetIdentity.loginom_build,
                       path:admission.path,tabTid:workflow.tab_tid,documentId:prepared.document_id,sessionId:session.metadata.sessionId,account:savedState.account});
                     const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:21000});
-                    const graph=await compareSavedPackageGraph({bytes:parseSavedPackageBytes(response),before,...intent});
+                    const {graphs,evidence,fileExists}=await readSavedPackageFacts({response,before});
+                    admission.savedFile={fileExists,evidence};
+                    if(!graphs||!before) throw Error('Saved graph comparison unavailable');
+                    const intent=actionRuntime.saveNodeIntent(prepared.document_id,workflow.workflow_id);
+                    const graph=compareSavedPackageGraph({graphs,before,...intent});
                     admission.savedGraph={...identity,status:'compared',...graph,
                       rename_attribution:savedState.modified?'unconfirmed':'observed_during_save'};
                   } catch {
@@ -912,7 +919,9 @@ export async function createBridge(config, session, { browserTransport: managedB
                   }
                 }
                 savedPackageGraph=admission.savedGraph;
-                reply.content.push({type:'text',text:redactor.text(savedGraphMessage(savedPackageGraph))});
+                reply.content.push({type:'text',text:admission.savedFile?.fileExists===false
+                  ?'Перечитывание: в доступном каталоге файл по указанному пути не найден. Квитанция Save остаётся; не повторяйте Save без проверки.'
+                  :redactor.text(savedGraphMessage(savedPackageGraph))});
               }
             }
             try {
@@ -932,8 +941,11 @@ export async function createBridge(config, session, { browserTransport: managedB
               // Knowledge/journal failure cannot erase a completed browser receipt.
               reply.content.push({ type: 'text', text: 'Recovery context unavailable; keep the operation receipt and inspect the actual state.' });
             }
-            if(userProfile&&presentNodeReply&&(savedPackageGraph||saveRequest&&outcome.operation_id===operationId))
-              return presentNodeReply(reply,options=>loginomFeedMetadata(reply,{...options,tool:request.params.name,save:savedOutcome,savedPackageGraph}));
+            if(userProfile&&presentNodeReply&&confirmedSave)
+              return presentNodeReply(reply,options=>loginomFeedMetadata(reply,{...options,tool:request.params.name,save:confirmedSave,
+                savedPackageGraph,savedFileRead:savedPackageGraph&&admission?.savedFile?.evidence,
+                receiptWindow:admission&&{documentId:admission.document_id,runtimeId:receiptRuntimeId,
+                  startSequence:admission.sequence,confirmedSequence:admission.confirmedSequence}}));
             return reply;
           });
         }

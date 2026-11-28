@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {TextReader, Uint8ArrayWriter, ZipWriter} from '@zip.js/zip.js';
 import {chromium} from 'playwright';
-import {compareSavedPackageGraph, makeSavedPackageGraphCode, parseSavedPackageBytes, savedGraphMessage} from '../lib/saved-package-graph.mjs';
+import {compareSavedPackageGraph, makeSavedPackageGraphCode, readSavedPackageFacts, savedGraphMessage} from '../lib/saved-package-graph.mjs';
 
 const join = '4527f5b0-c77f-4fcc-91be-fccae0406581';
 const sortingNode = '4abeb776-ab7c-48ba-ba43-0858d760c9e1';
@@ -13,20 +13,26 @@ const before = {
   links:[[join, output, sortingNode, input]],
 };
 const sorting = new Map([[sortingNode, {keys:['Region', 'Revenue'], fields:['Region', 'Revenue'] }]]);
+const mtime = '2026-11-27T15:00:00.000Z';
+const responseFor = value => ({content:[{type:'text',text:`### Result\n${JSON.stringify(value)}\n### Ran Playwright code`}]});
+const readResponse = bytes => responseFor({fileExists:true,mtime,size:bytes.length,base64:bytes.toString('base64')});
 
-async function compare({label='Слияние', fixedOrder=true, linked=true, graph=before, intendedLabels}={}) {
+async function fixture({label='Слияние', fixedOrder=true, linked=true, joinId=join}={}) {
   const columns = order => order.map(name => `<Item Name="${name}"/>`).join('');
   const archive = new ZipWriter(new Uint8ArrayWriter(), {useWebWorkers:false});
   await archive.add('Unit_0/Unit.xml', new TextReader(`<Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><WorkFlow>
-    <Nodes><Item Guid="${join}" DisplayName="${label}"/><Item Guid="${sortingNode}" DisplayName="Сортировка">
+    <Nodes><Item Guid="${joinId}" DisplayName="${label}"/><Item Guid="${sortingNode}" DisplayName="Сортировка">
       <Component><InputSockets><Item Name="DataSource"><Socket><DataSource><ColumnDefs>${columns(['Revenue', 'Region'])}</ColumnDefs></DataSource></Socket></Item></InputSockets>
       <OutputSockets><Item Name="DataSource"><Socket><DataSource SyncThroughColumns="${!fixedOrder}"><ColumnDefs>${fixedOrder ? columns(['Region', 'Revenue']) : ''}</ColumnDefs></DataSource></Socket></Item></OutputSockets>
       <Engine xsi:type="TBGSortingEngine"><SortingColumns>${columns(['Region', 'Revenue'])}</SortingColumns></Engine></Component>
-    </Item></Nodes><Links>${linked ? `<Item><SourcePort NodeGuid="${join}" PortGuid="${output}"/><TargetPort NodeGuid="${sortingNode}" PortGuid="${input}"/></Item>` : ''}</Links>
+    </Item></Nodes><Links>${linked ? `<Item><SourcePort NodeGuid="${joinId}" PortGuid="${output}"/><TargetPort NodeGuid="${sortingNode}" PortGuid="${input}"/></Item>` : ''}</Links>
     </WorkFlow></Unit>`));
-  const base64 = Buffer.from(await archive.close()).toString('base64');
-  const bytes = parseSavedPackageBytes({content:[{type:'text', text:`### Result\n${JSON.stringify({base64})}\n### Ran Playwright code`}]});
-  return {status:'compared', rename_attribution:'observed_during_save', ...await compareSavedPackageGraph({bytes,before:graph,sorting,intendedLabels})};
+  return readResponse(Buffer.from(await archive.close()));
+}
+
+async function compare({graph=before,intendedLabels,...options}={}) {
+  const {graphs} = await readSavedPackageFacts({response:await fixture(options),before:graph});
+  return {status:'compared', rename_attribution:'observed_during_save', ...compareSavedPackageGraph({graphs,before:graph,sorting,intendedLabels})};
 }
 
 test('a saved rename follows the node GUID and offers a request, not a mutation', async () => {
@@ -67,8 +73,20 @@ test('the same labels, links and field order produce no discrepancy', async () =
 });
 
 test('an unverified archive cannot be reported as an unchanged graph', async () => {
-  await assert.rejects(compareSavedPackageGraph({bytes:Buffer.from('not a package'),before}));
+  assert.deepEqual(await readSavedPackageFacts({response:readResponse(Buffer.from('not a package')),before}), {fileExists:true});
   assert.match(savedGraphMessage({status:'unavailable'}), /Пакет сохранён, но/);
+});
+
+test('the same package node count can have a different workflow GUID inventory', async () => {
+  const {evidence} = await readSavedPackageFacts({response:await fixture(),before});
+  assert.equal(evidence.kind,'savedFileRead');
+  assert.equal(evidence.scope,'package');
+  assert.equal(evidence.nodeCount,2);
+  assert.equal(evidence.workflowGuidMatch,true);
+  const changed = await readSavedPackageFacts({response:await fixture({joinId:input}),before});
+  assert.equal(changed.evidence.nodeCount,2);
+  assert.equal(changed.evidence.workflowGuidMatch,false);
+  assert.notEqual(changed.evidence.file.hash,evidence.file.hash);
 });
 
 test('saved-file read closes only its own Files tab, even if read or workflow return fails', async () => {
@@ -79,12 +97,23 @@ test('saved-file read closes only its own Files tab, even if read or workflow re
     await page.route('**/*',route=>route.fulfill({contentType:'text/html',body:
       '<div data-tid="fixture-workflow" class="x-tab-active">Workflow</div><button data-tid="MF;cntMain;tlbMainToolbar;btnFilestorage">Files</button>'}));
     const execute=Function('return '+makeSavedPackageGraphCode({origin,path,tabTid,build:'7.4.2',documentId:'doc',sessionId:'session',account:'account'}))();
-    for (const scenario of ['success','read failed','return failed','read stalled','existing']) {
+    for (const scenario of ['success','read failed','return failed','read stalled','existing','missing','listing failed','access unknown']) {
       await page.goto(origin);
       await page.evaluate(({scenario,path,tabTid})=>{
         const workflow=document.querySelector('[data-tid="'+tabTid+'"]');
         class PackageTreeNode { PackageFileName=path; HasRunningNodes(){return false;} }
-        class FileStorageForm { FFileStorage={}; }
+        const stat={Time:new Date('2026-11-27T15:00:00.000Z'),Size:1};
+        const lookupMiss=['missing','listing failed','access unknown'].includes(scenario);
+        const listing=scenario==='access unknown'?[{FileName:'SAVED.LGP'}]:[];
+        class FileStorageForm {
+          FFileStorage={GetFileInfo:filename=>filename===path&&!lookupMiss?stat:null,
+            DirectoryExists:directory=>directory==='/account',
+            FileInfoList:{GetFileInfoItemsEx(directory,masks,attributes){
+              if(directory!=='/account/'||masks[0]!=='saved.lgp'||attributes!==5)throw Error('Unexpected listing');
+              if(scenario==='listing failed')throw Error('Listing refused');
+              return listing;
+            }}};
+        }
         const pack=new PackageTreeNode(), card={Controller:{Node:{data:{node:pack}}},tab:{el:{dom:workflow}}};
         const filesTab=document.createElement('div');
         filesTab.dataset.tid='fixture-files';
@@ -111,15 +140,19 @@ test('saved-file read closes only its own Files tab, even if read or workflow re
         const FMapTree={FServerConnection:{Connected:true,UserName:'account',Session:{}},PackageNodes:{Count:1,Items:()=>pack}};
         const Workspace={getActiveTab:()=>active,items:{items:cards}};
         globalThis.bg={app:{Version:'7.4.2',PackageTreeNode,Application:{FInstance:{FMainForm:{Items:{Workspace},FMapTree}}}},
-          TBGFileOpenMode:{fomRead:0},filestorage:{FileDownloader}};
+          TBGFileOpenMode:{fomRead:0},TBGFileInfoAttributes:{fiaNormalFilesOnly:1,fiaHidden:4},
+          selectAllAsync:async rows=>accept=>accept(rows),forEach:(rows,accept)=>rows.forEach(accept),filestorage:{FileDownloader}};
+        globalThis.ReleaseObject=()=>{};
         globalThis.__loginomDockPreparationV1={document,id:'doc',receipts:new Map([['save',
           {phase:'verified',packageNode:pack,request:'{"session":"session"}'}]])};
         globalThis.observedTabs=()=>({active:active===card?'workflow':'files', files:cards.includes(files), disposed});
       },{scenario,path,tabTid});
-      if (scenario.endsWith('failed') || scenario==='read stalled') await assert.rejects(execute(page), /Read refused|Timeout|timed out/);
-      else assert.deepEqual(await execute(page), {base64:'Kg=='});
-      await page.waitForFunction(()=>globalThis.observedTabs().disposed===1);
-      assert.deepEqual(await page.evaluate(()=>globalThis.observedTabs()),{active:'workflow',files:scenario==='existing',disposed:1},scenario);
+      const noStream=['missing','listing failed','access unknown'].includes(scenario);
+      if (scenario.endsWith('failed') || scenario==='read stalled') await assert.rejects(execute(page), /Read refused|Listing refused|Timeout|timed out/);
+      else if (noStream) assert.deepEqual(await execute(page), {fileExists:scenario==='missing'?false:null});
+      else assert.deepEqual(await execute(page), {fileExists:true,mtime,size:1,base64:'Kg=='});
+      if (!noStream) await page.waitForFunction(()=>globalThis.observedTabs().disposed===1);
+      assert.deepEqual(await page.evaluate(()=>globalThis.observedTabs()),{active:'workflow',files:scenario==='existing',disposed:noStream?0:1},scenario);
     }
   } finally { await browser.close(); }
 });

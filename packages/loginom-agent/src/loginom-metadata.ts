@@ -98,11 +98,44 @@ const cell = Schema.Struct({
   non_finite: Schema.optional(Schema.String),
 })
 
+export const LoginomEvidence = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("tableRead"),
+    port: count,
+    portGuid: Schema.NonEmptyString,
+    rowsRead: count,
+    rowCount: count,
+    executionId: Schema.optional(Schema.NonEmptyString),
+  }).check(Schema.makeFilter((read) => read.rowsRead <= read.rowCount)),
+  Schema.Struct({
+    kind: Schema.Literal("executed"),
+    executionId: Schema.NonEmptyString,
+    scope: Schema.Literal("workspace"),
+  }),
+  Schema.Struct({ kind: Schema.Literal("saved"), path: Schema.NonEmptyString }),
+  Schema.Struct({
+    kind: Schema.Literal("savedFileRead"),
+    nodeCount: count,
+    scope: Schema.Literal("package"),
+    workflowGuidMatch: Schema.Union([Schema.Boolean, Schema.Null]),
+    file: Schema.Struct({
+      mtime: Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)),
+      size: Schema.Int.check(Schema.isGreaterThan(0)),
+      hash: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)),
+    }),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("savedGraphRead"),
+    nodeCount: count,
+    scope: Schema.Literal("activeWorkflow"),
+  }),
+])
+
 export const LoginomMetadata = Schema.Struct({
   v: Schema.Literal(1),
   operationId: Schema.NonEmptyString,
   attempt: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
-  kind: Schema.optional(Schema.Literals(["add", "configure", "execute", "export", "read"])),
+  kind: Schema.optional(Schema.Literals(["add", "configure", "execute", "export", "read", "save"])),
   state: Schema.Literals(["running", "settled"]),
   busy: Schema.optional(busy.check(fieldBudget("busy"))),
   step: Schema.optional(step.check(fieldBudget("step"))),
@@ -121,6 +154,15 @@ export const LoginomMetadata = Schema.Struct({
   effectPossible: Schema.optional(Schema.Boolean),
   cleanupComplete: Schema.optional(Schema.Boolean),
   limitations: Schema.optional(Schema.Array(Schema.String)),
+  evidence: Schema.optional(Schema.Array(LoginomEvidence)),
+  receiptWindow: Schema.optional(
+    Schema.Struct({
+      documentId: Schema.NonEmptyString,
+      runtimeId: Schema.String.check(Schema.isUUID()),
+      startSequence: Schema.Int.check(Schema.isGreaterThan(0)),
+      confirmedSequence: count,
+    }).check(Schema.makeFilter((window) => window.startSequence < window.confirmedSequence)),
+  ),
   nextStep: Schema.optional(Schema.Struct({ tool: Schema.optional(Schema.String), instruction: Schema.String })),
   ports: Schema.optional(
     Schema.Array(

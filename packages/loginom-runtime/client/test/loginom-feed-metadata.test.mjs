@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {nodeResultReply} from '../lib/node-result-reply.mjs';
-import {loginomFeedMetadata} from '../lib/user-results.mjs';
+import {loginomFeedMetadata, loginomSaveMetadata} from '../lib/user-results.mjs';
 import {withLoginomMetadata} from '../lib/loginom-feed-metadata.mjs';
 
 const node = {document_id:'document', workflow_id:'workflow', node_id:'node-guid'};
@@ -63,6 +63,61 @@ test('feed makes space for a new field by reducing the preview before declining 
   const savedPackageGraph = {saveOperationId:'save', packagePath:'Ж'.repeat(1500), status:'unavailable'};
   assert.equal(withLoginomMetadata(result, {savedPackageGraph}), result);
   assert.deepEqual(base._meta.loginom, projection);
+});
+
+test('reading existing output proves sample coverage, not a new execution', () => {
+  const tool = 'dock_node_read';
+  const sample = {...port([[cell('first')], [cell('second')]]), row_count:12, sample_complete:false};
+  const reply = nodeResultReply(receipt({ports:[sample]}), {userProfile:true, tool});
+  assert.deepEqual(loginomFeedMetadata(reply, {tool, facts:{...facts, kind:'read'}}).evidence, [
+    {kind:'tableRead', port:0, portGuid:'port-0', rowsRead:2, rowCount:12, executionId:'exec'},
+  ]);
+});
+
+test('completed launch proves execution even when no output was requested', () => {
+  const tool = 'dock_node_wait';
+  const reply = nodeResultReply(receipt(), {userProfile:true, tool});
+  assert.deepEqual(loginomFeedMetadata(reply, {tool, facts:{...facts, launchedExecutionId:'exec'}}).evidence, [
+    {kind:'executed', executionId:'exec', scope:'workspace'},
+  ]);
+  assert.equal(loginomFeedMetadata(reply, {tool, facts:{...facts, launchedExecutionId:'another-exec'}}).evidence, undefined);
+});
+
+test('save proves only the path unless the reopened workflow graph was checked', () => {
+  const path = '/analyst/result.lgp';
+  const save = {operation_id:'save', status:'SUCCEEDED', action_key:'package.save_checkpoint',
+    output:{package_ref:{path, active_identity:path}, reopened:false}};
+  assert.deepEqual(loginomSaveMetadata(save).evidence, [{kind:'saved', path}]);
+  assert.deepEqual(loginomSaveMetadata({...save, output:{...save.output, reopened:true}, trace:[
+    {event:'reopened_package_observed', actual_path:path, path_matches:true, graph_matches:true, graph:{nodes:['first','second']}},
+  ]}).evidence, [{kind:'saved', path}, {kind:'savedGraphRead', nodeCount:2, scope:'activeWorkflow'}]);
+  assert.equal(loginomSaveMetadata({...save, status:'AMBIGUOUS'}), undefined);
+});
+
+test('save evidence composes with all available feed fields and redacts both paths', () => {
+  const path = '/analyst/private-account/result.lgp';
+  const save = {operation_id:'save',status:'SUCCEEDED',action_key:'package.save_checkpoint',
+    output:{package_ref:{path,active_identity:path}}};
+  const savedFileRead = {kind:'savedFileRead',scope:'package',nodeCount:4,workflowGuidMatch:null,
+    file:{mtime:'2026-11-27T15:00:00.000Z',size:10157,hash:'a'.repeat(64)}};
+  const savedGraph = {save_operation_id:'save',package_path:path,status:'unavailable'};
+  const runtimeId = '32ef40ff-08d2-476a-ad73-1ef3feb17ce8';
+  const busy = {version:1,windowId:runtimeId,operationId:'save',active:false};
+  const receiptWindow = {documentId:'doc',runtimeId,startSequence:1,confirmedSequence:2};
+  const options = {tool:'dock_action_run',save,savedFileRead,savedPackageGraph:savedGraph,busy,receiptWindow,knownSecrets:['private-account']};
+  const reply = {content:[{type:'text',text:'receipt'}]};
+  const {busy:signal,savedPackageGraph,...projection} = loginomFeedMetadata(reply, options);
+  const step = {outcome:'completed',retryAvailable:false,persistence:'not_saved'};
+  const manualEdits = [{kind:'node_renamed',guid:'node',from:'old',to:'new'}];
+  const first = withLoginomMetadata(reply,{receipt:projection,busy:signal,savedPackageGraph});
+  const result = withLoginomMetadata(first,{step,manualEdits,verificationStale:false});
+  assert.deepEqual(result._meta.loginom,{v:1,operationId:'save',state:'settled',status:'SUCCEEDED',kind:'save',
+    evidence:[{kind:'saved',path:'/analyst/[redacted]/result.lgp'},savedFileRead],receiptWindow,busy,
+    savedPackageGraph:{saveOperationId:'save',packagePath:'/analyst/[redacted]/result.lgp',status:'unavailable'},
+    step,manualEdits,verificationStale:false});
+  const otherGraph = {...savedGraph,save_operation_id:'another-save'};
+  assert.deepEqual(loginomFeedMetadata(reply,{...options,savedPackageGraph:otherGraph}).evidence,
+    [{kind:'saved',path:'/analyst/[redacted]/result.lgp'}]);
 });
 
 test('configuration keeps the model text and exposes only the observed node and signals', () => {

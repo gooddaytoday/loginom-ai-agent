@@ -89,7 +89,8 @@ class ExternalClient {
     }
     else if(this.f.savedFixture && code.includes('function inSavedFileTab')){
       this.f.events.push('saved-file');
-      value={base64:this.f.savedFixture.toString('base64')};
+      value=this.f.fileMissing?{fileExists:false}:{fileExists:true,mtime:'2026-11-27T15:00:00.000Z',
+        size:this.f.savedFixture.length,base64:this.f.savedFixture.toString('base64')};
     }
     else if(code.includes('async function closeOwnedPackage')){
       this.f.events.push('package-cleanup');
@@ -188,7 +189,7 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
         if(key==='package.save_checkpoint')result.output.workflow_continuations=continuations;
       }
       if(f.recovered){result.output.reopened=false;if(f.saves===1){result.status='AMBIGUOUS';result.output={};}}
-      if(f.savedFixture)result.cleanup_complete=true;
+      if(f.savedFixture){result.cleanup_complete=true;result.output.package_ref.active_identity=parameters.path;}
       f.receipts.set(operationId,result);return f.loseId===operationId?{...result,status:'AMBIGUOUS'}:result;
     },
     inspect:async({operationId})=>f.inspection??{status:'SUCCEEDED',action_key:'operation.inspect',operation_id:operationId,
@@ -498,12 +499,13 @@ test('unknown prepared workflow advises only the last confirmed Save of its own 
   }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
 });
 
-for(const action_key of ['package.save_checkpoint','package.save_as'])
- test('Save rejects explicit null and compares persisted bytes after success: '+action_key,async t=>{
+for(const {action_key,fileMissing} of [{action_key:'package.save_checkpoint'},{action_key:'package.save_as'},
+  {action_key:'package.save_checkpoint',fileMissing:true}])
+ test('Save retains its receipt '+(fileMissing?'when listing confirms the file is absent: ':'and reads file evidence: ')+action_key,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-null-save-'));
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
   const savedFixture=await readFile(new URL('../../../../../evals/fixtures/calibration/sales-by-category/reference.lgp',import.meta.url));
-  const f=current={scenario:'success',events:[],busy:false,saves:0,path,receipts:new Map(),catalog,savedFixture};
+  const f=current={scenario:'success',events:[],busy:false,saves:0,path,receipts:new Map(),catalog,savedFixture,fileMissing};
   const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
    artifactStore:{list:()=>[],async releaseUploads(){}}};
@@ -531,17 +533,30 @@ for(const action_key of ['package.save_checkpoint','package.save_as'])
    const response=await client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'}}});
    const saved=JSON.parse(response.content[0].text);
    assert.equal(saved.status,'SUCCEEDED');assert.match(saved.operation_id,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-   const {operationId,savedPackageGraph:report}=response._meta.loginom;
-   assert.equal(report.status,'compared');
+   const {v,operationId,savedPackageGraph:report,evidence,receiptWindow}=response._meta.loginom;
+   assert.equal(v,1);
+   assert.equal(report.status,fileMissing?'unavailable':'compared');
    assert.equal(operationId,saved.operation_id);
+   assert.deepEqual(evidence,fileMissing?[{kind:'saved',path}]:[{kind:'saved',path},
+     {kind:'savedFileRead',scope:'package',nodeCount:4,workflowGuidMatch:false,file:{mtime:'2026-11-27T15:00:00.000Z',size:10157,
+       hash:'ad9e8e3b8e63597d724a26fc88f1fa17dc0c9b396ada0624a2756d13238b3790'}}]);
+   assert.equal(receiptWindow.documentId,'own-doc');
+   assert.ok(receiptWindow.startSequence<receiptWindow.confirmedSequence);
    assert.equal(report.saveOperationId,saved.operation_id);
    assert.equal(report.packagePath,path);
-   assert.deepEqual(report.savedLabels,[{nodeId:'770a65bc-5ea0-47f2-80f8-ab900e5e43c2',label:'По убыванию выручки'}]);
-   assert.ok(response.content.some(block=>block.text.includes('«Сортировка» → «По убыванию выручки»')));
+   if(fileMissing)assert.ok(response.content.some(block=>block.text.includes('Квитанция Save остаётся')));
+   else {
+     assert.deepEqual(report.savedLabels,[{nodeId:'770a65bc-5ea0-47f2-80f8-ab900e5e43c2',label:'По убыванию выручки'}]);
+     assert.ok(response.content.some(block=>block.text.includes('«Сортировка» → «По убыванию выручки»')));
+   }
    const replay=await client.callTool({name:'dock_action_run',arguments:{action_key,parameters:{path,conflict_policy:'replace'},operation_id:saved.operation_id}});
    assert.deepEqual(replay._meta.loginom.savedPackageGraph,report);
+   assert.deepEqual(replay._meta.loginom.evidence,evidence);
+   assert.deepEqual(replay._meta.loginom.receiptWindow,receiptWindow);
    const inspected=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:saved.operation_id}});
    assert.deepEqual(inspected._meta.loginom.savedPackageGraph,report);
+   assert.deepEqual(inspected._meta.loginom.evidence,evidence);
+   assert.deepEqual(inspected._meta.loginom.receiptWindow,receiptWindow);
    assert.equal(f.events.filter(event=>event==='saved-file').length,1);
    assert.equal(f.saves,1);
    assert.equal((await bridge.close()).browser_transport_closed,true);

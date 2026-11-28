@@ -233,7 +233,26 @@ function projectSavedPackageGraph(graph, knownSecrets) {
   return result;
 }
 
-export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts, busy, save, savedPackageGraph}) {
+const validReceiptWindow = window => typeof window?.documentId === 'string' && window.documentId
+  && typeof window.runtimeId === 'string' && window.runtimeId
+  && Number.isSafeInteger(window.startSequence) && window.startSequence > 0
+  && Number.isSafeInteger(window.confirmedSequence) && window.confirmedSequence > window.startSequence;
+
+export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptWindow, savedFileRead} = {}) {
+  const path = outcome.output?.package_ref?.path;
+  if (outcome.status !== 'SUCCEEDED' || !SAVE_ACTIONS.includes(outcome.action_key)
+      || !outcome.operation_id || typeof path !== 'string' || !path || path !== outcome.output.package_ref.active_identity) return;
+  const graph = outcome.trace?.findLast(item => item.event === 'reopened_package_observed'
+    && item.actual_path === path && item.path_matches === true && item.graph_matches === true)?.graph;
+  const evidence = [{kind:'saved', path:[...createRedactor(knownSecrets).text(path).toWellFormed()].slice(0, 1000).join('')}];
+  if (outcome.output.reopened === true && Array.isArray(graph?.nodes))
+    evidence.push({kind:'savedGraphRead', nodeCount:graph.nodes.length, scope:'activeWorkflow'});
+  if (savedFileRead) evidence.push(savedFileRead);
+  return {v:1, operationId:outcome.operation_id, state:'settled', status:'SUCCEEDED', kind:'save', evidence,
+    ...(validReceiptWindow(receiptWindow) && {receiptWindow})};
+}
+
+export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets = [], facts, busy, save, savedPackageGraph, savedFileRead, receiptWindow}) {
   const busyFor = operationId => busy?.version === 1 && busy.operationId === operationId
     && /^[A-Za-z0-9_.:-]{1,128}$/.test(busy.operationId)
     && typeof busy.active === 'boolean' && typeof busy.windowId === 'string'
@@ -241,12 +260,14 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
     ? {version:1, windowId:busy.windowId, operationId:busy.operationId, active:busy.active} : undefined;
   if (['dock_action_run', 'dock_operation_inspect'].includes(tool) && SAVE_ACTIONS.includes(save?.action_key)) {
     const signal = tool === 'dock_action_run' ? busyFor(save.operation_id) : undefined;
-    const graph = save.status === 'SUCCEEDED' && savedPackageGraph?.save_operation_id === save.operation_id
-      && savedPackageGraph.package_path === save.output?.package_ref?.path
-      ? projectSavedPackageGraph(savedPackageGraph, knownSecrets) : undefined;
+    const matchesSave = save.status === 'SUCCEEDED' && savedPackageGraph?.save_operation_id === save.operation_id
+      && savedPackageGraph.package_path === save.output?.package_ref?.path;
+    const graph = matchesSave ? projectSavedPackageGraph(savedPackageGraph, knownSecrets) : undefined;
     const bounded = graph && loginomMetadataBytes(graph) <= SAVED_GRAPH_MAX_BYTES ? graph : undefined;
-    return signal || bounded ? {v:1, operationId:save.operation_id, state:'settled', status:save.status,
-      ...(signal ? {busy:signal} : {}), ...(bounded ? {savedPackageGraph:bounded} : {})} : undefined;
+    const receipt = loginomSaveMetadata(save, {knownSecrets, receiptWindow, savedFileRead:matchesSave ? savedFileRead : undefined});
+    if (receipt || signal || bounded) return {v:1, operationId:save.operation_id, state:'settled', status:save.status,
+      ...receipt, ...(signal ? {busy:signal} : {}), ...(bounded ? {savedPackageGraph:bounded} : {})};
+    return;
   }
   const receipt = reply.structuredContent;
   if (!['dock_node_apply', 'dock_node_wait', 'dock_node_status', 'dock_node_read', 'dock_node_resume', 'dock_node_cancel', 'dock_node_stop', 'dock_node_delete'].includes(tool)
@@ -257,7 +278,8 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
   const text = (value, max = 1000) => typeof value === 'string'
     ? [...redactor.text(value).toWellFormed()].slice(0, max).join('') : undefined;
   const reference = receipt.node ?? receipt.progress?.node;
-  const matchingFacts = facts && facts.node.ref.node_id === (reference?.ref?.node_id ?? reference?.node_id) ? facts : undefined;
+  const matchingFacts = facts && ['document_id','workflow_id','node_id']
+    .every(key => facts.node.ref[key] === (reference?.ref ?? reference)?.[key]) ? facts : undefined;
   const node = matchingFacts?.node ?? reference;
   const guid = node?.ref?.node_id ?? node?.node_id;
   const label = text(node?.label);
@@ -310,14 +332,31 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
     } catch {}
   }
   const safeCount = value => Number.isSafeInteger(value) && value >= 0;
+  const boundTable = port => port.port_kind !== 'tree' && port.fresh === true && safeCount(port.port) && safeCount(port.row_count)
+    && typeof port.port_guid === 'string' && port.port_guid && Array.isArray(port.schema)
+    && (!execution?.execution_id || port.execution_id === execution.execution_id);
   const tables = (ports ?? []).flatMap(port => {
-    if (port.port_kind === 'tree' || port.fresh !== true || !safeCount(port.port) || !safeCount(port.row_count)
-        || typeof port.port_guid !== 'string' || !Array.isArray(port.schema)
-        || execution?.execution_id && port.execution_id !== execution.execution_id) return [];
+    if (!boundTable(port)) return [];
     const table = {index: port.port, guid: port.port_guid, rowCount: port.row_count, columnCount: port.schema.length};
     return [{table, port}];
   });
   if (tables.length) result.ports = tables.map(({table}) => table);
+
+  const evidence = [];
+  if (state === 'settled' && execution?.status === 'completed' && result.executionId
+      && matchingFacts?.launchedExecutionId === result.executionId) {
+    evidence.push({kind:'executed', executionId:result.executionId, scope:'workspace'});
+    if (validReceiptWindow(matchingFacts.executionWindow))
+      result.receiptWindow = matchingFacts.executionWindow;
+  }
+  if (succeeded) for (const port of matchingFacts?.readPorts ?? ports ?? []) {
+    if (!boundTable(port)) continue;
+    const rowsRead = port.read_coverage?.rows_read ?? port.sample?.length;
+    if (!safeCount(rowsRead) || rowsRead > port.row_count) continue;
+    evidence.push({kind:'tableRead', port:port.port, portGuid:port.port_guid, rowsRead, rowCount:port.row_count,
+      executionId:result.executionId});
+  }
+  if (evidence.length) result.evidence = evidence;
 
   // Reserve space for the receipt and table summaries before adding rows.
   let blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
@@ -329,6 +368,10 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
     if (blockRemaining >= 0) break;
     delete result[key];
     blockRemaining = LOGINOM_METADATA_MAX_BYTES - loginomMetadataBytes(result);
+  }
+  while (blockRemaining < 0 && result.evidence?.length) {
+    result.evidence.pop();
+    blockRemaining = FEED_MAX_BYTES - bytes(result);
   }
   if (blockRemaining < 0) return;
   if (!result.ports) return result;
