@@ -5,7 +5,7 @@ import { decodeLoginomMetadata, type LoginomMetadataFields } from "../src/logino
 
 const receipt = { operation_id: "operation", state: "settled", status: "SUCCEEDED" }
 const node = { guid: "node-guid", label: "Фильтр", type: "transform.filter_data" }
-const feed = { v: 1, operationId: "operation", state: "settled", status: "SUCCEEDED", node }
+const feed = { v: 1, operationId: "operation", state: "settled", status: "SUCCEEDED", node } as const
 const reply = (value: typeof receipt, loginom?: unknown) => ({
   content: [{ type: "text", text: JSON.stringify(value) }],
   structuredContent: value,
@@ -58,7 +58,7 @@ test("Dock keeps the native error and the original model error text", async () =
 })
 
 test("v1 drops invalid or oversized native error fields without discarding the receipt", () => {
-  const failure = { ...feed, status: "FAILED" }
+  const failure = { ...feed, status: "FAILED" } as const
   const error = {
     code: "NODE_EXECUTION_FAILED",
     message: "Ошибка Loginom",
@@ -66,7 +66,7 @@ test("v1 drops invalid or oversized native error fields without discarding the r
     attribution: "verified_node",
     node: { document_id: "pkg", workflow_id: "module", node_id: "fc94c88b-6b37-451b-9d57-a9378122d8a3" },
   }
-  const expected = { ...failure, dropped: ["error"] }
+  const expected = { ...failure, dropped: ["error"] } as const
   expect(decodeLoginomMetadata({ ...failure, error: { ...error, message: "Ж".repeat(2200) } })).toEqual(expected)
   expect(decodeLoginomMetadata({ ...failure, error: { ...error, attribution: "after_launch" } })).toEqual(expected)
   expect(
