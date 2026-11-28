@@ -49,8 +49,45 @@ function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '900719925474
  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model,Node:{data:{node:workflow}}}})}}}}}};
  const context=vm.createContext({document,bg:{app,IBGDataSource:{},IBGDataTree:{__riid:83},rpc:{TIBGDataSourceRpcCachedInternal_Proxy:{GetValues:batch},TIBGDataSource_Proxy:{prototype:{GetValueAsString:getValueAsString}}}},Out:class {},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date:clock?class extends Date{static now(){return clock.now;}}:Date});
  const page={evaluate:async(fn,arg)=>structuredClone(await vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context))};
- return {page,binding,columnItems,columns,node,port,portDom,integerColumn,dataSource,helper,child,group,root,store,output,disposed,rpcCalls,uiCalls,run:request=>vm.runInNewContext('('+makeNodePortOutputCode(binding,request,{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000})+')')(page)};
+ return {page,binding,diagram:d,columnItems,columns,node,port,portDom,integerColumn,dataSource,helper,child,group,root,store,output,disposed,rpcCalls,uiCalls,run:request=>vm.runInNewContext('('+makeNodePortOutputCode(binding,request,{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000})+')')(page)};
 }
+
+test('receipt-bound reread refuses a different port or replaced execution before opening its source',async()=>{
+ const f=fixture(),request={port:0,execution,sampleRows:100,requireExactNumbers:false,expectedPortGuid:'old-port'};
+ f.port.data.get_Output=async()=>assert.fail('refused read must not open any output');
+ assert.equal((await f.run(request)).reason,'port_changed');
+ f.root.childNodes.push({internalId:'new-root',data:{id:'2',Status:3,ErrorDetails:'',loaded:true},childNodes:[
+  {internalId:'new-child',data:{id:'2.1',Status:3,ErrorDetails:'',ModelNode:f.node.data},childNodes:[]},
+ ]});
+ assert.equal((await f.run({...request,expectedPortGuid:portGuid})).verified,false);
+ assert.deepEqual(f.disposed,[]);
+});
+
+test('private input proof identifies the actual single linked port and disappears if the link changes',async()=>{
+ const f=fixture();
+ const sourceNode={FGuid:'source',FStatus:1,FRunning:false,data:{}};
+ const source={FGuid:'source-port',parent:sourceNode,FStatus:1,FType:1,FSubType:1,FCell:{}};
+ const input={FGuid:'target-input',parent:f.node,FType:0,FSubType:1,FCell:{}};
+ const edge={source:source.FCell,target:input.FCell};
+ source.FCell.edges=input.FCell.edges=[edge];
+ const link={FGuid:'native-link',FSourcePort:source,FTargetPort:input,FCell:edge};
+ f.diagram.FLinks={FCollection:[link]};f.diagram.FNodes.FCollection.push(sourceNode);
+ f.group.data.id='3';f.child.data.id='3.1';
+ f.root.childNodes.unshift({internalId:'source-group',data:{id:'1',Status:3,ErrorDetails:'',loaded:true},childNodes:[
+  {internalId:'source-process',data:{id:'1.1',Status:3,ErrorDetails:'',ModelNode:sourceNode.data},childNodes:[]},
+ ]},{internalId:'neighbour-group',data:{id:'2',Status:3,ErrorDetails:'',loaded:true},childNodes:[]});
+ const request={port:0,execution:{...execution,execution_id:'doc:root:3',process_id:'3.1'},sampleRows:1,requireExactNumbers:false,captureInput:true};
+ const first=await f.run(request);
+ assert.equal(first.verified,true);
+ assert.deepEqual(first.input_source,{nodeId:'source',portGuid:'source-port',inputPortGuid:'target-input',linkGuid:'native-link',executionId:'doc:root:1'});
+ f.diagram.FLinks.FCollection.push({...link,FGuid:'second-link'});
+ assert.equal((await f.run(request)).input_source,undefined);
+ f.diagram.FLinks.FCollection.pop();
+ f.dataSource.get_RowCount=async()=>{f.diagram.FLinks.FCollection=[];return 1;};
+ const changed=await f.run(request);
+ assert.equal(changed.verified,true);
+ assert.equal(changed.input_source,undefined);
+});
 
 test('tree_io serialized reader retains completed-port ownership and disposes every acquired proxy',async()=>{
  const f=fixture({treeOutput:true}),result=await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true});

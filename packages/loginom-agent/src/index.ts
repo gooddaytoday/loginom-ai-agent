@@ -10,6 +10,7 @@ import type { Permission } from "@opencode/schema/permission"
 import { Tool } from "@opencode/schema/tool"
 import { Global } from "@opencode/util/global"
 import { grants, next, permits, type Grant, type Profile } from "./access"
+import { appVerifiedRpc, appVerifiedSummary, decodeAppVerifiedRequest } from "./app-verified"
 import { BrowserRecovery } from "./browser-recovery"
 import { connectionSettings } from "./connection-settings"
 import { Dashboard } from "./dashboard"
@@ -19,6 +20,7 @@ import { dockTools } from "./dock"
 import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
+import { nodeOutputRpc, readNodeOutput } from "./node-output"
 import { packageDocs } from "./package-docs"
 import {
   classify,
@@ -509,6 +511,12 @@ export default Plugin.define({
       await binding.fork(event.sessionID)
     })
 
+    await ctx.rpc.register(appVerifiedRpc, {
+      summary: async (value) => {
+        const { sessionID, promptID } = decodeAppVerifiedRequest(value)
+        return appVerifiedSummary(await ctx.session.context({ sessionID }), promptID)
+      },
+    })
     await ctx.rpc.register(runner, {
       start: async (value) => {
         // The RPC host validates the call against the JSON Schema above before the handler runs.
@@ -537,6 +545,9 @@ export default Plugin.define({
         const url = await drafts.preview((value as { id: string }).id, call.signal)
         return url ? { url } : {}
       },
+    })
+    await ctx.rpc.register(nodeOutputRpc, {
+      sample: (value) => readNodeOutput((input) => ctx.session.context(input), value),
     })
     await ctx.rpc.register(permission, {
       conversation: async (value, call) => {

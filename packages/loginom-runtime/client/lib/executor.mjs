@@ -24,6 +24,10 @@ import { makeWorkspaceUiCode, validateUiAction, uiActionSchema } from './workspa
 import { createObservationPages } from './observation-pages.mjs';
 import { makeWorkspaceBootstrapCode, packageReadOnlyAdvice } from './workspace.mjs';
 import { createNodeProcedure } from './node-procedure.mjs';
+import {makeNodePortOutputCode} from './node-port-output.mjs';
+import {readQualityPortOutput} from './quality-moda.mjs';
+import {linkedInputReceipt} from './user-results.mjs';
+import {confirmedTablePort,sampleFromReceipt} from './node-output-view.mjs';
 import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply, NodeVariableInputError } from './node-apply.mjs';
 import {reconcileOutputMappingPhase} from './node-output-mapping-recovery.mjs';
 import {reconcileInputMappingPhase} from './node-input-mapping-recovery.mjs';
@@ -2196,7 +2200,7 @@ export function parseCapabilityResult(response,{redactor}={}) {
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
   nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, getPreparationReceipt = () => null,
-  browserRecovery = false, probePreparedPage, reopenNodePackage, cacheDirectory, serverSourceCache = true }) {
+  browserRecovery = false, probePreparedPage, reopenNodePackage, cacheDirectory, serverSourceCache = true, nodeOutputRedactor }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   const executeBrowser=execute;
   execute=async(...args)=>{
@@ -3785,6 +3789,43 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       finally{running=false;}
     },
     nodeApplyStatus:id=>sourceReads.has(id)?sourceReads.status(id):nodeJobs.status(id),
+    nodeOutputInput(operationId,port) {
+      const operation=operations.get(operationId);
+      const witness=operation?.nodeOutputWitnesses?.get(port.port_guid);
+      if(!witness?.input||witness.request.execution.execution_id!==port.execution_id)return;
+      const incoming=operation.targetPhase?.final_graph?.links.filter(link=>link.target===witness.binding.node.node_id);
+      if(incoming?.length!==1||incoming[0].source!==witness.input.nodeId)return;
+      for(const source of operations.values()){
+        const receipt=linkedInputReceipt(witness.input,source,witness.binding.node);
+        if(receipt)return receipt;
+      }
+    },
+    async readNodeOutput(receipt) {
+      if(!nodeOutputRedactor||running||pending||nodeJobs.unsettled||sourceReads.unsettled||delivery.unsettled)return null;
+      const operation=operations.get(receipt.operationId),outcome=operation?.outcome,node=outcome?.output;
+      if(outcome?.status!=='SUCCEEDED'||outcome.cleanup_complete!==true||node?.execution?.status!=='completed'
+        ||node.execution.execution_id!==receipt.executionId)return null;
+      const port=node.output?.ports?.find(port=>port.port_guid===receipt.portGuid&&confirmedTablePort(port,receipt.executionId));
+      const witness=port&&operation.nodeOutputWitnesses?.get(port.port_guid);
+      if(!witness||witness.request.execution.execution_id!==receipt.executionId)return null;
+      const {captureInput,rowOffset,...original}=witness.request;
+      const request={...original,sampleRows:100,expectedPortGuid:port.port_guid};
+      const options={origin:targetOrigin,build:targetBuild,deadline:now()+12000};
+      const read=async(code,{timeout=15000}={})=>{
+        const remaining=options.deadline-now();
+        if(remaining<=0)return;
+        const response=await execute('async page=>({status:"SUCCEEDED",action_key:"node.output.read",action_revision:"1",operation_id:'
+          +JSON.stringify(operation.id)+',phase:"read",effect_possible:false,cleanup_complete:true,trace:[],error:null,output:{value:await ('+code+')(page)}})',{timeout:Math.min(timeout,remaining+3000)});
+        return response.output?.value;
+      };
+      running=true;
+      try{
+        const result=operation.parameters.target.type==='research.quality'&&request.port===4?
+          await readQualityPortOutput(read,witness.binding,request,options):
+          await read(makeNodePortOutputCode(witness.binding,request,options));
+        return sampleFromReceipt(port,result,nodeOutputRedactor);
+      }finally{running=false;}
+    },
     nodeApplyWorkflow:id=>nodeJobs.workflow(id),
     waitNodeApply:(id,options)=>sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options),
     cancelNodeApply:id=>sourceReads.has(id)?sourceReads.cancel(id):nodeJobs.cancel(id),
@@ -4545,6 +4586,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           operation={id:operationId,signature,parameters:request,scanReceipt:structuredClone(scanReceipt),
             action:{action_key:'node.apply',capability:'node.apply',revision:request.contract_revision},
             checkpoint:{document_id:request.document_id,workflow_ref:request.workflow_ref},deadline:admissionDeadline};
+          if(nodeOutputRedactor)operation.nodeOutputWitnesses=new Map();
           if(admissionUncertainty?.child){
             const child=admissionUncertainty.child;
             operation.lastReceipt=child.lastReceipt;
@@ -4855,7 +4897,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }});
   // Internal delivery calls retain the original runtime methods. The returned
   // facade prevents a second caller from changing UI between transfer stages.
-  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','nodeApplyWorkflow','waitNodeApply']);
+  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','nodeApplyWorkflow','waitNodeApply','nodeOutputInput']);
   const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply','deleteNode']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{
@@ -4876,6 +4918,20 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return value(...args);
     }]));
   return Object.freeze({...exposed,...browserRecoveryApi,
+    nodeFeedFacts:id=>{
+      const operation=operations.get(id),state=operation?.nodeApply;
+      const observed=state?.phases.find(phase=>phase.phase==='target')?.value?.target?.node;
+      if(!observed||observed.ref?.node_id!==state.node?.node_id)return;
+      const finish=state.phases.find(phase=>phase.phase==='finish')?.value;
+      const label=finish?.node_label??observed.label;
+      const request=state.request;
+      const kind=request.mode===NODE_READ_MODE?'read':request.mode==='add_only'?'add':request.finish==='execute'
+        ?observed.type?.startsWith('exports.')?'export':'execute'
+        :request.finish==='done'?'configure':undefined;
+      return {node:{ref:observed.ref,label,type:observed.type},kind,configuration:operation.outcome?.output?.configuration,
+        launchedExecutionId:finish?.mode==='execute'?finish.execution_id:undefined,readPorts:state.output?.ports,
+        executionWindow:{documentId:observed.ref.document_id, startedAt:state.execution_started_at, confirmedAt:state.execution_completed_at}};
+    },
     // Host lifecycle cleanup must bypass the user mutation facade. A retained
     // node/recovery gate still blocks package cleanup; it cannot block draining
     // the owned worker or removing its private local download cache.

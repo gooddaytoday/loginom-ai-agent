@@ -31,6 +31,7 @@ const state = {
   bridge: undefined,
   client: undefined,
   controller: undefined,
+  nodeOutput: undefined,
   session: undefined,
   browser: undefined,
   browserProfile: undefined,
@@ -253,8 +254,16 @@ async function handle(message) {
       )
       const [browserClientTransport, browserServerTransport] = InMemoryTransport.createLinkedPair()
       await state.browserServer.connect(browserServerTransport)
-      state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport,
+      const knownSecrets = [input.connection.apiKey, input.connection.password]
+      state.bridge = await createBridge(config, session, { browserTransport: browserClientTransport, nodeOutputSecrets: knownSecrets,
         reauthenticateReload: binding => reauthenticateReloadedPage(authenticated.context, input.connection, binding),
+        presentNodeReply: async (reply, project) => {
+          const outputFiles = await session.artifactStore.outputFiles(reply.structuredContent)
+          let loginom
+          try { loginom = project({ outputFiles, knownSecrets }) } catch {}
+          return outputFiles.length || loginom ? { ...reply, _meta: { ...reply._meta,
+            ...(loginom ? { loginom } : {}), ...(outputFiles.length ? { outputFiles } : {}) } } : reply
+        },
         startup: { deadline, signal: state.startupController.signal, onFailure: (error, detail) => {
           state.startupDiagnostics.push({ ...detail, error: startupDiagnostic(error,
             [input.connection.apiKey, input.connection.password, input.connection.username]) })
@@ -290,7 +299,7 @@ async function handle(message) {
         if (message.input?.generation !== state.owner.generation) throw Error("LOGINOM_GENERATION_UNAVAILABLE")
         if (message.input.origin !== state.owner.origin) throw Error("DASHBOARD_ORIGIN_MISMATCH")
       }
-      if (state.controller) throw Error("LOGINOM_REQUEST_INVALID")
+      if (state.controller || state.nodeOutput) throw Error("LOGINOM_REQUEST_INVALID")
       const controller = new AbortController()
       state.controller = controller
       const cancellation = { close: undefined }
@@ -354,6 +363,21 @@ async function handle(message) {
       })
       return
     }
+    if (message.operation === "nodeOutput") {
+      if (state.controller || state.nodeOutput || message.input?.generation !== state.owner.generation) {
+        send({ id: message.id, result: null })
+        return
+      }
+      const pending = Promise.resolve(state.bridge.readNodeOutput(message.input))
+      state.nodeOutput = pending
+      try {
+        const result = await pending
+        send({ id: message.id, result: state.controller || state.closing ? null : result })
+      } finally {
+        state.nodeOutput = undefined
+      }
+      return
+    }
     if (message.operation === "interrupt") {
       state.bridge?.cancelArtifactDeliveries?.()
       state.controller?.abort()
@@ -366,6 +390,10 @@ async function handle(message) {
     const controller = new AbortController()
     state.controller = controller
     try {
+      if (state.nodeOutput) {
+        await state.nodeOutput.catch(() => undefined)
+        controller.signal.throwIfAborted()
+      }
       // Allow the bounded owned read and cleanup to return before the outer IPC
       // deadlines. Other tools retain room for a 60-second dock_node_wait.
       const options = {
@@ -384,7 +412,8 @@ async function handle(message) {
         : message.input.scanReceipt !== undefined
           ? await state.bridge.applyWithScanReceipt(message.input.arguments, message.input.scanReceipt, options)
           : await state.client.callTool({name:message.input.name,arguments:message.input.arguments}, undefined, options))
-      const outputFiles = await state.session.artifactStore.outputFiles(result.structuredContent)
+      const outputFiles = result._meta?.loginom && Array.isArray(result._meta.outputFiles)
+        ? result._meta.outputFiles : await state.session.artifactStore.outputFiles(result.structuredContent)
       send({
         id: message.id,
         result: {

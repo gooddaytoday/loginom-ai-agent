@@ -17,6 +17,7 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
+import type { NodeOutputReceipt } from "./node-output"
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -808,6 +809,13 @@ export async function createLoginomHost(options: {
       const current = generations.get(generation)
       if (!current) throw new Error("LOGINOM_GENERATION_UNAVAILABLE")
       return inputs.admit(`${generation}:${chat}`, userMessage, files, `/${current.connection.username}`)
+    },
+    async readNodeOutput(chat: string, receipt: NodeOutputReceipt) {
+      const status = await service.api.status()
+      if (status.generation !== receipt.generation || lost.has(chat) || stale.has(chat)) return null
+      const child = generations.get(receipt.generation)?.children.get(chat)
+      if (!child) return null
+      return (await child).request("nodeOutput", receipt, 21_000)
     },
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true

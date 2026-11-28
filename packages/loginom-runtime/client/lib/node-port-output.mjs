@@ -349,7 +349,9 @@ export function decodePortCell(raw,type) {
 
 export function makeNodePortOutputCode(binding,request,options,quality=null) {
  validatePreparedNodeContext(binding);
- if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).filter(k=>!['typedVariants','variantEmptyIsNull','treeSchemaOnly','treePreview'].includes(k)).sort().join(','))
+ if(!request||!['execution,port,requireExactNumbers,sampleRows','execution,port,requireExactNumbers,rowOffset,sampleRows'].includes(Object.keys(request).filter(k=>!['typedVariants','variantEmptyIsNull','treeSchemaOnly','treePreview','captureInput','expectedPortGuid'].includes(k)).sort().join(','))
+  ||Object.hasOwn(request,'captureInput')&&request.captureInput!==true
+  ||Object.hasOwn(request,'expectedPortGuid')&&(typeof request.expectedPortGuid!=='string'||!request.expectedPortGuid)
   ||Object.hasOwn(request,'treeSchemaOnly')&&(request.treeSchemaOnly!==true||request.port!==0||request.sampleRows!==0
    ||Object.hasOwn(request,'rowOffset'))
   ||Object.hasOwn(request,'treePreview')&&(request.treePreview!==true||request.port!==0
@@ -376,6 +378,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
  const target=inventory.ports?.find(p=>p.index===request.port);
  if(!inventory.verified||JSON.stringify(inventory.node_context)!==JSON.stringify(before))return {verified:false,cleanup_complete:false,reason:'output_context'};
  if(!target?.active)return {verified:false,cleanup_complete:true,reason:'inactive_output'};
+ if(request.expectedPortGuid&&target.port_guid!==request.expectedPortGuid)return {verified:false,cleanup_complete:true,reason:'port_changed'};
  if((request.treeSchemaOnly||request.treePreview)&&target.kind!=='tree')return {verified:false,cleanup_complete:true,reason:'not_a_tree_output'};
  const result=await page.evaluate(async ({binding:b,request:q,options:o,before,target,decoder,treeReader,quality,variant})=>{
   const decode=eval(' ('+decoder+')'),readTree=eval(' ('+treeReader+')');
@@ -431,6 +434,36 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
     store,root,records:relevant.map(r=>r),fingerprint:JSON.stringify(relevant.map(r=>[r.internalId,r.data.id,r.data.Status,r.data.ErrorDetails,r.data.loaded,r.data.ModelNode===node.data]))};
   };
   const same=(a,b)=>Object.keys(a).every(k=>k==='records'?a.records.length===b.records.length&&a.records.every((r,i)=>r===b.records[i]):a[k]===b[k]);
+  const inputSource=()=>{
+   try{
+    const links=baseline.diagram.FLinks?.FCollection;
+    if(!Array.isArray(links)||links.length>400)return;
+    const incoming=links.filter(link=>link.FTargetPort?.parent===baseline.node&&link.FTargetPort.FType===0&&link.FTargetPort.FSubType===1);
+    if(incoming.length!==1)return;
+    const link=incoming[0],input=link.FTargetPort,source=link.FSourcePort,node=source?.parent,edge=link.FCell;
+    if(!node||node===baseline.node||!baseline.diagram.FNodes.FCollection.includes(node)||node.FStatus!==1||node.FRunning!==false
+     ||!source.FGuid||source.FType!==1||source.FSubType!==1||source.FStatus!==1||!input.FGuid||!link.FGuid
+     ||!edge||edge.source!==source.FCell||edge.target!==input.FCell||!source.FCell.edges?.includes(edge)||!input.FCell.edges?.includes(edge))return;
+    const seen=new Set(),own=[],parents=new Map();
+    const walk=parent=>{for(const record of parent.childNodes){
+     if(seen.has(record)||seen.size>=2000||record.data.loading)throw Error('Unstable process inventory');
+     seen.add(record);parents.set(record,parent);if(record.data.ModelNode===node.data)own.push(record);walk(record);
+    }};
+    walk(baseline.root);
+    const latest=own.reduce((last,record)=>!last||BigInt(String(record.data.id).split('.')[0])>BigInt(String(last.data.id).split('.')[0])?record:last,null);
+    const groupId=String(latest?.data.id).split('.')[0];
+    const targetGroup=q.execution.process_id.split('.')[0];
+    const group=baseline.root.childNodes.find(record=>String(record.data.id)===groupId);
+    if(!group||!/^[1-9][0-9]*$/.test(groupId)||BigInt(groupId)>BigInt(targetGroup)
+     ||group.data.Status!==3||group.data.ErrorDetails!==''||group.data.loaded!==true
+     ||own.filter(record=>String(record.data.id).startsWith(groupId+'.')).length!==1
+     ||latest.data.Status!==3||latest.data.ErrorDetails!=='')return;
+    let ancestor=parents.get(latest);while(ancestor&&ancestor!==group)ancestor=parents.get(ancestor);
+    if(ancestor!==group)return;
+    return {nodeId:node.FGuid,portGuid:source.FGuid,inputPortGuid:input.FGuid,linkGuid:link.FGuid,
+     executionId:b.document_id+':'+String(baseline.root.internalId)+':'+groupId};
+   }catch{return undefined;}
+  };
   const source=()=>{
    const helper=value(dataSource,'$FHelper'),identity=value(dataSource,'$'),outputIdentity=value(output,'$');
    const interfaceId=value(identity,'$I'),treeInterface=target.kind==='tree'?bg.IBGDataTree:null,treeInterfaceId=value(treeInterface,'__riid');
@@ -444,8 +477,10 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    return {helper,identity,interfaceId,treeInterface,treeInterfaceId,batchProxy,getValues:batchProxy?.GetValues,getValueAsString,session:value(dataSource,'$S'),owner:value(identity,'$OW'),object:value(identity,'$O'),outputIdentity,outputOwner:value(outputIdentity,'$OW'),outputObject:value(outputIdentity,'$O')};
   };
   const stable=()=>{need(same(baseline,snapshot()),'binding_changed');if(sourceBaseline){need(same(sourceBaseline,source()),'source_changed');if(sourceBaseline.interfaceId===116&&!cacheBaseline&&value(sourceBaseline.helper,'$FCacheInitialized')===true)cacheBaseline={data:value(sourceBaseline.helper,'$FData'),initialized:true};}if(cacheBaseline)need(value(sourceBaseline.helper,'$FData')===cacheBaseline.data&&value(sourceBaseline.helper,'$FCacheInitialized')===cacheBaseline.initialized,'cache_changed');};
+  let inputBefore;
   try {
    live();baseline=snapshot();
+   if(q.captureInput&&target.kind!=='tree')inputBefore=inputSource();
    output=await baseline.portData.get_Output();live();stable();
    dataSource=await output.QueryInterface(target.kind==='tree'?bg.IBGDataTree:bg.IBGDataSource);live();sourceBaseline=source();stable();
    if(target.kind==='tree'){
@@ -589,7 +624,8 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
   if(qualityNativeUncertain)return {verified:false,cleanup_complete:false,reason:'quality_native_pending'};
   if(!released||!context)return {verified:false,cleanup_complete:false,reason:released?'context_changed':'dispose_failed'};
   if(!result)return {verified:false,cleanup_complete:true,reason,...(readDiagnostic?{read_diagnostic:readDiagnostic}:{})};
-  return {verified:true,cleanup_complete:true,output:result};
+  return {verified:true,cleanup_complete:true,output:result,
+   ...(inputBefore&&JSON.stringify(inputSource())===JSON.stringify(inputBefore)?{input_source:inputBefore}:{})};
  },{binding,request,options,before,target,decoder:decodeCell.toString(),treeReader:treeReader.toString(),quality,variant});
  const after=await readNode(page,binding);
  if(JSON.stringify(before)!==JSON.stringify(after))return {verified:false,cleanup_complete:false,reason:'node_context_changed'};

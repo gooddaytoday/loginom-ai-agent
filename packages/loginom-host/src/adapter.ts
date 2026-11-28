@@ -10,6 +10,7 @@ import type { DashboardStorageOperation } from "../../loginom-runtime/src/dashbo
 import { Option, Schema } from "effect"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { decodeStepProgress, type StepProgress } from "./step-progress"
+import { NodeOutputSample, type NodeOutputReceipt } from "./node-output"
 
 const state: { connection?: ReturnType<typeof transport> } = {}
 export function connect(port: Port) {
@@ -19,6 +20,11 @@ export function connect(port: Port) {
 export function disconnect() {
   state.connection?.close()
   state.connection = undefined
+}
+export async function readNodeOutput(session: string, receipt: NodeOutputReceipt) {
+  if (!state.connection) return null
+  const value = await state.connection.request("nodeOutput", { run: randomUUID(), session, receipt }, 25_000)
+  return Schema.decodeUnknownSync(Schema.NullOr(NodeOutputSample))(value)
 }
 export async function acquire(session: string) {
   const connection = state.connection

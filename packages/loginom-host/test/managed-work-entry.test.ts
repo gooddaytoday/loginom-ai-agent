@@ -24,6 +24,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "managed-work-entry-"))
   const work = join(directory, "work.json")
+  const finishSample = join(directory, "finish-sample")
   const src = join(directory, "runtime/src")
   const files = {
     "runtime/src/managed-entry.mjs": await readFile(
@@ -94,13 +95,21 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
        export const admitStartupArtifacts=artifacts.admitStartupArtifacts;
        export const artifactFailure=artifacts.artifactFailure ?? (()=>null);`,
     "runtime/client/lib/bridge.mjs": `
-      import { readFileSync } from 'node:fs';
+      import { existsSync, readFileSync } from 'node:fs';
+      import { setTimeout } from 'node:timers/promises';
+      import { loginomFeedMetadata } from ${JSON.stringify(new URL("../../loginom-runtime/client/lib/user-results.mjs", import.meta.url).href)};
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
-      export async function createBridge() { return {
+      export async function createBridge(_config, _session, {presentNodeReply}) { return {
         server: { connect: async () => {} }, close: async () => ({
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
+        applyWithScanReceipt: reply => presentNodeReply(reply, options =>
+          loginomFeedMetadata(reply, {...options, tool:'dock_node_apply'})),
+        readNodeOutput: async () => {
+          while (!existsSync(${JSON.stringify(finishSample)})) await setTimeout(5);
+          return { rows: [[{ value: 'sample' }]] };
+        },
         prepareLocalPackage: async (args, pair, { signal }) => {
           signal.throwIfAborted();
           return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
@@ -113,6 +122,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         async listTools() { return { tools: [{ name: 'fixture', inputSchema: { type: 'object' } }] }; }
         async callTool(input, _unused, { signal }) {
           if (input.arguments.failAfterDispatch) throw Error('LOGINOM_FILE_CHANGED');
+          if (input.arguments.afterSample) {
+            if (!require('node:fs').existsSync(${JSON.stringify(finishSample)})) throw Error('sample still running');
+            return { content: [{ type: 'text', text: 'new turn ran' }] };
+          }
           if (input.arguments.progressFixture) {
             const { stepPhase } = await import('../../../../lib/step-progress.mjs');
             stepPhase('configuring', 'transform.group_data', { kind: 'fields', index: 2, total: 3 });
@@ -147,7 +160,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
     stateDir: join(directory, "state"),
     generation: 1,
     chat: "chat",
-    connection: { url: "http://example.test", username: "user", apiKey: "fixture", password: "" },
+    connection: { url: "http://example.test", username: "test", apiKey: "fixture", password: "private-password" },
     environment: {},
   })
   try {
@@ -176,6 +189,71 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       recoveryPending: false,
       activeWork: false,
     })
+    const receipt = {
+      result_version: "user-v1",
+      operation_id: "test-operation",
+      state: "settled",
+      status: "SUCCEEDED",
+      node: { node_id: "node-guid", label: "test node", type: "transform.filter_data" },
+      output: {
+        ports: [
+          {
+            port: 0,
+            port_guid: "port-guid",
+            fresh: true,
+            row_count: 3,
+            sample_complete: true,
+            schema: [{ index: 0, name: "test_name", type: "string" }],
+            sample: ["contest result", "fixture", "private-password"].map((value) => [{ type: "string", value }]),
+          },
+        ],
+      },
+    }
+    const content = [{ type: "text", text: JSON.stringify(receipt) }]
+    expect(
+      await runtime.request("call", {
+        name: "dock_node_apply",
+        arguments: { content, structuredContent: receipt },
+        scanReceipt: {},
+      }),
+    ).toMatchObject({
+      result: {
+        content,
+        _meta: {
+          loginom: {
+            operationId: "test-operation",
+            node: { label: "test node" },
+            evidence: [{ kind: "tableRead", port: 0, portGuid: "port-guid", rowsRead: 3, rowCount: 3 }],
+            ports: [
+              {
+                preview: {
+                  schema: [{ name: "test_name" }],
+                  sample: [[{ value: "contest result" }], [{ value: "[redacted]" }], [{ value: "[redacted]" }]],
+                },
+              },
+            ],
+          },
+        },
+      },
+    })
+    const nodeOutputRequest = {
+      generation: 1,
+      operationId: "test-operation",
+      executionId: "execution",
+      portGuid: "port-guid",
+    }
+    const sample = runtime.request("nodeOutput", nodeOutputRequest)
+    const nextCall = runtime
+      .request("call", { name: "fixture", arguments: { afterSample: true } })
+      .catch((error: unknown) => error)
+    try {
+      expect(await runtime.request("nodeOutput", nodeOutputRequest)).toBeNull()
+    } finally {
+      await Bun.write(finishSample, "")
+    }
+    expect(await nextCall).toMatchObject({ result: { content: [{ type: "text", text: "new turn ran" }] } })
+    expect(await sample).toBeNull()
+    expect(await runtime.request("nodeOutput", nodeOutputRequest)).toEqual({ rows: [[{ value: "sample" }]] })
     const call = runtime
       .request("call", { name: "fixture", arguments: { hold: true } })
       .catch((error: unknown) => error)
@@ -316,7 +394,10 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       expect(error).toMatchObject({ message: code })
       if (name === "oversize")
         expect(error).toMatchObject({ details: { actual: 16 * 1024 * 1024 + 1, limit: 16 * 1024 * 1024 } })
-      const text = error instanceof Error ? error.message + JSON.stringify("details" in error ? error.details : undefined) : String(error)
+      const text =
+        error instanceof Error
+          ? error.message + JSON.stringify("details" in error ? error.details : undefined)
+          : String(error)
       expect(text).toContain(code)
       expect(text).not.toMatch(/secret|sourcePath|\/private|stack|AAAA/)
       expect(host.journal.pending()).toEqual([])
