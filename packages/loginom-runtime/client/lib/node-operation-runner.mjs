@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {createStepState,followStepProgress} from './step-progress.mjs';
 
 const canonical=v=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'
  ?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
@@ -16,11 +17,13 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
   progress:progress(job.id),outcome:job.outcome??null,error:job.error??null});
  const launch=(request,signature,attempt,resume,previous,scanReceipt=previous?.scanReceipt)=>{
   const job={id:request.operation_id,request:structuredClone(request),scanReceipt:structuredClone(scanReceipt),signature,attempt,state:'running',controller:new AbortController(),stopController:new AbortController()};
+  const step=job.step=createStepState('waiting',request.target?.type);
   jobs.set(job.id,job);
+  followStepProgress(step);
   // Claim the local ID before calling run, including its synchronous validation.
   // Both rejection and success settle this promise; no unhandled background error.
   let execution;
-  try{execution=run(request,{signal:job.controller.signal,stopSignal:job.stopController.signal,resume,scanReceipt:job.scanReceipt});}catch(error){execution=Promise.reject(error);}
+  try{execution=step.run(()=>run(request,{signal:job.controller.signal,stopSignal:job.stopController.signal,resume,scanReceipt:job.scanReceipt}));}catch(error){execution=Promise.reject(error);}
   job.completion=Promise.resolve(execution).then(
    outcome=>{job.outcome=structuredClone(outcome);job.state='settled';},
    error=>{
@@ -78,6 +81,7 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
    if(!Number.isInteger(timeoutMs)||timeoutMs<0||timeoutMs>60000)throw Error('Node wait timeout must be 0..60000 ms');
    signal?.throwIfAborted();
    if(job.state!=='running'||timeoutMs===0)return snapshot(job);
+   followStepProgress(job.step);
    let timer,onAbort;
    const interrupted=new Promise((resolve,reject)=>{
     timer=setTimeout(resolve,timeoutMs);

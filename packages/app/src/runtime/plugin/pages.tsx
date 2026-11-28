@@ -2,6 +2,7 @@ import { For, Show, createMemo, createSignal } from "solid-js"
 import { useNavigate } from "@solidjs/router"
 import { Page } from "@opencode/plugin/gui/builtin"
 import { Button } from "@opencode/ui/button"
+import { Loader } from "@opencode/ui/loader"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useCurrentRoute } from "../../shell/state/layout"
 import { usePluginHost } from "./host"
@@ -25,7 +26,7 @@ export function PluginPageRoute() {
   const item = useActivePluginPage()
 
   return (
-    <Show when={item()} keyed fallback={<PageUnavailable />}>
+    <Show when={item()} keyed fallback={<PagePending />}>
       {(entry) => {
         const [failed, setFailed] = createSignal(false)
 
@@ -37,6 +38,32 @@ export function PluginPageRoute() {
           </Show>
         )
       }}
+    </Show>
+  )
+}
+
+function PagePending() {
+  const route = useCurrentRoute()
+  const host = usePluginHost()
+  const language = useLanguage()
+  const loading = () => {
+    const target = route()
+
+    if (target.type !== "page") return false
+
+    const status = host.status(target.plugin)
+
+    return (
+      status === "loading" ||
+      (status === undefined && host.definitions().some((definition) => definition.id === target.plugin))
+    )
+  }
+
+  return (
+    <Show when={loading()} fallback={<PageUnavailable />}>
+      <div class="flex min-h-0 flex-1 items-center justify-center">
+        <Loader role="img" aria-hidden="false" aria-label={language.t("common.loading")} />
+      </div>
     </Show>
   )
 }

@@ -68,10 +68,6 @@ export const dict = {
   "ui.sessionTurn.retry.geminiHot": "gemini šobrīd ir pārāk noslogots",
   "ui.sessionTurn.error.freeUsageExceeded": "Bezmaksas limits pārsniegts",
   "ui.sessionTurn.error.addCredits": "Pievienot kredītus",
-  "dialog.usageExceeded.freeTier.title": "Sasniegts bezmaksas limits",
-  "dialog.usageExceeded.freeTier.description":
-    "Abonē OpenCode Go par $10/mēn., lai iegūtu uzticamu piekļuvi labākajiem atvērtā koda modeļiem.",
-  "dialog.usageExceeded.freeTier.actionLabel": "Abonēt",
   "ui.sessionTurn.status.delegating": "Deleģē darbu",
   "ui.sessionTurn.status.planning": "Plāno nākamos soļus",
   "ui.sessionTurn.status.gatheringContext": "Izpēta",
