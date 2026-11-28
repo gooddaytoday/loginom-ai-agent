@@ -11,9 +11,12 @@ export function updateRequest(
   request.on("redirect", (_status, _method, location) => {
     if (++redirects > 5 || URL.parse(location)?.protocol !== "https:") {
       request.emit("error", Error("LOGINOM_UPDATE_REDIRECT_INVALID"))
+
       return
     }
+
     request.followRedirect()
   })
+
   return request
 }

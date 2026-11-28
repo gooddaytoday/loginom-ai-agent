@@ -3,8 +3,8 @@ import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
 import type { Cleanup, MainContext } from "@opencode/plugin/gui/main"
-import type { Wsl, WslServersState } from "./contract"
-import setup from "../loginom-gui/wsl-main"
+import type { Wsl, WslServersState } from "./wsl/contract"
+import setup from "./wsl-main"
 
 const path = process.env.PATH
 
@@ -74,6 +74,7 @@ test("main starts a server saved by the new client and keeps a migrated 0.4 serv
 
   // The WSL stand-in reports no installed CLI, so the attempted automatic start ends without running a server.
   const deadline = Date.now() + 1_000
+
   while (state().servers[1]?.runtime.kind === "starting" && Date.now() < deadline) await Bun.sleep(10)
   expect(state().servers[1]?.runtime.kind).toBe("failed")
   expect(state().servers[0]?.runtime.kind).toBe("stopped")

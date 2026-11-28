@@ -1,6 +1,26 @@
 import { Schema } from "effect"
 import { Ipc } from "@opencode/plugin/gui"
 
+export type WslCommandResult = {
+  code: number | null
+  signal: NodeJS.Signals | null
+  stdout: string
+  stderr: string
+}
+
+export type RunWslOptions = {
+  signal?: AbortSignal
+  /**
+   * Ceiling on how long we wait for the child process to exit. When the
+   * LXSS service or a specific distro wedges (e.g. Ubuntu-24.04 with a
+   * pending first-run prompt), `wsl.exe` never returns and any command
+   * that doesn't specify a timeout hangs the entire startup flow. Default
+   * is 20s - enough for slow cold-starts, short enough to fail fast on
+   * a wedge. Callers can override for longer-running jobs.
+   */
+  timeoutMs?: number
+}
+
 export const WslServerConfig = Schema.Struct({
   id: Schema.String,
   distro: Schema.String,

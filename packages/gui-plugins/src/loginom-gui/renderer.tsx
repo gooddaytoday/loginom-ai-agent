@@ -1,6 +1,14 @@
-import { SettingsPage, type Plugin } from "@opencode/plugin/gui"
-import { builtinContext, Page, QuestionRenderer, subscribeBuiltinDeepLinks } from "@opencode/plugin/gui/builtin"
+import { isModelServerID } from "@loginom-ai-agent/loginom-host/model-server-id"
 import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
+import { bindPlugin, SettingsPage, type Plugin } from "@opencode/plugin/gui"
+import {
+  builtinContext,
+  BuiltinProviderSetup,
+  Page,
+  QuestionRenderer,
+  subscribeBuiltinDeepLinks,
+  type ProviderSetupProps,
+} from "@opencode/plugin/gui/builtin"
 import { Option, Schema } from "effect"
 import { lazy, onCleanup, Show, Suspense } from "solid-js"
 import { unwrap } from "solid-js/store"
@@ -15,6 +23,107 @@ const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   registerStartScreen(ctx)
+
+  const ModelServer = lazy(() => import("./model-server"))
+
+  ctx.add(BuiltinProviderSetup, {
+    id: "loginom-own-model-server",
+    get title() {
+      return ctx.t("modelServerTitle")
+    },
+    matchesProvider: isModelServerID,
+    async preferFirst(client, directory, signal, report, listen) {
+      const { ModelServerRpc } = await import("@loginom-ai-agent/loginom-host/model-server-rpc")
+
+      if (signal.aborted) return
+
+      const isAvailability = Schema.is(ModelServerRpc.events.catalogAvailabilityChanged.schema)
+      let revision = 0
+
+      const refresh = async () => {
+        const requested = ++revision
+
+        const result = await client().rpc(ModelServerRpc).catalogAvailable(
+          {},
+          {
+            location: directory ? { directory } : undefined,
+            signal: AbortSignal.any([signal, AbortSignal.timeout(25_000)]),
+          },
+        )
+
+        if (!signal.aborted && requested === revision && result.ok) report(!result.value)
+      }
+
+      const unsubscribe = listen((event) => {
+        if (event.type === "server.connected") return void refresh().catch(() => undefined)
+
+        if (event.type !== `rpc.${ModelServerRpc.id}.catalogAvailabilityChanged`) return
+
+        if (!isAvailability(event.data)) return
+
+        revision++
+        report(!event.data.available)
+      })
+
+      signal.addEventListener("abort", unsubscribe, { once: true })
+
+      await refresh()
+    },
+    removal: {
+      get title() {
+        return ctx.t("modelServerRemove")
+      },
+      async run(client, provider, directory, signal) {
+        const confirmed = await ctx.dialogs.confirm({
+          title: ctx.t("modelServerRemove"),
+          description: ctx.t("modelServerRemoveConfirm", { server: provider.name }),
+          confirm: ctx.t("modelServerRemove"),
+          danger: true,
+        })
+
+        if (!confirmed || signal.aborted) return false
+
+        try {
+          const { ModelServerRpc } = await import("@loginom-ai-agent/loginom-host/model-server-rpc")
+
+          while (!signal.aborted) {
+            const result = await client
+              .rpc(ModelServerRpc)
+              .remove(
+                { providerID: provider.id },
+                {
+                  location: directory ? { directory } : undefined,
+                  signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
+                },
+              )
+
+            if (result.ok) return true
+
+            if (result.issue !== "modelServerRemoveProfileFailed") break
+
+            if (signal.aborted) return false
+
+            const retry = await ctx.dialogs.confirm({
+              title: ctx.t("modelServerRemoveProfileFailed"),
+              confirm: ctx.t("modelServerRemoveRetry"),
+            })
+
+            if (!retry) return false
+          }
+        } catch {}
+
+        if (!signal.aborted) ctx.toast.show({ variant: "error", title: ctx.t("modelServerRemoveFailed") })
+
+        return false
+      },
+    },
+    render: bindPlugin((props: ProviderSetupProps) => (
+      <Suspense>
+        <ModelServer {...props} />
+      </Suspense>
+    )),
+  })
+
   const Catalog = lazy(() => import("./catalog-page"))
 
   ctx.add(Page, {

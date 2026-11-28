@@ -56,11 +56,9 @@ export function setupWsl(ctx: MainContext, cli: WslCliAdapter) {
         const distro = record.value.distro
         const id = Schema.decodeUnknownOption(Id)(value)
 
-        return [{
-          id: Option.isSome(id) ? id.value.id : wslServerIdForDistro(distro),
-          distro,
-          ...(Schema.is(Autostart)(value) ? { autostart: true } : {}),
-        }]
+        const config = { id: Option.isSome(id) ? id.value.id : wslServerIdForDistro(distro), distro }
+
+        return [Schema.is(Autostart)(value) ? { ...config, autostart: true } : config]
       }),
     writeServers: (servers) => saved.set({ servers }),
     installCli: (distro, build) =>

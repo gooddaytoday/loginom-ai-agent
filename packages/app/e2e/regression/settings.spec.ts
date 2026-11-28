@@ -87,6 +87,7 @@ for (const [issue, text, address] of [
       },
     ])
     expect(fixture.saves).toEqual([])
+
     for (const secret of [loginomPassword, loginomDiagnosticKey]) {
       await expect(form).not.toContainText(secret)
       expect(journal.join("\n")).not.toContain(secret)
@@ -112,12 +113,15 @@ test("Loginom sends preserve, replace and passwordless operations through the se
   await expect(password).toBeDisabled()
   await check.click()
   await expect(checked).toBeVisible()
+
   const saved = page.waitForResponse(
     (response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/save",
   )
+
   await form.getByRole("button", { name: "Save", exact: true }).click()
   expect((await saved).ok()).toBe(true)
   await expect(checked).toBeHidden()
+
   const identity = { revision: 7, url: loginomAddress, username: "analyst" }
   expect(fixture.checks).toEqual([
     { input: { ...identity, password: { operation: "preserve" } } },
@@ -152,7 +156,9 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
     provider: NO_PROVIDER,
     onRpc: (request) => {
       if (request.rpcID !== "loginom.connection") return
+
       expect(request.directory).toBe(serviceDirectory)
+
       switch (request.method) {
         case "status":
           return {
@@ -172,11 +178,13 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
           }
         case "check":
           checks.push(request.body)
+
           return { output: { ok: true, value: { validationId: "checked", expiresAt: 4102444800000 } } }
         case "save":
           expect(request.body).toMatchObject({ input: { revision: 0, validationId: "checked" } })
           username = "analyst"
           revision = 1
+
           return { unavailable: true }
       }
     },
@@ -271,6 +279,7 @@ async function loginomApplication(page: Page, outcome: "applied" | "failed") {
       page.waitForResponse((response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/status"),
       page.clock.fastForward(duration),
     ])
+
     expect(response.ok()).toBe(true)
   }
 
@@ -295,6 +304,7 @@ async function loginomApplication(page: Page, outcome: "applied" | "failed") {
       data: { revision, generation },
     },
   ])
+
   if (outcome === "failed") {
     await expect(notice).toHaveText("Служба не применила подключение. Проверьте настройки и попробуйте снова.")
     await expect(notice.getByText("Применено", { exact: true })).toHaveCount(0)
@@ -2227,20 +2237,171 @@ test("providers: settings and the connect dialog list popular providers in the s
     { id: "anthropic", name: "Anthropic" },
     { id: "google", name: "Google" },
   ]
+
   const { settings } = await open(page, {
     integrations: popular.toReversed().map((item) => ({ ...item, methods: [{ type: "key" }], connections: [] })),
+    onRpc: ({ rpcID, method }) =>
+      rpcID === "loginom.model-server" && method === "catalogAvailable"
+        ? { output: { ok: true, value: true } }
+        : undefined,
   })
+
   const names = popular.map((item) => item.name)
 
   await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+
   const section = settings.locator(".settings-section").filter({
     has: page.getByRole("heading", { name: "Popular providers", exact: true }),
   })
+
   await expect(section.locator(".settings-provider-name")).toHaveText(names)
 
   await settings.getByRole("button", { name: "Show more providers", exact: true }).click()
   const dialog = page.getByRole("dialog", { name: "Connect provider", exact: true })
-  await expect(dialog.locator("[data-provider-id]")).toHaveText(names)
+  await expect(dialog.getByRole("region", { name: "Popular", exact: true }).locator("[data-provider-id]")).toHaveText(
+    names,
+  )
+  await expect(
+    dialog.getByRole("region", { name: "Services", exact: true }).getByText("Custom server (OpenAI-compatible)", {
+      exact: true,
+    }),
+  ).toBeVisible()
+})
+
+test("providers: an open dialog reacts to catalog changes across an event stream reconnect", async ({ page }) => {
+  const transport = await installSseTransport(page, { server: SERVER })
+  let catalogAvailable = false
+
+  const { settings } = await open(page, {
+    integrations: [{ id: "openai", name: "OpenAI", methods: [{ type: "key" }], connections: [] }],
+    onRpc: ({ rpcID, method }) =>
+      rpcID === "loginom.model-server" && method === "catalogAvailable"
+        ? { output: { ok: true, value: catalogAvailable } }
+        : undefined,
+  })
+
+  const first = await transport.waitForConnection()
+  expect(await page.evaluate(() => navigator.onLine)).toBe(true)
+  await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+  await settings.getByRole("button", { name: "Show more providers", exact: true }).click()
+
+  const dialog = page.getByRole("dialog", { name: "Connect provider", exact: true })
+  const rows = dialog.locator("[data-provider-id]")
+  const customServer = "Custom server (OpenAI-compatible)"
+
+  await expect(rows).toHaveText([customServer, "OpenAI"])
+
+  let availabilityEventID = 0
+
+  const publishAvailability = (available: boolean) => {
+    catalogAvailable = available
+
+    return transport.send({
+      id: `evt_model_catalog_available_${++availabilityEventID}`,
+      created: 1,
+      type: "rpc.loginom.model-server.catalogAvailabilityChanged",
+      location: { directory },
+      data: { available },
+    })
+  }
+
+  await publishAvailability(true)
+  await expect(rows).toHaveText(["OpenAI", customServer])
+
+  catalogAvailable = false
+  await transport.disconnect()
+  await transport.waitForConnection({ after: first.id })
+  await expect(rows).toHaveText([customServer, "OpenAI"])
+
+  await publishAvailability(true)
+  await expect(rows).toHaveText(["OpenAI", customServer])
+  await publishAvailability(false)
+  await expect(rows).toHaveText([customServer, "OpenAI"])
+})
+
+test("providers: the Russian dialog lists other providers and warns when saving a short key", async ({ page }) => {
+  const address = "http://127.0.0.1:8000/v1"
+  await mockWorkspace(page, {
+    name: "Настройки",
+    directory,
+    seed: { locale: "ru" },
+    onRpc: ({ rpcID, method, body }) => {
+      if (rpcID !== "loginom.model-server") return
+
+      switch (method) {
+        case "catalogAvailable":
+          return { output: { ok: true, value: true } }
+        case "discover":
+          return { output: { ok: true, value: ["alpha"] } }
+        case "save":
+          expect(body).toMatchObject({ input: { address, key: "1234567", models: ["alpha"] } })
+
+          return { output: { ok: true, value: { providerID: `loginom-model-server-${"1".repeat(64)}` } } }
+      }
+    },
+  })
+
+  await page.goto("/settings")
+  const settings = page.getByTestId("settings-screen")
+  const width = page.viewportSize()?.width ?? 1280
+
+  if (width < 800) {
+    await settings.getByRole("button", { name: "Общие", exact: true }).click()
+    await page.getByRole("menuitemradio", { name: "Провайдеры", exact: true }).click()
+  } else {
+    await settings.getByRole("tab", { name: "Провайдеры", exact: true }).click()
+  }
+
+  await settings.getByRole("button", { name: "Показать больше провайдеров", exact: true }).click()
+
+  const title = "Свой сервер (OpenAI-совместимый)"
+  const picker = page.getByRole("dialog", { name: "Подключить провайдера", exact: true })
+
+  await picker.getByRole("region", { name: "Остальные", exact: true }).getByText(title, { exact: true }).click()
+
+  const form = page.getByRole("dialog", { name: title, exact: true })
+  await form.getByLabel("Адрес", { exact: true }).fill(address)
+  await form.getByLabel("Ключ (необязательно)", { exact: true }).fill("1234567")
+  await form.getByRole("button", { name: "Найти модели", exact: true }).click()
+  await expect(form.getByRole("radio", { name: "alpha", exact: true })).toBeChecked()
+  await form.getByRole("button", { name: "Подключить", exact: true }).click()
+  await expect(page.getByText("Короткий ключ не защищается при выводе ошибок", { exact: true })).toBeVisible()
+})
+
+test("providers: a partial custom server removal explains the failure and can be retried", async ({ page }) => {
+  const providerID = `loginom-model-server-${"1".repeat(64)}`
+  let attempts = 0
+
+  const { settings } = await open(page, {
+    provider: () =>
+      attempts < 2
+        ? { all: [{ id: providerID, name: "Local server", models: {} }], connected: [providerID], default: {} }
+        : NO_PROVIDER,
+    onRpc: ({ rpcID, method, body }) => {
+      if (rpcID !== "loginom.model-server" || method !== "remove") return
+
+      expect(body).toEqual({ input: { providerID } })
+      attempts++
+
+      return attempts === 1
+        ? { output: { ok: false, issue: "modelServerRemoveProfileFailed" } }
+        : { output: { ok: true, value: true } }
+    },
+  })
+
+  await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+
+  const row = settings.locator(".settings-provider-row", { hasText: "Local server" })
+  await row.getByRole("button", { name: "Remove server", exact: true }).click()
+  await page
+    .getByRole("dialog", { name: "Remove server", exact: true })
+    .getByRole("button", { name: "Remove server", exact: true })
+    .click()
+
+  const partial = page.getByRole("dialog", { name: "The key was removed, but the settings could not be saved." })
+  await partial.getByRole("button", { name: "Try again", exact: true }).click()
+  await expect(row).toHaveCount(0)
+  expect(attempts).toBe(2)
 })
 
 test("providers: the connect dialog lists connected providers and manages their accounts", async ({ page }) => {

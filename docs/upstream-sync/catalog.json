@@ -53,7 +53,8 @@
       "id": "CAT-30",
       "title": "Desktop WSL product CLI (C5.7, В-101)",
       "paths": ["packages/gui-plugins/README.md", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/wsl/**",
-        "packages/gui-plugins/src/loginom-gui/wsl-*.ts", "packages/gui-plugins/src/updater/request.ts",
+        "packages/gui-plugins/src/loginom-gui/wsl-*.ts", "packages/gui-plugins/src/wsl-*.ts",
+        "packages/gui-plugins/src/update-feed.ts", "packages/gui-plugins/src/update-proxy.ts", "packages/gui-plugins/src/update-request.ts", "packages/gui-plugins/src/shell-escape.ts",
         "packages/app/e2e/regression/settings-wsl.spec.ts", "packages/app/e2e/utils/settings-wsl.*",
         "packages/app/test-browser/builtin-plugins.test.ts"]
     },
@@ -100,8 +101,13 @@
         "packages/core/src/session/history.ts", "packages/protocol/openapi.json",
         "packages/core/src/session/message-updater.ts", "packages/schema/src/session-event.ts",
         "packages/schema/src/session-message.ts", "packages/client/src/effect/api/api.ts",
-        "packages/app/src/runtime/server/data.test.ts"
-      ]
+        "packages/app/src/runtime/server/data.test.ts", "packages/core/src/config.ts",
+        "packages/core/src/model-resolver.ts", "packages/core/src/models-dev.ts", "packages/core/test/models.test.ts",
+        "packages/server/test/loginom-model-server.test.ts"
+      ],
+      "notes": {
+        "packages/server/test/loginom-model-server.test.ts": "C2.6: verifies that model discovery and direct saves omit identifiers containing an echoed server secret."
+      }
     },
     { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": [], "pending": "B2.7" },
     {
@@ -145,7 +151,7 @@
     },
     {
       "id": "CAT-14",
-      "title": "Built-in GUI tool renderers (C3.0, accepted timeline row exception)",
+      "title": "Built-in GUI tool renderers (C3.0, accepted timeline row exception) and provider setup (C2.6)",
       "paths": [
         "packages/app/component-tests/plugin-host.fixture.tsx",
         "packages/app/src/runtime/plugin/host.tsx",
@@ -165,7 +171,10 @@
         "packages/session-ui/src/timeline/projection.ts",
         "packages/session-ui/src/tools/tool-renderer.tsx",
         "packages/ui/src/i18n/en.ts"
-      ]
+      ],
+      "notes": {
+        "packages/plugin/src/gui/builtin.ts": "C2.6: provider setup priority follows the window host's reconnecting server event stream."
+      }
     },
     {
       "id": "CAT-09",
@@ -207,9 +216,14 @@
     {
       "id": "CAT-10",
       "title": "Web app, UI kit, session UI and Loginom localization",
-      "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],
+      "paths": [
+        "packages/app/**", "packages/ui/**", "packages/session-ui/**",
+        "packages/gui-plugins/src/main.ts", "packages/gui-plugins/src/renderer.ts", "packages/gui-plugins/src/loginom-gui/**"
+      ],
       "notes": {
-        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events."
+        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events. C2.6: own-server ordering after reconnect and short-key warning.",
+        "packages/app/src/providers/connect/dialog.tsx": "C2.6: pass the reconnecting server event stream to built-in provider setup priority.",
+        "packages/app/src/runtime/i18n/ru.ts": "C2.6 (В-90): Russian label for the remaining providers group."
       }
     },
     {

@@ -1,4 +1,4 @@
-import { compose } from "@opencode/plugin/gui/host"
+import { compose, type Entry } from "@opencode/plugin/gui/host"
 import context from "./context"
 import btw from "./btw"
 import debug from "./debug"
@@ -29,9 +29,24 @@ export const builtins = compose({
   pairing: { ...pairing, mainEntry: () => import("./pairing/main") },
   updater: { ...updater, mainEntry: () => import("./updater/main") },
   ssh: { ...ssh, mainEntry: () => import("./ssh/main") },
-  wsl: { ...wsl, mainEntry: () => import("./loginom-gui/wsl-main") },
+  wsl: { ...wsl, mainEntry: () => import("./wsl-main") },
   "microsoft-office": microsoftOffice,
   sources,
   goal,
   "loginom-gui": { ...loginom, mainEntry: () => import("./loginom-gui/main") },
 })
+
+export function withWslProxy(entries: readonly Entry[], systemProxyEnabled: () => boolean) {
+  return entries.map((entry): Entry => {
+    if (entry.id !== "wsl" || !entry.mainEntry) return entry
+
+    return {
+      ...entry,
+      mainEntry: async () => {
+        const { loginomWslMain } = await import("./wsl-main")
+
+        return { default: loginomWslMain(systemProxyEnabled) }
+      },
+    }
+  })
+}

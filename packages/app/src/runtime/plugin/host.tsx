@@ -24,6 +24,7 @@ import {
 import { createStore } from "solid-js/store"
 import { LifetimeContext, liveAccessor, PluginContext, type Bridge, type Entry } from "@opencode/plugin/gui/host"
 import {
+  BuiltinProviderSetup,
   Page,
   QuestionRenderer,
   ToolRenderer,
@@ -836,6 +837,9 @@ function createHost(input: HostInput) {
 
         if (registry.id === Page.id && !input.builtins?.has(plugin))
           throw new Error("Only built-in plugins can add pages")
+
+        if (registry.id === BuiltinProviderSetup.id && !input.builtins?.has(plugin))
+          throw new Error("Only built-in plugins can add provider setup forms")
 
         let active = toolRenderer
         let claimed: string | undefined

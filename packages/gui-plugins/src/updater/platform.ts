@@ -12,14 +12,13 @@ import {
   downloadTarget,
   loadSignedUpdate,
   matchUpdateManifest,
-  readUpdateBytes,
   updateMode,
   updateNotificationLink,
-  type UpdateSource,
 } from "./signed-feed"
+import { readUpdateBytes, type UpdateSource } from "../update-feed"
 import type { Platform } from "./machine"
-import { updateProxy } from "./proxy"
-import { updateRequest } from "./request"
+import { updateProxy } from "../update-proxy"
+import { updateRequest } from "../update-request"
 
 const updateClient = pkg.autoUpdater
 

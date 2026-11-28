@@ -462,6 +462,13 @@ export const resolveModel = (
 
 export const hasPackage = (model: Info) => Boolean(model.package)
 
+type TransportFetch = (model: RuntimeInfo) => typeof fetch | undefined
+const transportFetches: TransportFetch[] = []
+
+export function registerTransportFetch(resolve: TransportFetch) {
+  transportFetches.push(resolve)
+}
+
 /** Resolves catalog selections into runtime models for the current Location. */
 export const layer = Layer.effect(
   Service,
@@ -491,13 +498,24 @@ export const layer = Layer.effect(
     const load = Effect.fn("ModelResolver.resolveModel")(function* (selected: Info, variant?: VariantID) {
       const { provider, credential, runtimeInfo } = yield* prepare(selected, variant)
       const model = yield* fromCatalogModel(runtimeInfo, credential, dependencies)
-      const runtime =
+      const authenticated =
         provider?.activation === "enabled" &&
         credential === undefined &&
         !hasConfiguredAuth(runtimeInfo) &&
         usesAPIKeyAuth(runtimeInfo.package)
           ? LanguageModel.update(model, { route: model.route.with({ auth: Auth.none }) })
           : model
+      const route = authenticated.route
+      const transportFetch = transportFetches.map((resolve) => resolve(runtimeInfo)).find((fetch) => fetch !== undefined)
+      const runtime = transportFetch
+        ? LanguageModel.update(authenticated, {
+            route: {
+              ...route,
+              prepareTransport: (body, request, options) =>
+                route.prepareTransport(body, { ...request, fetch: transportFetch }, options),
+            },
+          })
+        : authenticated
       return {
         model: runtime,
         ref: Ref.make({

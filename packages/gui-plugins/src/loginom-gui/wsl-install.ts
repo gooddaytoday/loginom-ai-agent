@@ -3,7 +3,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { MainContext } from "@opencode/plugin/gui/main"
 import { wslCliExecutable, wslCliHome, wslCliPath } from "./wsl-path"
-import { shellEscape, type WslRuntime } from "../wsl/runtime"
+import { shellEscape } from "../shell-escape"
+import type { RunWslOptions, WslCommandResult } from "../wsl/contract"
 
 export function discoverProductCli() {
   return `cli="${wslCliPath}"
@@ -11,18 +12,20 @@ if [ -x "$cli" ]; then readlink -f -- "$cli"; fi`
 }
 
 export async function installProductCli(
-  runtime: Pick<WslRuntime, "runWslSh">,
-  distro: string,
+  runWslSh: (script: string, options: RunWslOptions) => Promise<WslCommandResult>,
   version: string,
   t: MainContext["t"],
   signal: AbortSignal,
   logFailure: (code: string) => void,
   download: (destination: string, signal: AbortSignal) => Promise<string>,
 ) {
-  const architecture = await runtime.runWslSh("uname -m", distro, { signal })
+  const architecture = await runWslSh("uname -m", { signal })
+
   if (architecture.code !== 0) throw Error(t("error.executeDistro"))
   const machine = architecture.stdout.trim()
+
   if (machine === "aarch64" || machine === "arm64") throw Error(t("error.armUnsupported"))
+
   if (machine !== "x86_64") throw Error(t("error.archUnsupported"))
 
   const temporary = await mkdtemp(join(tmpdir(), "loginom-wsl-"))
@@ -36,12 +39,13 @@ export async function installProductCli(
       throw Error(t(code === "WSL_CLI_RELEASE_UNAVAILABLE" ? "error.releaseUnavailable" : "error.releaseVerification"))
     })
 
-    const result = await runtime.runWslSh(productCliInstallScript(destination, digest, version), distro, {
+    const result = await runWslSh(productCliInstallScript(destination, digest, version), {
       signal,
       timeoutMs: 4 * 60_000,
     })
 
     if (result.stderr.includes("WSL_CLI_CLEANUP_FAILED")) logFailure("WSL_CLI_CLEANUP_FAILED")
+
     if (result.code !== 0) throw Error(t("error.installOpencode"))
   } finally {
     await rm(temporary, { recursive: true, force: true })

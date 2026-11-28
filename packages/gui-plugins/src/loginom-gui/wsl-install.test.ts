@@ -21,16 +21,21 @@ test.skipIf(process.platform !== "linux" || process.arch !== "x64")(
       await writeFile(join(root, "wslpath"), '#!/bin/sh\nprintf "%s\\n" "$2"\n', { mode: 0o755 })
       await writeFile(join(payload, "bin/loginom-ai-agent-cli"), "#!/bin/sh\necho 2.3.0\n", { mode: 0o755 })
       const shell = (script: string) => execFileSync("sh", ["-c", script], { env, encoding: "utf8" })
+
       const pack = async () => {
         execFileSync("tar", ["-czf", archive, "--owner=1234", "--group=1234", "-C", payload, "."], { env })
+
         return createHash("sha256").update(await readFile(archive)).digest("hex")
       }
+
       const install = async (skill: string) => {
         await writeFile(join(payload, "resources/loginom/skill"), skill)
         const digest = await pack()
         shell(productCliInstallScript(archive, digest, "2.3.0"))
+
         return digest
       }
+
       const base = join(home, ".local/share/loginom-ai-agent-wsl")
       const releases = async () => (await readdir(base)).filter((name) => /^[0-9a-f]{64}(?:\.[a-zA-Z0-9]{8})?$/.test(name)).sort()
 
@@ -81,14 +86,13 @@ test.skipIf(process.platform !== "linux" || process.arch !== "x64")(
 
 test.each(["aarch64", "arm64"])("refuses %s before accessing a release feed", async (arch) => {
   const commands: string[] = []
+
   const result = installProductCli(
-    {
-      async runWslSh(command) {
-        commands.push(command)
-        return { code: 0, signal: null, stdout: `${arch}\r\n`, stderr: "" }
-      },
+    async (command) => {
+      commands.push(command)
+
+      return { code: 0, signal: null, stdout: `${arch}\r\n`, stderr: "" }
     },
-    "Ubuntu",
     "2.3.0",
     (key) => key,
     new AbortController().signal,
@@ -97,6 +101,7 @@ test.each(["aarch64", "arm64"])("refuses %s before accessing a release feed", as
       throw Error("Unexpected download")
     },
   )
+
   await expect(result).rejects.toThrow("error.armUnsupported")
   expect(commands).toEqual(["uname -m"])
 })

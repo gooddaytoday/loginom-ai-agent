@@ -2,32 +2,15 @@ import { spawn } from "node:child_process"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import type { MainContext } from "@opencode/plugin/gui/main"
-import type { WslDistroProbe, WslInstalledDistro, WslOnlineDistro, WslRuntimeCheck } from "./contract"
+import type { RunWslOptions, WslCommandResult, WslDistroProbe, WslInstalledDistro, WslOnlineDistro, WslRuntimeCheck } from "./contract"
 import { discoverScript, parseVersion, versionScript } from "./remote-cli"
+import { shellEscape } from "../shell-escape"
+
+export { shellEscape } from "../shell-escape"
 
 export type WslCommandLine = {
   stream: "stdout" | "stderr"
   text: string
-}
-
-export type WslCommandResult = {
-  code: number | null
-  signal: NodeJS.Signals | null
-  stdout: string
-  stderr: string
-}
-
-export type RunWslOptions = {
-  signal?: AbortSignal
-  /**
-   * Ceiling on how long we wait for the child process to exit. When the
-   * LXSS service or a specific distro wedges (e.g. Ubuntu-24.04 with a
-   * pending first-run prompt), `wsl.exe` never returns and any command
-   * that doesn't specify a timeout hangs the entire startup flow. Default
-   * is 20s - enough for slow cold-starts, short enough to fail fast on
-   * a wedge. Callers can override for longer-running jobs.
-   */
-  timeoutMs?: number
 }
 
 export type WslCliBuild = {
@@ -52,10 +35,6 @@ export function summarize(value: string) {
     .map((line) => line.trim())
     .filter(Boolean)
     .join("\n")
-}
-
-export function shellEscape(value: string) {
-  return `'${value.replace(/'/g, `'"'"'`)}'`
 }
 
 /** WSL commands; `t` resolves the plugin's copy for errors the user sees. */

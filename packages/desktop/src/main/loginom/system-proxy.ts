@@ -1,6 +1,7 @@
 import { desktopServiceProxy, MODEL_PROXY_URLS, probeProxyUrl } from "@loginom-ai-agent/loginom-host/system-proxy"
 import { Product } from "@loginom-ai-agent/product"
 import { SystemProxy, type SystemProxySetting } from "@opencode/gui-plugins/loginom-gui/contract"
+import { withWslProxy } from "@opencode/gui-plugins/main"
 import { systemProxyPreference } from "@opencode/gui-plugins/updater/proxy-preference"
 import type { Entry } from "@opencode/plugin/gui/host"
 import type { MainContext } from "@opencode/plugin/gui/main"
@@ -124,18 +125,8 @@ export function withSystemProxy(entries: readonly Entry[], proxy: Effect.Success
     ctx.onCleanup(proxy.subscribe(() => provider.changed()))
   }
 
-  return entries.map((entry): Entry => {
+  return withWslProxy(entries, () => proxy.setting().enabled).map((entry): Entry => {
     const main = entry.mainEntry
-
-    if (entry.id === "wsl" && main) {
-      return {
-        ...entry,
-        mainEntry: async () => {
-          const { loginomWslMain } = await import("@opencode/gui-plugins/loginom-gui/wsl-main")
-          return { default: loginomWslMain(() => proxy.setting().enabled) }
-        },
-      }
-    }
 
     if (entry.id !== "loginom-gui" || !main) return entry
 
