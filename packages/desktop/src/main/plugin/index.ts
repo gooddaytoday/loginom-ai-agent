@@ -4,7 +4,9 @@ import { app } from "electron"
 import { Context, Effect, Layer } from "effect"
 import type { PluginEndpoint } from "../../shared/ipc-rpc/plugins"
 import { ApplicationLifecycle } from "../lifecycle"
+import { DesktopInitialization } from "../lifecycle/desktop-initialization"
 import { Shutdown } from "../lifecycle/shutdown"
+import { withSystemProxy } from "../loginom/system-proxy"
 
 const LEVELS = { debug: "Debug", info: "Info", warn: "Warn", error: "Error" } as const
 
@@ -34,6 +36,7 @@ export const layer = Layer.effect(
     const shutdown = yield* Shutdown.Service
     const lifecycle = yield* ApplicationLifecycle.Service
     const desktopCli = yield* DesktopCli.Service
+    const { systemProxy } = yield* DesktopInitialization.Service
     const context = yield* Effect.context()
     const runFork = Effect.runForkWith(context)
     const runPromise = Effect.runPromiseWith(context)
@@ -43,18 +46,18 @@ export const layer = Layer.effect(
 
     const driver = createDriver({
       load: async () => {
-        const [module, cli] = await Promise.all([import("./host"), runPromise(desktopCli.resolve)])
+        const [module, registry] = await Promise.all([import("./host"), import("@opencode/gui-plugins/main")])
 
         return () =>
           module.createHost({
             db: storage.db,
             state: storage.state,
-            cli: {
-              version: cli.version,
-              command: cli.command,
-              binary: cli.binary,
-              development: !app.isPackaged && !cli.binary,
-            },
+            builtins: withSystemProxy(registry.builtins, systemProxy),
+            cli: () =>
+              runPromise(desktopCli.resolve).then((cli) => ({
+                ...cli,
+                development: !app.isPackaged && !cli.binary,
+              })),
             subscriptions,
             servers,
             appState: lifecycle.state,

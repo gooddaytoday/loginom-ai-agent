@@ -154,6 +154,49 @@ test("conversation search keeps its results while waiting and searches prompts f
   await expectPath(page, sessionHref(sessionID))
 })
 
+test("conversation search keeps title and project matches when prompt search fails", async ({ page }) => {
+  let promptSearchUnavailable = true
+
+  const workspace = await mockWorkspace(page, {
+    name: "Revenue",
+    seed: { tabs: [], settings: { appearance: { tabLayout: "vertical" } } },
+    sessions: [{ id: "ses_project_match", title: "Quarterly analysis" }],
+    provider: NO_PROVIDER,
+    promptSearchFailures: () => promptSearchUnavailable,
+  })
+
+  await page.goto("/")
+  const trigger = page.getByRole("button", { name: "Search", exact: true })
+  await expect(row(page, "Quarterly analysis")).toBeVisible({ timeout: APP_READY_TIMEOUT })
+  await trigger.press("ControlOrMeta+k")
+  const dialog = page.getByRole("dialog")
+  const search = dialog.getByRole("combobox", { name: "Title, project, or words from your prompt" })
+  const results = dialog.getByRole("option")
+  await expect(search).toBeFocused()
+  await expect(results).toHaveText([/Quarterly analysis/])
+
+  // This session first reaches the client as a search result.
+  workspace.sessions.push(
+    session({
+      id: "ses_title_match",
+      title: "Revenue report",
+      projectID: workspace.projectID,
+      directory: workspace.directory,
+    }),
+  )
+  await search.fill("revenue")
+  await expect(results).toHaveText(["Revenue", /Revenue report/, /Quarterly analysis/])
+  const notice = dialog.getByRole("status").filter({ hasText: "Prompt text search is currently unavailable." })
+  await expect(notice).toBeVisible()
+
+  promptSearchUnavailable = false
+  await search.fill("revenue report")
+  await expect(results).toHaveText([/Revenue report/])
+  await expect(notice).toBeHidden()
+  await search.press("Enter")
+  await expectPath(page, sessionHref("ses_title_match"))
+})
+
 test("Home keeps the session list in every interface mode", async ({ page }) => {
   const earlier = { id: "ses_home_earlier", title: "Finished earlier" }
   await mockWorkspace(page, { name: "Home", sessions: [earlier] })

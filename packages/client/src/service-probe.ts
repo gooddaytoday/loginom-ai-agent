@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import type { DiscoverOptions, Endpoint, Info } from "./service.js"
@@ -43,6 +44,23 @@ export function fallback() {
 /** Whether two registrations describe the same service instance. */
 export function same(left: Info, right: Info) {
   return left.id === right.id && left.version === right.version && left.url === right.url && left.pid === right.pid
+}
+
+export async function isServiceProcessAlive(pid: number) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false
+  try {
+    process.kill(pid, 0)
+  } catch (error) {
+    return error instanceof Error && "code" in error && error.code === "EPERM"
+  }
+  if (process.platform !== "linux") return true
+  try {
+    const stat = await readFile(`/proc/${pid}/stat`, "utf8")
+    const state = stat[stat.lastIndexOf(")") + 2]
+    return state !== "Z" && state !== "X"
+  } catch {
+    return true
+  }
 }
 
 /** Ask a registered owner for its health and classify the answer. */
