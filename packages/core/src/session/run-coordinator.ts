@@ -1,6 +1,6 @@
 export * as SessionRunCoordinator from "./run-coordinator.js"
 
-import { Deferred, Effect, Exit, Fiber, FiberSet, Scope } from "effect"
+import { Cause, Deferred, Effect, Exit, Fiber, FiberSet, Scope } from "effect"
 import type { Promotable } from "./inbox.js"
 
 /** Serializes execution for each key while allowing different keys to run concurrently. */
@@ -40,7 +40,7 @@ type Execution<E, Reason> = {
   readonly done: Deferred.Deferred<void, E>
   owner?: Fiber.Fiber<void>
   scope: Promotable
-  pendingWake?: Promotable
+  pendingWake?: { readonly scope: Promotable }
   pendingQueueWake: boolean
   stopping: boolean
   interruptionReason?: Reason
@@ -66,6 +66,10 @@ export const make = <Key, E, Reason = never>(options: {
    * drain and before the execution settles (waiters resolve after it completes).
    */
   readonly settled?: (key: Key, exit: Exit.Exit<void, E>, reason?: Reason) => Effect.Effect<void>
+  /** Whether a wake recorded before a failure still has steering work left to do. */
+  readonly hasSteeringWork?: (key: Key) => Effect.Effect<boolean>
+  /** Runs after a successful execution settles without a successor. */
+  readonly succeededWhileIdle?: (key: Key) => Effect.Effect<void>
 }): Effect.Effect<Coordinator<Key, E, Reason>, never, Scope.Scope> =>
   Effect.gen(function* () {
     const executions = new Map<Key, Execution<E, Reason>>()
@@ -80,7 +84,7 @@ export const make = <Key, E, Reason = never>(options: {
       Effect.suspend(() => options.drain(key, force, execution.scope, continuation)).pipe(
         Effect.andThen(
           Effect.suspend(() => {
-            const pending = execution.pendingQueueWake ? "input" : execution.pendingWake
+            const pending = execution.pendingQueueWake ? "input" : execution.pendingWake?.scope
             if (execution.stopping || pending === undefined) return Effect.void
             execution.scope = pending
             execution.pendingWake = undefined
@@ -111,7 +115,7 @@ export const make = <Key, E, Reason = never>(options: {
               execution.owner = undefined
             }).pipe(Effect.andThen(options.settled?.(key, exit, execution.interruptionReason) ?? Effect.void)),
           ),
-          Effect.onExit((exit) => Effect.sync(() => settle(key, execution, exit))),
+          Effect.onExit((exit) => settle(key, execution, exit)),
           Effect.exit,
           Effect.asVoid,
         ),
@@ -121,12 +125,33 @@ export const make = <Key, E, Reason = never>(options: {
 
     // A late wake starts a fresh execution for the remaining work. A queue-only wake
     // waits for success, including when it arrives during terminal settlement.
-    const settle = (key: Key, execution: Execution<E, Reason>, exit: Exit.Exit<void, E>) => {
-      const next = execution.pendingQueueWake && Exit.isSuccess(exit) ? "input" : execution.pendingWake
-      if (next) start(key, false, next)
-      else executions.delete(key)
-      Deferred.doneUnsafe(execution.done, exit)
-    }
+    const settle = (key: Key, execution: Execution<E, Reason>, exit: Exit.Exit<void, E>) =>
+      Effect.gen(function* () {
+        const succeeded = Exit.isSuccess(exit)
+        const wake = execution.pendingWake
+        const failed = !succeeded && !Cause.hasInterrupts(exit.cause)
+        // A steer may already have been delivered before a later model step failed.
+        // Keep wakes that arrive during this read, while never widening them to queued prompts.
+        const hasSteering =
+          failed &&
+          wake &&
+          (yield* (options.hasSteeringWork?.(key) ?? Effect.succeed(true)).pipe(
+            Effect.catchCause((cause) =>
+              Effect.logError("Failed to check pending steering work", cause).pipe(Effect.as(false)),
+            ),
+          ))
+        const pending = execution.pendingWake
+        const next = failed
+          ? pending && (hasSteering || pending !== wake) && "steer"
+          : succeeded && execution.pendingQueueWake
+            ? "input"
+            : pending?.scope
+        if (next) start(key, false, next)
+        else {
+          executions.delete(key)
+          if (succeeded) yield* options.succeededWhileIdle?.(key) ?? Effect.void
+        }
+      }).pipe(Effect.ensuring(Effect.sync(() => Deferred.doneUnsafe(execution.done, exit))))
 
     const isActive = (key: Key) => Effect.sync(() => executions.has(key))
 
@@ -151,7 +176,7 @@ export const make = <Key, E, Reason = never>(options: {
             return
           }
           // Coalesced wakes keep the widest scope: "input" subsumes "steer".
-          execution.pendingWake = execution.pendingWake === "input" ? "input" : scope
+          execution.pendingWake = { scope: execution.pendingWake?.scope === "input" ? "input" : scope }
           return
         }
         start(key, false, scope === "queue" ? "input" : scope)

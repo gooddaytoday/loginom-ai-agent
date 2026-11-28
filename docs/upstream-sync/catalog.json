@@ -70,7 +70,9 @@
         "packages/core/src/session/message-updater.ts", "packages/core/test/session-runner.test.ts",
         "packages/schema/src/session-event.ts", "packages/schema/test/event-manifest.test.ts",
         "packages/protocol/openapi.json", "packages/client/src/effect/api/api.ts",
-        "packages/client/src/effect/generated/client.ts", "packages/server/test/media.test.ts"
+        "packages/client/src/effect/generated/client.ts", "packages/server/test/media.test.ts",
+        "packages/client/src/solid/data.ts", "packages/client/test/solid-inbox-race.test.ts",
+        "packages/app/src/shell/notifications/notification.tsx", "packages/app/test-browser/server-notification-state.test.ts"
       ]
     },
     {

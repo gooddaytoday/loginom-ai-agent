@@ -464,18 +464,20 @@ const layer = Layer.unwrap(
         function drain(
           sessionID: Session.ID,
           force: boolean,
+          promotable: SessionInbox.Promotable,
           continuation?: SessionRunner.Continuation,
         ): Effect.Effect<void, SessionRunner.RunError> {
           return sessionRunner
-            .drain({ sessionID, force, continuation })
+            .drain({ sessionID, force, continuation, promotable })
             .pipe(
               Effect.flatMap((result) =>
-                result._tag === "Complete" ? Effect.void : drain(sessionID, false, result.continuation),
+                result._tag === "Complete" ? Effect.void : drain(sessionID, false, promotable, result.continuation),
               ),
             )
         }
         const coordinator = yield* SessionRunCoordinator.make<Session.ID, SessionRunner.RunError>({
-          drain: (sessionID, force) => drain(sessionID, force),
+          drain: (sessionID, force, promotable, continuation) =>
+            drain(sessionID, force, promotable, continuation ? { step: 1 } : undefined),
         })
         return SessionExecution.Service.of({
           active: coordinator.active,
@@ -2082,9 +2084,7 @@ describe("SessionRunnerLLM", () => {
     expect(userTexts(last)).toEqual(["First", "Fourth"])
     expect(last.system.map((part) => part.text).join("\n")).not.toContain("Entered mode")
     // Clients still see every message; only the model context hides the stale update.
-    expect((yield* s.messages).filter((message) => message.type === "system")).toMatchObject([
-      { text: "Entered mode" },
-    ])
+    expect((yield* s.messages).filter((message) => message.type === "system")).toMatchObject([{ text: "Entered mode" }])
   })
 
   scenario("uses the selected model family prompt when the agent does not override it", function* (s) {
@@ -5014,6 +5014,24 @@ describe("SessionRunnerLLM", () => {
 
     expect(s.requests).toHaveLength(2)
     expect(userTexts(s.requests[1])).toEqual(["Start working", "Recover with this"])
+  })
+
+  scenario("parks a queued prompt when a tool continuation fails after consuming a steer", function* (s) {
+    yield* s.admit("Start working")
+    const tools = yield* s.blockTools()
+    const failure = invalidRequest()
+    yield* s.llm.push(TestLLM.toolCall("call-work", "echo", { text: "working" }), Stream.fail(failure), TestLLM.stop())
+
+    const active = yield* s.resume.pipe(Effect.forkChild)
+    yield* tools.started
+    yield* s.session.prompt({ sessionID, text: "Steer the current turn", delivery: "steer" })
+    const queued = yield* s.session.prompt({ sessionID, text: "Leave this queued", delivery: "queue" })
+    yield* tools.release
+    expect(yield* Fiber.join(active).pipe(Effect.flip)).toBe(failure)
+    yield* s.session.wait(sessionID)
+
+    expect(s.requests.map(userTexts)).toEqual([["Start working"], ["Start working", "Steer the current turn"]])
+    expect(yield* s.inbox).toMatchObject([{ id: queued.id, delivery: "queue", payload: { text: "Leave this queued" } }])
   })
 
   scenario("parks queued prompts admitted during a failed turn", function* (s) {

@@ -1,8 +1,8 @@
 // A foreground shell call across a graceful restart, through the whole app: server 1 runs the turn, prepares a
 // handoff and is torn down mid-call, server 2 recovers the command from the same process daemon and resumes the session.
-import { describe, expect } from "bun:test"
+import { describe, expect, spyOn } from "bun:test"
 import path from "path"
-import { Context, Effect, Exit, Fiber, Layer, Scope, Stream } from "effect"
+import { Context, Deferred, Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect"
 import type { ChildProcess } from "effect/process"
 import { AIError, InvalidRequestError, LanguageModel, LLMClient } from "@opencode/ai/effect"
 import { OpenAIChat } from "@opencode/ai/protocols/openai-chat"
@@ -23,7 +23,9 @@ import { Provider } from "@opencode/core/provider"
 import { AbsolutePath } from "@opencode/core/schema"
 import { Session } from "@opencode/core/session"
 import { SessionEvent } from "@opencode/core/session/event"
+import { SessionStatusEvent } from "@opencode/schema/session-status-event"
 import { SessionRestart } from "@opencode/core/session/execution/restart"
+import { SessionStore } from "@opencode/core/session/store"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { Shell } from "@opencode/core/shell"
 import { Environment } from "@opencode/core/environment/index"
@@ -87,6 +89,7 @@ const world = Effect.gen(function* () {
           Session.node,
           LocationServiceMap.node,
           SessionRestart.node,
+          SessionStore.node,
           Job.node,
         ]),
         [
@@ -124,47 +127,114 @@ const until = (check: () => boolean) =>
     while (!check()) yield* Effect.sleep(5)
   })
 
-it.live("signals completion once after a prompt queued during an active turn", () =>
-  Effect.gen(function* () {
-    const { llm, project, server } = yield* world
-    const context = yield* server(yield* Scope.fork(yield* Effect.scope))
-    const sessions = Context.get(context, Session.Service)
-    const bus = Context.get(context, Bus.Service)
-    const { id: sessionID } = yield* sessions.create({
-      location: { directory: AbsolutePath.make(project) },
-      title: "Queued prompt completion",
-      agent: Agent.ID.make("build"),
-      model: Model.Ref.make({ id: Model.ID.make("restart"), providerID: Provider.ID.make("test") }),
-    })
-    const completions: string[] = []
-    yield* Effect.acquireRelease(
-      bus.listen((event) =>
-        event.type === SessionEvent.Execution.Succeeded.type && event.durable?.aggregateID === sessionID
-          ? Effect.sync(() => void completions.push(event.id))
-          : Effect.void,
-      ),
-      (unsubscribe) => unsubscribe,
-    )
+for (const admission of ["while draining", "during settlement"] as const)
+  it.live(`signals completion once after a prompt queued ${admission}`, () =>
+    Effect.gen(function* () {
+      const { llm, project, server } = yield* world
+      const context = yield* server(yield* Scope.fork(yield* Effect.scope))
+      const sessions = Context.get(context, Session.Service)
+      const bus = Context.get(context, Bus.Service)
+      const { id: sessionID } = yield* sessions.create({
+        location: { directory: AbsolutePath.make(project) },
+        title: "Queued prompt completion",
+        agent: Agent.ID.make("build"),
+        model: Model.Ref.make({ id: Model.ID.make("restart"), providerID: Provider.ID.make("test") }),
+      })
+      const completions: string[] = []
+      yield* Effect.acquireRelease(
+        bus.listen((event) => {
+          if (event.type !== SessionStatusEvent.Status.type || !Schema.is(SessionStatusEvent.Status.data)(event.data))
+            return Effect.void
+          const { data } = event
+          return data.sessionID === sessionID && data.status.type === "idle"
+            ? Effect.sync(() => void completions.push(event.id))
+            : Effect.void
+        }),
+        (unsubscribe) => unsubscribe,
+      )
 
-    const active = yield* llm.gate()
-    yield* sessions.prompt({ sessionID, text: "Active prompt" })
-    yield* active.started
-    yield* sessions.prompt({ sessionID, text: "Queued prompt", delivery: "queue" })
-    const queued = yield* llm.gate()
-    yield* active.release
-    yield* queued.started
+      const settling = yield* Deferred.make<void>()
+      const release = yield* Deferred.make<void>()
+      if (admission === "during settlement") {
+        const jobs = Context.get(context, Job.Service)
+        const prepare = jobs.prepareSubagentReport
+        const spy = yield* Effect.acquireRelease(
+          Effect.sync(() => spyOn(jobs, "prepareSubagentReport")),
+          (mock) => Effect.sync(() => mock.mockRestore()),
+        )
+        spy.mockImplementation((key, generation) =>
+          Deferred.succeed(settling, undefined).pipe(
+            Effect.andThen(Deferred.await(release)),
+            Effect.andThen(prepare(key, generation)),
+          ),
+        )
+      }
 
-    expect(JSON.stringify((yield* llm.requests())[1]?.messages)).toContain("Queued prompt")
-    expect(completions).toEqual([])
-    yield* queued.release
-    yield* sessions.wait(sessionID)
+      const active = yield* llm.gate()
+      yield* sessions.prompt({ sessionID, text: "Active prompt" })
+      yield* active.started
+      const queued = yield* llm.gate()
+      if (admission === "during settlement") {
+        yield* active.release
+        yield* Deferred.await(settling)
+      }
+      yield* sessions.prompt({ sessionID, text: "Queued prompt", delivery: "queue" })
+      if (admission === "during settlement") yield* Deferred.succeed(release, undefined)
+      else yield* active.release
+      yield* queued.started
 
-    expect(yield* llm.requests()).toHaveLength(2)
-    expect(completions).toHaveLength(1)
-  }),
-)
+      expect(JSON.stringify((yield* llm.requests())[1]?.messages)).toContain("Queued prompt")
+      expect(completions).toEqual([])
+      const idle = yield* sessions.wait(sessionID).pipe(Effect.forkChild({ startImmediately: true }))
+      yield* queued.release
+      yield* Fiber.join(idle)
+
+      expect(yield* llm.requests()).toHaveLength(2)
+      expect(completions).toHaveLength(1)
+    }),
+  )
 
 describe("queued prompts across a graceful restart", () => {
+  it.live("delivers the original queued prompt on the first request after a claim without delivery", () =>
+    Effect.gen(function* () {
+      const { llm, project, server } = yield* world
+      const scope = yield* Effect.scope
+      const first = yield* Scope.fork(scope)
+      const original = yield* server(first)
+      const sessions = Context.get(original, Session.Service)
+      const { id: sessionID } = yield* sessions.create({
+        location: { directory: AbsolutePath.make(project) },
+        title: "Claim without delivery",
+        agent: Agent.ID.make("build"),
+        model: Model.Ref.make({ id: Model.ID.make("restart"), providerID: Provider.ID.make("test") }),
+      })
+      const queued = yield* sessions.prompt({ sessionID, text: "Original prompt", delivery: "queue", resume: false })
+      // Persist the same claim as the execution start hook, then close before the runner delivers the row.
+      const store = Context.get(original, SessionStore.Service)
+      yield* Context.get(original, Bus.Service).publish(
+        SessionEvent.Execution.Started,
+        { sessionID },
+        { commit: () => store.claim(sessionID) },
+      )
+      expect(yield* llm.requests()).toEqual([])
+      expect(yield* sessions.inbox(sessionID)).toMatchObject([{ id: queued.id }])
+      yield* Scope.close(first, Exit.void)
+
+      const reopened = yield* server(yield* Scope.fork(scope))
+      const firstRequest = yield* llm.gate()
+      yield* Context.get(reopened, SessionRestart.Service).resumeSuspendedSessions
+      yield* firstRequest.started
+      yield* firstRequest.release
+      const restored = Context.get(reopened, Session.Service)
+      yield* restored.wait(sessionID)
+
+      const requests = yield* llm.requests()
+      expect(requests).toHaveLength(1)
+      expect(JSON.stringify(requests[0]?.messages)).toContain("Original prompt")
+      expect(yield* restored.inbox(sessionID)).toEqual([])
+    }),
+  )
+
   for (const recovery of ["manual", "fails", "succeeds"] as const)
     it.live(`reopens the inbox when recovery is ${recovery}`, () =>
       Effect.gen(function* () {
