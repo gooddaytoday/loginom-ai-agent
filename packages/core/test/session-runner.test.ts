@@ -2084,7 +2084,9 @@ describe("SessionRunnerLLM", () => {
     expect(userTexts(last)).toEqual(["First", "Fourth"])
     expect(last.system.map((part) => part.text).join("\n")).not.toContain("Entered mode")
     // Clients still see every message; only the model context hides the stale update.
-    expect((yield* s.messages).filter((message) => message.type === "system")).toMatchObject([{ text: "Entered mode" }])
+    expect((yield* s.messages).filter((message) => message.type === "system")).toMatchObject([
+      { text: "Entered mode" },
+    ])
   })
 
   scenario("uses the selected model family prompt when the agent does not override it", function* (s) {
@@ -4762,6 +4764,34 @@ describe("SessionRunnerLLM", () => {
       ["Interrupt current work"],
       ["Interrupt current work", "Run after interrupt"],
       ["Interrupt current work", "Run after interrupt", "Run second"],
+    ])
+    expect(yield* s.inbox).toEqual([])
+  })
+
+  scenario("delivers a queued prompt admitted while Stop is cleaning up", function* (s) {
+    yield* s.admit("Interrupt current work")
+    const started = yield* Deferred.make<void>()
+    const cleaningUp = yield* Deferred.make<void>()
+    const release = yield* Deferred.make<void>()
+    yield* s.llm.push(
+      Stream.unwrap(Deferred.succeed(started, undefined).pipe(Effect.as(Stream.never))).pipe(
+        Stream.ensuring(Deferred.succeed(cleaningUp, undefined).pipe(Effect.andThen(Deferred.await(release)))),
+      ),
+      TestLLM.stop(),
+    )
+
+    const running = yield* s.resume.pipe(Effect.forkChild)
+    yield* Deferred.await(started)
+    yield* s.session.interrupt(sessionID)
+    yield* Deferred.await(cleaningUp)
+    yield* s.session.prompt({ sessionID, text: "Admitted after Stop", delivery: "queue" })
+    yield* Deferred.succeed(release, undefined)
+    expect(yield* Fiber.await(running)).toMatchObject({ _tag: "Failure" })
+    yield* s.session.wait(sessionID)
+
+    expect(s.requests.map(userTexts)).toEqual([
+      ["Interrupt current work"],
+      ["Interrupt current work", "Admitted after Stop"],
     ])
     expect(yield* s.inbox).toEqual([])
   })
