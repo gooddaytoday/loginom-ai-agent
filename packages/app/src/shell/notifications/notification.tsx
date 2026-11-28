@@ -50,7 +50,7 @@ function systemNotificationDescription(title: string, fallback: string) {
   // Titles can come from user input or from a model. Keep credential-like text out of OS notification history.
   if (
     /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bbearer\s+[\w./+=-]{8,}|\b[a-z][\w+.-]*:\/\/[^/\s]*@/i.test(text) ||
-    /(?:\b(?:[a-z0-9]+_)*(?:api[ _-]?key|access[ _-]?key|password|passwd|secret|token|authorization|cookie)|пароль|токен|секретный ключ)["']?\s*[:=]\s*\S/i.test(text) ||
+    /(?:\b(?:[a-z0-9]+_)*(?:api[ _-]?key|access[ _-]?key|password|passwd|(?:client[ _-]?)?secret|(?:(?:access|refresh|auth)[ _-]?)?token|authorization|cookie)|пароль|токен|секретный ключ)["']?\s*[:=]\s*\S/i.test(text) ||
     /\b(?:sk-|gh[pousr]_|github_pat_|glpat-|xox[baprs]-|AIza|AKIA)[\w-]{12,}|\beyJ[\w-]+\.[\w-]+\.[\w-]+/.test(text)
   ) {
     return fallback
@@ -58,9 +58,7 @@ function systemNotificationDescription(title: string, fallback: string) {
 
   const url = text.match(/\b(?:file|https?):\/\/[^\s"'`]+/i)?.[0]
   const quotedPath = text.match(/(["'`])([^"'`]*[\\/][^"'`]+)\1/)?.[2]
-  const barePath = /^(?:[a-z]:[\\/]|\\{2}|~?\/)/i.test(text)
-    ? text
-    : text.match(/[^\s"'`]*[\\/][^\s"'`]+/)?.[0]
+  const barePath = /^(?:[a-z]:[\\/]|\\{2}|~?\/)/i.test(text) ? text : text.match(/[^\s"'`]*[\\/][^\s"'`]+/)?.[0]
   const path = url ? (URL.parse(url)?.pathname ?? "/") : (quotedPath ?? barePath)
 
   if (path === undefined) return title.trim() || fallback

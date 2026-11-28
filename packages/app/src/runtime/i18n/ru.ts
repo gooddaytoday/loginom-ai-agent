@@ -802,6 +802,8 @@ export const dict = {
   "settings.general.notifications.permissions.title": "Разрешения",
   "settings.general.notifications.permissions.description":
     "Показывать системное уведомление, когда требуется разрешение",
+  "settings.general.notifications.questions.title": "Вопросы",
+  "settings.general.notifications.questions.description": "Показывать системное уведомление, когда агент задаёт вопрос",
   "settings.general.notifications.turnFinished.title": "Ход закончен",
   "settings.general.notifications.turnFinished.description": "Уведомлять об окончании хода, когда окно не в фокусе",
   "settings.general.notifications.decision.title": "Нужно ваше решение",
