@@ -102,6 +102,7 @@ class ExternalClient {
       this.f.cleanupOptions=options;
       value={version:1,session_id:'own-session',document_id:'own-doc',status:this.f.scenario.endsWith('native-blocked')?'BLOCKED':'SUCCEEDED',package_closed:!this.f.scenario.endsWith('native-blocked'),
         logged_out:!this.f.scenario.endsWith('native-blocked'),account:'test-2',package_path:this.f.path,unsaved_changes_discarded:false,packages_before:1,packages_after:0,reason:null};
+      if(this.f.nativeAuditError)value.audit_error=this.f.nativeAuditError;
       // Mirrors the native tab guard (package-cleanup.mjs: no own receipt for this node and tab).
       if(this.f.activeTab&&options.tabTid!==this.f.activeTab)value={...value,status:'BLOCKED',package_closed:false,logged_out:false,
         packages_after:1,reason:'TAB_IDENTITY_CHANGED'};
@@ -459,6 +460,7 @@ for(const fault of ['cancelled','unknown','wrong-bytes','changed-mtime','late-ha
   const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
   const f=current={scenario:'opened-clean',events:[],saves:0,path,catalog};
   const store=await createArtifactStore({directory:join(directory,'input')});
+  if(fault==='cancelled')f.nativeAuditError={code:'ARTIFACT_DELIVERY_AUDIT_DEADLINE',detail:'browser-only-marker'};
   const sourcePath=join(directory,'input.csv'),contents='value\n42\n';
   await writeFile(sourcePath,contents);
   const artifact=await store.admit({sourcePath,name:'input.csv',bytes:Buffer.byteLength(contents),
@@ -581,8 +583,8 @@ for(const fault of ['cancelled','unknown','wrong-bytes','changed-mtime','late-ha
   assert.equal(cleanup.reason,fault==='cancelled'?null:auditError?'CLEANUP_EVIDENCE_UNCONFIRMED':'CLEANUP_OR_OPERATION_UNCONFIRMED');
   assert.equal(cleanup.package_closed===true,fault==='cancelled'||stalledCloseAudit);
   assert.equal(cleanup.logged_out===true,fault==='cancelled'||stalledCloseAudit);
+  assert.deepEqual(cleanup.audit_error,auditError??undefined);
   if(auditError){
-    assert.deepEqual(cleanup.audit_error,auditError);
     const resourceRecords=(await readFile(join(directory,'resource-close.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
     const completion=resourceRecords.find(event=>event.stage==='complete');
     assert.equal(completion?.status,'rejected');
@@ -590,7 +592,9 @@ for(const fault of ['cancelled','unknown','wrong-bytes','changed-mtime','late-ha
     assert.deepEqual(completion?.audit_error,auditError);
   }
   if(auditError||['cancelled','late-ack','stalled-ack'].includes(fault)){
-    const records=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+    const journalText=await readFile(join(directory,'execution-events.jsonl'),'utf8');
+    assert.doesNotMatch(journalText,/browser-only-marker/);
+    const records=journalText.trim().split('\n').map(JSON.parse);
     const terminal=records.filter(event=>['transfer_completed','verification_completed','artifact_delivery_completed'].includes(event.phase)
       &&['delivery','delivery:upload','delivery:shutdown-verify'].includes(event.operation_id));
     const completed=['transfer_completed','verification_completed','artifact_delivery_completed'];

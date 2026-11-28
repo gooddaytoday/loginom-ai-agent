@@ -1096,7 +1096,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         const saveOperationId = normalCleanup ? lastSavedPackage?.operation_id : savedPackages.get(packagePath);
         let cleanup;
         if (packagePath || normalCleanup) {
-          if (auditError) cleanup = {status:'BLOCKED', reason:'CLEANUP_EVIDENCE_UNCONFIRMED',audit_error:auditError};
+          if (auditError) cleanup = {status:'BLOCKED', reason:'CLEANUP_EVIDENCE_UNCONFIRMED'};
           else if (lifecycleCleanupFailed) cleanup = {status:'BLOCKED', reason:'CLEANUP_OR_OPERATION_UNCONFIRMED'};
           else if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
           else {
@@ -1165,6 +1165,9 @@ export async function createBridge(config, session, { browserTransport: managedB
           cleanup = {...cleanup, session_id:session.metadata.sessionId,
             save_operation_id:saveOperationId ?? null,
             ...(normalCleanup ? {package_path:packagePath ?? null, policy:unsavedDraft?'unsaved_draft':openedPackage||failedOpen?'opened_saved_package':'last_confirmed_own_save'} : {})};
+          // The browser can report native cleanup, but only the host records its audit verdict.
+          delete cleanup.audit_error;
+          if(auditError)cleanup.audit_error=auditError;
           const saveCleanup=()=>writeFile(join(session.directory,normalCleanup?'saved-package-cleanup.json':'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
           let receiptSaved=false;
           try {
