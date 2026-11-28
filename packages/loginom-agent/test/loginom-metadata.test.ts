@@ -33,7 +33,7 @@ test("Dock forwards the runtime Save projection and its file proof alongside the
     saved_labels: [{ node_id: "node-guid", label: "Левое" }],
     unchecked_sorting: [],
   }
-  const options = { knownSecrets: [], busy, savedPackageGraph, savedFileRead }
+  const options = { knownSecrets: [], busy, savedPackageGraph, savedFile: { fileExists: true, evidence: savedFileRead } }
   const input = withLoginomMetadata(reply(receipt), { receipt: loginomSaveMetadata({
     operation_id: "operation", action_key: "package.save_checkpoint", status: "SUCCEEDED",
     output: { package_ref: { path, active_identity: path } },
@@ -42,13 +42,30 @@ test("Dock forwards the runtime Save projection and its file proof alongside the
   expect(result.metadata?.loginom).toEqual(input._meta.loginom)
   expect(result.metadata?.loginom).toMatchObject({
     v: 1, operationId: "operation", state: "settled", kind: "save", busy,
-    evidence: [{ kind: "saved", path }, savedFileRead],
+    evidence: [{ kind: "saved", path }, { kind: "savedFilePresence", fileExists: true }, savedFileRead],
     savedPackageGraph: {
       scope: "activeWorkflow", savedLabels: [{ nodeId: "node-guid", label: "Левое" }], truncated: false,
       changes: expect.arrayContaining([{ kind: "node_added", nodeId: "new-guid" }]),
     },
   })
   expect(result.content).toEqual(input.content[0].text)
+})
+
+test.each([false, null])("Dock retains a saved file presence result of %s alongside the successful Save", async (fileExists) => {
+  const path = "/account/saved.lgp"
+  const options = {
+    knownSecrets: [],
+    savedPackageGraph: { status: "unavailable", save_operation_id: "operation", package_path: path },
+    savedFile: { fileExists },
+  }
+  const input = withLoginomMetadata(reply(receipt), { receipt: loginomSaveMetadata({
+    operation_id: "operation", action_key: "package.save_checkpoint", status: "SUCCEEDED",
+    output: { package_ref: { path, active_identity: path } },
+  }, options) })
+  const result = await dockToolResult(input, 1)
+  expect(result.metadata?.loginom).toMatchObject({
+    status: "SUCCEEDED", evidence: [{ kind: "saved", path }, { kind: "savedFilePresence", fileExists }],
+  })
 })
 
 test.each([

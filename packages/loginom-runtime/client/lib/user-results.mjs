@@ -244,7 +244,7 @@ function busyFor(busy, operationId) {
     ? {version:1, windowId:busy.windowId, operationId:busy.operationId, active:busy.active} : undefined;
 }
 
-export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptWindow, savedPackageGraph, savedFileRead, busy,
+export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptWindow, savedPackageGraph, savedFile, busy,
   maskSavedGraph = createRedactor(knownSecrets, {minimumLength:1}).text} = {}) {
   if (!['package.save_as', 'package.save_checkpoint'].includes(outcome.action_key) || !outcome.operation_id) return;
   const signal = busyFor(busy, outcome.operation_id);
@@ -259,7 +259,10 @@ export function loginomSaveMetadata(outcome, {knownSecrets = [], receiptWindow, 
   if (outcome.output.reopened === true && Array.isArray(graph?.nodes))
     evidence.push({kind:'reopenedGraphRead', nodeCount:graph.nodes.length, scope:'activeWorkflow'});
   const matchesSave = savedPackageGraph?.save_operation_id === outcome.operation_id && savedPackageGraph.package_path === path;
-  if (matchesSave && savedFileRead) evidence.push(savedFileRead);
+  if (matchesSave && savedFile) {
+    evidence.push({kind:'savedFilePresence', fileExists:savedFile.fileExists});
+    if (savedFile.evidence) evidence.push(savedFile.evidence);
+  }
   return {...receipt, kind:'save', evidence,
     ...(matchesSave && {savedPackageGraph:projectSavedPackageGraph(savedPackageGraph, maskSavedGraph)}),
     ...(validReceiptWindow(receiptWindow) && {receiptWindow})};

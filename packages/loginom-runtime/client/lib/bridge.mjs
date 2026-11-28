@@ -925,6 +925,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                     const token=randomUUID();
                     const code=makeSavedPackageGraphCode({origin:new URL(config.loginomUrl).origin,build:session.metadata.targetIdentity.loginom_build,
                       path:admission.path,tabTid:workflow.tab_tid,documentId:prepared.document_id,sessionId:session.metadata.sessionId,account:savedState.account,token});
+                    admission.savedFile={fileExists:null};
                     savedFileRead={token,operationId:savedOutcome.operation_id};
                     const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{code}},undefined,{timeout:24000});
                     if(savedPackageReadRejected(response)) savedFileRead=undefined;
@@ -968,7 +969,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               reply.content.push({ type: 'text', text: 'Recovery context unavailable; keep the operation receipt and inspect the actual state.' });
             }
             if(userProfile && confirmedSave)projectSave?.(options=>loginomSaveMetadata(confirmedSave,{...options,
-              busy:saveRequest?options.busy:undefined,savedPackageGraph,savedFileRead:admission?.savedFile?.evidence,maskSavedGraph,
+              busy:saveRequest?options.busy:undefined,savedPackageGraph,savedFile:admission?.savedFile,maskSavedGraph,
               receiptWindow:admission&&{runtimeId:receiptSequence.id,documentId:admission.document_id,
                 startSequence:admission.sequence,confirmedSequence:admission.confirmed}}));
             return reply;

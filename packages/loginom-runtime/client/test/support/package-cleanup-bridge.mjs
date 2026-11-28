@@ -562,9 +562,10 @@ for(const {action_key,fileMissing,refuseSavedRead} of [{action_key:'package.save
    assert.equal(v,1);
    assert.equal(report.status,fileMissing||refuseSavedRead?'unavailable':'compared');
    assert.equal(operationId,saved.operation_id);
-   assert.deepEqual(evidence,fileMissing||refuseSavedRead?[{kind:'saved',path}]:[{kind:'saved',path},
-     {kind:'savedFileRead',scope:'package',nodeCount:4,workflowGuidMatch:false,file:{mtime:'2026-11-27T15:00:00.000Z',size:10157,
-       hash:'ad9e8e3b8e63597d724a26fc88f1fa17dc0c9b396ada0624a2756d13238b3790'}}]);
+   assert.deepEqual(evidence,[{kind:'saved',path},
+     {kind:'savedFilePresence',fileExists:refuseSavedRead?null:!fileMissing},
+     ...(fileMissing||refuseSavedRead?[]:[{kind:'savedFileRead',scope:'package',nodeCount:4,workflowGuidMatch:false,
+       file:{mtime:'2026-11-27T15:00:00.000Z',size:10157,hash:'ad9e8e3b8e63597d724a26fc88f1fa17dc0c9b396ada0624a2756d13238b3790'}}])]);
    assert.equal(receiptWindow.documentId,'own-doc');
    assert.ok(receiptWindow.startSequence<receiptWindow.confirmedSequence);
    assert.equal(report.saveOperationId,saved.operation_id);
@@ -593,6 +594,7 @@ for(const {action_key,fileMissing,refuseSavedRead} of [{action_key:'package.save
    assert.deepEqual(replay._meta.loginom.evidence,evidence);
    assert.deepEqual(replay._meta.loginom.receiptWindow,receiptWindow);
    const inspected=await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:saved.operation_id}});
+   assert.equal(inspected._meta.loginom.operationId,saved.operation_id);
    assert.deepEqual(inspected._meta.loginom.savedPackageGraph,report);
    assert.deepEqual(inspected._meta.loginom.evidence,evidence);
    assert.deepEqual(inspected._meta.loginom.receiptWindow,receiptWindow);
@@ -612,6 +614,7 @@ for(const {action_key,fileMissing,refuseSavedRead} of [{action_key:'package.save
     f.savedReadLost=true;
     const pending=await save('second-save');
     assert.equal(JSON.parse(pending.content[0].text).status,'SUCCEEDED');
+    assert.deepEqual(pending._meta.loginom.evidence,[{kind:'saved',path},{kind:'savedFilePresence',fileExists:null}]);
     assert.ok(pending.content.some(block=>block.text.includes('SAVED_PACKAGE_READ_CLEANUP_PENDING')));
     assert.equal(bridge.hasUnsettledWork(),true);
      const repeated=await save('second-save');

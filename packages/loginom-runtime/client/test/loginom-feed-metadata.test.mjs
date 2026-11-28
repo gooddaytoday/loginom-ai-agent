@@ -313,6 +313,22 @@ test('Save publishes only the matching bounded busy snapshot, without changing i
   assert.deepEqual(reply.content,[{type:'text',text:'original Save receipt'}]);
 });
 
+test('the Save projector distinguishes confirmed absence from unknown presence without changing the receipt', () => {
+  const reply={content:[{type:'text',text:'Save succeeded'}]};
+  const path='/account/result.lgp', operationId='save-id';
+  const save={action_key:'package.save_checkpoint',operation_id:operationId,status:'SUCCEEDED',
+    output:{package_ref:{path,active_identity:path}}};
+  const savedPackageGraph={status:'unavailable',package_path:path,save_operation_id:operationId};
+  for (const fileExists of [false,null,true]) {
+    const receipt=loginomSaveMetadata(save,{savedPackageGraph,savedFile:{fileExists}});
+    const projected=withLoginomMetadata(reply,{receipt});
+    assert.deepEqual(projected.content,reply.content);
+    assert.equal(projected._meta.loginom.status,'SUCCEEDED');
+    assert.deepEqual(projected._meta.loginom.evidence,[{kind:'saved',path},{kind:'savedFilePresence',fileExists}]);
+  }
+  assert.deepEqual(loginomSaveMetadata(save,{savedPackageGraph}).evidence,[{kind:'saved',path}]);
+});
+
 test('one Save projection keeps both graph evidence kinds, masks labels and fits the v1 budget', () => {
   const reply={content:[{type:'text',text:'Save succeeded'}]};
   const packagePath='/account/result.lgp', operationId='save-id';
@@ -328,13 +344,14 @@ test('one Save projection keeps both graph evidence kinds, masks labels and fits
   const savedPackageGraph={status:'compared',package_path:packagePath,save_operation_id:operationId,
     unchecked_sorting:[],saved_labels,changes:[{kind:'node_renamed',node_id:'node-199',before:'Слияние',saved:'Левое',
       observed_before_save:'Слияние',repair:{label:'Попросить исправить',prompt:'Проверить узел node-199'}}]};
-  const receipt=loginomSaveMetadata(save,{busy,savedPackageGraph,savedFileRead,receiptWindow,knownSecrets:['credential-example']});
+  const savedFile={fileExists:true,evidence:savedFileRead};
+  const receipt=loginomSaveMetadata(save,{busy,savedPackageGraph,savedFile,receiptWindow,knownSecrets:['credential-example']});
   const metadata=withLoginomMetadata(reply,{receipt})._meta.loginom;
   assert.equal(metadata.v,1);
   assert.deepEqual(metadata.busy,busy);
   assert.deepEqual(metadata.receiptWindow,receiptWindow);
   assert.deepEqual(metadata.evidence,[{kind:'saved',path:packagePath},
-    {kind:'reopenedGraphRead',nodeCount:1,scope:'activeWorkflow'},savedFileRead]);
+    {kind:'reopenedGraphRead',nodeCount:1,scope:'activeWorkflow'},{kind:'savedFilePresence',fileExists:true},savedFileRead]);
   const graph=metadata.savedPackageGraph;
   assert.equal(graph.truncated,true);
   assert.ok(graph.savedLabels.length<=32);
@@ -343,7 +360,7 @@ test('one Save projection keeps both graph evidence kinds, masks labels and fits
   assert.doesNotMatch(JSON.stringify(graph),/credential-example/);
   assert.ok(Buffer.byteLength(JSON.stringify(graph))<=8*1024);
   assert.ok(Buffer.byteLength(JSON.stringify(metadata))<=16*1024);
-  const mismatched=loginomSaveMetadata(save,{savedFileRead,savedPackageGraph:{...savedPackageGraph,save_operation_id:'other'}});
+  const mismatched=loginomSaveMetadata(save,{savedFile,savedPackageGraph:{...savedPackageGraph,save_operation_id:'other'}});
   assert.equal(mismatched.savedPackageGraph,undefined);
-  assert.equal(mismatched.evidence.some(fact=>fact.kind==='savedFileRead'),false);
+  assert.deepEqual(mismatched.evidence,[{kind:'saved',path:packagePath},{kind:'reopenedGraphRead',nodeCount:1,scope:'activeWorkflow'}]);
 });

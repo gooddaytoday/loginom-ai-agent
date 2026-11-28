@@ -108,6 +108,7 @@ export const LoginomEvidence = Schema.Union([
   Schema.Struct({ kind: Schema.Literal("executed"), executionId: id, scope: graphScope }),
   Schema.Struct({ kind: Schema.Literal("saved"), path: id }),
   Schema.Struct({ kind: Schema.Literal("reopenedGraphRead"), nodeCount: count, scope: graphScope }),
+  Schema.Struct({ kind: Schema.Literal("savedFilePresence"), fileExists: Schema.NullOr(Schema.Boolean) }),
   Schema.Struct({
     kind: Schema.Literal("savedFileRead"),
     nodeCount: count,
