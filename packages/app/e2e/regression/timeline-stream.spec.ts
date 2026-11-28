@@ -3486,7 +3486,7 @@ for (const width of [1280, 390]) {
     const saved = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_save")}"]`)
     const legacyFailure = page.locator(`[data-timeline-part-id="${renderedPartID("prt_loginom_legacy_failure")}"]`)
 
-    const details = imported.getByText("Выход 1: 2400 строк, 1 столбцов", { exact: true })
+    const details = imported.getByText("Выход 1 · строк: 2400, столбцов: 1", { exact: true })
     const more = imported.getByLabel("Показать детали шага", { exact: true })
 
     const legacyReason = legacyFailure.getByText("Loginom connection closed")
@@ -3494,6 +3494,7 @@ for (const width of [1280, 390]) {
     await expect(brief).toHaveAttribute("aria-pressed", "true")
     await expect(imported.getByText("Прочитал таблицу", { exact: true })).toBeVisible()
     await expect(saved.getByText("Сохранил «ABC-анализ.lgp» в /user", { exact: true })).toBeVisible()
+    await expect(legacyFailure.getByText("Шаг Loginom", { exact: true })).toBeVisible()
 
     if (width === 1280) {
       const disclosure = legacyFailure.locator('[data-slot="collapsible-trigger"]')

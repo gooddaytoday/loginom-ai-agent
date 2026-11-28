@@ -41,7 +41,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
   ctx.add(ToolRenderer, {
     tool: "loginom_*",
     get title() {
-      return ctx.t("step.done")
+      return ctx.t("step.label")
     },
     separate: true,
     handlesFailure: (metadata) => Boolean(failureReason(ctx, Option.getOrUndefined(decodeFacts(metadata.loginom)))),

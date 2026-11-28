@@ -3,6 +3,7 @@ export const dict = {
   "detail.compact": "Brief",
   "detail.detailed": "Detailed",
   "detail.more": "Show step details",
+  "step.label": "Loginom step",
   "step.running": "Working in Loginom…",
   "step.done": "Completed a step in Loginom",
   "step.pending": "Received an interim result from Loginom",
