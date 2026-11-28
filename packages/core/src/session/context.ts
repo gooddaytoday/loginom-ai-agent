@@ -180,7 +180,7 @@ const layer = Layer.effect(
     const load = Effect.fn("SessionContext.load")(function* (selection: Selection) {
       const model = yield* resolveModel(selection.session, { kind: "primary", agent: selection.agent.id })
       let tools = selection.tools
-      if (yield* hooks.has("session", "experimental.tools.prepare")) {
+      if (yield* hooks.has("session", "experimental.tools.prepare", model.ref.providerID)) {
         yield* hooks.trigger("session", "experimental.tools.prepare", {
           sessionID: selection.session.id,
           model: model.ref,

@@ -1175,6 +1175,31 @@ describe("SessionRunnerLLM", () => {
     ])
   })
 
+  scenario("advertises tool changes from a preparation hook scoped to the resolved model provider", function* (s) {
+    const hooks = yield* PluginHooks.Service
+    const registry = yield* Tool.Service
+    const scope = yield* Scope.Scope
+    yield* hooks.register(
+      "session",
+      "experimental.tools.prepare",
+      () =>
+        registry
+          .transform((editor) => {
+            editor.update("echo", (tool) => {
+              tool.description = "Echo prepared for the fake provider"
+            })
+          })
+          .pipe(Scope.provide(scope), Effect.asVoid),
+      { providerID: "fake" },
+    )
+    yield* s.llm.push(TestLLM.text("Done", "text-done"))
+    yield* s.runPrompt("Echo text")
+
+    expect(s.requests[0]?.tools.find((tool) => tool.name === "echo")?.description).toBe(
+      "Echo prepared for the fake provider",
+    )
+  })
+
   scenario("executes a tool renamed by a session context hook", function* (s) {
     const hooks = yield* PluginHooks.Service
     yield* hooks.register("session", "context", (event) =>
