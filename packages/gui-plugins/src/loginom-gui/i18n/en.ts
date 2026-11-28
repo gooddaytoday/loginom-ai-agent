@@ -143,6 +143,7 @@ export default {
   permissionWaiting: "Waiting for your permission below",
   permissionOnce: "Allow once",
   permissionConversation: "Allow in this conversation",
+  permissionConversationNotSaved: "Could not save permission for this conversation. The action was allowed once.",
   permissionDeny: "Decline",
   permissionInstead: "Or say what to do instead",
   permissionSend: "Send",

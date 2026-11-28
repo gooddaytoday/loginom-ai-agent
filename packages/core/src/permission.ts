@@ -117,7 +117,7 @@ export interface Interface {
   readonly assertNotDenied: (input: AssertInput) => Effect.Effect<void, BlockedError | SessionErrors.NotFoundError>
   /** True only when the rules already allow the request; never asks the user. */
   readonly allows: (input: AssertInput) => Effect.Effect<boolean, SessionErrors.NotFoundError>
-  readonly reply: (input: ReplyInput) => Effect.Effect<void, NotFoundError>
+  readonly reply: (input: ReplyInput, resolveNotice?: Effect.Effect<string | undefined>) => Effect.Effect<void, NotFoundError>
   readonly get: (id: ID) => Effect.Effect<Request | undefined>
   readonly forSession: (sessionID: SessionSchema.ID) => Effect.Effect<ReadonlyArray<Request>>
   readonly list: () => Effect.Effect<ReadonlyArray<Request>>
@@ -331,7 +331,7 @@ const layer = Layer.effect(
       )
     }
 
-    const reply = Effect.fn("Permission.reply")((input: ReplyInput) =>
+    const reply = Effect.fn("Permission.reply")((input: ReplyInput, resolveNotice?: Effect.Effect<string | undefined>) =>
       Effect.uninterruptible(
         Effect.gen(function* () {
           const existing = pending.get(input.requestID)
@@ -378,7 +378,7 @@ const layer = Layer.effect(
                 input.message ? new CorrectedError({ feedback: input.message }) : new DeclinedError(),
               )
             }
-            yield* publishReplyNotice(existing.request, input.notice)
+            yield* publishReplyNotice(existing.request, resolveNotice ? yield* resolveNotice : input.notice)
             return
           }
 
@@ -400,7 +400,7 @@ const layer = Layer.effect(
               yield* Deferred.succeed(item.deferred, undefined)
             }
           }
-          yield* publishReplyNotice(existing.request, input.notice)
+          yield* publishReplyNotice(existing.request, resolveNotice ? yield* resolveNotice : input.notice)
         }),
       ),
     )

@@ -12,11 +12,13 @@ export const PermissionConversation = {
           sessionID: { type: "string" },
           requestID: { type: "string" },
           notice: { type: "string", maxLength: Permission.NoticeMaxLength },
+          onceNotice: { type: "string", maxLength: Permission.NoticeMaxLength },
         },
         required: ["sessionID", "requestID"],
         additionalProperties: false,
       },
-      output: { type: "object", properties: { kind: { type: "string" } }, required: ["kind"] },
+      // `saved: false` means the action was allowed once, but saving the conversation grant failed.
+      output: { type: "object", properties: { kind: { type: "string" }, saved: { const: false } }, required: ["kind"] },
       // The terminal (В-31) and a request the product does not ask by default are answered one at a time.
       errors: {
         not_grantable: { type: "object", properties: { action: { type: "string" } }, required: ["action"] },

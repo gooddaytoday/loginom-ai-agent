@@ -186,12 +186,11 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     return Math.min(limit, left)
   }
   const requireLoginAddress = () => {
-    if (!reload && !sameOrigin) return
+    if (!reload) return
     signal?.throwIfAborted()
     const expected = new URL(loginomAddress(candidate.url))
     const current = new URL(page.url())
-    if (current.origin !== expected.origin || (reload && current.pathname !== expected.pathname))
-      throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+    if (current.origin !== expected.origin || current.pathname !== expected.pathname) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
   }
   const network = await trackLoginNetwork(page)
   try {
@@ -246,7 +245,8 @@ export async function loginPage(page, candidate, { deadline = Infinity, themeSta
     }
     await network.close()
     phase = "form"; phaseStarted = performance.now()
-    if (sameOrigin) requireLoginAddress()
+    if (sameOrigin && new URL(page.url()).origin !== new URL(candidate.url).origin)
+      throw Error("LOGINOM_LOGIN_UNAVAILABLE")
     let alreadyAuthenticated = false
     if (reload) {
       const fresh = await observeReloadedLoginPage(page, candidate.url, reload)

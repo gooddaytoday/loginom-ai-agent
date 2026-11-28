@@ -20,6 +20,7 @@ const decodeInput = Schema.decodeUnknownOption(Schema.Record(Schema.String, Sche
 const isString = Schema.is(Schema.String)
 
 const isNotice = Schema.is(Schema.String.check(Schema.isMaxCodePoints(Permission.NoticeMaxLength)))
+const isUnsavedGrant = Schema.is(Schema.Struct({ saved: Schema.Literal(false) }))
 
 const traces = { once: "traceOnce", reject: "traceDeny", conversation: "traceConversation" } as const
 
@@ -44,9 +45,15 @@ export default function PermissionPrompt(props: PermissionDockInput) {
   const resources = request.resources.filter((resource) => !save || resource !== "*")
   const decodeFailure = Schema.is(Schema.Struct({ type: Schema.Literal("not_grantable") }))
 
-  async function answer(decision: "once" | "conversation" | "reject", message?: string) {
+  function receipt(decision: keyof typeof traces) {
+    const notice = ctx.t(traces[decision], { action: description })
+
+    return isNotice(notice) ? notice : ctx.t(traces[decision], { action: ctx.t("permissionAction") })
+  }
+
+  async function answer(decision: keyof typeof traces, message?: string) {
     const next = permissionTransition(state(), "submit")
-    const notice = message ? feedbackNotice(message) : ctx.t(traces[decision], { action: description })
+    const notice = message ? feedbackNotice(message) : receipt(decision)
 
     if (next === state() || (message && !isNotice(notice))) return
 
@@ -55,17 +62,20 @@ export default function PermissionPrompt(props: PermissionDockInput) {
     const target = {
       sessionID: request.sessionID,
       requestID: request.id,
-      notice: isNotice(notice) ? notice : ctx.t(traces[decision], { action: ctx.t("permissionAction") }),
+      notice,
     }
 
     const options = { signal: ctx.signal }
 
     try {
-      if (decision === "conversation")
-        await props.client
+      if (decision === "conversation") {
+        const result = await props.client
           .rpc(PermissionConversation)
-          .conversation(target, { ...options, location: { directory: props.directory } })
-      else await props.client.permission.reply({ ...target, decision, message }, options)
+          .conversation({ ...target, onceNotice: receipt("once") }, { ...options, location: { directory: props.directory } })
+
+        if (isUnsavedGrant(result) && !ctx.signal.aborted)
+          ctx.toast.show({ variant: "error", title: ctx.t("permissionConversationNotSaved") })
+      } else await props.client.permission.reply({ ...target, decision, message }, options)
     } catch (error) {
       if (!ctx.signal.aborted)
         setState((current) => permissionTransition(current, decodeFailure(error) ? "not_grantable" : "failed"))

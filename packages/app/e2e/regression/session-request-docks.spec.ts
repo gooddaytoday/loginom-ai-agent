@@ -632,7 +632,7 @@ function mockServer(page: Page, requests: Pick<WorkspaceInput, "sessionPermissio
 
 const decodeNotice = Schema.decodeUnknownOption(Schema.Struct({ notice: Schema.String }))
 
-for (const decision of ["once", "conversation", "reject", "feedback"] as const) {
+for (const decision of ["once", "conversation", "conversation-save-failed", "reject", "feedback"] as const) {
   test(`answers package permission with ${decision} and records it in the conversation`, async ({ page }, info) => {
     const id = "per_save_package"
     const replies: unknown[] = []
@@ -694,8 +694,22 @@ for (const decision of ["once", "conversation", "reject", "feedback"] as const) 
     await page.route("**/api/rpc/loginom.permission/conversation**", async (route) => {
       const body = route.request().postDataJSON()
       grants.push(body)
-      record(body.input.notice)
-      await route.fulfill({ json: { output: { kind: "save" } } })
+      const failed = decision === "conversation-save-failed"
+
+      if (failed) {
+        await push([
+          {
+            id: "evt_permission_replied",
+            created,
+            type: "permission.replied",
+            location: { directory },
+            data: { sessionID, requestID: id, reply: "once" },
+          },
+        ])
+      }
+
+      record(failed ? body.input.onceNotice : body.input.notice)
+      await route.fulfill({ json: { output: failed ? { kind: "save", saved: false } : { kind: "save" } } })
     })
     await page.goto(sessionHref(sessionID))
     await expectSessionTitle(page, title)
@@ -723,10 +737,27 @@ for (const decision of ["once", "conversation", "reject", "feedback"] as const) 
       await dock.getByRole("button", { name: "Разрешить один раз" }).click()
       await expect(page.getByText(/^Вы разрешили один раз:/)).toBeVisible()
       expect(replies).toEqual([{ decision: "once", notice: `Вы разрешили один раз: ${action}` }])
-    } else if (decision === "conversation") {
+    } else if (decision === "conversation" || decision === "conversation-save-failed") {
       await dock.getByRole("button", { name: /^Разрешать в этом разговоре/ }).click()
-      await expect(page.getByText(/^Вы разрешили в этом разговоре:/)).toBeVisible()
-      expect(grants).toEqual([{ input: { sessionID, requestID: id, notice: `Вы разрешили в этом разговоре: ${action}` } }])
+
+      if (decision === "conversation-save-failed") {
+        await expect(page.getByText(/^Вы разрешили один раз:/)).toBeVisible()
+        await expect(page.getByText(/^Вы разрешили в этом разговоре:/)).toHaveCount(0)
+        await expect(page.getByText("Разрешение на разговор не сохранилось. Действие разрешено один раз.")).toBeVisible()
+      } else {
+        await expect(page.getByText(/^Вы разрешили в этом разговоре:/)).toBeVisible()
+      }
+
+      expect(grants).toEqual([
+        {
+          input: {
+            sessionID,
+            requestID: id,
+            notice: `Вы разрешили в этом разговоре: ${action}`,
+            onceNotice: `Вы разрешили один раз: ${action}`,
+          },
+        },
+      ])
       expect(replies).toEqual([])
     } else if (decision === "feedback") {
       const feedback = dock.getByRole("textbox", { name: "Или скажите, что сделать иначе" })

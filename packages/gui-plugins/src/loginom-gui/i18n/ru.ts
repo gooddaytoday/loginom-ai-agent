@@ -146,6 +146,7 @@ export default {
   permissionWaiting: "Жду вашего разрешения — внизу",
   permissionOnce: "Разрешить один раз",
   permissionConversation: "Разрешать в этом разговоре",
+  permissionConversationNotSaved: "Разрешение на разговор не сохранилось. Действие разрешено один раз.",
   permissionDeny: "Отклонить",
   permissionInstead: "Или скажите, что сделать иначе",
   permissionSend: "Отправить",

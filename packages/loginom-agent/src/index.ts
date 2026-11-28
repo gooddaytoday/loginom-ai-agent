@@ -531,6 +531,7 @@ export default Plugin.define({
           sessionID: string
           requestID: string
           notice?: string
+          onceNotice?: string
         }
         const request = await ctx.permission.get(input)
         const entry = classify(request.action, request.resources)
@@ -550,15 +551,29 @@ export default Plugin.define({
           return call.error("not_grantable", `the administrator's policy sets «${kinds[entry.kind]}»`, {
             action: request.action,
           })
-        // Only the client whose reply was accepted can grant this kind for the conversation.
-        await ctx.permission.reply({ ...input, decision: "once" })
         const key = conversationKey(input.sessionID, entry.kind)
-        await ctx.storage.set(key, true)
-        // Deletion can run while the RPC checks policy or writes the grant.
-        await ctx.session.get({ sessionID: input.sessionID }).catch(async (error) => {
-          await ctx.storage.remove(key)
-          throw error
-        })
+        let saved = false
+        // Only the client whose reply was accepted can grant this kind for the conversation.
+        await ctx.permission.reply(
+          { sessionID: input.sessionID, requestID: input.requestID, decision: "once" },
+          {
+            resolveNotice: async () => {
+              try {
+                await ctx.storage.set(key, true)
+              } catch {
+                return input.onceNotice ?? "Вы разрешили один раз."
+              }
+              // Deletion can run while the RPC checks policy or writes the grant.
+              await ctx.session.get({ sessionID: input.sessionID }).catch(async (error) => {
+                await ctx.storage.remove(key)
+                throw error
+              })
+              saved = true
+              return input.notice
+            },
+          },
+        )
+        if (!saved) return { kind: entry.kind, saved: false }
         // Answer the session's other open requests now covered by the grant.
         const open = await ctx.permission.list({ sessionID: input.sessionID })
         await Promise.all(

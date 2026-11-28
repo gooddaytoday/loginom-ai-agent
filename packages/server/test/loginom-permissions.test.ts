@@ -17,6 +17,7 @@ import { define } from "@opencode/plugin/effect/plugin"
 import { Location } from "@opencode/schema/location"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Global } from "@opencode/util/global"
+import { sql } from "drizzle-orm"
 import { Context, Deferred, Effect, Fiber, Layer, Schema, type Scope } from "effect"
 import { HttpEffect, HttpRouter, HttpServer } from "effect/http"
 import { LanguageModel, LLMClient, type LLMRequest } from "../../ai/src/effect"
@@ -181,8 +182,8 @@ const boot = (
       call(`/api/session/${sessionID}/permission/${requestID}/reply?${at}`, { decision, message, notice }).pipe(
         Effect.map((response) => response.status),
       )
-    const conversation = (sessionID: string, requestID: string, notice?: string) =>
-      call(`/api/rpc/loginom.permission/conversation?${at}`, { input: { sessionID, requestID, notice } })
+    const conversation = (sessionID: string, requestID: string, notice?: string, onceNotice?: string) =>
+      call(`/api/rpc/loginom.permission/conversation?${at}`, { input: { sessionID, requestID, notice, onceNotice } })
     const saved = call(`/api/permission/saved?${at}`).pipe(Effect.map((response) => response.body.data as unknown[]))
     const prompt = (sessionID: Session.ID, text: string) =>
       sessions.prompt({ sessionID, text }).pipe(Effect.andThen(sessions.wait(sessionID)))
@@ -245,6 +246,7 @@ const boot = (
       reply,
       conversation,
       conversationGrants,
+      db: database.db,
       saved,
       call,
       prompt,
@@ -378,6 +380,42 @@ describe("loginom.product permissions (B2.6a)", () => {
         expect((yield* test.conversation(id, first.id)).status).toBe(200)
         expect((yield* test.open(id)).map((item) => item.id)).toEqual([web.id])
         expect(second.effect).toBe("ask")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "answers once and records only the one-time receipt when saving the conversation grant fails",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const sessionID = yield* test.create("grant write fails")
+        const action = { action: "edit", resources: ["file.md"] }
+        const request = yield* test.ask(sessionID, action)
+        expect(request.effect).toBe("ask")
+        yield* Effect.acquireRelease(
+          test.db.run(sql`CREATE TRIGGER fail_conversation_grant BEFORE INSERT ON kv
+            WHEN NEW.key GLOB '*:permission/conversation/*'
+            BEGIN SELECT RAISE(ABORT, 'forced grant write failure'); END`),
+          () => test.db.run(sql`DROP TRIGGER fail_conversation_grant`).pipe(Effect.orDie),
+        )
+
+        const onceNotice = "Allowed once: " + "📝".repeat(1986)
+        const rejected = yield* test.conversation(sessionID, request.id, "Allowed for this conversation", onceNotice + "!")
+        expect(rejected.status).toBe(400)
+        expect(rejected.body.message).toContain("onceNotice")
+        expect(rejected.body.message).toContain("2000")
+        expect((yield* test.open(sessionID)).map((item) => item.id)).toEqual([request.id])
+        expect(yield* test.sessions.messages({ sessionID })).toEqual([])
+
+        const result = yield* test.conversation(sessionID, request.id, "Allowed for this conversation", onceNotice)
+        expect(result).toEqual({ status: 200, body: { output: { kind: "write", saved: false } } })
+        expect(yield* test.open(sessionID)).toEqual([])
+        expect(yield* test.sessions.messages({ sessionID })).toEqual([
+          expect.objectContaining({ type: "system", description: onceNotice }),
+        ])
+        expect(yield* test.conversationGrants(sessionID)).toEqual([])
+        expect((yield* test.ask(sessionID, action)).effect).toBe("ask")
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )

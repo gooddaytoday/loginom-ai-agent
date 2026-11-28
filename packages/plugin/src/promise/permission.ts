@@ -20,8 +20,17 @@ export interface PermissionHooks {
   readonly evaluate: PermissionEvaluation
 }
 
-export type PermissionDomain = Pick<PermissionApi, "list" | "get" | "reply"> & {
+type Reply = PermissionApi["reply"]
+
+export type PermissionDomain = Pick<PermissionApi, "list" | "get"> & {
   readonly hook: Hooks<PermissionHooks>
+  readonly reply: (
+    input: Parameters<Reply>[0],
+    options?: Parameters<Reply>[1] & {
+      /** Resolves the history notice after the reply has been accepted. Overrides `input.notice`. */
+      readonly resolveNotice?: () => Promise<string | undefined>
+    },
+  ) => ReturnType<Reply>
   /**
    * Evaluates the session's permission rules and, when approval is required, prompts the user and
    * waits for the reply. Resolves when allowed. A deny rule or a rejection with feedback rejects with
