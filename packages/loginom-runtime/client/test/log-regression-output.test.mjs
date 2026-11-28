@@ -48,7 +48,7 @@ test('both outputs use distinct native ports and propagate incomplete samples',a
 });
 
 
-for(const column of [false,true])for(const pending of [false,true])for(const regrouped of [false,true])for(const mixed of [false,true])test('weighted/column predictions pin factor/target/passthrough order through native mapping, column='+column+', regrouped='+regrouped+', mixed='+mixed+', pending='+pending,async()=>{
+for(const column of [false,true])for(const pending of [false,true])for(const regrouped of [false,true])for(const mixed of [false,true])test('weighted/column predictions preserve native order and autosync, column='+column+', regrouped='+regrouped+', mixed='+mixed+', pending='+pending,async()=>{
  const c={mode:'enter',fields:[{name:'RowID',label:'RowID',type:'integer',usage_type:0},...configuration.fields,
   {name:'Note',label:'Note',type:'string',usage_type:0},...(column?[{name:'Fold',label:'Fold',type:'integer',usage_type:0},{name:'Split',label:'Split',type:'boolean',usage_type:0}]:[{name:'Weight',label:'Weight',type:'real',usage_type:7}])]};
  if(column)c.partition={sampling:2,field:'Split'};
@@ -76,7 +76,7 @@ for(const column of [false,true])for(const pending of [false,true])for(const reg
   if(a.ref==='rbLinks;DisplayEl'){links=true;return;}
   if(a.ref==='rbTable;DisplayEl'){links=false;return;}
   if(a.ref==='btnGetSourceColumns'){
-   assert.equal(links,true);assert.equal(mapping.autosync,false);
+   assert.equal(links,true);assert.equal(mapping.autosync,true);
    mapping.source_fields=source_fields;mapping.source_identity_verified=true;
    mapping.target_fields.forEach(f=>{f.source=source_fields.find(s=>s.name===f.name);});return;
   }
@@ -87,9 +87,9 @@ for(const column of [false,true])for(const pending of [false,true])for(const reg
   mapping.target_fields=mapping.target_fields.map((f,index)=>({...f,index,group_index:index}));
  }};
  const result=await configureLogRegressionOutputs(channel,c,{},[],async(mode,port,definition)=>{finished.push(mode);assert.equal(port,true);assert.equal(definition.definition_complete,true);});
- assert.equal(mapping.autosync,false);assert.deepEqual(mapping.target_fields.map(f=>f.name),expected);
+ assert.equal(mapping.autosync,true);assert.deepEqual(mapping.target_fields.map(f=>f.name),order.map(f=>f.name));
  assert.deepEqual(mapping.source_fields,source_fields);assert.deepEqual(finished,['done']);
  assert.equal(links,false);assert.equal(actions.filter(a=>a.ref==='btnGetSourceColumns').length,pending?1:0);
- assert.equal(actions.some(a=>a.ref==='move'),mixed);assert.deepEqual(result.ports[0].schema.map(f=>f.name),expected);
+ assert.ok(!actions.some(a=>a.ref==='move'||a.ref==='auto'));assert.deepEqual(result.ports[0].schema.map(f=>f.name),expected);
  await configureLogRegressionOutputs({}, {...c,mode:'apply'},{},[],()=>assert.fail('apply must preserve saved output settings'));
 });

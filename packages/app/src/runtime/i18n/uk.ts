@@ -168,7 +168,6 @@ export const dict = {
   "dialog.provider.tag.recommended": "Рекомендовані",
   "dialog.provider.opencode.note": "Відібрані моделі, включаючи Claude, GPT, Gemini та інші",
   "dialog.provider.opencode.tagline": "Надійні оптимізовані моделі",
-  "dialog.provider.opencodeGo.tagline": "Недорога підписка для всіх",
   "dialog.provider.copilot.note": "Моделі ШІ для допомоги в кодуванні через GitHub Copilot",
   "dialog.provider.openai.note": "Моделі GPT для швидких і універсальних завдань ШІ",
   "dialog.provider.google.note": "Моделі Gemini для швидких структурованих відповідей",
@@ -182,8 +181,6 @@ export const dict = {
   "dialog.model.manage.description": "Налаштуйте, які моделі відображатимуться у виборі моделей.",
 
   "dialog.model.unpaid.freeModels.title": "Безкоштовні моделі від OpenCode",
-  "dialog.model.unpaid.addMore.title": "Додати більше моделей від популярних провайдерів",
-  "dialog.model.unpaid.viewMoreProviders": "Переглянути ще понад 70 провайдерів",
 
   "dialog.provider.viewAll": "Показати більше провайдерів",
 
@@ -298,8 +295,6 @@ export const dict = {
   "dialog.project.edit.color.select": "Вибрати колір {{color}}",
   "dialog.project.edit.worktree.startup": "Скрипт запуску робочої області",
   "dialog.project.edit.worktree.startup.placeholder": "напр. bun install",
-
-  "dialog.usageExceeded.dontShowAgain": "Більше не показувати",
 
   "toast.permissions.autoaccept.on.title": "Автоматичне прийняття дозволів",
   "toast.permissions.autoaccept.on.description": "Запити дозволів будуть автоматично схвалюватися",

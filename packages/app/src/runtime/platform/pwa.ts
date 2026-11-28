@@ -24,7 +24,8 @@ export function restorePwaRoute() {
     if (
       url.pathname !== "/" &&
       url.pathname !== "/new-session" &&
-      !/^\/server\/[^/]+\/session\/[^/]+$/.test(url.pathname)
+      !/^\/server\/[^/]+\/session\/[^/]+$/.test(url.pathname) &&
+      !/^\/page\/[^/]+\/[^/]+$/.test(url.pathname)
     )
       return
     history.replaceState(history.state, "", url.pathname + url.search + url.hash)
