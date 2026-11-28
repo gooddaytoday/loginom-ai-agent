@@ -10,7 +10,7 @@ import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady,makeLargeUploadCode,guardUploadDebugDialog} from './artifact-discovery.mjs';
 import {createArtifactDelivery} from './artifact-delivery.mjs';
 import {findNativeStorageRow} from './text-export-output.mjs';
-import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt, proveReloadedNode } from './node-target.mjs';
+import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt, proveReloadedNode, sameDomainGraph, normalizeGraphRefusal } from './node-target.mjs';
 import {isPythonInputOpening,settledPythonInputOpening,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
 import {normalizeVariablesToTableLinkGraph} from './variables-vartodata-target.mjs';
@@ -2554,7 +2554,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   };
   const nodeTargetOutcome=(operation,result)=>({status:result.status,action_key:operation.action.action_key,action_revision:'1',operation_id:operation.id,
     phase:result.phase,effect_possible:operation.targetPhase?.effect_possible===true,cleanup_complete:result.cleanup_complete===true,
-    output:result,error:result.error?{code:'NODE_TARGET_INCOMPLETE',message:result.error}:null,trace:[]});
+    output:result,error:result.error?{code:result.error_code??'NODE_TARGET_INCOMPLETE',message:result.error}:null,trace:[]});
   const nodeTargetRecord=event=>onRecord({...event,action_key:'node.target.internal',action_revision:'1'});
   const targetAdapter=operation=>nodeTargetAdapterFactory({execute:async(code,options)=>{
     const wrapped='async page => {const base={action_key:"node.target.transport",action_revision:"1",operation_id:'+JSON.stringify(operation.id)+',phase:"observed",effect_possible:false,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('+code+')(page)}};}catch(error){return {...base,status:"FAILED",output:{},error:{code:"NODE_TARGET_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
@@ -3290,7 +3290,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         observation_error: 'Observation could not fit a page; request a narrower workspace scope and inspect the operation.' } };
     }
   };
-  const inspect = async ({ operationId, signal } = {}) => {
+  const inspect = async ({ operationId, signal, observeOnly } = {}) => {
     signal?.throwIfAborted();
     const operation = operationId ? operations.get(operationId) : pending;
     if(operationId&&!operation&&!auxiliary.has(operationId)&&!nodeJobs.has(operationId)&&!sourceReads.has(operationId)){
@@ -3300,7 +3300,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           next_steps:[{tool:'dock_action_describe',instruction:'Request selected node_types and modes for complete rules. This is the retained preparation receipt, not a fresh workspace observation.'}]},error:null,trace:[]};
     }
     if (operationId && !operation) throw new Error('Operation is not known in this session');
-    if (!operation || pending !== operation) return view(operation);
+    if (observeOnly || !operation || pending !== operation) return view(operation);
     return view(operation, await reconcilePending(signal));
   };
   const nodeResumeRefusal='Resume requires the original inspected node checkpoint without an unresolved phase';
@@ -4696,7 +4696,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                 }}:{})});
             }finally{operation.deadline=overallDeadline;}
             if(result.status!=='SUCCEEDED'){
-              const error=new Error(result.error??'Node target is not verified');
+              const error=Object.assign(new Error(result.error??'Node target is not verified'),{code:result.error_code});
               if(result.status==='FAILED'&&result.cleanup_complete===true&&operation.targetPhase?.move_mismatch&&!operation.targetPhase.pending)
                 error.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,
                   settings_unchanged:true,verification:'node_move_position_mismatch'};
@@ -4880,12 +4880,44 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     // node/recovery gate still blocks package cleanup; it cannot block draining
     // the owned worker or removing its private local download cache.
     closeNodeOperations:()=>nodeJobs.close(),
+    stepReceipt:id=>operations.get(id)?.outcome,
+    stepCheckBusy:()=>!!(running||nodeJobs.busy||leased||storageNavigating||serverDownloads?.unsettled||delivery.unsettled||sourceReads.unsettled),
+    async settleUnappliedStep(id,graph,{signal,deadline}){
+      const operation=pending;
+      if(operation?.id!==id||running||nodeJobs.busy||operation.transportUncertain)return false;
+      const target=operation.targetPhase,effect=target?.pending,state=operation.nodeApply;
+      if(!effect||target.receipts.length||state&&(state.pending?.phase!=='target'||state.phases.some(p=>p.effect_possible!==false))
+        ||!sameDomainGraph(effect.before,graph))return false;
+      // Inspect the exact native receipt. An equal graph alone cannot disprove a write.
+      running=true;
+      try{
+        const result=await operation.nodeTargetAdapter.reconcile(effect,graph,deadline,signal);
+        const receipt=normalizeGraphRefusal(effect,result?.receipt);
+        if(result?.completed!==true||result.cleanup_complete!==true||receipt?.status!=='NOT_APPLIED'
+          ||receipt.effect_possible!==false)return false;
+        const request=state?validateNodeApplyRequest(state.request,nodeApplyHandlers).graph:operation.parameters;
+        const after=await operation.nodeTargetAdapter.observe(request,deadline,signal);
+        signal?.throwIfAborted();
+        if(!after.interaction_ready||!sameDomainGraph(graph,after))return false;
+        const outcome={...operation.outcome,status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,phase:'checked',
+          error:{code:'NODE_WRITE_NOT_APPLIED',message:'The original graph gesture was confirmed not applied.'}};
+        if(state)outcome.output={...outcome.output,status:outcome.status,effect_possible:false,cleanup_complete:true,pending_phase:null,error:outcome.error};
+        await remember(operation,'reconciled_without_effect',outcome);
+        target.pending=null;target.effect_possible=false;target.last_graph=after;
+        if(state)Object.assign(state,{pending:null,effect_possible:false,cleanup_complete:true,result:outcome.output});
+        operation.outcome=outcome;operation.cleanupConfirmed=true;
+        if(nodeJobs.has(id))nodeJobs.settle(id,outcome);
+        pending=null;
+        return true;
+      }finally{running=false;}
+    },
     cleanupServerCache:runtime.cleanupServerCache,
     // Retained ambiguous jobs are active recovery work even while no worker is
     // running. Keep the same host lease so the next model turn can use the
     // explicitly bounded status/resume tools instead of dead-ending in global
     // recovery mode.
     hasActiveWork:()=>!!(storageNavigating||serverDownloads?.unsettled||running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
+    knowsWriteOperation: id => operations.has(id) || auxiliary.has(id) || nodeJobs.has(id),
     hasUnsettledWork:()=>!!(storageNavigating||serverDownloads?.unsettled||running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
     deliverPackageArtifact:(request,options)=>delivery.deliver(request,{...options,packageUpload:true}),
