@@ -1,6 +1,6 @@
 import { $ } from "bun"
 import { buildPhase } from "./build-phase"
-import { downloadBunBaselineArchive, useBunBaseline } from "./native-resource-candidates"
+import { downloadBunBaselineArchive, useBunBaseline, verifyBunBaselineArchive } from "./native-resource-candidates"
 import { createHash } from "node:crypto"
 import { createReadStream } from "node:fs"
 import { link, lstat, mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises"
@@ -57,13 +57,20 @@ if (baseline && process.env.LOGINOM_CLI_BASELINE_CHILD !== "1") {
   const runtime = await mkdtemp(join(tmpdir(), "loginom-cli-bun-"))
   try {
     const url = `https://github.com/oven-sh/bun/releases/download/bun-v${bunNotice.version}`
-    const target = `bun-${process.platform === "win32" ? "windows" : "linux"}-x64-baseline`
-    const archive = await downloadBunBaselineArchive(`${url}/${target}.zip`, process.platform as "linux" | "win32")
+    const platform = process.platform === "win32" ? "win32" : "linux"
+    const target = `bun-${platform === "win32" ? "windows" : "linux"}-x64-baseline`
+    const cached = process.env.LOGINOM_AI_AGENT_BUN_BASELINE_ARCHIVE
+    const archive = cached ? await readFile(cached) : await downloadBunBaselineArchive(`${url}/${target}.zip`, platform)
+    if (cached) verifyBunBaselineArchive(archive, platform)
     await Bun.write(join(runtime, "bun.zip"), archive)
-    if (process.platform === "win32") await $`${archiver} -xf ${join(runtime, "bun.zip")} -C ${runtime}`
-    if (process.platform === "linux") await $`/usr/bin/unzip -q ${join(runtime, "bun.zip")} -d ${runtime}`
-    await $`${join(runtime, target, process.platform === "win32" ? "bun.exe" : "bun")} ${import.meta.path} ${args}`.env({
+    if (platform === "win32") await $`${archiver} -xf ${join(runtime, "bun.zip")} -C ${runtime}`
+    if (platform === "linux") await $`/usr/bin/unzip -q ${join(runtime, "bun.zip")} -d ${runtime}`
+    const executable = join(runtime, target, platform === "win32" ? "bun.exe" : "bun")
+    // Linux cross-target compilation resolves its executable through Bun's install cache.
+    if (platform === "linux") await link(executable, join(runtime, `${target}-v${bunNotice.version}`))
+    await $`${executable} ${import.meta.path} ${args}`.env({
       ...process.env,
+      ...(platform === "linux" ? { BUN_INSTALL_CACHE_DIR: runtime } : {}),
       LOGINOM_CLI_BASELINE_CHILD: "1",
     })
   } finally {

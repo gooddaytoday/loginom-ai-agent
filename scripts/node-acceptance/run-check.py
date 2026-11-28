@@ -2575,6 +2575,7 @@ class Runner:
         self.report['phase'] = 'gate:' + name
         self.report['phase_folder'] = str(folder)
         self.save()
+        child = None
         try:
             while True:
                 if time.time() >= self.deadline: raise TimeoutError('load/spacing budget')
@@ -2663,15 +2664,8 @@ class Runner:
                     self.phase('dependencies', ['nice', '-n', '19', bun, 'install', '--frozen-lockfile', '--ignore-scripts', '--linker', 'hoisted'], cache, env=env, cwd=source)
                 restore_source_modes(source)
                 assert not git('status', '--porcelain', cwd=source), 'Dependencies modified tracked source'
-                build_args = []
-                if sys.platform == 'linux' and os.uname().machine == 'x86_64':
-                    build_args.append('--baseline')
-                    version = read(source / 'package.json')['packageManager'].removeprefix('bun@')
-                    bun_cache = Path(env.get('BUN_INSTALL_CACHE_DIR') or Path.home() / '.bun/install/cache')
-                    baseline = bun_cache / f'bun-linux-x64-baseline-v{version}'
-                    if baseline.is_file() and os.access(baseline, os.X_OK):
-                        bun = baseline
-                        env['LOGINOM_CLI_BASELINE_CHILD'] = '1'
+                build_args = ['--baseline'] if sys.platform == 'linux' and os.uname().machine == 'x86_64' else []
+                env.pop('LOGINOM_CLI_BASELINE_CHILD', None)
                 self.phase('build', ['nice', '-n', '19', bun, '--no-install', 'run', 'script/build-cli.ts',
                                      build, '--no-archive', *build_args], cache, env=env, cwd=source / 'packages/loginom-host')
             meta = read(build / 'cli-manifest.json')['metadata']
@@ -3106,6 +3100,7 @@ class Runner:
         cli_before = cli_cleanup_paths(profile) if port_output else None
         exit_status = 0
         if live:
+            self.current['cleanup'] = 'pending live shutdown'
             timeout = spec.get('model_timeout', 1800)
             with self.timed_phase('model', folder, spacing=live.child is None):
                 deadline = time.monotonic() + max(0, min(timeout, self.deadline - time.time()))
@@ -3135,7 +3130,7 @@ class Runner:
             exit_status = self.phase('model', command + ['--', prompt], folder,
                                      timeout=spec.get('model_timeout', 1800), env=env, cwd=workspace,
                                      **({'check_exit': False} if port_output else {}))
-        if not live and getattr(self, 'auth_source', None) and case == self.current['scenario']:
+        if getattr(self, 'auth_source', None):
             try:
                 (profile / 'data/auth.json').unlink(missing_ok=True)
             except OSError as error:
@@ -3612,25 +3607,15 @@ class Runner:
             self.phase('case-port-oracle', oracle, folder, timeout=60)
             readback = read(folder / 'case-port-oracle.stdout')
             if readback:
-                if live and (spec.get('manual_edit') or case == self.current['scenario']):
-                    self.close_live(live)
                 write(folder / 'case-port-expected.json', dict(package_path=package,
                     outputs=[target['output'] for target in readback],
                     case_port_node_ids=[target['node_id'] for target in readback],
                     **{key: expected[key] for key in ('nodes', 'n18_javascript_step') if key in expected}))
-                write(folder / 'case-port-config.json', dict(loginom_url=login['url'], workflow_profile=dict(
-                    loginom_user=login['username'], password=login['password'], passwordless_login=login.get('passwordless_login', False))))
-                self.phase('case-port-readback', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs',
-                    '--config', folder / 'case-port-config.json', '--resources', build / 'resources/loginom',
-                    '--saved', package, '--expected', folder / 'case-port-expected.json', '--output', folder / 'case-port-readback',
-                    *(['--case-port-read-only'] if live and live.child is not None else [])], folder)
-                result = folder / 'case-port-readback/result.json'
-                verified = read(result)
-                assert verified['status'] == 'PASS' and all(verified['cleanup'].get(key) is True
-                    for key in ['package_closed', 'logged_out']), 'CASE_PORT_READBACK_UNCONFIRMED'
-                assert [match['node']['node_id'] for match in verified['correspondence']] == [
-                    target['node_id'] for target in readback], 'CASE_PORT_READBACK_NODE_CHANGED'
-                self.phase('case-port-sample-oracle', [*oracle, result], folder, timeout=60)
+                if live and live.child is not None:
+                    live.port_readbacks.append((folder, package, login, build))
+                    self.current['csv'] = 'pending native port readback'
+                    return session, expected, None, None
+                self.case_port_readback(folder, package, login, build)
             self.current['csv'] = '— (native outputs PASS)'
             return session, expected, None, None
         if only_graph:
@@ -3988,7 +3973,23 @@ class Runner:
             baseline['moved_node_id'] = result['delta']['changed_nodes'][0]['node_id']
         return baseline
 
-    def close_live(self, live):
+    def case_port_readback(self, folder, package, login, build):
+        node = build / 'resources/loginom/bin/node'
+        write(folder / 'case-port-config.json', dict(loginom_url=login['url'], workflow_profile=dict(
+            loginom_user=login['username'], password=login['password'], passwordless_login=login.get('passwordless_login', False))))
+        self.phase('case-port-readback', [node, REPO / 'scripts/node-acceptance/cold-check.mjs',
+            '--config', folder / 'case-port-config.json', '--resources', build / 'resources/loginom',
+            '--saved', package, '--expected', folder / 'case-port-expected.json', '--output', folder / 'case-port-readback'], folder)
+        result = folder / 'case-port-readback/result.json'
+        verified = read(result)
+        assert verified['status'] == 'PASS' and all(verified['cleanup'].get(key) is True
+            for key in ('package_closed', 'logged_out')), 'CASE_PORT_READBACK_UNCONFIRMED'
+        assert [match['node']['node_id'] for match in verified['correspondence']] == read(
+            folder / 'case-port-expected.json')['case_port_node_ids'], 'CASE_PORT_READBACK_NODE_CHANGED'
+        self.phase('case-port-sample-oracle', [node, REPO / 'scripts/node-acceptance/case-ports.mjs',
+            folder / 'expected.json', folder / 'case-port-evidence.json', result], folder, timeout=60)
+
+    def close_live(self, live, *, verify_ports=True):
         if live.child is None:
             return
         cancellation_pending = getattr(self, 'cancel_requested', False)
@@ -4064,6 +4065,34 @@ class Runner:
             self.closing_live = False
             if not cancellation_pending and getattr(self, 'cancel_requested', False):
                 raise InterruptedError('LIVE_CHAIN_CANCELLED')
+
+        readbacks, live.port_readbacks = live.port_readbacks, []
+        for request in readbacks:
+            stage = request[0]
+            turn = next(turn for turn in self.current['turns'] if turn['case'] == stage.name)
+            if not verify_ports:
+                turn.update(status='UNKNOWN', csv='— (deferred readback skipped)')
+                continue
+            try:
+                self.case_port_readback(*request)
+            except Exception as error:
+                turn.update(status='UNKNOWN' if isinstance(error, TimeoutError) else 'FAIL', csv='FAIL',
+                            failure_class=str(error).split(':')[0] or type(error).__name__)
+                raise
+            turn['csv'] = '— (native outputs PASS)'
+            if turn is self.current['turns'][-1]:
+                self.current['csv'] = turn['csv']
+
+    def preserve_live_evidence(self, profile, folder):
+        runtime = profile / 'loginom/runtime'
+        destination = folder / 'live-evidence'
+        for pattern in ('execution-events.jsonl', '*-cleanup.json', 'runtime-close-*.json'):
+            for source in runtime.rglob(pattern):
+                target = destination / source.relative_to(runtime)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+        if destination.is_dir():
+            self.current['live_evidence'] = str(destination)
 
     def run(self):
         try:
@@ -4232,7 +4261,7 @@ class Runner:
                     try:
                         if live and live.child is not None:
                             try:
-                                self.close_live(live)
+                                self.close_live(live, verify_ports=False)
                             except InterruptedError as error:
                                 self.failure(r, error, folder)
                                 raise
@@ -4246,8 +4275,16 @@ class Runner:
                         if auth:
                             try:
                                 if profile.exists():
-                                    try: auth_path.unlink(missing_ok=True)
-                                    finally: shutil.rmtree(profile)
+                                    try:
+                                        if live_chain:
+                                            try:
+                                                self.preserve_live_evidence(profile, folder)
+                                            except OSError as error:
+                                                r['live_evidence_error'] = str(error)
+                                                if r['status'] != 'FAIL': self.failure(r, error, folder)
+                                    finally:
+                                        try: auth_path.unlink(missing_ok=True)
+                                        finally: shutil.rmtree(profile)
                             except OSError as error:
                                 r['oauth_cleanup_error'] = str(error)
                                 if r['status'] != 'FAIL': self.failure(r, error, folder)

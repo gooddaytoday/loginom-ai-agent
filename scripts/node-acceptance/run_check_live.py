@@ -104,6 +104,7 @@ def tool_failure(events):
         'LOGINOM_LOGIN_UNAVAILABLE', 'LOGINOM_BROWSER_START_FAILED',
     }
     connections, unresolved = {}, {}
+    workspace_failure = None
     permission_denied = recovery_required = False
 
     def key(value):
@@ -129,6 +130,17 @@ def tool_failure(events):
                 connections[identity] = 'LOGINOM_CONNECTION_NOT_READY'
             elif not failed and not metadata.get('isError') and not metadata.get('loginomPending'):
                 connections.pop(identity, None)
+                try:
+                    reply = json.JSONDecoder().raw_decode(state.get('output', ''))[0]
+                except (TypeError, ValueError):
+                    reply = None
+                workspace = reply.get('workspace') if isinstance(reply, dict) else None
+                if isinstance(workspace, dict):
+                    if workspace.get('status') == 'READY':
+                        workspace_failure = None
+                    elif workspace.get('status') == 'NOT_READY':
+                        reason = workspace.get('reason')
+                        workspace_failure = reason if isinstance(reason, str) and re.fullmatch(r'[A-Z][A-Z0-9_]*', reason) else 'LOGINOM_WORKSPACE_NOT_READY'
             continue
         if tool.startswith('loginom_') or tool == 'question':
             continue
@@ -150,6 +162,8 @@ def tool_failure(events):
         return connections[next(reversed(connections))]
     if recovery_required:
         return 'LOGINOM_RECOVERY_REQUIRED'
+    if workspace_failure:
+        return workspace_failure
     if unresolved:
         return 'CLI_TOOL_FAILED'
 
@@ -276,6 +290,7 @@ class LiveChain:
         self.browser = None
         self.screen = b''
         self.saved = self.turn_saved = None
+        self.port_readbacks = []
         self.previous_acks = set()
         self.previous_attempts = set()
         self.browsers_seen = set()
@@ -453,6 +468,7 @@ class LiveChain:
             assert self.browser in (None, current_browser), 'LIVE_CHAIN_BROWSER_OWNER_CHANGED'
             self.browser = current_browser
             self.browsers_seen.add(current_browser)
+        saved = []
         if current_browser:
             receipts = json_lines(current_browser[2] / 'execution-events.jsonl')
             since = datetime.fromtimestamp(submitted, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
@@ -461,13 +477,15 @@ class LiveChain:
             if saved and all(state.get('account') == self.account and state.get('package_path') == self.package
                              for state in saved):
                 self.saved = self.turn_saved = saved[-1]
-        # A terminal tool error must reach the same verdict as run even when
-        # it prevented login or Save. Cleanup checks the entire segment.
+        # Terminal tool evidence takes precedence when the tool refused the operation before Save.
         if failure:
             self.log('turn_failed', case=folder.name, sessionID=finished_session, code=failure)
             return finished_session
-        assert current_browser, 'LIVE_CHAIN_BROWSER_OWNER_CHANGED'
-        assert self.turn_saved, 'LIVE_CHAIN_ACCOUNT_UNVERIFIED'
+        if not current_browser:
+            raise AssertionError('LIVE_CHAIN_BROWSER_OWNER_CHANGED' if self.browser else 'LIVE_CHAIN_BROWSER_OWNER_UNVERIFIED')
+        assert saved, 'LIVE_CHAIN_SAVE_MISSING'
+        assert all(state.get('account') == self.account for state in saved), 'LIVE_CHAIN_ACCOUNT_UNVERIFIED'
+        assert self.turn_saved, 'LIVE_CHAIN_PACKAGE_UNVERIFIED'
         model_finished = max(m.get('time', {}).get('completed') or 0 for m in assistants)
         self.log('completed', case=folder.name, sessionID=finished_session, browser_pid=self.browser[0],
                  model_finished=model_finished / 1000, owner_verified=True)

@@ -511,14 +511,14 @@ exist, `package_directory` wins). Unknown formats fail before detach and name
 the file, required fields and supplied keys; credential values are never printed.
 Runs use the worker account. The default is `deepseek/deepseek-flash` without a
 variant, using `DEEPSEEK_API_KEY`. Set `RUN_CHECK_MODEL` to select another model
-and `RUN_CHECK_VARIANT` for the model variant in `run` or `--live-chain`. A variant on a two-turn TUI case or an unreadable `RUN_CHECK_AUTH` file
-is rejected before detach. `RUN_CHECK_AUTH` points to a legacy `auth.json`.
-The path is private to the runner and is not passed in the phase environment.
-The runner copies the file with mode `0600` into the fresh CLI profile for
-import. For an ordinary case the runner unlinks it after the final model phase;
-a live chain keeps its profile until the CLI shuts down. On success,
+and `RUN_CHECK_VARIANT` for `run` or `--live-chain`. A variant on a two-turn
+TUI case or an unreadable `RUN_CHECK_AUTH` file is rejected before detach.
+`RUN_CHECK_AUTH` points to a legacy `auth.json`. The runner consumes the path
+privately and copies the file with mode `0600` into the fresh CLI profile for
+import. It unlinks the copy after the first completed model phase. On success,
 failure, or worker SIGTERM, cleanup removes any remaining copy and the entire
-OAuth profile, including its database, sidecars, and `execution-events.jsonl`.
+OAuth profile, including its database and sidecars. For live chains the private
+result directory retains runtime execution journals and cleanup/ACK receipts.
 If the worker is forcibly killed before cleanup (for example with SIGKILL),
 remove that run's OAuth profile manually before sharing any evidence.
 Without `RUN_CHECK_AUTH`, no copy is made and the profile is retained.
@@ -535,18 +535,13 @@ and network access for the locked dependencies. Build inputs can be overridden
 with `LOGINOM_AI_AGENT_NODE_SOURCE` / `LOGINOM_AI_AGENT_BROWSER_SOURCE`.
 
 Use the repository's pinned Bun on `PATH`. On Linux x64 the runner builds a
-baseline CLI. It reuses the executable
-`bun-linux-x64-baseline-v<version>` in `BUN_INSTALL_CACHE_DIR` (default
-`~/.bun/install/cache`), when present. For a manual build with an isolated home,
-put the cached executable in the new Bun cache, then use that executable to
-invoke the baseline build. `build-cli.ts` checks its version and revision.
+baseline CLI. To build without fetching Bun, set
+`LOGINOM_AI_AGENT_BUN_BASELINE_ARCHIVE` to the warm cache's original release ZIP.
+The build hashes the archive against the pinned SHA-256 before extraction and
+uses the extracted Linux executable for compilation.
 
 ```sh
-export BUN_INSTALL_CACHE_DIR="$BUILD_TMP/bun-cache"
-mkdir -p "$BUN_INSTALL_CACHE_DIR"
-baseline="$BUN_INSTALL_CACHE_DIR/bun-linux-x64-baseline-v1.4.4"
-cp "$HOST_BUN_CACHE/bun-linux-x64-baseline-v1.4.4" "$baseline"
-LOGINOM_CLI_BASELINE_CHILD=1 "$baseline" packages/loginom-host/script/build-cli.ts "$ARTIFACT" --baseline --no-archive
+export LOGINOM_AI_AGENT_BUN_BASELINE_ARCHIVE="$HOST_BUN_CACHE/bun-linux-x64-baseline-v1.4.4.zip"
 ```
 
 Defaults: 1800 seconds per model phase, load1 and load5 ≤ 8, ≥60 seconds
@@ -703,6 +698,9 @@ applies the edit in a separate browser, reopens the package to confirm it, and
 resumes the same chat in a new CLI process. For `"output_mode":"ports"`, the
 runner checks native port receipts against the expected graph and values.
 A partial receipt requires a full verified read from the same saved node.
+These reads use the segment’s final saved package after CLI shutdown, package
+close, logout, and runtime ACK. The reader closes and logs out before any
+manual edit or continuation.
 
 The model and any explicit variant are recorded per run in `results.json`.
 

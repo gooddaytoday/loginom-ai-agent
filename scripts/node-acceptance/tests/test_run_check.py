@@ -1918,6 +1918,349 @@ while b'\x04' not in data: data+=os.read(sys.stdin.fileno(),4096)
                     runner.write(follow / 'case.json', bad)
                     runner.scenario('follow-up', cases=root)
 
+    def test_private_case_chains_resolve_root_first_and_limit_depth(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            names = list('zyxwvutsr')
+            for i, name in enumerate(names):
+                folder = root / name
+                folder.mkdir()
+                (folder / 'task.md').write_text(name)
+                if i:
+                    runner.write(folder / 'case.json', dict(base=names[i - 1]))
+            for length in (3, 5, 8):
+                with self.subTest(length=length):
+                    steps = runner.scenario_steps(names[length - 1], cases=root)
+                    self.assertEqual([step for step, _ in steps], names[:length])
+            with self.assertRaisesRegex(ValueError, 'exceeds 8 turns'):
+                runner.scenario_steps(names[-1], cases=root)
+            runner.write(root / 'z/case.json', dict(base='x'))
+            with self.assertRaisesRegex(ValueError, 'Case base cycle: x → y → z → x'):
+                runner.scenario_steps('x', cases=root)
+
+    def test_runner_passes_one_session_profile_and_package_through_private_chain(self):
+        for length in (3, 5):
+            with self.subTest(length=length), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                names = [f'case-{i}' for i in range(length)]
+                for i, name in enumerate(names):
+                    folder = root / 'cases' / name
+                    folder.mkdir(parents=True)
+                    (folder / 'task.md').write_text(name)
+                    if i:
+                        runner.write(folder / 'case.json', dict(base=names[i - 1]))
+                pair = root / 'pair'
+                pair.mkdir()
+                runner.write(pair / 'worker.json', dict(url='https://example.invalid', username='worker',
+                                                        password='synthetic', package_directory='/test'))
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.out, instance.env, instance.auth_source = root, {}, None
+                instance.options = dict(pair=str(pair), cases=str(root / 'cases'), cold=True)
+                instance.report = dict(phase='setup', runs=[dict(scenario=names[-1], status='PENDING')])
+                instance.deadline = time.time() + 60
+                model_calls = []
+
+                def phase(name, command, folder, **kwargs):
+                    self.assertEqual(name, 'setup')
+                    for child in ('data', 'config'):
+                        (folder / 'profile' / child).mkdir(parents=True)
+                    runner.write(folder / 'setup.stdout', dict(browser=dict(state='verified')))
+
+                def model(name, folder, profile, workspace, package, login, build, session):
+                    model_calls.append((name, folder.name, profile, workspace, package, session))
+                    return 'shared-session', dict(graph={}, outputs=[]), None, None
+
+                with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'save'), \
+                        patch.object(instance, 'phase', side_effect=phase), patch.object(instance, 'model', side_effect=model):
+                    instance.run()
+                self.assertEqual([(name, folder) for name, folder, *_ in model_calls], list(zip(names, names)))
+                self.assertEqual([call[-1] for call in model_calls], [None] + ['shared-session'] * (length - 1))
+                for index in (2, 3, 4):
+                    self.assertEqual(len({call[index] for call in model_calls}), 1)
+                result = instance.report['runs'][0]
+                self.assertEqual(result['status'], 'PASS')
+                self.assertEqual([(t['turn'], t['status']) for t in result['turns']],
+                                 [(n, 'PASS') for n in range(1, length + 1)])
+
+    def test_manual_edit_validates_port_position_and_numeric_boundaries(self):
+        node = dict(type='imports.text', label='Sales')
+        commands = [
+            (dict(kind='connect', source=node, target={'type': 'filter'}, output=0, input=99), dict(input=True)),
+            (dict(kind='create', type='filter', position=dict(x=64, y=10000)), dict(position=dict(x=63, y=64))),
+            (dict(kind='filter_threshold', node=node, field='Revenue', value=2**53 - 1), dict(value=float('inf'))),
+        ]
+        for valid, override in commands:
+            with self.subTest(kind=valid['kind']):
+                runner.validate_manual_edit(valid, 'contract')
+                with self.assertRaisesRegex(ValueError, r'contract/case.json: manual_edit'):
+                    runner.validate_manual_edit(dict(valid, **override), 'contract')
+
+    def test_manual_edit_phase_requires_fresh_cli_cleanup_and_precedes_continuation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cases = root / 'cases'
+            edit = dict(kind='rename', node=dict(label='Before'), label='After')
+            for name, config in [('first', dict(manual_edit=edit)), ('second', dict(base='first'))]:
+                case = cases / name
+                case.mkdir(parents=True)
+                (case / 'task.md').write_text(name)
+                runner.write(case / 'case.json', config)
+            with self.assertRaisesRegex(ValueError, 'manual_edit requires a following turn'):
+                runner.scenario_steps('first', cases=cases)
+            for malformed in (None, dict(edit, extra=True), dict(kind='filter_threshold', node=edit['node'], field='Revenue', value=True)):
+                with self.assertRaisesRegex(ValueError, 'manual_edit'):
+                    runner.validate_manual_edit(malformed, 'first')
+
+            pair = root / 'pair'
+            pair.mkdir()
+            worker = dict(url='https://example.invalid', username='worker', password='synthetic', package_directory='/test')
+            runner.write(pair / 'worker.json', worker)
+            persisted = dict(complete=True, links=[], nodes=[
+                dict(ref=dict(node_id='node'), label='After', type='imports.text', position=dict(x=64,y=64))])
+
+            def phase(name, command, folder, **kwargs):
+                calls.append(name)
+                if name == 'setup':
+                    profile = folder / 'profile'
+                    for child in ('data', 'config', 'loginom/runtime'):
+                        (profile / child).mkdir(parents=True)
+                    runner.write(folder / 'setup.stdout', dict(browser=dict(state='verified')))
+                    return
+                self.assertEqual(name, 'manual-edit')
+                self.assertEqual(folder.name, 'first')
+                self.assertEqual(json.loads(kwargs['stdin']), dict(login=worker, packagePath=proof['package_path'], edit=edit))
+                if mode == 'edit-failure':
+                    (folder / 'manual/execution-events.jsonl').write_text('{}\n')
+                    raise AssertionError('MANUAL_EDIT_GESTURE_FAILED')
+                runner.write(folder / 'manual/result.json', dict(status='PASS', persisted=persisted, cleanup=proof, reopen_cleanup=proof))
+
+            def model(name, stage, profile, workspace, package, login, build, session, baseline=None):
+                calls.append(name)
+                cleanup = profile / 'saved-package-cleanup.json'
+                ack = profile / 'loginom/runtime/runtime-close-current.json'
+                if name == 'first':
+                    self.assertIsNone(session)
+                    if mode != 'close-failure':
+                        runner.write(cleanup, proof)
+                        runner.write(ack, dict(closed_ack=True))
+                    if mode == 'continue':
+                        instance.current['cli_exit'] = dict(code='CLI_TOOL_FAILED', location='first/model.stdout:1')
+                        with self.assertRaisesRegex(AssertionError, 'MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED'):
+                            instance.manual_edit(edit, stage, profile, package, login, build, ({cleanup}, {ack}))
+                else:
+                    self.assertEqual(session, 'same-session')
+                    self.assertEqual(baseline['nodes']['node']['label'], 'After')
+                return 'same-session', dict(graph={}, outputs=[]), None, None
+
+            for mode, code, category, followup in [
+                ('continue', 'CLI_TOOL_FAILED', None, ['manual-edit', 'second']),
+                ('edit-failure', 'MANUAL_EDIT_GESTURE_FAILED', 'runner/setup', ['manual-edit']),
+                ('close-failure', 'MANUAL_EDIT_CLI_PACKAGE_CLOSE_UNCONFIRMED', 'product', []),
+            ]:
+                with self.subTest(mode=mode):
+                    calls = []
+                    out = root / mode
+                    out.mkdir()
+                    proof = dict(package_closed=True, logged_out=True, package_path=f'/test/{out.name}-second.lgp')
+                    instance = runner.Runner.__new__(runner.Runner)
+                    instance.out, instance.env, instance.auth_source = out, {}, None
+                    instance.options = dict(pair=str(pair), cases=str(cases), cold=False)
+                    instance.report = dict(head='head', tree='tree', phase='setup', runs=[dict(scenario='second', status='PENDING')])
+                    instance.deadline = time.time() + 60
+                    with patch.object(instance, 'build', return_value=root / 'build'), patch.object(instance, 'save'), \
+                            patch.object(instance, 'phase', side_effect=phase), patch.object(instance, 'model', side_effect=model):
+                        instance.run()
+                    self.assertEqual(calls, ['setup', 'first', *followup])
+                    result = instance.report['runs'][0]
+                    first, second = result['turns']
+                    manual = first['manual_edit']
+                    self.assertEqual(result['status'], 'FAIL')
+                    self.assertEqual(result['failure_class'], code)
+                    if category is None:
+                        self.assertEqual((first['status'], manual['status'], second['status']), ('FAIL', 'PASS', 'PASS'))
+                    else:
+                        self.assertEqual((first['status'], manual['status'], second['status']), ('PASS', 'FAIL', 'NOT_RUN'))
+                        self.assertNotIn('failure_class', first)
+                        self.assertEqual(result['failed_phase'], 'manual-edit')
+                        self.assertEqual(result['failure_category'], category)
+                        self.assertEqual((manual['failure_class'], manual['failure_category']), (code, category))
+                        self.assertEqual('journal' in manual, mode == 'edit-failure')
+                        summary = runner.summary(instance.report)
+                        self.assertIn('### Сбои ручных правок', summary)
+                        self.assertIn(f'| second | first | rename | FAIL | {category} | {code} |', summary)
+
+    def test_exact_graph_detects_replaced_moved_and_extra_nodes_or_edges(self):
+        want = dict(nodes=[dict(id='tag', type='imports.text', label='Sales')], exact=True, retain=['tag'])
+        node = dict(type='imports.text', label='Sales', position=dict(x=128, y=128))
+        baseline = dict(nodes=dict(native=node), links=[], location='manual/result.json', moved_node_id='native')
+        runner.validate_graph_contract(want)
+        runner.check_case_graph(want, baseline, baseline)
+        for code, observed in [
+            ('NODE_REPLACED', dict(baseline, nodes=dict(other=node))),
+            ('POSITION_CHANGED', dict(baseline, nodes=dict(native=dict(node, position=dict(x=192,y=128))))),
+            ('UNEXPECTED_NODE', dict(baseline, nodes=dict(native=node, other=dict(type='transform.sorting', label='Sort')))),
+            ('UNEXPECTED_LINK', dict(baseline, links=['foreign-link'])),
+        ]:
+            with self.assertRaisesRegex(AssertionError, 'CASE_GRAPH_' + code):
+                runner.check_case_graph(want, observed, baseline)
+
+    def test_graph_contract_checks_current_snapshot_captions_direction_and_ports(self):
+        want = dict(nodes=[dict(id='import', type='imports.text', label='Продажи'),
+                           dict(id='group', type='transform.group_data', label_contains='по регионам')],
+                    links=[dict(source='import', target='group', output=0, input=0)])
+        runner.validate_graph_contract(want)
+        for malformed in [dict(nodes=want['nodes'] * 2), dict(nodes=want['nodes'], links=[dict(source='import', target='unknown')]),
+                          dict(nodes=want['nodes'], links=[dict(want['links'][0], input=True)])]:
+            with self.assertRaisesRegex(ValueError, 'CASE_GRAPH_INVALID'):
+                runner.validate_graph_contract(malformed)
+        with tempfile.TemporaryDirectory() as directory:
+            profile = Path(directory)
+            path = profile / 'execution-events.jsonl'
+            native = dict(complete=True, nodes=[
+                dict(ref=dict(node_id='i'), type='imports.text', label='Старый импорт'),
+                dict(ref=dict(node_id='g'), type='transform.group_data', label='Выручка по регионам')],
+                links=[dict(source='i', target='g', output=0, input=0)])
+            checkpoint = dict(recorded_at='2026-11-25T10:00:00.000Z', phase='node_target_checkpoint',
+                              target_state=dict(final_graph=native))
+            since = '2026-11-25T10:01:00.000Z'
+            raw = dict(scan=dict(complete=True), graph_identity=dict(status='observed', native_prefix='A;Graph;'),
+                       nodes=[dict(node_id='i', node_ref=dict(node_label='Продажи')),
+                              dict(node_id='g', node_ref=dict(node_label='Выручка_по_регионам'))],
+                       links=['A;Graph;Продажи|Output_Data-0|Выручка_по_регионам|Input_Data-0'],
+                       ui=dict(elements=[dict(graph_node=dict(part='label', node_label='Выручка_по_регионам',
+                                                              label_text='Выручка порегионам'))]))
+            current = dict(recorded_at=since, phase='observation_completed',
+                           outcome=dict(status='SUCCEEDED', output=raw))
+            path.write_text(json.dumps(checkpoint) + '\n')
+            with self.assertRaisesRegex(AssertionError, 'CASE_GRAPH_EVIDENCE_MISSING'):
+                runner.observed_case_graph(profile, since)
+            path.write_text('\n'.join(map(json.dumps, (checkpoint, current))))
+            graph = runner.observed_case_graph(profile, since)
+            self.assertEqual(graph['location'], 'execution-events.jsonl:2')
+            runner.check_case_graph(want, graph)
+            caption = raw['ui']['elements'][0]['graph_node']
+            caption['label_text'] = 'Выручка_по_регионам'
+            path.write_text('\n'.join(map(json.dumps, (checkpoint, current))))
+            with self.assertRaisesRegex(AssertionError, 'CASE_GRAPH_NODE_MISSING'):
+                runner.check_case_graph(want, runner.observed_case_graph(profile, since))
+            caption['label_text'] = 'Выручка порегионам'
+            for changed in [dict(want['links'][0], input=1), dict(source='group', target='import')]:
+                with self.assertRaisesRegex(AssertionError, 'CASE_GRAPH_LINK_MISSING'):
+                    runner.check_case_graph(dict(want, links=[changed]), graph)
+            raw['nodes'][0]['variable_outputs'] = [dict(native_index=4, port=2)]
+            raw['nodes'][1]['variable_inputs'] = [dict(native_index=1, port=0)]
+            raw['links'] = ['A;Graph;Продажи|Output_Var-4|Выручка_по_регионам|Input_Var-1']
+            path.write_text('\n'.join(map(json.dumps, (checkpoint, current))))
+            runner.check_case_graph(dict(want, links=[dict(want['links'][0], output=2)]),
+                                    runner.observed_case_graph(profile, since))
+            raw['nodes'].pop()
+            raw['links'].clear()
+            path.write_text('\n'.join(map(json.dumps, (checkpoint, current))))
+            with self.assertRaisesRegex(AssertionError, 'CASE_GRAPH_NODE_MISSING'):
+                runner.check_case_graph(want, runner.observed_case_graph(profile, since))
+
+    def test_graph_only_turn_uses_existing_model_journal_without_export(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cases = root / 'cases'
+            case = cases / 'bh-t0-import'
+            (case / 'data').mkdir(parents=True)
+            (case / 'data/sales.csv').write_text('Value\n1\n')
+            (case / 'task.md').write_text('Импортируй sales.csv.')
+            runner.write(case / 'expected.json', dict(graph=dict(nodes=[dict(id='sales', type='imports.text')]), outputs=[]))
+            profile, workspace, stage = (root / name for name in ('profile', 'workspace', 'bh-t0-import'))
+            for folder in (profile, workspace, stage):
+                folder.mkdir()
+            instance = runner.Runner.__new__(runner.Runner)
+            instance.out, instance.env, instance.options, instance.current = root, {}, dict(cases=cases), {}
+
+            def phase(name, command, folder, **kwargs):
+                self.assertEqual(name, 'model')
+                self.assertEqual(command[command.index('--file') + 1], workspace / 'sales.csv')
+                self.assertNotIn('Выгрузи', command[-1])
+                self.assertIn('Сохрани пакет как /own/run.lgp', command[-1])
+                save = dict(status='SUCCEEDED', action_key='package.save_checkpoint', output=dict(save_completed=True))
+                event = dict(type='tool_use', sessionID='chat', part=dict(state=dict(status='completed', output=json.dumps(save))))
+                (folder / 'model.stdout').write_text(json.dumps(event) + '\n')
+                native = dict(complete=True, nodes=[dict(ref=dict(node_id='sales'), type='imports.text', label='Продажи')],
+                              links=[])
+                event = dict(recorded_at='2099-01-01T00:00:00.000Z', phase='node_target_checkpoint',
+                             target_state=dict(final_graph=native))
+                (profile / 'execution-events.jsonl').write_text(json.dumps(event) + '\n')
+                runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=True, logged_out=True))
+                runner.write(profile / 'runtime-close-model.json', dict(closed_ack=True))
+
+            with patch.object(instance, 'phase', side_effect=phase):
+                session, expected, actual, delimiter = instance.model(
+                    'bh-t0-import', stage, profile, workspace, '/own/run.lgp', {'package_directory': '/own'}, root / 'build')
+            self.assertEqual((session, expected['outputs'], actual, delimiter), ('chat', [], None, None))
+            self.assertEqual(instance.current['graph'], 'PASS')
+            self.assertEqual(instance.current['save'], 'PASS')
+            self.assertEqual(instance.current['cleanup'], 'main PASS')
+            self.assertEqual(instance.current['port-read'], '— (graph only)')
+            self.assertNotIn('failure_class', instance.current)
+            self.assertEqual(runner.read(stage / 'graph-observed.json')['location'], 'execution-events.jsonl:1')
+
+    def test_private_graph_turn_port_validation_follows_expected_outputs(self):
+        graph = dict(nodes=[dict(id='sales', type='imports.text')])
+        columns = [dict(name='Value', type='integer')]
+        output = dict(output_node_type='imports.text', output_port=0, export_destination='/own/sales.csv',
+                      columns=columns, rows=[dict(Value=1)], ordered=True)
+        for contract, read, port_status in [
+            (dict(outputs=[]), None, '— (graph only)'),
+            (dict(outputs=[]), False, 'FAIL'),
+            (dict(outputs=[], tables=[output]), None, 'FAIL'),
+            (dict(outputs=[output]), None, 'FAIL'),
+            (dict(outputs=[output]), True, 'PASS'),
+        ]:
+            with self.subTest(contract=list(contract), outputs=bool(contract['outputs']), read=read), \
+                    tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                case = root / 'cases/bh-sales'
+                case.mkdir(parents=True)
+                (case / 'task.md').write_text('Подготовь таблицу.')
+                runner.write(case / 'expected.json', dict(graph=graph, **contract))
+                out = root / 'run'
+                profile, workspace, stage = (out / name for name in ('profile', 'workspace', case.name))
+                for folder in (profile, workspace, stage):
+                    folder.mkdir(parents=True)
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.out, instance.env, instance.options, instance.current = out, {}, dict(cases=case.parent), {}
+
+                def phase(name, command, folder, **kwargs):
+                    self.assertEqual(name, 'model')
+                    ports = [] if read is None else [dict(port=0, schema=columns, sample=[dict(Value=1)],
+                                                          freshness_basis='completed_execution_port_source')]
+                    receipts = [dict(status='SUCCEEDED', cleanup_complete=read, output=dict(ports=ports)),
+                                dict(status='SUCCEEDED', action_key='package.save_checkpoint',
+                                     output=dict(save_completed=True))]
+                    events = [dict(type='tool_use', sessionID='chat',
+                                   part=dict(state=dict(status='completed', output=json.dumps(receipt))))
+                              for receipt in receipts]
+                    (folder / 'model.stdout').write_text('\n'.join(map(json.dumps, events)) + '\n')
+                    native = dict(complete=True, nodes=[dict(ref=dict(node_id='sales'), type='imports.text')], links=[])
+                    event = dict(recorded_at='2099-01-01T00:00:00.000Z', phase='node_target_checkpoint',
+                                 target_state=dict(final_graph=native))
+                    (profile / 'execution-events.jsonl').write_text(json.dumps(event) + '\n')
+                    runner.write(profile / 'saved-package-cleanup.json', dict(package_closed=True, logged_out=True))
+                    runner.write(profile / 'runtime-close-model.json', dict(closed_ack=True))
+                    if contract['outputs']:
+                        self.assertIn('/own/run-run-bh-sales-sales.csv', command[-1])
+                        (profile / 'run-run-bh-sales-sales.csv').write_text('Value\n1\n')
+
+                with patch.object(instance, 'phase', side_effect=phase):
+                    instance.model(case.name, stage, profile, workspace, '/own/run.lgp',
+                                   {'package_directory': '/own'}, root / 'build')
+                self.assertEqual(instance.current['graph'], 'PASS')
+                self.assertEqual(instance.current['csv'], 'PASS' if contract['outputs'] else '— (graph only)')
+                self.assertEqual(instance.current['port-read'], port_status)
+                if port_status == 'FAIL':
+                    self.assertEqual(instance.current['failure_class'], 'PORT_READ_INVALID')
+                    self.assertEqual(instance.current['location'], f'{stage / "model.stdout"}:1')
+                else:
+                    self.assertNotIn('failure_class', instance.current)
+
+
     def test_private_case_attaches_every_data_format_with_configured_model(self):
         with tempfile.TemporaryDirectory() as directory:
             commands = []
