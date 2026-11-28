@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js"
 import { Schema } from "effect"
 import { isSessionNotFoundError, type SessionInfo } from "@opencode/client/promise"
+import { getFilename, parsePathLineSuffix } from "@opencode/util/path"
 import type { ServerSDK } from "@/runtime/server/client"
 import type { Data } from "@opencode/client/solid"
 import { usePlatform } from "@/runtime/platform/platform"
@@ -36,6 +37,38 @@ const requestTitles = {
   "mcp-elicitation": "notification.elicitation.title",
   "websearch.provider": "notification.permission.title",
 } as const
+
+function systemNotificationDescription(title: string, fallback: string) {
+  let text = title.trim()
+
+  try {
+    text = decodeURIComponent(text)
+  } catch {
+    // Conversation titles can contain literal percent signs.
+  }
+
+  // Titles can come from user input or from a model. Keep credential-like text out of OS notification history.
+  if (
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bbearer\s+[\w./+=-]{8,}|\b[a-z][\w+.-]*:\/\/[^/\s]*@/i.test(text) ||
+    /(?:\b(?:[a-z0-9]+_)*(?:api[ _-]?key|access[ _-]?key|password|passwd|secret|token|authorization|cookie)|пароль|токен|секретный ключ)["']?\s*[:=]\s*\S/i.test(text) ||
+    /\b(?:sk-|gh[pousr]_|github_pat_|glpat-|xox[baprs]-|AIza|AKIA)[\w-]{12,}|\beyJ[\w-]+\.[\w-]+\.[\w-]+/.test(text)
+  ) {
+    return fallback
+  }
+
+  const url = text.match(/\b(?:file|https?):\/\/[^\s"'`]+/i)?.[0]
+  const quotedPath = text.match(/(["'`])([^"'`]*[\\/][^"'`]+)\1/)?.[2]
+  const barePath = /^(?:[a-z]:[\\/]|\\{2}|~?\/)/i.test(text)
+    ? text
+    : text.match(/[^\s"'`]*[\\/][^\s"'`]+/)?.[0]
+  const path = url ? (URL.parse(url)?.pathname ?? "/") : (quotedPath ?? barePath)
+
+  if (path === undefined) return title.trim() || fallback
+
+  const filename = getFilename(parsePathLineSuffix(path).path).trim()
+
+  return filename && !/^(?:\.{1,2}|[a-z]:)$/i.test(filename) ? filename : fallback
+}
 
 export function openNotificationSession(tabs: NotificationTabs, server: ServerConnection.Key, sessionID: string) {
   const tab = tabs.addSessionTab({ server, sessionId: sessionID })
@@ -308,6 +341,9 @@ export function createServerNotificationState(input: {
       .catch(() => undefined)
   }
 
+  const notificationDescription = (session: SessionInfo) =>
+    systemNotificationDescription(session.title, language.t("notification.session.fallbackDescription"))
+
   const handleSessionIdle = (sessionID: string, eventID: string) => {
     void lookup(sessionID).then((session) => {
       if (disposed.value || input.muted(sessionID)) return
@@ -329,10 +365,20 @@ export function createServerNotificationState(input: {
 
       if (hasOpenTab && settings.notifications.turnFinished()) {
         void input.coordinator.system(`${input.key}\0${eventID}`, () => {
-          if (busy()) return
+          if (
+            disposed.value ||
+            input.muted(sessionID) ||
+            !sessionIDHasOpenTab(tabs.store, input.key, sessionID) ||
+            !settings.notifications.turnFinished() ||
+            busy()
+          ) {
+            return
+          }
 
-          return platform.notify(language.t("notification.session.responseReady.title"), session.title, () =>
-            openNotificationSession(tabs, input.key, sessionID),
+          return platform.notify(
+            language.t("notification.session.responseReady.title"),
+            notificationDescription(session),
+            () => openNotificationSession(tabs, input.key, sessionID),
           )
         })
       }
@@ -351,7 +397,9 @@ export function createServerNotificationState(input: {
         void input.coordinator.sound(`${input.key}\0${eventID}`, () => playSoundById(settings.sounds.errors()))
       }
 
-      const description = session?.title ?? language.t("notification.session.error.fallbackDescription")
+      const description = session
+        ? notificationDescription(session)
+        : language.t("notification.session.error.fallbackDescription")
 
       if (hasOpenTab && settings.notifications.errors()) {
         void input.coordinator.system(`${input.key}\0${eventID}`, () =>
@@ -401,7 +449,7 @@ export function createServerNotificationState(input: {
     void input.coordinator.system(key, () => {
       const request = pending()
 
-      if (!request || !settings.notifications.decision()) return
+      if (!request || !sessionIDHasOpenTab(tabs.store, input.key, target) || !settings.notifications.decision()) return
 
       // Request messages, form copy and tool arguments can contain paths or credentials.
       const actionTitle = "action" in request ? `notification.permission.action.${request.action}.title` : undefined
@@ -412,7 +460,9 @@ export function createServerNotificationState(input: {
           ? (actionTitle as Extract<keyof typeof en, `notification.permission.action.${string}.title`>)
           : requestTitles[kind]
 
-      return platform.notify(language.t(subject), session.title, () => openNotificationSession(tabs, input.key, target))
+      return platform.notify(language.t(subject), notificationDescription(session), () =>
+        openNotificationSession(tabs, input.key, target),
+      )
     })
   }
 

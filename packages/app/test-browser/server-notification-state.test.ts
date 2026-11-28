@@ -17,6 +17,8 @@ const session = { id: "session-1", title: "Test session", location: { directory:
 
 const alerts: string[] = []
 
+const descriptions: Array<string | undefined> = []
+
 const sounds: string[] = []
 
 const clicks: Array<() => void> = []
@@ -68,8 +70,9 @@ beforeAll(async () => {
       platform: desktopStorage.has("desktop") ? "desktop" : "web",
       windowID: "notification-test",
       storage: () => desktopStorage.get("desktop"),
-      notify: async (title: string, _description?: string, onClick?: () => void) => {
+      notify: async (title: string, description?: string, onClick?: () => void) => {
         alerts.push(title)
+        descriptions.push(description)
 
         if (onClick) clicks.push(onClick)
       },
@@ -109,6 +112,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   alerts.length = 0
+  descriptions.length = 0
   sounds.length = 0
   clicks.length = 0
   selected.length = 0
@@ -317,6 +321,85 @@ test.each([
   await new Promise((resolve) => setTimeout(resolve, 0))
   expect(alerts).toEqual([title])
   dispose()
+})
+
+const systemNotificationCases = [
+  { title: "Test session", expected: "Test session", change: undefined },
+  { title: 'Review "/home/user/private/Quarterly report.xlsx"', expected: "Quarterly report.xlsx", change: undefined },
+  { title: String.raw`C:\Projects\Private\Monthly report.xlsx`, expected: "Monthly report.xlsx", change: undefined },
+  { title: "Check ./private/report.csv before sending", expected: "report.csv", change: undefined },
+  { title: "Check password=fixture-only", expected: "notification.session.fallbackDescription", change: undefined },
+  {
+    title: `Review ${["ghp", "exampleFixtureValue1234567890"].join("_")}`,
+    expected: "notification.session.fallbackDescription",
+    change: undefined,
+  },
+  { title: "Проверить пароль: пример", expected: "notification.session.fallbackDescription", change: undefined },
+  { title: "SDK_TOKEN=fixture-only", expected: "notification.session.fallbackDescription", change: undefined },
+  { title: "Basic project setup", expected: "Basic project setup", change: undefined },
+  { title: "Test session", expected: undefined, change: "tab closed" },
+  { title: "Test session", expected: undefined, change: "muted" },
+  { title: "Test session", expected: undefined, change: "disabled" },
+] as const
+
+test.each(
+  (["session.status", "permission.asked"] as const).flatMap((type) =>
+    systemNotificationCases.map((options) => ({ ...options, type, scenario: options.change ?? options.title })),
+  ),
+)("system notification $type / $scenario", async ({ type, title, expected, change }) => {
+  const delivery = Promise.withResolvers<NotificationDelivery>()
+  const listeners = new Array<(event: OpenCodeEvent) => void>()
+  const request = { sessionID: session.id, id: "request-1", action: "shell", resources: [], metadata: {} }
+  const muted = { value: false }
+  tabs.store = [{ type: "session", server, sessionId: session.id }]
+  preferences.permissionsSound = false
+
+  const dispose = createRoot((dispose) => {
+    createState({
+      muted: () => muted.value,
+      sdk: {
+        scope: ServerScope.local,
+        connection: { status: () => "connected" },
+        event: {
+          listen: (listener: (event: OpenCodeEvent) => void) => {
+            listeners.push(listener)
+
+            return () => {}
+          },
+        },
+      },
+      data: {
+        session: {
+          get: () => ({ ...session, title, projectID: "project-1" }),
+          family: () => [session.id],
+          status: () => "idle",
+          root: () => session.id,
+          permission: { list: () => [request] },
+        },
+      },
+      coordinator: { system: (_key: string, run: NotificationDelivery) => delivery.resolve(run) },
+    })
+
+    return dispose
+  })
+
+  try {
+    const event: OpenCodeEvent =
+      type === "session.status"
+        ? { type, id: "event-1", created: 1, data: { sessionID: session.id, status: { type: "idle" } } }
+        : { type, id: "event-1", created: 1, location: session.location, data: request }
+    listeners.forEach((listener) => listener(event))
+    const notifyAfterLock = await delivery.promise
+
+    if (change === "tab closed") tabs.store = []
+    if (change === "muted") muted.value = true
+    if (change === "disabled") preferences[type === "session.status" ? "turnFinished" : "decision"] = false
+
+    await notifyAfterLock()
+    expect(descriptions).toEqual(expected === undefined ? [] : [expected])
+  } finally {
+    dispose()
+  }
 })
 
 test("manual unread edits wait for desktop storage to load", async () => {
