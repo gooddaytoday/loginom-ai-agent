@@ -87,9 +87,14 @@ test("Save checks first and reports pending activation until the service applies
   expect(view(applied)).toMatchObject({ connected: { username: "user", folder: "/user" }, readOnly: false })
 })
 
-test("settings show that pending changes could not be deleted while the original generation is ready", () => {
-  const state = form({ ...fresh, revision: 2, generation: 1, state: "ready", failed: true, pendingCleanupFailed: true })
-  expect(view(state)).toMatchObject({ message: "pendingCleanupFailed", busy: false })
+test.each([
+  { pendingCleanupFailed: true as const, message: "pendingCleanupFailed" },
+  { message: "activationFailed" },
+])("settings show the original connection alongside $message", ({ pendingCleanupFailed, message }) => {
+  const state = form({ ...fresh, revision: 2, generation: 1, state: "ready", failed: true, pendingCleanupFailed })
+  expect(view(state)).toMatchObject({
+    message, busy: false, connected: { generation: 1, username: fresh.username, folder: fresh.folder },
+  })
 })
 
 test("unavailable, changed targets and disposal ignore late completions", () => {

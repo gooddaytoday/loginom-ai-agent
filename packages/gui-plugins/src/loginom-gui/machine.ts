@@ -208,7 +208,7 @@ export function view(state: State) {
   const issue = state.type === "editing" ? state.issue : undefined
   return {
     draft: form?.draft,
-    connected: form?.status.state === "ready" && !form.status.failed ? form.status : undefined,
+    connected: form?.status.state === "ready" ? form.status : undefined,
     message: message(state),
     fieldErrors: {
       url: issue === "invalidAddress" || issue === "loginUnavailable" ? issue : undefined,

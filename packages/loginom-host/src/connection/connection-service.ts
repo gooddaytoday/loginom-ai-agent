@@ -64,8 +64,8 @@ export async function connectionService(
     if (state.loading) return state.loading
     state.loading = (async () => {
       const active = await store.read()
-      const saved = await store.pendingForStartup()
       const latest = await store.latestGeneration()
+      const saved = await store.pendingForStartup(active?.generation ?? 0)
       if (saved === "interrupted") return { active, latest, failure: await discardPending() }
       return { active, latest, pending: saved }
     })()
@@ -75,7 +75,7 @@ export async function connectionService(
           state.failure = failure
           state.active = active
           state.setupRequired = active ? undefined : true
-          state.pending = pending && pending.generation > (active?.generation ?? 0) ? pending : undefined
+          state.pending = pending
           state.revision = state.pending?.revision ?? active?.revision ?? 0
           state.generation = Math.max(active?.generation ?? 0, pending?.generation ?? 0, latest)
           state.phase = active ? "starting" : failure ? "recoverable-error" : "unconfigured"
@@ -169,10 +169,7 @@ export async function connectionService(
     )
   }
   async function failPending(failure: string) {
-    finishPending(await discardPending() ?? failure)
-  }
-  function finishPending(failure: string) {
-    state.failure = failure
+    state.failure = (await discardPending()) ?? failure
     state.pending = undefined
     state.pendingBrowser = undefined
     state.phase = state.handle ? state.readiness : "recoverable-error"
@@ -185,19 +182,6 @@ export async function connectionService(
     const candidate = state.pending
     state.phase = "starting"
     state.applying = (async () => {
-      // Persist the attempt before starting it. If deletion fails or the Host is
-      // interrupted, startup can discard this record while keeping queued saves.
-      try {
-        await store.setPendingActivation(true)
-      } catch {
-        finishPending("LOGINOM_STORE_WRITE_FAILED")
-        return
-      }
-      const resumeOnStartup = () => store.setPendingActivation(false).catch(() => undefined)
-      if (state.closing) {
-        await resumeOnStartup()
-        return
-      }
       const signal = state.active ? switching.signal : undefined
       let prepared: RuntimeHandle | undefined
       try {
@@ -216,8 +200,7 @@ export async function connectionService(
         const cancelled =
           signal?.aborted && (error === signal.reason || (error instanceof Error && error.cause === signal.reason))
         await prepared?.close().catch(() => undefined)
-        if (cancelled) await resumeOnStartup()
-        else
+        if (!cancelled)
           await failPending(
             error instanceof Error && error.message === "LOGINOM_RUNTIME_TIMEOUT"
               ? error.message
@@ -230,7 +213,6 @@ export async function connectionService(
       void next.ready?.catch(() => undefined)
       if (state.closing || state.pending !== candidate) {
         await next.close().catch(() => undefined)
-        await resumeOnStartup()
         return
       }
       const committed = await store
@@ -527,11 +509,14 @@ export async function connectionService(
       beginClose()
       await state.loading?.catch(() => undefined)
       await Promise.allSettled([...checks.values()])
-      state.pending = undefined
       clearValidations()
       await state.recovering?.catch(() => undefined)
       await state.applying
       await state.handle?.close()
+      // A clean shutdown can hand off a change that was still waiting or cancelled by shutdown.
+      const pending = state.pending
+      state.pending = undefined
+      if (pending && !state.writing && !state.checkCleanupFailed) await store.deferPending(pending).catch(() => undefined)
       state.handle = undefined
       state.phase = state.active ? "recoverable-error" : "unconfigured"
       if (state.checkCleanupFailed) throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED")

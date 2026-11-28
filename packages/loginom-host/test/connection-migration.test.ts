@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { Product } from "@loginom-ai-agent/product"
@@ -250,6 +250,74 @@ for (const [name, codec] of [
     } finally { await f.close() }
   })
 
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    `${name}: a write failure during activation does not replay the saved request when permissions are restored`,
+    async () => {
+      const f = await fixture(codec)
+      const replacementUrl = "https://replacement.example/app/"
+      try {
+        await f.store.stage(original)
+        await f.store.activate(1)
+        const first = await f.start()
+        const run = first.acquire("draining")!
+        const validation = await first.api.check({
+          revision: 1, url: replacementUrl, username: "replacement-user", password: { operation: "empty" },
+        })
+        expect(await first.api.save({ revision: 1, validationId: validation.validationId })).toMatchObject({
+          generation: 1, state: "pending",
+        })
+
+        // Before activation can write anything, deny both atomic replacement and unlink in the actual store.
+        const generations = join(f.directory, "generations")
+        await chmod(f.directory, 0o500)
+        try {
+          await chmod(generations, 0o500)
+          run.release()
+          await first.settled()
+          expect(await first.api.status()).toMatchObject({
+            generation: 1, state: "ready", failure: "LOGINOM_PENDING_CLEAR_FAILED",
+          })
+          expect(await f.store.read()).toEqual(original)
+          expect(await f.store.pending()).toMatchObject({ url: replacementUrl })
+          expect(first.acquire("after-failure")?.generation).toBe(1)
+          await first.close()
+        } finally {
+          await chmod(f.directory, 0o700)
+          await chmod(generations, 0o700)
+        }
+
+        const startsBeforeRestart = f.prepared.length
+        const restarted = await f.start()
+        expect(await restarted.api.status()).toMatchObject({ generation: 1, state: "ready", url: original.url })
+        expect(f.prepared.slice(startsBeforeRestart)).toEqual([original.url])
+        expect(await f.store.read()).toEqual(original)
+        expect(await f.store.pending()).toBeUndefined()
+      } finally { await f.close() }
+    },
+  )
+
+  test(`${name}: a clean restart resumes a change still queued behind a lease`, async () => {
+    const f = await fixture(codec)
+    const replacementUrl = "https://replacement.example/app/"
+    try {
+      await f.store.stage(original)
+      await f.store.activate(1)
+      const first = await f.start()
+      expect(first.acquire("draining")?.generation).toBe(1)
+      const validation = await first.api.check({
+        revision: 1, url: replacementUrl, username: "replacement-user", password: { operation: "empty" },
+      })
+      expect(await first.api.save({ revision: 1, validationId: validation.validationId })).toMatchObject({
+        generation: 1, state: "pending",
+      })
+      await first.close()
+
+      const restarted = await f.start()
+      expect(await restarted.api.status()).toMatchObject({ generation: 2, state: "ready", url: replacementUrl })
+      expect(await f.store.pending()).toBeUndefined()
+    } finally { await f.close() }
+  })
+
   test(`${name}: retries deleting rejected pending settings on startup without preparing them again`, async () => {
     const f = await fixture(codec)
     const replacementUrl = "https://replacement.example/app/"
@@ -341,6 +409,7 @@ for (const [name, codec] of [
           apiKey: "pending-key",
         }
         await f.store.savePending(pending)
+        await f.store.deferPending(pending)
         await f.start()
         expect(await f.store.read()).toEqual(pending)
         expect(f.prepared).toEqual([original.url, url])

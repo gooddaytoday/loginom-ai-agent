@@ -178,15 +178,20 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
       const record = await read(pendingPath)
       return record && decodeRecord(record)
     },
-    async pendingForStartup() {
+    async pendingForStartup(activeGeneration: number) {
       const record = await read(pendingPath)
       if (record?.activationStarted) return "interrupted" as const
-      return record && decodeRecord(record)
+      if (!record || record.generation <= activeGeneration) return
+      // Claim older records and clean-shutdown handoffs before returning a candidate to activate.
+      const candidate = await decodeRecord(record)
+      await write(pendingPath, { ...record, activationStarted: true }, true)
+      return candidate
     },
-    async setPendingActivation(started: boolean) {
+    async deferPending(candidate: Pick<ActiveConnection, "generation" | "revision">) {
       const record = await read(pendingPath)
-      if (!record) throw Error("LOGINOM_STORE_WRITE_FAILED")
-      await write(pendingPath, { ...record, activationStarted: started ? true : undefined }, true)
+      if (record?.generation !== candidate.generation || record.revision !== candidate.revision)
+        throw Error("LOGINOM_STORE_WRITE_FAILED")
+      await write(pendingPath, { ...record, activationStarted: undefined }, true)
     },
     async savePending(value: ActiveConnection) {
       await initialize()
@@ -195,6 +200,8 @@ export function connectionStore(directory: string, codec: CredentialCodec = cred
         {
           generation: value.generation,
           revision: value.revision,
+          // Publish the request and its restart guard in the same atomic write.
+          activationStarted: true,
           url: value.url,
           ...(value.urlSource ? { urlSource: value.urlSource } : {}),
           username: value.username,
