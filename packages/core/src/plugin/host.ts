@@ -12,6 +12,7 @@ import { Artifact } from "../artifact.js"
 import { AISDK } from "../aisdk.js"
 import { Command } from "../command.js"
 import { Credential } from "../credential.js"
+import { Form } from "../form.js"
 import { Bus } from "../bus.js"
 import { Integration } from "../integration.js"
 import { IntegrationConnection } from "../integration/connection.js"
@@ -68,6 +69,7 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: Pick<Interfa
   const rpc = yield* Rpc.Service
   const skill = yield* Skill.Service
   const tools = yield* Tool.Service
+  const forms = yield* Form.Service
   const vcs = yield* Vcs.Service
   const websearch = yield* WebSearch.Service
   const generate = yield* Generate.Service
@@ -501,6 +503,16 @@ export const make = Effect.fn("PluginHost.make")(function* (plugin: Pick<Interfa
       hook: (name, callback) => hooks.register("shell", name, callback),
     },
     tool: {
+      ask: (form, call) =>
+        permission.assert({ action: "question", resources: ["*"], ...Permission.invocation(call) }).pipe(
+          Effect.andThen(
+            forms.ask({
+              ...form,
+              sessionID: call.sessionID,
+              metadata: { ...form.metadata, tool: { messageID: call.messageID, id: call.id } },
+            }),
+          ),
+        ),
       transform: tools.transform,
       reload: tools.reload,
       list: tools.list,
@@ -648,6 +660,7 @@ export const requirements = LayerNode.group([
   Rpc.node,
   Skill.node,
   Tool.node,
+  Form.node,
   Vcs.node,
   WebSearch.node,
   Worktree.node,

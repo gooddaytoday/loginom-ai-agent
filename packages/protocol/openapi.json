@@ -894,6 +894,20 @@
             "required": false
           },
           {
+            "name": "searchField",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": ["title", "project", "prompt"]
+                }
+              ],
+              "description": "Field for literal session search. Prompt searches stored user message text with at least three query characters."
+            },
+            "required": false
+          },
+          {
             "name": "parentID",
             "in": "query",
             "schema": {
@@ -27873,6 +27887,9 @@
               },
               "permissions": {
                 "$ref": "#/components/schemas/Permission.Ruleset"
+              },
+              "instructionEntries": {
+                "$ref": "#/components/schemas/InstructionEntry.Snapshot"
               },
               "version": {
                 "type": "string"

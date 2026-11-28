@@ -261,6 +261,114 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
   ])
 })
 
+for (const outcome of ["applied", "failed"] as const) {
+  test(`Loginom settings count draining tasks and refresh on ${outcome}`, ({ page }) =>
+    loginomApplication(page, outcome),
+  )
+}
+
+async function loginomApplication(page: Page, outcome: "applied" | "failed") {
+  const directory = "/service"
+  const oldUrl = "https://old.example/app/"
+  const newUrl = "https://new.example/app/"
+  let generation = 1
+  let revision = 1
+  let tasks = 2
+  let state: "ready" | "pending" | "starting" | "recoverable-error" = "ready"
+
+  function status() {
+    return {
+      revision,
+      generation,
+      url: generation === 1 ? oldUrl : newUrl,
+      username: "analyst",
+      folder: "/analyst",
+      hasPassword: false,
+      failed: state === "recoverable-error",
+      state,
+      ...(state === "pending" && { application: { state: "pending", tasks } }),
+      ...(state === "ready" && generation === 2 && { application: { state: "applied" } }),
+    }
+  }
+
+  const { push } = await mockWorkspace(page, {
+    name: "Loginom",
+    sessions: [],
+    directory,
+    provider: NO_PROVIDER,
+    seed: { locale: "ru" },
+    onRpc: (request) => {
+      if (request.rpcID !== "loginom.connection") return
+
+      switch (request.method) {
+        case "status":
+          return { output: { ok: true, value: status() } }
+        case "check":
+          expect(request.body).toMatchObject({ input: { url: newUrl, revision: 1 } })
+
+          return { output: { ok: true, value: { validationId: "checked", expiresAt: 4102444800000 } } }
+        case "save":
+          expect(request.body).toMatchObject({ input: { revision: 1, validationId: "checked" } })
+          revision = 2
+          state = "pending"
+
+          return { output: { ok: true, value: status() } }
+      }
+    },
+  })
+
+  await page.clock.install()
+  await page.goto("/settings?tab=loginom")
+  const settings = page.getByRole("tabpanel", { name: "Loginom", exact: true })
+  const address = settings.getByRole("textbox", { name: "Адрес" })
+  const notice = settings.getByRole("status")
+  await expect(address).toHaveValue(oldUrl)
+  await address.fill(newUrl)
+
+  // Freeze before Save so each clock step starts exactly one status poll.
+  const now = await page.evaluate(() => Date.now())
+  await page.clock.pauseAt(now + 1_000)
+  await settings.getByRole("button", { name: "Сохранить", exact: true }).click()
+  await expect(notice).toHaveText("Новые параметры применятся после завершения 2 задач")
+
+  async function pollStatus(duration: number) {
+    const [response] = await Promise.all([
+      page.waitForResponse((response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/status"),
+      page.clock.fastForward(duration),
+    ])
+    expect(response.ok()).toBe(true)
+  }
+
+  tasks = 1
+  await pollStatus(16_000)
+  await expect(notice).toHaveText("Новые параметры применятся после завершения 1 задачи")
+
+  generation = 2
+  state = "starting"
+  await pollStatus(1_000)
+  await expect(notice).toHaveText("Применяем подключение…")
+  await expect(notice.getByText("Применено", { exact: true })).toHaveCount(0)
+
+  // Leave the clock frozen. The event must refresh the status for the same generation.
+  state = outcome === "applied" ? "ready" : "recoverable-error"
+  await push([
+    {
+      id: `evt_loginom_connection_${outcome}`,
+      created: 1,
+      type: `rpc.loginom.connection.${outcome}`,
+      location: { directory },
+      data: { revision, generation },
+    },
+  ])
+  if (outcome === "failed") {
+    await expect(notice).toHaveText("Служба не применила подключение. Проверьте настройки и попробуйте снова.")
+    await expect(notice.getByText("Применено", { exact: true })).toHaveCount(0)
+  } else {
+    await expect(notice.getByText("Применено", { exact: true })).toBeVisible()
+    await expect(address).toHaveValue(newUrl)
+  }
+}
+
 test("settings has its own route and returns through app history", async ({ page }) => {
   const { settings } = await open(page)
   const home = page.getByRole("button", { name: "Home", exact: true })
