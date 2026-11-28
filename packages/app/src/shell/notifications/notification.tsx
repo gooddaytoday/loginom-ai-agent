@@ -38,8 +38,12 @@ const requestTitles = {
   "websearch.provider": "notification.permission.title",
 } as const
 
-function systemNotificationDescription(title: string, fallback: string) {
-  let text = title.trim()
+function systemNotificationDescription(title: string | undefined, fallback: string) {
+  const original = title?.trim()
+
+  if (!original) return fallback
+
+  let text = original
 
   try {
     text = decodeURIComponent(text)
@@ -61,7 +65,7 @@ function systemNotificationDescription(title: string, fallback: string) {
   const barePath = /^(?:[a-z]:[\\/]|\\{2}|~?\/)/i.test(text) ? text : text.match(/[^\s"'`]*[\\/][^\s"'`]+/)?.[0]
   const path = url ? (URL.parse(url)?.pathname ?? "/") : (quotedPath ?? barePath)
 
-  if (path === undefined) return title.trim() || fallback
+  if (path === undefined) return original
 
   const filename = getFilename(parsePathLineSuffix(path).path).trim()
 
@@ -395,7 +399,7 @@ export function createServerNotificationState(input: {
         void input.coordinator.sound(`${input.key}\0${eventID}`, () => playSoundById(settings.sounds.errors()))
       }
 
-      const description = session
+      const description = session?.title
         ? notificationDescription(session)
         : language.t("notification.session.error.fallbackDescription")
 

@@ -324,6 +324,7 @@ test.each([
 })
 
 const systemNotificationCases = [
+  { title: undefined, expected: "notification.session.fallbackDescription", change: undefined },
   { title: "Test session", expected: "Test session", change: undefined },
   { title: 'Review "/home/user/private/Quarterly report.xlsx"', expected: "Quarterly report.xlsx", change: undefined },
   { title: String.raw`C:\Projects\Private\Monthly report.xlsx`, expected: "Monthly report.xlsx", change: undefined },
@@ -344,7 +345,7 @@ const systemNotificationCases = [
 
 test.each(
   (["session.status", "permission.asked"] as const).flatMap((type) =>
-    systemNotificationCases.map((options) => ({ ...options, type, scenario: options.change ?? options.title })),
+    systemNotificationCases.map((options) => ({ ...options, type, scenario: options.change ?? options.title ?? "untitled" })),
   ),
 )("system notification $type / $scenario", async ({ type, title, expected, change }) => {
   const delivery = Promise.withResolvers<NotificationDelivery>()
