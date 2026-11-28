@@ -314,6 +314,7 @@ for (const [issue, text, address] of [
       },
     ])
     expect(fixture.saves).toEqual([])
+
     for (const secret of [loginomPassword, loginomDiagnosticKey]) {
       await expect(form).not.toContainText(secret)
       expect(journal.join("\n")).not.toContain(secret)
@@ -339,9 +340,11 @@ test("Loginom sends preserve, replace and passwordless operations through the se
   await expect(password).toBeDisabled()
   await check.click()
   await expect(checked).toBeVisible()
+
   const saved = page.waitForResponse(
     (response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/save",
   )
+
   await form.getByRole("button", { name: "Save", exact: true }).click()
   expect((await saved).ok()).toBe(true)
   await expect(checked).toBeHidden()
