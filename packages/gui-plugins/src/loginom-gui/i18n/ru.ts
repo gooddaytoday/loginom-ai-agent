@@ -23,7 +23,7 @@ export default {
   dashboardConnect: "Подключитесь к Loginom в настройках, затем откройте новую ссылку из Studio.",
   dashboardOpenFailed: "Не удалось открыть дашборд. Проверьте подключение к Loginom и откройте новую ссылку из Studio.",
   dashboardLoading: "Готовим предпросмотр дашборда…",
-  dashboardPreviewFailed: "Предпросмотр недоступен. Дашборд всё ещё можно открыть в чате.",
+  dashboardPreviewFailed: "Не удалось открыть предпросмотр. Дашборд всё ещё можно открыть в чате.",
   dashboardPublicationNotice: "Опубликованная версия может отличаться от этого локального черновика.",
   dashboardEdit: "Изменить в чате",
   dashboardCreatePrompt: "Помоги создать дашборд для узла «{{node}}».",

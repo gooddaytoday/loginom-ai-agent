@@ -15,6 +15,7 @@ import {
   type Servers,
   type SessionScreen,
   type Ipc,
+  type IpcCallOptions,
   type IpcClient,
   type IpcSpec,
   type Plugin,
@@ -78,6 +79,7 @@ export {
 } from "@opencode/plugin/gui"
 
 export { Schema }
+
 export { BuiltinSlot } from "@opencode/plugin/gui/builtin"
 
 type PluginHost = ReturnType<typeof usePluginHost>
@@ -463,7 +465,7 @@ export function mountPluginPages(options?: Parameters<typeof pagePlugin>[0]) {
   return { disable: () => host.disable([plugin.id]), unmount: host.unmount }
 }
 
-export function mountDashboard(initialLink: typeof Schema.Json.Type) {
+export function mountDashboard(initialLink: typeof Schema.Json.Type, preview: "ready" | "stalled" = "ready") {
   const definition = builtins.find((entry) => entry.id === "loginom-gui")
 
   if (!definition) throw new Error("Loginom GUI not installed")
@@ -472,6 +474,7 @@ export function mountDashboard(initialLink: typeof Schema.Json.Type) {
   const drafts: Parameters<BuiltinLayout["draft"]>[0][] = []
   const previews: string[] = []
   const finds: string[] = []
+  let opens = 0
   const deliver = (data: typeof Schema.Json.Type) => deliverBuiltinDeepLink({ channel: dashboardLinkChannel, data })
 
   deliver(initialLink)
@@ -525,8 +528,22 @@ export function mountDashboard(initialLink: typeof Schema.Json.Type) {
     locale: "ru",
     ipc: () =>
       Object.assign(
-        Object.fromEntries<() => Promise<{ id: string } | undefined>>([
-          ["open", async () => ({ id: "preview" })],
+        Object.fromEntries([
+          [
+            "open",
+            async (_input?: { url: string } | IpcCallOptions, options?: IpcCallOptions) => {
+              opens++
+
+              if (preview === "ready") return { id: "preview" }
+
+              const signal = options?.signal
+              signal?.throwIfAborted()
+
+              return new Promise<never>((_resolve, reject) => {
+                signal?.addEventListener("abort", () => reject(signal.reason), { once: true })
+              })
+            },
+          ],
           ["close", async () => undefined],
         ]),
         { state: () => undefined, on: () => () => undefined },
@@ -584,10 +601,13 @@ export function mountDashboard(initialLink: typeof Schema.Json.Type) {
     ),
   })
 
+  host.release()
+
   return {
     drafts,
     previews,
     finds,
+    opens: () => opens,
     unmount: host.unmount,
     deliver,
   }

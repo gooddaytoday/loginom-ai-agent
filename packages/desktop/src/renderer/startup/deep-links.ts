@@ -6,7 +6,7 @@ const deepLinkEvent = "opencode:deep-link"
 
 // Main sends each link to one renderer at a time and forgets it once acknowledged, so a reload or a new window
 // never handles it again.
-export function startDeepLinks(api: ElectronAPI) {
+export function startDeepLinks(api: Pick<ElectronAPI, "onDeepLink" | "readyDeepLinks" | "acknowledgeDeepLinks">) {
   api.onDeepLink((delivery) => {
     emitDeepLinks(delivery.urls.filter(Predicate.isString))
 

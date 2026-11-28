@@ -74,6 +74,41 @@ const unavailable = () => wire(400, '{"_tag":"RpcError","type":"rpc.unavailable"
 const failed = () => wire(500, '{"_tag":"RpcInternalError","type":"rpc.internal","message":"RPC call failed"}')
 
 describe("dashboard links (B4.15)", () => {
+  test("sends only the target and notice kind on the built-in dashboard channel", () => {
+    const link = { id: "snapshot", action: "edit" } satisfies DashboardLinks.Link
+
+    expect(
+      DashboardLinks.delivery(link, {
+        status: "fulfilled",
+        value: { ...prepared, action: "create", notice: { kind: "stale", error: "internal details" } },
+      }),
+    ).toEqual({
+      channel: "loginom-gui.dashboard",
+      data: {
+        id: "snapshot",
+        directory: "/data/dashboards/orders-1/work",
+        nodeName: "Заказы",
+        action: "create",
+        notice: { kind: "stale" },
+      },
+    })
+  })
+
+  test("sends the link id and a refusal code without internal error details", () => {
+    const link = { id: "snapshot", action: "edit" } satisfies DashboardLinks.Link
+
+    expect(
+      DashboardLinks.delivery(link, {
+        status: "fulfilled",
+        value: { code: "DASHBOARD_SNAPSHOT_UNAVAILABLE", message: "internal details" },
+      }),
+    ).toEqual({ channel: "loginom-gui.dashboard", data: { id: "snapshot", code: "DASHBOARD_SNAPSHOT_UNAVAILABLE" } })
+    expect(DashboardLinks.delivery(link, { status: "rejected", reason: Error("internal details") })).toEqual({
+      channel: "loginom-gui.dashboard",
+      data: { id: "snapshot", code: "DASHBOARD_SERVICE_UNAVAILABLE" },
+    })
+  })
+
   test("a second click on the same Studio link reports its spent snapshot", async () => {
     const id = crypto.randomUUID()
     const gone = { code: "DASHBOARD_SNAPSHOT_UNAVAILABLE", message: "DASHBOARD_SNAPSHOT_UNAVAILABLE" }
