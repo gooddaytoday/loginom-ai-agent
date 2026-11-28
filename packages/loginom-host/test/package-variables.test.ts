@@ -2,12 +2,12 @@ import { expect, test } from "bun:test"
 import { TextReader, Uint8ArrayWriter, ZipWriter } from "@zip.js/zip.js"
 import { extractPackageVariables } from "../src/package-docs/extract"
 
-async function packageFixture(variables?: string) {
+async function packageFixture(variables?: string, unit?: string) {
   const zip = new ZipWriter(new Uint8ArrayWriter())
   const options = { useWebWorkers: false }
   await zip.add("PackageInfo.xml", new TextReader('<PackageInfo Name="fixture"/>'), options)
   if (variables) await zip.add("Variables.xml", new TextReader(variables), options)
-  await zip.add("Unit_0/Unit.xml", new TextReader(`
+  await zip.add("Unit_0/Unit.xml", new TextReader(unit ?? `
     <Unit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><WorkFlow><Nodes>
       <Item Guid="import" DisplayName="Импорт"><Component>
         <Engine FileName="%INPUT%/%INPUT%.csv"/><PropBinder><PropertyBindSavers>
@@ -48,7 +48,7 @@ test("uses the local workflow's package port links and keeps local control bindi
       <Item Name="unset" DataType="dtString"/>
     </Elements></Variables>`))
   expect(result).toEqual({
-    source: "saved", definitionsCoverage: "complete", defaultsCoverage: "complete", usagesCoverage: "partial",
+    source: "saved", definitionsCoverage: "complete", defaultsCoverage: "complete", usagesCoverage: "partial", truncated: false,
     definitions: [
       { name: "INPUT", type: "dtString" }, { name: "limit", type: "dtInteger" },
       { name: "enabled", type: "dtBoolean" }, { name: "unset", type: "dtString" },
@@ -80,4 +80,26 @@ test("distinguishes an unread registry from a verified empty registry", async ()
   expect(await extractPackageVariables(await packageFixture())).toMatchObject({ definitionsCoverage: "unavailable", definitions: null, defaults: null })
   expect(await extractPackageVariables(await packageFixture("<Variables><Elements/></Variables>")))
     .toMatchObject({ definitionsCoverage: "complete", definitions: [] })
+})
+
+test("bounds the UTF-8 projection when many usages repeat the same long label", async () => {
+  const label = "Ж".repeat(32 * 1024)
+  const names = Array.from({ length: 256 }, (_, index) => `%variable${index}%`).join("-")
+  const result = await extractPackageVariables(await packageFixture("<Variables><Elements/></Variables>", `
+    <Unit><WorkFlow><Nodes><Item Guid="source" DisplayName="${label}"><Component>
+      <Engine FileName="${names}"/>
+    </Component></Item></Nodes></WorkFlow></Unit>`))
+  expect(Buffer.byteLength(JSON.stringify(result), "utf8")).toBeLessThanOrEqual(256 * 1024)
+  expect(result).toMatchObject({ truncated: true, definitionsCoverage: "complete", definitions: [] })
+  expect(result.usages[0]).toMatchObject({ name: "variable0", parameter: "FileName" })
+  expect(result.usages.length).toBeLessThan(256)
+})
+
+test("marks defaults partial when a visible value cannot fit the projection", async () => {
+  const result = await extractPackageVariables(await packageFixture(`<Variables><Elements>
+    <Item Name="oversize" DataType="dtString" IsHidden="false"><DefaultValue Value="${"Ж".repeat(140 * 1024)}"/></Item>
+  </Elements></Variables>`))
+  expect(Buffer.byteLength(JSON.stringify(result), "utf8")).toBeLessThanOrEqual(256 * 1024)
+  expect(result).toMatchObject({ truncated: true, definitionsCoverage: "complete", defaultsCoverage: "partial",
+    definitions: [{ name: "oversize", type: "dtString" }], defaults: [] })
 })

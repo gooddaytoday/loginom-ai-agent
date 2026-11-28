@@ -1,16 +1,21 @@
-// From 0.4 `packages/opencode/src/util/file-snapshot.ts`, unchanged.
-import { constants } from "node:fs"
+// Based on 0.4 `packages/opencode/src/util/file-snapshot.ts`.
+import { constants, type BigIntStats } from "node:fs"
 import { open } from "node:fs/promises"
 import { fileError, hostException } from "@loginom-ai-agent/loginom-host/errors"
 
 // Read an authorized file, with a bound on allocation and reads.
 // O_NONBLOCK lets us reject a FIFO after fstat without waiting for a writer.
-export async function fileSnapshot(path: string, maxBytes = 10 * 1024 * 1024) {
+export async function fileSnapshot(
+  path: string,
+  maxBytes = 10 * 1024 * 1024,
+  verify?: (identity: Pick<BigIntStats, "dev" | "ino">) => Promise<void>,
+) {
   const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK).catch((error) => {
     throw fileError(error)
   })
   try {
     const stat = await handle.stat()
+    if (verify) await verify(await handle.stat({ bigint: true }))
     if (!stat.isFile()) throw hostException("LOGINOM_FILE_NOT_REGULAR")
     if (stat.size > maxBytes)
       throw hostException({ error: "LOGINOM_FILE_TOO_LARGE", details: { actual: stat.size, limit: maxBytes } })

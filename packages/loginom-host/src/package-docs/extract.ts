@@ -101,6 +101,8 @@ function unitPaths(index: Element | undefined, entries: readonly string[]) {
   }))].toSorted()
 }
 
+const packageVariablesProjectionLimit = 256 * 1024
+
 export async function extractPackageVariables(bytes: Uint8Array) {
   return withPackageXml(bytes, async (xml, entries) => {
     if ((await xml("PackageInfo.xml"))?.localName !== "PackageInfo") throw Error("PACKAGE_DOCS_PACKAGE_INFO_MISSING")
@@ -108,34 +110,52 @@ export async function extractPackageVariables(bytes: Uint8Array) {
     const elements = registry?.localName === "Variables" ? child(registry, "Elements") : undefined
     const definitions: { name: string; type: string }[] = []
     const defaults: { name: string; value: string }[] = []
+    const packageNames = new Set<string>()
     const nonPublic = new Set<string>()
+    const registrations = children(elements)
+    for (const entry of registrations) {
+      const name = entry.getAttribute("Name")
+      if (name && !explicitlyVisible(entry)) nonPublic.add(name)
+    }
+    const framing = { output: { snapshot: { source: "saved", definitionsCoverage: "unavailable",
+      defaultsCoverage: "unavailable", usagesCoverage: "partial", definitions: null, defaults: null, usages: [], truncated: false } } }
+    let remaining = packageVariablesProjectionLimit - Buffer.byteLength(JSON.stringify(framing), "utf8")
+    const append = <Row>(rows: Row[], row: Row) => {
+      const length = Buffer.byteLength(JSON.stringify(row), "utf8") + 1
+      if (length > remaining) return false
+      remaining -= length
+      rows.push(row)
+      return true
+    }
     let defaultsWithheld = false
-    let definitionsCoverage: "complete" | "partial" | "unavailable" = elements ? "complete" : "unavailable"
-    for (const entry of children(elements)) {
+    let definitionsTruncated = false
+    let defaultsTruncated = false
+    let registryCoverage: "complete" | "partial" | "unavailable" = elements ? "complete" : "unavailable"
+    for (const entry of registrations) {
       const name = entry.getAttribute("Name"), type = entry.getAttribute("DataType")
-      const visible = explicitlyVisible(entry)
-      if (name && !visible) nonPublic.add(name)
       if (entry.localName !== "Item" || !name || !type) {
-        definitionsCoverage = "partial"
+        registryCoverage = "partial"
         continue
       }
-      definitions.push({ name, type })
+      packageNames.add(name)
+      if (!definitionsTruncated) definitionsTruncated = !append(definitions, { name, type })
       const value = child(entry, "DefaultValue")
       if (value?.hasAttribute("Value")) {
-        if (visible) defaults.push({ name, value: value.getAttribute("Value") ?? "" })
-        else defaultsWithheld = true
+        if (nonPublic.has(name)) defaultsWithheld = true
+        else if (!defaultsTruncated) defaultsTruncated = !append(defaults, { name, value: value.getAttribute("Value") ?? "" })
       }
     }
-    const packageNames = new Set(definitions.map(({ name }) => name))
 
     const modules = unitPaths(await xml("PackageIndex.xml"), entries)
     const usages: { name: string; kind: "template" | "binding"; scope: "package" | "control" | "unknown"; module: string; branch: string[];
       nodeID: string; nodeLabel: string; parameter: string }[] = []
+    let usagesTruncated = false
     for (const module of modules) {
       const unit = await xml(module + "/Unit.xml")
       if (!unit) throw Error("PACKAGE_DOCS_UNIT_MISSING")
+      if (usagesTruncated) continue
       const pending = [{ root: child(unit, "WorkFlow"), branch: new Array<string>() }]
-      while (pending.length) {
+      workflows: while (pending.length) {
         const flow = pending.pop()
         if (!flow) break
         const packageTargets = packageVariableTargets(flow.root)
@@ -156,22 +176,33 @@ export async function extractPackageVariables(bytes: Uint8Array) {
           const location = { module, branch: flow.branch, nodeID, nodeLabel }
           for (const parameter of ["FileName", "TableName"]) {
             const setting = engine?.getAttribute(parameter) ?? ""
-            const names = new Set(Array.from(setting.matchAll(/%([\p{L}_][\p{L}\p{N}_]*)%/gu), (match) => match[1]))
-            for (const name of names) usages.push({ ...location, name, parameter, kind: "template", scope: scope(name) })
+            const names = new Set<string>()
+            for (const [, name] of setting.matchAll(/%([\p{L}_][\p{L}\p{N}_]*)%/gu)) {
+              if (names.has(name)) continue
+              names.add(name)
+              if (!append(usages, { ...location, name, parameter, kind: "template", scope: scope(name) })) {
+                usagesTruncated = true
+                break workflows
+              }
+            }
           }
           for (const binding of items(child(child(component, "PropBinder"), "PropertyBindSavers"))) {
             const name = binding.getAttribute("VariableName"), parameter = binding.getAttribute("PropertyPath")
-            if (name && parameter) usages.push({ ...location, name, parameter, kind: "binding", scope: scope(name) })
+            if (name && parameter && !append(usages, { ...location, name, parameter, kind: "binding", scope: scope(name) })) {
+              usagesTruncated = true
+              break workflows
+            }
           }
           const inner = child(child(engine, "ModelUnit"), "WorkFlow")
           if (inner) pending.push({ root: inner, branch: [...flow.branch, nodeLabel] })
         }
       }
     }
-    return { source: "saved" as const, definitionsCoverage, usagesCoverage: "partial" as const,
+    return { source: "saved" as const, usagesCoverage: "partial" as const,
+      definitionsCoverage: definitionsTruncated ? "partial" as const : registryCoverage,
       definitions: elements ? definitions : null,
-      defaultsCoverage: defaultsWithheld ? "partial" as const : definitionsCoverage,
-      defaults: elements ? defaults.filter(({ name }) => !nonPublic.has(name)) : null, usages }
+      defaultsCoverage: defaultsWithheld || defaultsTruncated ? "partial" as const : registryCoverage,
+      defaults: elements ? defaults : null, usages, truncated: definitionsTruncated || defaultsTruncated || usagesTruncated }
   }, 16 * 1024 * 1024)
 }
 

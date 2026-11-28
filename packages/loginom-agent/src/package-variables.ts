@@ -1,4 +1,4 @@
-import { realpath } from "node:fs/promises"
+import { lstat, realpath } from "node:fs/promises"
 import { extname, relative, resolve } from "node:path"
 import { fileError, hostError } from "@loginom-ai-agent/loginom-host/errors"
 import type { RpcHandlers } from "@opencode/plugin/promise/rpc"
@@ -12,6 +12,7 @@ const snapshot = Schema.Struct({
   definitionsCoverage: Schema.Literals(["complete", "partial", "unavailable"]),
   defaultsCoverage: Schema.Literals(["complete", "partial", "unavailable"]),
   usagesCoverage: Schema.Literal("partial"),
+  truncated: Schema.Boolean,
   definitions: Schema.NullOr(Schema.Array(Schema.Struct({ name: Schema.String, type: Schema.String }))),
   defaults: Schema.NullOr(Schema.Array(Schema.Struct({ name: Schema.String, value: Schema.String }))),
   usages: Schema.Array(Schema.Struct({
@@ -69,11 +70,21 @@ export function packageVariablesHandler(input: {
       if (!inside(requested) || !await input.canRead(sessionID, [resource(requested)]))
         throw Error("LOGINOM_FILE_ACCESS_DENIED")
       const canonical = await realpath(requested)
-      if (!inside(canonical) || (requested !== canonical && !await input.canRead(sessionID, [resource(canonical)])))
-        throw Error("LOGINOM_FILE_ACCESS_DENIED")
+      if (!inside(canonical)) throw Error("LOGINOM_FILE_ACCESS_DENIED")
       if (extname(canonical).toLowerCase() !== ".lgp") throw Error("LOGINOM_FILE_NOT_REGULAR")
-      bytes = await fileSnapshot(canonical, MAX_BYTE_ADMISSION)
+      bytes = await fileSnapshot(canonical, MAX_BYTE_ADMISSION, async (opened) => {
+        const checkIdentity = async () => {
+          if (await realpath(canonical) !== canonical) throw Error("LOGINOM_FILE_CHANGED")
+          const current = await lstat(canonical, { bigint: true })
+          if (current.dev !== opened.dev || current.ino !== opened.ino) throw Error("LOGINOM_FILE_CHANGED")
+        }
+        await checkIdentity()
+        if (!await input.canRead(sessionID, [resource(canonical)])) throw Error("LOGINOM_FILE_ACCESS_DENIED")
+        await checkIdentity()
+        call.signal.throwIfAborted()
+      })
     } catch (error) {
+      call.signal.throwIfAborted()
       switch (hostError(fileError(error))) {
         case "LOGINOM_FILE_ACCESS_DENIED": return call.error("access_denied", "Read access to this package is denied", {})
         case "LOGINOM_FILE_NOT_FOUND": return call.error("file_not_found", "The saved package was not found", {})
