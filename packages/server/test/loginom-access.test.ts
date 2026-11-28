@@ -27,16 +27,6 @@ import { Dashboard } from "../../loginom-agent/src/dashboard"
 import { ServiceHost } from "../../loginom-agent/src/host"
 import { temporaryData } from "../../loginom-agent/test/fixture/temporary-data"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
-import {
-  createFormBodyState,
-  formCommitInput,
-  formCurrent,
-  formPick,
-  formReply,
-  formRows,
-  formSetSelected,
-  formValidate,
-} from "../../tui/src/mini/form.shared"
 import { createEmbeddedRoutes } from "../src/routes"
 import { dockTool, scriptedHost } from "./fixture/loginom-dock-host"
 import { pluginsLoaded } from "./fixture/routes"
@@ -393,7 +383,7 @@ describe("loginom.product access and tool gate (G1)", () => {
   )
 
   it.live(
-    "Mini can decide the third identical Loginom call across waits and status checks",
+    "the third identical Loginom call pauses for a decision across waits and status checks",
     () =>
       Effect.gen(function* () {
         const applyTool = dockTool("dock_node_apply")
@@ -421,16 +411,6 @@ describe("loginom.product access and tool gate (G1)", () => {
         const question = (id = sessionID) => until(() => test.forms(id).pipe(Effect.map((forms) => forms[0])))
         const reply = (id: Form.ID, answer: Form.Answer) =>
           test.post(`/api/session/${sessionID}/form/${id}/reply`, { answer })
-        const replyFromMini = (form: Form.Info, label: string, hint = "") => {
-          const state = createFormBodyState(form)
-          const selection = formRows(formCurrent(form, state)).findIndex((row) => row.label === label)
-          expect(selection).toBeGreaterThanOrEqual(0)
-          const picked = formPick(formSetSelected(state, selection), form)
-          const edited = formCommitInput(picked, form, hint)
-          const input = formReply(form, edited)
-          if (!input) throw new Error(formValidate(form, edited) ?? "Mini did not produce a form reply")
-          return test.post(`/api/session/${input.sessionID}/form/${input.formID}/reply`, { answer: input.answer })
-        }
 
         const wait = { tool: "loginom_dock_node_wait", input: { path: "one" } }
         const status = { tool: "loginom_dock_node_status", input: { path: "two" } }
@@ -452,7 +432,7 @@ describe("loginom.product access and tool gate (G1)", () => {
         ])
 
         const replies = yield* Effect.all(
-          [replyFromMini(confirmation, "Продолжить"), replyFromMini(confirmation, "Продолжить")],
+          [reply(confirmation.id, { decision: "continue" }), reply(confirmation.id, { decision: "continue" })],
           { concurrency: "unbounded" },
         )
         expect(replies.some((response) => response.status === 204)).toBe(true)
@@ -467,7 +447,7 @@ describe("loginom.product access and tool gate (G1)", () => {
         const hinted = yield* Effect.forkScoped(start(step, step, step, step, { text: "hinted" }))
         const hintForm = yield* question()
         expect(executed()).toBe(9)
-        expect((yield* replyFromMini(hintForm, "Подсказать агенту", "Проверь только заголовок")).status).toBe(204)
+        expect((yield* reply(hintForm.id, { decision: "hint", hint: "Проверь только заголовок" })).status).toBe(204)
         yield* Fiber.join(hinted)
         expect(executed()).toBe(9)
         expect(JSON.stringify(yield* test.requests(sessionID))).toContain("Проверь только заголовок")
@@ -540,7 +520,7 @@ describe("loginom.product access and tool gate (G1)", () => {
           text: script({ text: "queued run resumed" }),
           delivery: "queue",
         })
-        expect((yield* replyFromMini(repeat, "Остановить")).status).toBe(204)
+        expect((yield* reply(repeat.id, { decision: "stop" })).status).toBe(204)
         yield* Fiber.join(stopped)
         expect(executed()).toBe(20)
         expect(yield* test.forms(sessionID)).toEqual([])

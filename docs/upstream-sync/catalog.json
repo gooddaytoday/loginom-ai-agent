@@ -24,6 +24,7 @@
         "packages/gui-plugins/src/loginom-gui/renderer.tsx",
         "packages/gui-plugins/src/loginom-gui/repeat-dock.tsx",
         "packages/server/test/loginom-access.test.ts",
+        "packages/tui/test/mini/blocker.responsive.test.tsx",
         "packages/session-ui/src/components/tool-group-row.tsx",
         "packages/session-ui/src/message/tool-group.ts",
         "packages/session-ui/src/timeline/projection.ts",
