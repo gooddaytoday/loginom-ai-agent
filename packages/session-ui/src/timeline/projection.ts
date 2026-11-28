@@ -1,3 +1,5 @@
+import { currentToolMetadata } from "../message/current-tool-state"
+import { collapseToolGroups, toolGroupSummary } from "../message/tool-group"
 import type {
   ModelRef,
   SessionMessageAssistant,
@@ -562,7 +564,8 @@ export namespace Timeline {
       const before = interruptedAt < 0 ? refs : refs.filter((ref) => ref.messageIndex <= interruptedAt)
       const after = interruptedAt < 0 ? [] : refs.filter((ref) => ref.messageIndex > interruptedAt)
 
-      const appendGroups = (items: typeof refs) => {
+      const appendGroups = (refsToGroup: typeof refs) => {
+        const items = collapseToolGroups(refsToGroup)
         let offset = 0
         groupContent(items, shellToolDefaultOpen, editToolDefaultOpen, commentary, detail, toolSeparate).forEach(
           (group) => {
@@ -1036,15 +1039,19 @@ function groupContent(
   }
 
   items.forEach((item) => {
-    const type = contentGroupType(
-      item.content,
-      shellToolDefaultOpen,
-      editToolDefaultOpen,
-      adjacent?.type === "context" && adjacent.tools,
-      commentary,
-      detail,
-      toolSeparate,
-    )
+    const summary = item.content.type === "tool" && toolGroupSummary(currentToolMetadata(item.content))
+
+    const type = summary
+      ? undefined
+      : contentGroupType(
+          item.content,
+          shellToolDefaultOpen,
+          editToolDefaultOpen,
+          adjacent?.type === "context" && adjacent.tools,
+          commentary,
+          detail,
+          toolSeparate,
+        )
 
     if (type) {
       if (adjacent?.type !== type) flush()
