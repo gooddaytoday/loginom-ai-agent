@@ -19,6 +19,7 @@
         "packages/app/src/session/requests/session-question-dock.tsx",
         "packages/app/e2e/regression/loginom-repeat-question.spec.ts",
         "packages/app/component-tests/plugin-host.spec.ts",
+        "packages/app/component-tests/plugin-host.fixture.tsx",
         "packages/gui-plugins/AGENTS.md",
         "packages/gui-plugins/README.md",
         "packages/gui-plugins/src/loginom-gui/renderer.tsx",
