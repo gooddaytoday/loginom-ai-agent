@@ -3,9 +3,13 @@ import { Schema } from "effect"
 import { Rpc, RpcGroup } from "effect/rpc"
 import { PluginInstalled, PluginMenubarItem, PluginPayload, PluginGuis } from "./plugins"
 
+const DeepLinkPayload = Schema.Union([Schema.String, Schema.Struct({ channel: Schema.String, data: Schema.Json })])
+
+export type DeepLinkPayload = typeof DeepLinkPayload.Type
+
 export class DeepLinksOpened extends Schema.TaggedClass<DeepLinksOpened>()("DeepLinksOpened", {
   attempt: Schema.Number,
-  urls: Schema.Array(Schema.String),
+  urls: Schema.Array(DeepLinkPayload),
 }) {}
 
 export class MenuCommandTriggered extends Schema.TaggedClass<MenuCommandTriggered>()("MenuCommandTriggered", {

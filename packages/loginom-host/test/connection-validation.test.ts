@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { Schema } from "effect"
 import { Loginom } from "../src/loginom"
+import { once } from "node:events"
 import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -12,7 +13,8 @@ import { credentials } from "../src/connection/credentials"
 import { connectionStore } from "../src/connection/connection-store"
 import { writeHelp } from "../../loginom-runtime/client/test/support/help-fixture.mjs"
 import { launchNodeHost } from "../src/node-client"
-import { stageHeldKnowledge } from "./fixtures/knowledge"
+import { stageHeldKnowledge, waitForKnowledge } from "./fixtures/knowledge"
+import { hasConnectionFixture, loginomConnectionFixture } from "./fixtures/loginom-connection"
 
 async function buildNodeHost(output: string) {
   // Isolate Bun.build: repeated in-process builds in Bun's test runner can fail
@@ -636,3 +638,132 @@ function runtimeAlive(pid: number) {
     return false
   }
 }
+
+test.skipIf(!hasConnectionFixture)(
+  "CON-02: settings Check signs in and out without contacting the unavailable file service",
+  async () => {
+    const f = await loginomConnectionFixture()
+    try {
+      const host = await launchNodeHost({
+        node: f.node,
+        entry: await buildNodeHost(f.directory),
+        root: f.root,
+        resources: f.resources,
+        headless: true,
+      })
+      try {
+        const before = await host.request("connection.status", {})
+        const denied = await fetch(new URL("/files/first-user", f.url))
+        expect(denied.status).toBe(503)
+        const start = f.requests.length
+        const checked = await host.request("connection.settings.check", {
+          revision: 0,
+          url: f.url,
+          username: "first-user",
+          password: { operation: "replace", value: "fixture-password" },
+        })
+        expect(checked).toMatchObject({ validationId: expect.any(String), browser: { state: "verified" } })
+        expect(await host.request("connection.status", {})).toEqual(before)
+        expect(f.logins.map((login) => login.username)).toEqual(["first-user"])
+        expect(f.requests.slice(start).map(({ method, path }) => [method, path])).toEqual([
+          ["GET", "/app/"],
+          ["POST", "/login"],
+          ["GET", "/live"],
+          ["POST", "/logout"],
+        ])
+      } finally {
+        await host.close()
+      }
+    } finally {
+      await f.close()
+    }
+  },
+  60_000,
+)
+
+test.skipIf(!hasConnectionFixture)(
+  "CON-05: saving a different user closes the old browser and isolates cookie, storage and file root",
+  async () => {
+    const f = await loginomConnectionFixture()
+    try {
+      const host = await createLoginomHost({
+        root: f.root,
+        resources: f.resources,
+        codec: credentials("linux"),
+        headless: true,
+      })
+      try {
+        const chat = "same-chat"
+        const check = (revision: number, username: string) =>
+          host.api.check(
+            {
+              revision,
+              url: f.url,
+              username,
+              password: { operation: "replace", value: "fixture-password" },
+            },
+            true,
+          )
+        const first = await check(0, "first-user")
+        await host.api.save({ revision: 0, validationId: first.validationId }, true)
+        await waitForKnowledge(host)
+        expect(await host.api.status()).toMatchObject({ generation: 1, username: "first-user", folder: "/first-user" })
+        const oldRuntime = await host.runtime(1, chat)
+        const oldSession = f.logins.at(-1)
+        if (!oldSession) throw Error("The first browser did not authenticate")
+        const oldStream = f.sessions.get(oldSession.cookie)
+        expect(oldSession.username).toBe("first-user")
+        if (!oldStream) throw Error("The first authenticated browser session did not start")
+
+        const second = await check(1, "second-user")
+        expect(oldStream.destroyed).toBe(false)
+        const closed = once(oldStream, "close", { signal: AbortSignal.timeout(15_000) })
+        const activation = (async () => {
+          await host.api.save({ revision: 1, validationId: second.validationId }, true)
+          await waitForKnowledge(host)
+        })()
+        const [exit] = await Promise.all([oldRuntime.exited, closed, activation])
+        expect(exit).toEqual({ code: 0, signal: null })
+        expect(await host.api.status()).toMatchObject({
+          generation: 2,
+          username: "second-user",
+          folder: "/second-user",
+        })
+        const afterSave = f.requests.length
+        const newRuntime = await host.runtime(2, chat)
+        expect(f.logins.map((login) => login.username)).toEqual([
+          "first-user",
+          "first-user",
+          "second-user",
+          "second-user",
+        ])
+        const newSession = f.logins.at(-1)
+        if (!newSession) throw Error("The second browser did not authenticate")
+        expect(newSession.cookie).not.toBe(oldSession.cookie)
+        expect(newSession).toMatchObject({ previousLocalOwner: "", previousSessionOwner: "" })
+        expect(f.requests.slice(afterSave)).toEqual([
+          { method: "GET", path: "/app/", cookie: "" },
+          { method: "POST", path: "/login", cookie: "" },
+          { method: "GET", path: "/live", cookie: newSession.cookie },
+        ])
+
+        const files = await host.inputs(2, chat, "fixture-message", [
+          { name: "sample.csv", data: Buffer.from("id\n1\n").toString("base64") },
+        ])
+        expect(await newRuntime.request("admit", { userMessage: "fixture-message", files })).toEqual([
+          expect.objectContaining({
+            upload: expect.objectContaining({
+              directory: "/second-user",
+              destination: expect.stringMatching(/^\/second-user\/[^/]+-sample\.csv$/),
+            }),
+          }),
+        ])
+      } finally {
+        await host.close()
+      }
+    } finally {
+      await f.close()
+    }
+  },
+  60_000,
+)
