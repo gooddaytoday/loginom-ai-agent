@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./system-proxy": "./src/system-proxy/index.ts",
+    "./write-outcomes": "./src/connection/write-outcomes.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {
