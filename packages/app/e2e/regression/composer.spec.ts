@@ -4,6 +4,8 @@ import { mockWorkspace, openDraft, openSession } from "../utils/workspace"
 import { mockPluginsActivating, type MockServerConfig } from "../utils/mock-server"
 import { nodeFixture } from "../utils/loginom-node-fixture"
 
+type MockLoginomPackageBinding = { open: boolean; path: string; staleForSeconds?: number }
+
 test.use({ permissions: ["clipboard-read", "clipboard-write"] })
 
 for (const width of [1280, 390]) {
@@ -14,7 +16,11 @@ for (const width of [1280, 390]) {
     const prompts: Parameters<NonNullable<MockServerConfig["onPrompt"]>>[0][] = []
     const bindings: { body: unknown; directory: string | null }[] = []
     let creates = 0
-    let currentPath = nodeFixture.node.path
+
+    let binding: MockLoginomPackageBinding = {
+      open: true,
+      path: nodeFixture.node.path,
+    }
 
     const view = await openSession(page, {
       name: "LoginomNodeDraft",
@@ -35,7 +41,7 @@ for (const width of [1280, 390]) {
         if (request.rpcID !== "loginom.package-state" || request.method !== "snapshot") return
         bindings.push({ body: request.body, directory: request.directory })
 
-        return { output: { path: currentPath } }
+        return { output: binding }
       },
       onPrompt: (input) => void prompts.push(input),
       onSessionCreate: () => {
@@ -92,7 +98,7 @@ for (const width of [1280, 390]) {
     await openPackage()
     await page.getByRole("button", { name: "Изменить узел с агентом", exact: true }).click()
     await expect(chip).toBeVisible()
-    currentPath = "/Команда/Другой.lgp"
+    binding = { open: true, path: "/Команда/Другой.lgp" }
     await view.editor.press("Enter")
     await expect(
       page.getByText("К этому разговору привязан другой пакет Loginom. Уберите узел, чтобы отправить сообщение."),
@@ -102,7 +108,21 @@ for (const width of [1280, 390]) {
     expect(prompts).toEqual([])
     expect(creates).toBe(0)
 
-    currentPath = nodeFixture.node.path
+    binding = { open: true, path: nodeFixture.node.path, staleForSeconds: 0 }
+    await view.editor.press("Enter")
+    await expect(page.getByText("Состояние пакета устарело.", { exact: false })).toBeVisible()
+    await expect(chip).toBeVisible()
+    await expect(view.editor).toHaveText(text)
+    expect(prompts).toEqual([])
+
+    binding = { open: false, path: nodeFixture.node.path }
+    await view.editor.press("Enter")
+    await expect(page.getByText("Не удалось проверить, какой пакет Loginom привязан к разговору.")).toBeVisible()
+    await expect(chip).toBeVisible()
+    await expect(view.editor).toHaveText(text)
+    expect(prompts).toEqual([])
+
+    binding = { open: true, path: nodeFixture.node.path }
     await view.editor.press("Enter")
     await expect.poll(() => prompts.length).toBe(1)
     expect(prompts[0]?.sessionID).toBe(source.sessionID)
@@ -111,6 +131,8 @@ for (const width of [1280, 390]) {
         '\nThe user referenced Loginom node {"package":"Продажи.lgp","path":"/Команда/Продажи.lgp","guid":"{e9bd5bda-1245-43b0-acbe-d81c405077b1}","name":"Расчёт выручки","intent":"edit"}.',
     )
     expect(bindings).toEqual([
+      { body: { input: { sessionID: source.sessionID } }, directory: view.directory },
+      { body: { input: { sessionID: source.sessionID } }, directory: view.directory },
       { body: { input: { sessionID: source.sessionID } }, directory: view.directory },
       { body: { input: { sessionID: source.sessionID } }, directory: view.directory },
     ])

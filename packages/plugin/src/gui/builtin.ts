@@ -120,7 +120,13 @@ export interface ToolRenderer {
  */
 export const ToolRenderer = Registry.define<ToolRenderer>("tool.renderer")
 
-/** Presentation and send check for a built-in plugin's structured composer notes, matched by the note's origin. */
+/**
+ * Presentation and send check for a built-in plugin's structured composer notes, matched by the note's origin.
+ * @example
+ * ```ts
+ * ctx.add(ComposerNoteHandler, { render: renderNote, check: verifyNote })
+ * ```
+ */
 export const ComposerNoteHandler = Registry.define<{
   /**
    * Renders the draft chip. The fallback is the standard note card.

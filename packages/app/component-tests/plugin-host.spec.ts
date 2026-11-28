@@ -178,6 +178,26 @@ story("a third-party plugin cannot register a page with a public registry token"
   expect(result).toEqual({ status: "failed", pages: 0 })
 })
 
+story("a third-party plugin cannot register a composer note handler", async ({ page }) => {
+  const result = await page.evaluate(async (fixture) => {
+    const { mountPluginHost, Registry, until } = await import(fixture)
+    const host = mountPluginHost()
+
+    try {
+      host.load((ctx: Context) =>
+        ctx.add(Registry.define("composer.note"), { render: () => null, check: async () => undefined }),
+      )
+      await until(() => host.status() === "failed" || host.status() === "active")
+
+      return { status: host.status(), handlers: host.entries("composer.note") }
+    } finally {
+      host.unmount()
+    }
+  }, fixture)
+
+  expect(result).toEqual({ status: "failed", handlers: 0 })
+})
+
 story("a plugin that finishes loading after the host unmounts is never set up", async ({ page }) => {
   const setups = await page.evaluate(async (fixture) => {
     const { mountPluginHost } = await import(fixture)

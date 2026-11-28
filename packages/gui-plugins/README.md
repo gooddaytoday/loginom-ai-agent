@@ -171,6 +171,15 @@ uses a selector as `title` and its localized annotation label as `subtitle`; a c
 These display fields do not change `subject`. Both survive draft storage, sent-message metadata and restoration.
 Only the process-bound `live` reference is dropped when a stored draft or sent message is restored.
 
+A built-in can attach a note with durable `data` and register a `ComposerNoteHandler` from
+`@opencode/plugin/gui/builtin`. The note's `origin` names the built-in that owns the handler. The handler renders
+the draft chip and checks its data against the receiving session before sending. A rejection or unavailable handler
+blocks sending and leaves the draft in the composer. The model receives `subject`. The handler's data stays in the
+draft and message metadata.
+
+When a note action starts outside the conversation, `ctx.tabs.open` can focus the existing session and reveal an
+optional `messageID`. Wait for the matching mounted session before writing to its composer.
+
 ### Quoting selected content
 
 Attach a `type: "quote"` part with a `commentID`, then call `screen.composer.focus(commentID, { anchor })` to open its

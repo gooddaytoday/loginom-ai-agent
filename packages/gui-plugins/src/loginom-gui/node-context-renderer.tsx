@@ -2,14 +2,22 @@ import { createKeyed, type Plugin, type ComposerNote } from "@opencode/plugin/gu
 import { ComposerNoteHandler } from "@opencode/plugin/gui/builtin"
 import { Icon } from "@opencode/ui/icon"
 import { Option, Schema } from "effect"
-import { Show } from "solid-js"
+import { createSignal, Show, untrack } from "solid-js"
 import type nodeContext from "./node-context-entry"
 import { LoginomNodeDraft, encodeNodeContext, nodeSubject, readNodeContext, type NodeContext } from "./node-context"
 
-const readBinding = Schema.decodeUnknownOption(Schema.Struct({ path: Schema.NullOr(Schema.NonEmptyString) }))
+import { initialNodeDraft, transitionNodeDraft } from "./node-context/machine"
+
+const readBinding = Schema.decodeUnknownOption(
+  Schema.Struct({
+    open: Schema.NullOr(Schema.Boolean),
+    path: Schema.NullOr(Schema.NonEmptyString),
+    staleForSeconds: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
+  }),
+)
 
 const setup: Plugin.Setup<typeof nodeContext> = (ctx) => {
-  let pending: NodeContext | undefined
+  const [state, setState] = createSignal(initialNodeDraft)
 
   function attach(context: NodeContext) {
     const screen = ctx.screen.current()
@@ -33,29 +41,31 @@ const setup: Plugin.Setup<typeof nodeContext> = (ctx) => {
     screen.composer.focus()
   }
 
+  function dispatch(event: Parameters<typeof transitionNodeDraft>[1]) {
+    const next = transitionNodeDraft(untrack(state), event)
+
+    setState(next.state)
+    next.effects.forEach((effect) => {
+      if (effect.type === "attach") return attach(effect.context)
+      const source = effect.context.source
+
+      ctx.tabs.open({ server: source.serverID, id: source.sessionID }, { focus: true, messageID: source.messageID })
+    })
+  }
+
+  const openTabs = () => ctx.sessions.list().map((session) => session.key)
+
+  // Drive draft writes from the mounted screen and cancel if its target tab closes while waiting.
   createKeyed(
     () => ctx.sessions.current(),
-    (session) => {
-      if (!pending) return
-      const context = pending
-      pending = undefined
-
-      if (session.id === context.source.sessionID && session.server.id === context.source.serverID) attach(context)
-    },
+    (session) => dispatch({ type: "mounted", sessionKey: session.key }),
     { equals: (previous, next) => previous.visit === next.visit },
   )
+  createKeyed(openTabs, (tabs) => dispatch({ type: "tabs.changed", tabs }))
 
   ctx.provide(LoginomNodeDraft, {
     attach(context) {
-      const session = ctx.sessions.current()
-      const source = context.source
-      const here = session?.id === source.sessionID && session.server.id === source.serverID
-      pending = here ? undefined : context
-
-      if (!here || source.messageID)
-        ctx.tabs.open({ server: source.serverID, id: source.sessionID }, { focus: true, messageID: source.messageID })
-
-      if (here) attach(context)
+      dispatch({ type: "requested", context, mounted: ctx.sessions.current()?.key, tabs: openTabs() })
     },
   })
 
@@ -111,7 +121,9 @@ const setup: Plugin.Setup<typeof nodeContext> = (ctx) => {
 
       const binding = Option.getOrUndefined(readBinding(response?.output))
 
-      if (!binding?.path) return ctx.t("missingPackage")
+      if (binding?.staleForSeconds != null) return ctx.t("stalePackage")
+
+      if (binding?.open !== true || !binding.path) return ctx.t("missingPackage")
 
       if (binding.path !== context.node.path) return ctx.t("differentPackage")
     },
