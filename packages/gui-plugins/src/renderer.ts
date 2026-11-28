@@ -25,8 +25,6 @@ import goal from "./goal"
 import loginom from "./loginom-gui"
 import goalRenderer from "./goal/renderer"
 import loginomRenderer from "./loginom-gui/renderer"
-import nodeContext from "./loginom-gui/node-context-entry"
-import nodeContextRenderer from "./loginom-gui/node-context-renderer"
 
 // The window renders once every built-in is active, so the small renderer entries load with the app, like the
 // features they replaced. Heavy UI stays behind `lazy()` inside them.
@@ -51,5 +49,4 @@ export const builtins = compose({
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
   goal: { ...goal, windowEntry: eager(goalRenderer) },
   "loginom-gui": { ...loginom, windowEntry: eager(loginomRenderer) },
-  "loginom-node-context": { ...nodeContext, windowEntry: eager(nodeContextRenderer) },
 })

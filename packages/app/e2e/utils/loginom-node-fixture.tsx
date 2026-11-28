@@ -1,7 +1,7 @@
 import type { Context } from "@opencode/plugin/gui"
 import { Page } from "@opencode/plugin/gui/builtin"
 import type { Entry } from "@opencode/plugin/gui/host"
-import { LoginomNodeDraft } from "../../../gui-plugins/src/loginom-gui/node-context"
+import { LoginomNodeDraft } from "../../../gui-plugins/src/loginom-gui/contract"
 
 export const nodeFixture = {
   source: { sessionID: "ses_node_origin", messageID: "msg_node_00" },
@@ -19,8 +19,7 @@ export const loginomNodeFixture: Entry = {
     default(ctx: Context) {
       const draft = ctx.use(LoginomNodeDraft)
 
-      const attach = (intent: "ask" | "edit") => {
-        const serverID = ctx.servers.list()[0]
+      const attach = (intent: "ask" | "edit", serverID = ctx.servers.list()[0]) => {
         const target = draft()
 
         if (!serverID || target.status !== "active") return
@@ -38,6 +37,9 @@ export const loginomNodeFixture: Entry = {
             </button>
             <button disabled={draft().status !== "active"} onClick={() => attach("edit")}>
               Изменить узел с агентом
+            </button>
+            <button disabled={draft().status !== "active"} onClick={() => attach("ask", "unlisted")}>
+              Позвать агента с недоступного сервера
             </button>
           </>
         ),

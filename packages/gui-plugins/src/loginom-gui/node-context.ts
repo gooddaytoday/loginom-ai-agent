@@ -1,4 +1,3 @@
-import { Contract } from "@opencode/plugin/gui"
 import { Option, Schema } from "effect"
 
 export const NodeContext = Schema.Struct({
@@ -35,8 +34,3 @@ export function nodeSubject(context: NodeContext) {
     intent: context.intent,
   })}`
 }
-
-/** Node actions supply the originating conversation and a node from a verified package snapshot. */
-export const LoginomNodeDraft = Contract.define<{ attach(context: NodeContext): void }, "loginom-node-context.draft">(
-  "loginom-node-context.draft",
-)

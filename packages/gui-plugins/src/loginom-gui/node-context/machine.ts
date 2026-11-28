@@ -3,11 +3,11 @@ import type { NodeContext } from "../node-context"
 type State = { type: "idle" } | { type: "awaiting"; context: NodeContext; sessionKey: string; tabOpened: boolean }
 
 type Event =
-  | { type: "requested"; context: NodeContext; mounted?: string; tabs: readonly string[] }
+  | { type: "requested"; context: NodeContext; mounted?: string; tabs: readonly string[]; serverListed: boolean }
   | { type: "mounted"; sessionKey: string }
   | { type: "tabs.changed"; tabs: readonly string[] }
 
-type Effect = { type: "open" | "attach"; context: NodeContext }
+type Effect = { type: "open" | "attach"; context: NodeContext } | { type: "unavailable" }
 
 type Transition = { state: State; effects: Effect[] }
 
@@ -15,6 +15,7 @@ export const initialNodeDraft: State = { type: "idle" }
 
 export function transitionNodeDraft(state: State, event: Event): Transition {
   if (event.type === "requested") {
+    if (!event.serverListed) return { state: initialNodeDraft, effects: [{ type: "unavailable" }] }
     const { context } = event
     const key = `${context.source.serverID}\n${context.source.sessionID}`
 

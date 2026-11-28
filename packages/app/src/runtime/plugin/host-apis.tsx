@@ -34,9 +34,14 @@ import {
   type ShellTab,
   type Storage,
   type StorageScope,
-  type Tabs,
 } from "@opencode/plugin/gui"
-import { BuiltinPanel, type BuiltinStoreFrom, type BuiltinStoreOptions } from "@opencode/plugin/gui/builtin"
+import {
+  BuiltinPanel,
+  type BuiltinComposerNote,
+  type BuiltinStoreFrom,
+  type BuiltinStoreOptions,
+  type BuiltinTabs,
+} from "@opencode/plugin/gui/builtin"
 import { usePlatform } from "@/runtime/platform/platform"
 import { same } from "@/runtime/persistence/equality"
 import { Persist, persisted, removePersisted } from "@/runtime/persistence/storage"
@@ -99,8 +104,9 @@ import { ui } from "./ui"
 type Attached = {
   sessions: Accessor<readonly SessionRef[]>
   current: Accessor<MountedSession | undefined>
-  tabs: Tabs
+  tabs: BuiltinTabs
   screen: Accessor<SessionScreen | undefined>
+  attachNote: (note: BuiltinComposerNote) => void
   scope: (server: string) => ServerScope
   /** Records a session-scoped store so layout pruning drops it with the session. */
   scoped: (name: string) => void
@@ -395,9 +401,13 @@ export function createHostApis() {
       current: () => current()?.current(),
     }),
     // Before the interface mounts, no tabs are listed and writes wait for it.
-    tabs: () => ({
+    tabs: (_plugin, _owner, _context, _register, builtin) => ({
       list: () => current()?.tabs.list() ?? [],
-      open: (session, options) => write((value) => value.tabs.open(session, options)),
+      open: (session, options) => {
+        const allowed = builtin || !options ? options : { focus: options.focus }
+
+        write((value) => value.tabs.open(session, allowed))
+      },
       focus: (key) => write((value) => value.tabs.focus(key)),
       move: (key, index) => write((value) => value.tabs.move(key, index)),
       close: (key) => write((value) => value.tabs.close(key)),
@@ -452,11 +462,16 @@ export function createHostApis() {
     }),
     // No command is registered before the interface mounts.
     commands: () => ({ run: (id) => untrack(attached)?.run(id) ?? false }),
-    screen: () => ({
+    screen: (plugin, _owner, _context, _register, builtin) => ({
       current: () => {
         const attached = current()
 
         return attached?.current() ? attached.screen() : undefined
+      },
+      attachNote: (note) => {
+        const attached = current()
+
+        if (builtin && attached?.current()) attached.attachNote({ ...note, origin: plugin })
       },
     }),
     // Before the interface mounts, reads return what an empty layout holds and writes wait for it.
@@ -533,7 +548,8 @@ export function createPluginAttachment(apis: HostApis) {
   const narrow = () => !desktop()
   // The mounted session screen, from its first render, and its object for the session it routes once it has mounted;
   // one screen is mounted at a time.
-  const [screen, setScreen] = createSignal<SessionScreen>()
+  const [mountedScreen, setMountedScreen] = createSignal<Pick<Attached, "attachNote"> & { screen: SessionScreen }>()
+  const screen = () => mountedScreen()?.screen
   const [routedView, setRoutedView] = createSignal<Accessor<MountedSession>>()
   const refs = new Map<string, SessionRef>()
 
@@ -1056,7 +1072,7 @@ export function createPluginAttachment(apis: HostApis) {
   const findTab = (key: string) => tabs.store.find((tab) => tabKey(tab) === key)
 
   // Opens a session as the session list and the app's notifications do; an unlisted server opens nothing.
-  const openSession: Tabs["open"] = (session, options) => {
+  const openSession: BuiltinTabs["open"] = (session, options) => {
     const conn = servers.list.find((item) => ServerConnection.key(item) === session.server)
 
     if (!conn) return
@@ -1074,7 +1090,7 @@ export function createPluginAttachment(apis: HostApis) {
     openNotificationSession(tabs, key, session.id, options)
   }
 
-  const shell: Tabs = {
+  const shell: BuiltinTabs = {
     list: shellTabs,
     open: openSession,
     focus(key) {
@@ -1164,6 +1180,7 @@ export function createPluginAttachment(apis: HostApis) {
     notify,
     mode: theme.mode,
     screen,
+    attachNote: (note) => mountedScreen()?.attachNote(note),
     scope,
     scoped: layout.sessionState.track,
     project: (server, title) =>
@@ -1276,11 +1293,13 @@ export function createPluginAttachment(apis: HostApis) {
       },
     },
     /** A screen started rendering: `Screen.current` returns it only while its session matches the route. */
-    screen(value: SessionScreen) {
-      setScreen(() => value)
+    screen(screen: SessionScreen, attachNote: Attached["attachNote"]) {
+      const value = { screen, attachNote }
+
+      setMountedScreen(value)
 
       return () => {
-        if (screen() === value) setScreen(undefined)
+        if (mountedScreen() === value) setMountedScreen(undefined)
       }
     },
     /** A session screen mounted: `Sessions.current` reads its object for the routed session. */

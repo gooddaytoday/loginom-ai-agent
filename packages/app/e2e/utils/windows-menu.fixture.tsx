@@ -1,7 +1,7 @@
 import { MemoryRouter, createMemoryHistory } from "@solidjs/router"
 import { createStore } from "solid-js/store"
 import { render } from "solid-js/web"
-import type { Bridge } from "@opencode/plugin/gui/host"
+import type { Bridge, BridgePluginGui } from "@opencode/plugin/gui/host"
 import { AppBaseProviders, AppInterface } from "../../src/app"
 import { PlatformProvider, type Platform } from "../../src/runtime/platform/platform"
 
@@ -29,7 +29,9 @@ export function mount(input: { server: string; path?: string; os?: "macos"; open
       throw new Error("Unexpected fixture action")
     }
 
-    // No main-process plugins run in this fixture.
+    const bundle = localStorage.getItem("opencode.e2e.desktop-plugin")
+    const plugin: BridgePluginGui | undefined = bundle ? JSON.parse(bundle) : undefined
+
     const bridge: Bridge = {
       packaged: false,
       call: unused,
@@ -39,7 +41,7 @@ export function mount(input: { server: string; path?: string; os?: "macos"; open
       capture: async () => undefined,
       runMenubarItem: () => undefined,
       configure: () => undefined,
-      pluginGuis: async () => ({ plugins: [], reserved: [] }),
+      pluginGuis: async () => ({ plugins: plugin ? [plugin] : [], reserved: [] }),
       manager: {
         list: async () => [],
         enable: async () => undefined,

@@ -137,7 +137,7 @@ function fakeApis(storage: (plugin: string) => Storage): HostApiFactories {
     workspaces: () => workspaces,
     desktop: () => undefined,
     sessions: () => ({ list: () => [], current: () => undefined }),
-    screen: () => ({ current: () => undefined }),
+    screen: () => ({ current: () => undefined, attachNote() {} }),
     layout: () => layout,
     storage,
     system: () => ({ copy: async () => {}, save: async () => false, openExternal() {} }),
@@ -607,6 +607,7 @@ function standIn(overrides: Partial<Interface>): Interface {
     current: () => undefined,
     tabs: { list: () => [], open() {}, focus() {}, move() {}, close() {} },
     screen: () => undefined,
+    attachNote() {},
     scope: () => ServerScope.local,
     scoped: () => undefined,
     layout: {

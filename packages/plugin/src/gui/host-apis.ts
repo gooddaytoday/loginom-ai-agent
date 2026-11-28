@@ -490,8 +490,6 @@ export interface ComposerNote {
   icon: IconName
   /** What the comment is about, for the model. Quote untrusted text such as page content. */
   subject: string
-  /** Durable data for a built-in note handler. A note carrying data must pass that handler's check before sending. */
-  data?: string
   /** The user's comment. An empty string attaches the subject without a comment. */
   comment: string
   /** The link opening the chip routes, with `origin`. */
@@ -1618,8 +1616,6 @@ export interface Tabs {
        * false: the tab opens in the background.
        */
       readonly focus?: boolean
-      /** With focus, reveals this message in the session timeline. */
-      readonly messageID?: string
     },
   ): void
   /**

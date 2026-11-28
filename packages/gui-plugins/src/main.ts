@@ -15,7 +15,6 @@ import microsoftOffice from "./microsoft-office"
 import sources from "./sources"
 import goal from "./goal"
 import loginom from "./loginom-gui"
-import nodeContext from "./loginom-gui/node-context-entry"
 
 /** Built-in plugins with their main entries, by id. Lists every built-in so their ids stay reserved. */
 export const builtins = compose({
@@ -35,5 +34,4 @@ export const builtins = compose({
   sources,
   goal,
   "loginom-gui": { ...loginom, mainEntry: () => import("./loginom-gui/main") },
-  "loginom-node-context": nodeContext,
 })

@@ -3,8 +3,9 @@ import { NO_PROVIDER, SERVER, T0, expectPath, holdRoute, pageMessagesFrom, provi
 import { mockWorkspace, openDraft, openSession } from "../utils/workspace"
 import { mockPluginsActivating, type MockServerConfig } from "../utils/mock-server"
 import { nodeFixture } from "../utils/loginom-node-fixture"
+import { APP_READY_TIMEOUT, expectSessionTitle } from "../utils/waits"
 
-type MockLoginomPackageBinding = { open: boolean; path: string; staleForSeconds?: number }
+type MockLoginomPackageBinding = { open: boolean; path: string; staleForSeconds?: number | null }
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] })
 
@@ -20,6 +21,7 @@ for (const width of [1280, 390]) {
     let binding: MockLoginomPackageBinding = {
       open: true,
       path: nodeFixture.node.path,
+      staleForSeconds: null,
     }
 
     const view = await openSession(page, {
@@ -61,6 +63,18 @@ for (const width of [1280, 390]) {
       await tabs.getByRole("button", { name: "Тестовый пакет", exact: true }).click()
     }
 
+    await openPackage()
+    const unavailable = page.getByRole("button", { name: "Позвать агента с недоступного сервера", exact: true })
+    await unavailable.click()
+    await expect(page.getByText("Сервер исходного разговора недоступен.")).toBeVisible()
+    await expect(unavailable).toBeVisible()
+    await showTabs()
+    await tabs.locator(`[data-titlebar-tab-link][href="${sessionHref(source.sessionID)}"]`).click()
+    await expectPath(page, sessionHref(source.sessionID))
+    const chip = page.getByRole("group", { name: "Расчёт выручки · Продажи.lgp", exact: true })
+    await expect(view.editor).toBeEditable()
+    await expect(chip).toHaveCount(0)
+
     const origin = page.getByText("Подготовь отчёт", { exact: true })
     await expect(page.getByText("Уточнение 26", { exact: true })).toBeInViewport()
 
@@ -71,7 +85,6 @@ for (const width of [1280, 390]) {
     await page.getByRole("button", { name: "Спросить агента", exact: true }).click()
     await expect(page).toHaveURL((url) => url.pathname === sessionHref(source.sessionID))
     await expect(origin).toBeInViewport()
-    const chip = page.getByRole("group", { name: "Расчёт выручки · Продажи.lgp", exact: true })
     await expect(chip).toBeVisible()
     await expect(view.editor).toHaveText(text)
     expect(prompts).toEqual([])
@@ -98,7 +111,7 @@ for (const width of [1280, 390]) {
     await openPackage()
     await page.getByRole("button", { name: "Изменить узел с агентом", exact: true }).click()
     await expect(chip).toBeVisible()
-    binding = { open: true, path: "/Команда/Другой.lgp" }
+    binding = { open: true, path: "/Команда/Другой.lgp", staleForSeconds: null }
     await view.editor.press("Enter")
     await expect(
       page.getByText("К этому разговору привязан другой пакет Loginom. Уберите узел, чтобы отправить сообщение."),
@@ -115,14 +128,22 @@ for (const width of [1280, 390]) {
     await expect(view.editor).toHaveText(text)
     expect(prompts).toEqual([])
 
-    binding = { open: false, path: nodeFixture.node.path }
-    await view.editor.press("Enter")
-    await expect(page.getByText("Не удалось проверить, какой пакет Loginom привязан к разговору.")).toBeVisible()
-    await expect(chip).toBeVisible()
-    await expect(view.editor).toHaveText(text)
-    expect(prompts).toEqual([])
+    for (const rejected of [
+      { open: true, path: nodeFixture.node.path },
+      { open: false, path: nodeFixture.node.path, staleForSeconds: null },
+    ]) {
+      binding = rejected
+      const previous = bindings.length
+      await view.editor.press("Enter")
+      await expect.poll(() => bindings.length).toBe(previous + 1)
+      await expect(page.locator('[data-action="composer-submit"]')).not.toHaveAttribute("aria-busy", "true")
+      await expect(page.getByText("Не удалось проверить, какой пакет Loginom привязан к разговору.").first()).toBeVisible()
+      await expect(chip).toBeVisible()
+      await expect(view.editor).toHaveText(text)
+      expect(prompts).toEqual([])
+    }
 
-    binding = { open: true, path: nodeFixture.node.path }
+    binding = { open: true, path: nodeFixture.node.path, staleForSeconds: null }
     await view.editor.press("Enter")
     await expect.poll(() => prompts.length).toBe(1)
     expect(prompts[0]?.sessionID).toBe(source.sessionID)
@@ -130,16 +151,94 @@ for (const width of [1280, 390]) {
       text +
         '\nThe user referenced Loginom node {"package":"Продажи.lgp","path":"/Команда/Продажи.lgp","guid":"{e9bd5bda-1245-43b0-acbe-d81c405077b1}","name":"Расчёт выручки","intent":"edit"}.',
     )
-    expect(bindings).toEqual([
-      { body: { input: { sessionID: source.sessionID } }, directory: view.directory },
-      { body: { input: { sessionID: source.sessionID } }, directory: view.directory },
-      { body: { input: { sessionID: source.sessionID } }, directory: view.directory },
-      { body: { input: { sessionID: source.sessionID } }, directory: view.directory },
-    ])
+    expect(bindings).toHaveLength(5)
+
+    for (const request of bindings)
+      expect(request).toEqual({ body: { input: { sessionID: source.sessionID } }, directory: view.directory })
     expect(creates).toBe(0)
     await expect(chip).toHaveCount(0)
   })
 }
+
+test("a third-party GUI can attach ordinary notes and focus tabs without structured note or message access", async ({
+  page,
+}) => {
+  const start = { id: "ses_plugin_start", title: "Plugin start" }
+  const target = { id: "ses_plugin_target", title: "Plugin target" }
+  const messageID = "msg_plugin_00"
+  const prompts: Parameters<NonNullable<MockServerConfig["onPrompt"]>>[0]["body"][] = []
+
+  const workspace = await mockWorkspace(page, {
+    name: "ExternalComposer",
+    sessions: [start, target],
+    pageMessages: pageMessagesFrom({
+      [target.id]: [
+        { id: messageID, type: "user", text: "Old plugin target", time: { created: T0 } },
+        ...Array.from({ length: 26 }, (_, index) => ({
+          id: `msg_plugin_${String(index + 1).padStart(2, "0")}`,
+          type: "user" as const,
+          text: `Plugin follow-up ${index + 1}`,
+          time: { created: T0 + index + 1 },
+        })),
+      ],
+    }),
+    seed: {
+      storage: {
+        "opencode.e2e.desktop-plugin": {
+          id: "external-composer",
+          revision: "1",
+          options: {},
+          code: `
+            const { Plugin, TitlebarItem } = require("@opencode/plugin/gui")
+            exports.default = Plugin.define({
+              setup(ctx) {
+                ctx.add(TitlebarItem, {
+                  id: "attach",
+                  label: "Attach plugin notes",
+                  run() {
+                    const note = { type: "note", origin: ctx.id, commentID: "plain", label: "Ordinary note",
+                      subject: "an ordinary note", icon: "branch", comment: "" }
+                    const { composer } = ctx.screen.current()
+                    composer.attach({ ...note, commentID: "public-data", label: "Public structured note", data: "{}" })
+                    ctx.screen.attachNote?.({ ...note, commentID: "builtin-data", label: "Built-in structured note", data: "{}" })
+                    composer.attach(note)
+                  },
+                })
+                ctx.add(TitlebarItem, {
+                  id: "open",
+                  label: "Open plugin target",
+                  run() {
+                    ctx.tabs.open({ server: ctx.sessions.current().server.id, id: ${JSON.stringify(target.id)} },
+                      { focus: true, messageID: ${JSON.stringify(messageID)} })
+                  },
+                })
+              },
+            })
+          `,
+        },
+      },
+    },
+    onPrompt: (input) => void prompts.push(input.body),
+  })
+
+  await page.goto(
+    `/e2e/utils/windows-menu.html?${new URLSearchParams({ server: workspace.server, path: sessionHref(start.id, "sidecar") })}`,
+  )
+  await expectSessionTitle(page, start.title)
+  const editor = page.locator('[data-component="composer-editor"]')
+  await expect(editor).toBeEditable({ timeout: APP_READY_TIMEOUT })
+  await page.getByRole("button", { name: "Attach plugin notes", exact: true }).click()
+  await expect(page.getByText("Ordinary note", { exact: true }).first()).toBeVisible()
+  await expect(page.getByText("Public structured note", { exact: true })).toHaveCount(0)
+  await expect(page.getByText("Built-in structured note", { exact: true })).toHaveCount(0)
+  await editor.fill("Read my note.")
+  await editor.press("Enter")
+  await expect.poll(() => prompts[0]?.text).toBe("Read my note.\nThe user referenced an ordinary note.")
+
+  await page.getByRole("button", { name: "Open plugin target", exact: true }).click()
+  await expect(page.getByText("Plugin follow-up 26", { exact: true })).toBeInViewport()
+  await expect(page.getByText("Old plugin target", { exact: true })).not.toBeInViewport()
+})
 
 test("mention a session by title, send its stable token, and open its own tab", async ({ page }) => {
   const target = "ses_0123456789abcdefghijklmnop"

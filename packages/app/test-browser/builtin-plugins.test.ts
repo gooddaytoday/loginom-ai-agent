@@ -17,7 +17,6 @@ const product = [
   "sources",
   "goal",
   "loginom-gui",
-  "loginom-node-context",
 ]
 
 const app = await import("@/runtime/plugin/builtins")

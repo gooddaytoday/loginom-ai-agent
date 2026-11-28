@@ -1,5 +1,11 @@
-import { Ipc } from "@opencode/plugin/gui"
+import { Contract, Ipc } from "@opencode/plugin/gui"
 import { Schema } from "effect"
+import type { NodeContext } from "./node-context"
+
+/** Node actions supply the originating conversation and a node from a verified package snapshot. */
+export const LoginomNodeDraft = Contract.define<{ attach(context: NodeContext): void }, "loginom-gui.node-draft">(
+  "loginom-gui.node-draft",
+)
 
 export const DashboardTarget = Schema.Struct({
   id: Schema.String,

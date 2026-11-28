@@ -1,22 +1,23 @@
-import { createKeyed, type Plugin, type ComposerNote } from "@opencode/plugin/gui"
-import { ComposerNoteHandler } from "@opencode/plugin/gui/builtin"
+import { createKeyed, type Plugin } from "@opencode/plugin/gui"
+import { builtinContext, ComposerNoteHandler, type BuiltinComposerNote } from "@opencode/plugin/gui/builtin"
 import { Icon } from "@opencode/ui/icon"
 import { Option, Schema } from "effect"
 import { createSignal, Show, untrack } from "solid-js"
-import type nodeContext from "./node-context-entry"
-import { LoginomNodeDraft, encodeNodeContext, nodeSubject, readNodeContext, type NodeContext } from "./node-context"
-
+import { LoginomNodeDraft } from "./contract"
+import type definition from "./index"
+import { encodeNodeContext, nodeSubject, readNodeContext, type NodeContext } from "./node-context"
 import { initialNodeDraft, transitionNodeDraft } from "./node-context/machine"
 
 const readBinding = Schema.decodeUnknownOption(
   Schema.Struct({
     open: Schema.NullOr(Schema.Boolean),
     path: Schema.NullOr(Schema.NonEmptyString),
-    staleForSeconds: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
+    staleForSeconds: Schema.NullOr(Schema.Finite),
   }),
 )
 
-const setup: Plugin.Setup<typeof nodeContext> = (ctx) => {
+export const registerNodeContext: Plugin.Setup<typeof definition> = (ctx) => {
+  const builtin = builtinContext(ctx)
   const [state, setState] = createSignal(initialNodeDraft)
 
   function attach(context: NodeContext) {
@@ -24,7 +25,7 @@ const setup: Plugin.Setup<typeof nodeContext> = (ctx) => {
 
     if (!screen) return
 
-    const note: ComposerNote = {
+    const note: BuiltinComposerNote = {
       type: "note",
       origin: ctx.id,
       commentID: ctx.id,
@@ -37,7 +38,7 @@ const setup: Plugin.Setup<typeof nodeContext> = (ctx) => {
     }
 
     screen.composer.detach(note.commentID)
-    screen.composer.attach(note)
+    builtin.screen.attachNote(note)
     screen.composer.focus()
   }
 
@@ -47,9 +48,12 @@ const setup: Plugin.Setup<typeof nodeContext> = (ctx) => {
     setState(next.state)
     next.effects.forEach((effect) => {
       if (effect.type === "attach") return attach(effect.context)
+
+      if (effect.type === "unavailable")
+        return void ctx.toast.show({ variant: "error", title: ctx.t("node.sourceUnavailable") })
       const source = effect.context.source
 
-      ctx.tabs.open({ server: source.serverID, id: source.sessionID }, { focus: true, messageID: source.messageID })
+      builtin.tabs.open({ server: source.serverID, id: source.sessionID }, { focus: true, messageID: source.messageID })
     })
   }
 
@@ -65,7 +69,13 @@ const setup: Plugin.Setup<typeof nodeContext> = (ctx) => {
 
   ctx.provide(LoginomNodeDraft, {
     attach(context) {
-      dispatch({ type: "requested", context, mounted: ctx.sessions.current()?.key, tabs: openTabs() })
+      dispatch({
+        type: "requested",
+        context,
+        mounted: ctx.sessions.current()?.key,
+        tabs: openTabs(),
+        serverListed: ctx.servers.list().includes(context.source.serverID),
+      })
     },
   })
 
@@ -74,7 +84,7 @@ const setup: Plugin.Setup<typeof nodeContext> = (ctx) => {
       const context = () => readNodeContext(input.data)
 
       return (
-        <Show when={context()} fallback={<button onClick={input.remove}>{ctx.t("remove")}</button>}>
+        <Show when={context()} fallback={<button onClick={input.remove}>{ctx.t("node.remove")}</button>}>
           {(value) => (
             <div
               class="flex shrink-0 items-center gap-2 rounded-full border border-v2-border-border-base px-2 py-1"
@@ -90,7 +100,7 @@ const setup: Plugin.Setup<typeof nodeContext> = (ctx) => {
               <button
                 type="button"
                 class="flex size-5 shrink-0 items-center justify-center rounded-full hover:bg-v2-action-control-neutral-action-hover"
-                aria-label={ctx.t("remove")}
+                aria-label={ctx.t("node.remove")}
                 onClick={input.remove}
               >
                 <Icon name="outline-xmark" size="small" />
@@ -104,7 +114,7 @@ const setup: Plugin.Setup<typeof nodeContext> = (ctx) => {
       const context = readNodeContext(data)
 
       if (!context || context.source.sessionID !== session?.id || context.source.serverID !== session.server.id)
-        return ctx.t("differentConversation")
+        return ctx.t("node.differentConversation")
 
       // Package state is scoped to the conversation and its Location on the receiving server.
       const response = await session.server.client.rpc
@@ -121,13 +131,13 @@ const setup: Plugin.Setup<typeof nodeContext> = (ctx) => {
 
       const binding = Option.getOrUndefined(readBinding(response?.output))
 
-      if (binding?.staleForSeconds != null) return ctx.t("stalePackage")
+      if (!binding) return ctx.t("node.missingPackage")
 
-      if (binding?.open !== true || !binding.path) return ctx.t("missingPackage")
+      if (binding.staleForSeconds !== null) return ctx.t("node.stalePackage")
 
-      if (binding.path !== context.node.path) return ctx.t("differentPackage")
+      if (binding.open !== true || !binding.path) return ctx.t("node.missingPackage")
+
+      if (binding.path !== context.node.path) return ctx.t("node.differentPackage")
     },
   })
 }
-
-export default setup
