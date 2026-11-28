@@ -21,6 +21,7 @@ const setting = [
   "app/src/settings/experimental/experimental.tsx",
   "app/src/settings/search-catalog.ts",
   "app/src/runtime/i18n/en.ts",
+  "app/src/runtime/i18n/ru.ts",
 ]
 
 const root = '[data-timeline="next"]'
