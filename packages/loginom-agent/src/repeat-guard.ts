@@ -201,6 +201,7 @@ export function repeatGuard(options: {
                   message: typeof hint === "string" ? `${stopped}\nПодсказка пользователя: ${hint}` : stopped,
                 })
               }
+              // Continue runs this call and starts a new streak for later identical calls.
               if (recent.get(session) === streak) recent.delete(session)
             }
 
