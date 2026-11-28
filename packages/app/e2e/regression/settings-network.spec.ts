@@ -36,7 +36,7 @@ async function settings(
     sessions: [],
     pageMessages: () => ({ items: [] }),
   })
-  await page.route("**/api/rpc/loginom.network/*", async (route) => {
+  await page.route(`${SERVER}/api/rpc/loginom.network/**`, async (route) => {
     const headers = {
       "access-control-allow-origin": "*",
       "access-control-allow-headers": "content-type,authorization",
@@ -133,10 +133,11 @@ test("fits a 390 px window and shows the default port fallback", async ({ page }
   await page.screenshot({ path: info.outputPath("network-390.png"), animations: "disabled" })
 })
 
-test("shows when the service connects directly in the web app", async ({ page }) => {
+test("uses the canonical service connection in the web app", async ({ page }) => {
   const screen = await settings(page, "direct", false, true)
   await screen.getByRole("tab", { name: "Сеть", exact: true }).press("Enter")
   await expect(screen.getByText("Без прокси · прямое подключение")).toBeVisible()
+  await expect(screen.getByText("Текущий порт — 28288")).toBeVisible()
 })
 
 test("confirms a saved port using status after the save request times out", async ({ page }) => {

@@ -2,6 +2,7 @@ import { createMemoryHistory, MemoryRouter } from "@solidjs/router"
 import { render } from "solid-js/web"
 import { AppBaseProviders, AppInterface } from "../../src/app"
 import { PlatformProvider, type Platform } from "../../src/runtime/platform/platform"
+import { ServerConnection } from "../../src/runtime/server/registry"
 
 const root = document.getElementById("root")
 
@@ -16,6 +17,9 @@ const history = createMemoryHistory()
 history.set({ value: "/settings", replace: true, scroll: false })
 
 const desktop = query.get("platform") !== "web"
+const server: ServerConnection.Any = desktop
+  ? { type: "sidecar", variant: "base", displayName: "Loginom AI Agent", http: { url } }
+  : { type: "http", http: { url } }
 
 const platform: Platform = {
   ...(desktop
@@ -36,11 +40,8 @@ render(
     <PlatformProvider value={platform}>
       <AppBaseProviders locale="ru">
         <AppInterface
-          servers={[
-            desktop
-              ? { type: "sidecar", variant: "base", displayName: "Loginom AI Agent", http: { url } }
-              : { type: "http", http: { url } },
-          ]}
+          canonicalLocalServer={desktop ? undefined : ServerConnection.key(server)}
+          servers={[server]}
           router={(props) => <MemoryRouter {...props} history={history} />}
         />
       </AppBaseProviders>

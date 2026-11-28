@@ -29,6 +29,33 @@ test("WinINET reaches the Desktop service but not its Loginom runtime", async ()
   })
 })
 
+test("proxy status attributes only the configured routes selected by the service", () => {
+  const system = {
+    LOGINOM_AI_AGENT_RUNTIME_PROXY_SOURCE: "windows",
+    HTTP_PROXY: "http://proxy.example:8080",
+    HTTPS_PROXY: "http://secure.example:8080",
+  }
+  const configured = { ALL_PROXY: "http://fallback.example:8080" }
+
+  expect(serviceProxyStatus({ ...system, ...configured }, configured)).toEqual({
+    source: "windows",
+    hosts: ["proxy.example:8080", "secure.example:8080"],
+  })
+  expect(serviceProxyStatus({ ...system, ...configured, HTTPS_PROXY: "" }, configured)).toEqual({
+    source: "environment",
+    hosts: ["proxy.example:8080", "fallback.example:8080"],
+  })
+  const explicit = { HTTPS_PROXY: "http://sample-user:sample-pass@explicit.example:8080" }
+  expect(serviceProxyStatus({ ...system, ...explicit }, explicit)).toEqual({
+    source: "environment",
+    hosts: ["proxy.example:8080", "explicit.example:8080"],
+  })
+  expect(serviceProxyStatus({ ...system, ...explicit, https_proxy: system.HTTPS_PROXY }, explicit)).toEqual({
+    source: "windows",
+    hosts: ["proxy.example:8080", "secure.example:8080"],
+  })
+})
+
 test("explicit HTTPS_PROXY skips system and PAC readers and survives in the runtime", async () => {
   const environment = {
     ...inherited,
