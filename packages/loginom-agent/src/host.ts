@@ -138,7 +138,10 @@ export async function packageState(sessionID: string) {
   return result ?? { open: null, path: null, modified: null, modifiedDetectedAt: null, lastSave: null }
 }
 
-export const packageInventory = () => request("package.inventory", [...(state.current?.sessions ?? [])])
+export async function packageInventory() {
+  const sessions = [...(state.current?.sessions ?? [])]
+  return sessions.length ? request("package.inventory", sessions) : []
+}
 
 export function packageAction(input: { sessionID: string; path: string | null; decision: "save" | "discard" | "clean"; close: boolean }) {
   return request("package.action", input)

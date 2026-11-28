@@ -724,6 +724,7 @@ export const dict = {
   "desktop.loginom.quit.save": "Сохранить в Loginom",
   "desktop.loginom.quit.discard": "Закрыть без сохранения",
   "desktop.loginom.quit.cancel": "Отмена",
+  "desktop.loginom.quit.discardFailed": "Выход отменён: не удалось закрыть все открытые пакеты Loginom.",
   "desktop.loginom.quit.saveFailed":
     "Выход отменён: Loginom подтвердил не все сохранения. Сначала сохраните пакеты в Loginom. Для нового пакета выберите «Сохранить как» и укажите путь.",
   "toast.migration.progress.clearingOldEvents": "Удаление старых событий",

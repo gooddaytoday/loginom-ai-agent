@@ -981,14 +981,11 @@ export async function createBridge(config, session, { browserTransport: managedB
           const target = packageTarget(metadata, context, config.loginomUrl && new URL(config.loginomUrl).origin);
           if (!target) return !metadata.workspacePreparation && close ? { status: 'closed' } : blocked;
           const observed = await target.page.evaluate(readOwnedPackage, target.owner);
-          if (observed?.open === false && observed.packageCount === 0 && close) {
-            userCloseReceipt = { status: 'ALREADY_CLOSED', package_closed: true, logged_out: false };
-            return { status: 'closed' };
-          }
-          if (observed?.open !== true || observed.path !== path || typeof observed.modified !== 'boolean') return blocked;
-          if (decision === 'clean' && observed.modified) return blocked;
+          const alreadyClosed = close && observed?.open === false && observed.packageCount === 0;
+          if (!alreadyClosed && (observed?.open !== true || observed.path !== path || typeof observed.modified !== 'boolean')) return blocked;
+          if (decision === 'clean' && observed?.modified) return blocked;
           let result = { status: 'clean' };
-          if (decision === 'save') {
+          if (!alreadyClosed && decision === 'save') {
             if (path === null && observed.modified) await target.page.bringToFront();
             result = await target.page.evaluate(readOwnedPackage, { ...target.owner, save: { path } }) ?? blocked;
             if (result.status === 'blocked') return result;
@@ -1003,7 +1000,8 @@ export async function createBridge(config, session, { browserTransport: managedB
           const packagePath = result.lastSave?.path ?? path;
           const options = { ...target.owner, loginomUrl: config.loginomUrl, loginomBuild: target.owner.build,
             packagePath, tabTid: prepared.workflow_ref?.tab_tid, unsavedDraft: packagePath === null,
-            diagnosticReadOnly: prepared.package_ref?.read_only === true, userDecision: decision };
+            diagnosticReadOnly: !alreadyClosed && prepared.package_ref?.read_only === true, userDecision: decision,
+            alreadyClosedOperationId: alreadyClosed ? target.owner.operationId : null };
           const response = await browser.callTool({name:'browser_run_code_unsafe',
             arguments:{code:makePackageCleanupCode(options)}}, undefined, {timeout:30000});
           const receipt = parsePackageCleanupResult(response, options);

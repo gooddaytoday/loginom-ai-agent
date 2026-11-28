@@ -54,6 +54,9 @@ function fixture(overrides = {}) {
     ownedPackage:state.foreignPreparedPackage ? {} : node, ownedTab:tab,
     getComputedStyle:() => ({visibility:'visible'}), bg:{app:{Version:'7.4.2', Application:{FInstance:{FMainForm:{FMapTree:m}}}}}});
   vm.runInContext(`globalThis.__loginomDockPreparationV1={document,id:'owned-document',receipts:new Map([['prepare',{request:JSON.stringify({session:'owned-session'}),packageNode:ownedPackage,tab:ownedTab}]])}`,context);
+  Object.assign(context.__loginomDockPreparationV1.receipts.get('prepare'), {
+    phase:'verified',openConnection:m.FServerConnection,openServerSession:m.FServerConnection.Session,
+  });
   const locator = query => ({
     locator:() => locator(query+' input'),
     async waitFor(settings) {
@@ -135,6 +138,21 @@ test('saved owned package closes with native guards, tabs disappear, then logout
   assert.equal(result.unsaved_changes_discarded,false);
   assert.deepEqual(f.events,['modified-read','close','tab-detached','avatar','logout','login-visible']);
   const again=await f.run();assert.equal(again.reason,'CLEANUP_ALREADY_ATTEMPTED');assert.equal(f.events.filter(e=>e==='close').length,1);
+});
+
+test('an already closed conversation logs out of its original session without repeating Close',async()=>{
+  const f=fixture({count:0,tab:false});
+  const expected={...options,userDecision:'discard',alreadyClosedOperationId:'prepare'};
+  const result=await f.run(expected);
+  assert.equal(result.status,'SUCCEEDED');
+  assert.equal(result.logged_out,true);
+  assert.equal(parsePackageCleanupResult({content:[{type:'text',text:JSON.stringify(result)}]},expected).packages_before,0);
+  assert.deepEqual(f.events,['tab-detached','avatar','logout','login-visible']);
+
+  const replacement=fixture({count:0,tab:false});
+  replacement.context.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session={};
+  assert.equal((await replacement.run(expected)).reason,'ALREADY_CLOSED_OWNER_UNCONFIRMED');
+  assert.deepEqual(replacement.events,[]);
 });
 
 for(const mode of ['saved','readonly','diagnostic discard'])for(const changedAt of ['native Close','logout account readback'])

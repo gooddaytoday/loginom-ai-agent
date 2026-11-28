@@ -110,7 +110,10 @@ test("package inventory reads only existing conversation runtimes, and explicit 
       .toEqual({ status: "blocked" })
     expect(await f.host.packageAction({ sessionID, path, decision: "discard", close: true })).toEqual({ status: "closed" })
     expect(await f.host.packageInventory([sessionID])).toEqual([])
-    expect((await readFile(f.launches, "utf8")).trim().split("\n")).toHaveLength(1)
+    expect(await f.host.updateWorkState()).toEqual({ activeWork: false, unsettledWork: false, dispatching: false })
+    await f.host.runtime(1, chat)
+    expect((await f.host.packageInventory([sessionID]))[0]?.state).toMatchObject({ open: true, path })
+    expect((await readFile(f.launches, "utf8")).trim().split("\n")).toHaveLength(2)
   } finally {
     await f.close()
   }

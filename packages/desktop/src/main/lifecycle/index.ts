@@ -11,7 +11,7 @@ import { nativeT } from "../native/translations"
 import { SidecarCredentials } from "../service/sidecar-credentials"
 import { DesktopStorage } from "../storage"
 import { safeWebContentsURL } from "../windows/state"
-import { getLastFocusedWindow, mainWindows } from "../windows"
+import { getLastFocusedWindow, getMainWindows, mainWindows } from "../windows"
 import type { Scope } from "@opencode/plugin/gui/host"
 import { protocolUrls, startupUrls } from "./deep-link"
 import { marks } from "./marks"
@@ -76,33 +76,34 @@ const runtime = Layer.effect(
 
         return confirmPackageQuit({
           rpc,
-          ask: async (kind) => {
-            const choices = ["save", "discard", "cancel"] as const
-
+          ask: async (kind, choices) => {
+            const cancel = choices.indexOf("cancel")
             const { response } = await show({
               type: "warning",
-              defaultId: 2,
-              cancelId: 2,
+              defaultId: cancel,
+              cancelId: cancel,
               message: nativeT(`desktop.loginom.quit.${kind}`),
               buttons: choices.map((choice) => nativeT(`desktop.loginom.quit.${choice}`)),
             })
 
             return choices[response] ?? "cancel"
           },
-          failed: async () => {
-            await show({ type: "warning", message: nativeT("desktop.loginom.quit.saveFailed") })
+          failed: async (decision) => {
+            await show({ type: "warning", message: nativeT(`desktop.loginom.quit.${decision}Failed`) })
           },
         })
       },
-      stop: () =>
-        runPromise(
+      stop: (): Promise<void> => {
+        if (!restoresWindows(driver.state())) for (const window of getMainWindows()) window.hide()
+        return runPromise(
           shutdown.stop.pipe(
             Effect.timeoutOrElse({
               duration: "90 seconds",
               orElse: () => Effect.logError("shutdown timed out, continuing anyway"),
             }),
           ),
-        ),
+        )
+      },
       resume: () =>
         runPromise(
           shutdown.resume.pipe(

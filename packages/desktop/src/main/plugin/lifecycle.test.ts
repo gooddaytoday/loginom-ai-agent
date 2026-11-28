@@ -127,6 +127,7 @@ function world() {
   const stops: Promise<void>[] = []
 
   const app = createDriver({
+    confirmExit: async () => true,
     stop: () => {
       const stopped = lifecycle.stop()
       stops.push(stopped)

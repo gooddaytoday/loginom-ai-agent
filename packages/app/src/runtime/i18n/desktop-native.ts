@@ -317,6 +317,7 @@ export const DESKTOP_NATIVE_ENGLISH = {
   "desktop.loginom.quit.save": "Save in Loginom",
   "desktop.loginom.quit.discard": "Close Without Saving",
   "desktop.loginom.quit.cancel": "Cancel",
+  "desktop.loginom.quit.discardFailed": "Quit cancelled: Loginom could not close all open packages.",
   "desktop.loginom.quit.saveFailed":
     "Quit cancelled: Loginom did not confirm all saves. Save the packages in Loginom first. For a new package, use Save As and choose a path.",
 

@@ -3,7 +3,7 @@ import { confirmPackageQuit } from "./quit-packages"
 
 const path = "/alice/package.lgp"
 
-const conversation = (modified: boolean) => ({
+const conversation = (modified: boolean | null) => ({
   sessionID: "ses_chat",
   directory: "/project",
   state: { open: true, path, modified },
@@ -24,10 +24,28 @@ test.each([
     name: "discard",
     modified: true,
     decision: "discard",
-    output: null,
+    output: { status: "closed" },
     allow: true,
     requests: ["active", "close"],
     dialogs: ["unsaved"],
+  },
+  {
+    name: "unconfirmed Discard",
+    modified: true,
+    decision: "discard",
+    output: { status: "blocked" },
+    allow: false,
+    requests: ["active", "close"],
+    dialogs: ["unsaved", "discard failed"],
+  },
+  {
+    name: "unknown package has no Save choice",
+    modified: null,
+    decision: "cancel",
+    output: null,
+    allow: false,
+    requests: ["active"],
+    dialogs: ["unknown"],
   },
   {
     name: "confirmed Save",
@@ -45,7 +63,7 @@ test.each([
     output: { status: "saved" },
     allow: false,
     requests: ["active", "save"],
-    dialogs: ["unsaved", "failed"],
+    dialogs: ["unsaved", "save failed"],
   },
 ] as const)("Desktop exit: $name", async (row) => {
   const requests: string[] = []
@@ -56,7 +74,7 @@ test.each([
       call: async (request) => {
         requests.push(request.method)
 
-        if (request.method === "active") return { output: [conversation(requests.length === 1 && row.modified)] }
+        if (request.method === "active") return { output: [conversation(requests.length === 1 ? row.modified : false)] }
 
         const target = { sessionID: "ses_chat", path }
         expect(request.location).toEqual({ directory: "/project" })
@@ -65,13 +83,14 @@ test.each([
         return { output: row.output }
       },
     },
-    ask: async (kind) => {
+    ask: async (kind, choices) => {
       dialogs.push(kind)
+      expect(choices).toEqual(kind === "unknown" ? ["discard", "cancel"] : ["save", "discard", "cancel"])
 
       return row.decision
     },
-    failed: async () => {
-      dialogs.push("failed")
+    failed: async (decision) => {
+      dialogs.push(`${decision} failed`)
     },
   })
 
