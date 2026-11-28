@@ -52,7 +52,7 @@ export default function Page() {
       const now = Date.now()
 
       if (startup && now >= startup.until) {
-        dispatch({ type: "status", attempt: effect.attempt, now, result: { ok: false, issue: "unavailable" } })
+        dispatch({ type: "status", attempt: effect.attempt, now, result: undefined })
 
         return
       }
@@ -99,7 +99,7 @@ export default function Page() {
             type: "status",
             attempt: effect.attempt,
             now: Date.now(),
-            result: result ?? { ok: false, issue: "unavailable" },
+            result,
           })
           break
         }

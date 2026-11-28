@@ -55,7 +55,7 @@ function open(page: Page, input: Partial<WorkspaceInput> = {}) {
 
 const loginomPassword = "fixture-wrong-password"
 
-test("Loginom settings recover automatically from a cold Location and a slow Host", async ({ page }) => {
+test("Loginom settings recover from a cold Location, a slow Host and one dropped status request", async ({ page }) => {
   let registered = false
   let host: "handshake" | "catalog" | "ready" = "handshake"
   let earlyStatusCalls = 0
@@ -98,16 +98,26 @@ test("Loginom settings recover automatically from a cold Location and a slow Hos
   await page.clock.fastForward(36_000)
   await page.clock.resume()
 
+  const statusPath = "/api/rpc/loginom.connection/status"
+
   const nextStatus = () =>
     page.waitForResponse(
       (response) =>
         response.request().method() === "POST" &&
-        new URL(response.url()).pathname === "/api/rpc/loginom.connection/status",
+        new URL(response.url()).pathname === statusPath,
     )
 
   const handshakeStatus = nextStatus()
   registered = true
   expect((await handshakeStatus).status()).toBe(200)
+  await expect(notice).toHaveText("Запускаем службу…")
+
+  const interrupted = page.waitForEvent("requestfailed", {
+    predicate: (request) => new URL(request.url()).pathname === statusPath,
+  })
+
+  await page.route((url) => url.pathname === statusPath, (route) => route.abort("connectionreset"), { times: 1 })
+  await interrupted
   await expect(notice).toHaveText("Запускаем службу…")
 
   const catalogStatus = nextStatus()

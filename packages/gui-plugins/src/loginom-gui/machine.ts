@@ -31,7 +31,8 @@ type Event =
   | { type: "application"; revision: number; generation: number }
   | { type: "edit"; patch: Partial<Draft> }
   | { type: "submit"; submit: "check" | "save"; now: number }
-  | { type: "status" | "saved"; attempt: number; result: StatusResult; now: number }
+  | { type: "status"; attempt: number; result: StatusResult | undefined; now: number }
+  | { type: "saved"; attempt: number; result: StatusResult; now: number }
   | { type: "checked"; attempt: number; result: CheckResult }
 
 type Effect =
@@ -194,16 +195,13 @@ export function transition(state: State, event: Event): Transition {
         return { state: { type: "unavailable", attempt }, effects: [] }
 
       const reply = event.result
-      const hostStarting = "state" in reply
-      const result = hostStarting ? ({ ok: false, issue: "unavailable" } as const) : reply
+      const result = !reply || "state" in reply ? ({ ok: false, issue: "unavailable" } as const) : reply
 
       if (
         state.type === "loading" &&
-        (hostStarting ||
-          (result.ok &&
-            result.value.state === "starting" &&
-            !result.value.failed &&
-            result.value.application?.state !== "pending"))
+        (result.ok
+          ? result.value.state === "starting" && !result.value.failed && result.value.application?.state !== "pending"
+          : !("reason" in result))
       ) {
         return {
           state: { ...state, attempt, starting: true },

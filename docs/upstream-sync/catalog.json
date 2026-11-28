@@ -201,7 +201,7 @@
       "title": "Web app, UI kit, session UI and Loginom localization",
       "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"],
       "notes": {
-        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events. LAB-2308: automatic startup across plugin registration, Host handshake, and catalog readiness."
+        "packages/app/e2e/regression/settings.spec.ts": "C2.12 (CON-06): Loginom settings drain, catalog readiness, and applied/failed RPC events. LAB-2308: automatic startup across plugin registration, Host handshake, one dropped status request, and catalog readiness."
       }
     },
     {

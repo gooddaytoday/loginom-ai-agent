@@ -103,14 +103,14 @@ test("unavailable, changed targets and disposal ignore late completions", () => 
 
   const loading = transition(gone, { type: "target", available: true, now: 0 }).state
 
-  const timedOut = transition(loading, {
+  const refused = transition(loading, {
     type: "status",
     now: 2000,
     attempt: loading.attempt,
-    result: { ok: false, issue: "unavailable" },
+    result: { ok: false, issue: "unavailable", reason: "LOGINOM_HOST_CLOSED" },
   }).state
 
-  expect(view(timedOut)).toMatchObject({ message: "serviceUnavailable", retry: true })
+  expect(view(refused)).toMatchObject({ message: "serviceUnavailable", retry: true })
   const disposed = transition(loading, { type: "disposed" }).state
   expect(transition(disposed, result).state).toBe(disposed)
 })
@@ -202,6 +202,19 @@ test.each([
   const retried = transition(expired.state, { type: "refresh", now: expiredAt }).state
   const next = transition(retried, { type: "status", attempt: retried.attempt, now: expiredAt + 1_000, result })
   expect(view(next.state).message).not.toBe("serviceUnavailable")
+})
+
+test("an unavailable startup reply without a reason keeps polling until the deadline", () => {
+  const loading = transition(initial, { type: "target", available: true, now: 0 }).state
+  const result = { ok: false, issue: "unavailable" } as const
+  const pending = transition(loading, { type: "status", attempt: loading.attempt, now: 1000, result })
+
+  expect(view(pending.state)).toMatchObject({ message: "serviceStarting", retry: false })
+  expect(pending.effects).toMatchObject([{ type: "status", attempt: pending.state.attempt }])
+
+  const expired = transition(pending.state, { type: "status", attempt: pending.state.attempt, now: 180_000, result })
+  expect(view(expired.state)).toMatchObject({ message: "serviceUnavailable", retry: true })
+  expect(expired.effects).toEqual([])
 })
 
 test("polling is bounded and keeps edits made while the connection is pending", () => {
