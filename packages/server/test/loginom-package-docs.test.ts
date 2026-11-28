@@ -1319,7 +1319,6 @@ describe("package_docs_run (B2.5c)", () => {
           "glob",
           "grep",
           "package_docs_run",
-          "question",
           "read",
           "skill",
           "todowrite",
