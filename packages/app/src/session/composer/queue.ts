@@ -3,9 +3,11 @@ import type { PromptAttachment } from "@opencode/client/promise"
 import { SessionMessage } from "@opencode/schema/session-message"
 import type { ComposerDelivery, ComposerSession } from "@/composer/adapter"
 import type { ComposerStateTarget } from "@/composer/submission-state"
+import { contextItemKey, type NoteContextItem } from "@/composer/schema"
 import type { ImageAttachmentPart, Prompt } from "@/composer/state"
 import { clonePrompt, promptLength } from "@/composer/prompt-parts"
 import { buildPromptRequest } from "@/composer/request"
+import { commentContextItem, formatPromptComment, readPromptPresentation } from "@/composer/comment-note"
 import { type BlobReference, blobDataUrl } from "@/runtime/persistence/drafts"
 import { pinPromptMedia } from "@/composer/media"
 import { extractPromptContext, extractPromptFromMessage } from "@/composer/prompt"
@@ -21,6 +23,7 @@ import {
   isPristine,
   mergePrompt,
   QUEUE_MUTATION_TIMEOUT_MS,
+  queuedPromptNotes,
   queuedPromptText,
   transitionQueue,
   viewQueue,
@@ -67,9 +70,23 @@ export function createSessionQueue(input: {
       next.effects.forEach(perform)
     })
 
+  const draftNotes = () =>
+    input.draft.context.items().filter(
+      (item): item is NoteContextItem & { key: string } => item.type === "note" && item.data !== undefined,
+    )
+
+  const setDraftNotes = (notes: readonly NoteContextItem[]) => {
+    const context = input.draft.context.items()
+    const ambient = context.filter((item) => item.type !== "note" || item.data === undefined)
+
+    if (!notes.length && ambient.length === context.length) return
+    input.draft.context.replace([...ambient, ...notes])
+  }
+
   const perform = (effect: QueueEffect) => {
     if (effect.type === "draft.load") {
       input.draft.mode.set("normal")
+      setDraftNotes(queuedPromptNotes(effect.item).map((note) => commentContextItem(note)))
       input.draft.set(effect.prompt, effect.cursor)
       input.restoreFocus(effect.cursor)
 
@@ -79,14 +96,15 @@ export function createSessionQueue(input: {
     if (effect.type === "draft.restore") {
       const current = input.draft.current()
 
-      const prompt =
-        effect.keep && !isPristine(effect.keep, current)
-          ? mergePrompt(effect.stash.prompt, current)
-          : effect.stash.prompt
+      const notes = draftNotes()
+      const keep = effect.keep && !isPristine(effect.keep, current, notes)
+      const prompt = keep ? mergePrompt(effect.stash.prompt, current) : effect.stash.prompt
+      const restoredNotes = effect.stash.notes ?? []
 
       const cursor = prompt === effect.stash.prompt ? effect.stash.cursor : promptLength(prompt)
       // The stashed retry fingerprints its own payload, so a merged prompt sends under a new ID.
       input.draft.mode.set(effect.stash.mode)
+      setDraftNotes(keep ? [...restoredNotes, ...notes] : restoredNotes)
       input.draft.set(prompt, cursor)
 
       if (effect.stash.retry) input.draft.retry.set(effect.stash.retry)
@@ -281,6 +299,7 @@ export function createSessionQueue(input: {
       operation.item,
       operation.prompt,
       operation.raw,
+      operation.notes,
     )
 
     // Admit before cancelling so a failed replacement never discards the original. A queued edit rebuilds its position
@@ -439,6 +458,7 @@ export function createSessionQueue(input: {
         cursor: input.draft.cursor() ?? promptLength(draft),
         mode: input.draft.mode.current(),
         retry: input.draft.retry.current(),
+        notes: draftNotes(),
       },
     })
 
@@ -456,6 +476,7 @@ export function createSessionQueue(input: {
         delivery,
         reverted: reverted(),
         prompt: clonePrompt(input.draft.current()),
+        notes: draftNotes(),
         ids: queued().map(() => SessionMessage.ID.create()),
       }),
     cancelEdit: () => dispatch({ type: "edit.cancel" }),
@@ -519,16 +540,16 @@ function storedFileUri(file: PromptAttachment) {
 // Confirming an edit submits the current composer content as the replacement:
 // mentions and attachments are parsed like a normal submission, so removed
 // attachments drop and added ones join. Stored file mentions and context files
-// the composer cannot show are preserved, and the review-comment notes appended
-// to the original's model-visible text survive. Ambient composer context (open
-// review comments) stays out: it belongs to the next fresh prompt, not to a
-// queued edit.
+// the composer cannot show are preserved. Structured notes are edited as chips
+// and serialized from the edit's note context. Ambient review comments belong
+// to the next fresh prompt.
 async function editedPromptInput(
   sessionID: string,
   directory: string,
   item: QueuedPrompt | undefined,
   prompt: Prompt,
   text: string,
+  editedNotes: readonly NoteContextItem[],
 ) {
   const images = await Promise.all(
     prompt
@@ -536,10 +557,27 @@ async function editedPromptInput(
       .map(async (part) => ({ ...part, dataUrl: await blobDataUrl(part.blob, part.mime) })),
   )
 
-  const request = buildPromptRequest({ prompt, context: [], images, text, sessionDirectory: directory })
+  const request = buildPromptRequest({
+    prompt,
+    context: editedNotes.map((note) => ({ ...note, key: contextItemKey(note) })),
+    images,
+    text,
+    sessionDirectory: directory,
+  })
+
   const payload = item?.payload
-  const display = item ? queuedPromptText(item) : ""
-  const notes = payload && display && payload.text.startsWith(display) ? payload.text.slice(display.length) : ""
+  const rebuildContext = queuedPromptNotes(item).length > 0
+  // Copy the other comments' text and metadata while keeping their server-stored file references.
+
+  const otherComments = rebuildContext
+    ? (readPromptPresentation(payload?.metadata)?.comments ?? []).filter(
+        (comment) => comment.type !== "note" || comment.data === undefined,
+      )
+    : []
+
+  const display = item && !rebuildContext ? queuedPromptText(item) : ""
+  const suffix = payload && display && payload.text.startsWith(display) ? payload.text.slice(display.length) : ""
+  const legacyComments = suffix ? payload?.metadata?.["comments"] : undefined
 
   const mention = (value: { start: number; end: number; text: string } | undefined) => {
     if (!value) return undefined
@@ -572,7 +610,9 @@ async function editedPromptInput(
 
   return {
     sessionID,
-    text: request.text + notes,
+    text: rebuildContext
+      ? [request.text, ...otherComments.map(formatPromptComment)].filter(Boolean).join("\n")
+      : request.text + suffix,
     files: [
       // A stored file whose mention the edit deleted is dropped; unmentioned context stays.
       ...(payload?.files
@@ -597,12 +637,12 @@ async function editedPromptInput(
     ],
     agents: agents.map((agent) => ({ name: agent.name, mention: mention(agent.mention) })),
     skills: skills.map((skill) => ({ id: skill.id, mention: mention(skill.mention) })),
-    // Presentation metadata reads only with a comments list, which prompts from other clients lack.
-    // Comments survive while their notes stay out of the edited text; when the editor showed the
-    // notes as text (a prompt with no display text), the edit owns them and the comments go.
+    // Record exactly the comments that still contribute model-visible context.
     metadata: {
       ...payload?.metadata,
-      comments: notes ? (payload?.metadata?.["comments"] ?? []) : [],
+      comments: request.comments.length
+        ? [...request.comments, ...otherComments, ...(Array.isArray(legacyComments) ? legacyComments : [])]
+        : (legacyComments ?? otherComments),
       displayText: request.displayText,
       attachments: request.attachments,
     },

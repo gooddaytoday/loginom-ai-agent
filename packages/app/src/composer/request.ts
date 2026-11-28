@@ -17,9 +17,7 @@ import type {
 } from "@/composer/state"
 import {
   formatAttachmentReference,
-  formatCommentNote,
-  formatNoteComment,
-  formatQuoteComment,
+  formatPromptComment,
   type PromptAttachmentReference,
   type PromptComment,
 } from "@/composer/comment-note"
@@ -223,13 +221,7 @@ export function buildPromptRequest(input: BuildPromptRequestInput): PromptReques
     text: [
       ...(text.trim() ? [text] : []),
       ...attachments.map(formatAttachmentReference),
-      ...comments.map((comment) => {
-        if (comment.type === "note") return formatNoteComment(comment)
-
-        if (comment.type === "quote") return formatQuoteComment(comment)
-
-        return formatCommentNote(comment)
-      }),
+      ...comments.map(formatPromptComment),
     ].join("\n"),
     displayText: text,
     files: [...files, ...context, ...inline],

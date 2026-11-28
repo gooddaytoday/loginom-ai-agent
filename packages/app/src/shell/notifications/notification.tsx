@@ -413,7 +413,8 @@ export function createServerNotificationState(input: {
       showToast({
         variant: "error",
         title: language.t("prompt.toast.promptSendFailed.title"),
-        description: event.data.reason,
+        description:
+          event.data.reason === "loginom.package-changed" ? language.t("prompt.toast.loginomPackageChanged") : undefined,
       })
 
       return

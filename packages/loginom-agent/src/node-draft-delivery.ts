@@ -16,7 +16,7 @@ const readBinding = Schema.decodeUnknownOption(
   Schema.Struct({ open: Schema.Literal(true), path: Schema.NonEmptyString, staleForSeconds: Schema.Null }),
 )
 
-const packageChanged = "The Loginom package changed, closed, or could not be verified before delivery."
+const packageChanged = "loginom.package-changed"
 
 export const checkNodeDraftDelivery = (sessionID: string, metadata: unknown, snapshot: () => Effect.Effect<unknown>) =>
   Effect.gen(function* () {

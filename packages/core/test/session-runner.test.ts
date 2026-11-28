@@ -4923,7 +4923,7 @@ describe("SessionRunnerLLM", () => {
       if (delivered) expect(cancelled).toEqual([])
       else
         expect(cancelled).toMatchObject([
-          { data: { inboxID: guarded.id, reason: expect.stringContaining("Loginom package") } },
+          { data: { inboxID: guarded.id, reason: "loginom.package-changed" } },
         ])
     })
   }

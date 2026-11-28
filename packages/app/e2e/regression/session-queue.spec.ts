@@ -9,7 +9,8 @@ import { holdRoute, provider, seed, SERVER } from "../utils/app"
 import type { MockServerConfig } from "../utils/mock-server"
 import { installSseTransport } from "../utils/sse-transport"
 import { chooseUserMessageAction, openUserMessageMenu } from "../utils/timeline"
-import { openSession } from "../utils/workspace"
+import { openSession, type WorkspaceInput } from "../utils/workspace"
+import { nodeFixture } from "../utils/loginom-node-fixture"
 
 const sessionID = "ses_session_queue_regression"
 
@@ -171,7 +172,7 @@ async function openQueue(
   revert?: string,
   status: "idle" | "running" = "running",
   model = { id: "queue-model", name: "Queue Model" },
-  config: Pick<MockServerConfig, "beforeAgentsResponse"> = {},
+  config: Pick<WorkspaceInput, "beforeAgentsResponse" | "seed"> = {},
 ) {
   const options: Parameters<typeof openSession>[1] = {
     name: "SessionQueueRegression",
@@ -196,7 +197,7 @@ async function openQueue(
     ...config,
   }
 
-  if (followUpBehavior) options.seed = { settings: { general: { followUpBehavior } } }
+  if (followUpBehavior) options.seed = { ...options.seed, settings: { general: { followUpBehavior } } }
   await openSession(page, options)
   const composer = page.locator('[data-component="composer"]')
 
@@ -221,19 +222,25 @@ function userRow(page: Page, messageID: string) {
   )
 }
 
-test("explains a Loginom package rejection from the server and keeps the next queued prompt", async ({ page }) => {
-  const mock = createQueueMock(["Inspect the sales node", "Next plain prompt"])
-  const view = await openQueue(page, mock, "queue")
-  await expect(view.rows).toHaveCount(2)
+for (const [locale, description] of [
+  ["en", "The Loginom package changed, closed, or could not be verified before delivery."],
+  ["ru", "Пакет Loginom сменился, закрылся или его не удалось проверить перед отправкой."],
+] as const) {
+  test(`explains a Loginom package rejection in ${locale} and keeps the next queued prompt`, async ({ page }) => {
+    const mock = createQueueMock(["Inspect the sales node", "Next plain prompt"])
+    const view = await openQueue(page, mock, "queue", undefined, "running", undefined, { seed: { locale } })
 
-  const [rejected] = mock.rows.splice(0, 1)
-  const reason = "The Loginom package changed, closed, or could not be verified before delivery."
-  mock.emit("session.inbox.cancelled", { sessionID, inboxID: rejected.id, reason })
+    await expect(view.rows).toHaveCount(2)
 
-  await expect(page.getByText(reason, { exact: true })).toBeVisible()
-  await expect(view.rows.locator('[data-action="session-queue-edit"]')).toHaveText(["Next plain prompt"])
-  await expect(page.getByText("Inspect the sales node", { exact: true })).toHaveCount(0)
-})
+    const [rejected] = mock.rows.splice(0, 1)
+
+    mock.emit("session.inbox.cancelled", { sessionID, inboxID: rejected.id, reason: "loginom.package-changed" })
+
+    await expect(page.getByText(description, { exact: true })).toBeVisible()
+    await expect(view.rows.locator('[data-action="session-queue-edit"]')).toHaveText(["Next plain prompt"])
+    await expect(page.getByText("Inspect the sales node", { exact: true })).toHaveCount(0)
+  })
+}
 
 test("follow-up preference controls Enter while Mod+Enter uses the alternate delivery", async ({ page }) => {
   const mock = createQueueMock([])
@@ -774,6 +781,53 @@ test("editing restores the existing draft and replaces only the original queue p
   ])
   expect(mock.log[0]).toBe("prompt:queue")
 })
+
+for (const delivery of ["queue", "steer", "remove chip"] as const) {
+  test(`editing a chip-only queued prompt can ${delivery}`, async ({ page }) => {
+    const node = nodeFixture.node
+    const subject = `Loginom node ${JSON.stringify({ ...node, intent: "ask" })}`
+
+    const comment = {
+      type: "note",
+      origin: "loginom-gui",
+      label: node.name,
+      subtitle: node.package,
+      icon: "branch",
+      subject,
+      data: JSON.stringify({ source: { serverID: SERVER, sessionID }, node, intent: "ask" }),
+      comment: "",
+    }
+
+    const reference = `The user referenced ${subject}.`
+    const mock = createQueueMock([reference])
+
+    mock.rows[0].payload.metadata = { displayText: "", comments: [comment] }
+    const view = await openQueue(page, mock, "queue", undefined, "running", undefined, { seed: { locale: "en" } })
+    const chip = page.getByRole("group", { name: `${node.name} · ${node.package}`, exact: true })
+
+    await expect(view.rows).toHaveCount(1)
+    await view.input.fill("my existing draft")
+    await view.input.press("ControlOrMeta+ArrowUp")
+    await expect(chip).toBeVisible()
+    await expect(view.input).toHaveText("")
+
+    if (delivery === "remove chip") await chip.getByRole("button", { name: "Remove node", exact: true }).click()
+
+    const edit = "Explain the calculation."
+
+    await view.input.fill(edit)
+    await view.input.press(delivery === "steer" ? "ControlOrMeta+Enter" : "Enter")
+    await expect(view.input).toHaveText("my existing draft")
+    await expect(chip).toHaveCount(0)
+    await expect.poll(() => mock.changes).toEqual([{ inboxID: "inb_seed_1", action: "cancel" }])
+    expect(mock.prompts).toHaveLength(1)
+    expect(mock.prompts[0]).toMatchObject({
+      delivery: delivery === "steer" ? "steer" : "queue",
+      text: delivery === "remove chip" ? edit : [edit, reference].join("\n"),
+      metadata: { displayText: edit, comments: delivery === "remove chip" ? [] : [comment] },
+    })
+  })
+}
 
 test("a queued prompt the server delivers mid-edit returns the draft typed before the edit", async ({ page }) => {
   const mock = createQueueMock(["first queued prompt", "tighten the error copy"])
