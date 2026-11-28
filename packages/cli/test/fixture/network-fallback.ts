@@ -13,7 +13,7 @@ if (denied > 0) {
       queueMicrotask(() => this.emit("error", Object.assign(new Error("Reserved port"), { code: "EACCES" })))
       return this
     }
-    return Reflect.apply(listen, this, args)
+    return Function.prototype.apply.call(listen, this, args)
   }
 }
 
