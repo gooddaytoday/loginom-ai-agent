@@ -417,7 +417,7 @@ export interface BuiltinContext extends Context {
  * The members only built-ins use, on a window context from setup or `usePlugin()`.
  *
  * @param ctx - The plugin's context.
- * @returns The same object, typed with the built-in members.
+ * @returns The same object with the built-in members. Call only from a built-in plugin.
  *
  * @example
  * ```ts
@@ -426,8 +426,7 @@ export interface BuiltinContext extends Context {
  * ```
  */
 export function builtinContext(ctx: Context): BuiltinContext {
-  // SAFETY: the app's window host builds every context as a `BuiltinContext` (its HostApi factories are typed by it),
-  // and built-ins run only in that host.
+  // SAFETY: the app window host provides the built-in APIs to every built-in plugin.
   return ctx as BuiltinContext
 }
 
@@ -526,7 +525,7 @@ export interface BuiltinMainContext extends MainContext {
  * The members only built-ins use, on a main context.
  *
  * @param ctx - The plugin's main context.
- * @returns The same object, typed with the built-in members.
+ * @returns The same object with the built-in members. Call only from a built-in plugin.
  *
  * @example
  * ```ts

@@ -4,6 +4,7 @@ import { timelinePresets } from "@opencode/session-ui/timeline/detail"
 import { createTwoFilesPatch } from "diff"
 import { readSessionDraftText } from "../utils/drafts"
 import { holdRoute } from "../utils/app"
+import nodeOutput from "../fixtures/loginom-node-output.json"
 import {
   assistantID,
   assistantMessage,
@@ -3574,63 +3575,9 @@ test("Loginom updates the current step when live progress arrives", async ({ pag
 
 for (const width of [1280, 390]) {
   test(`Loginom node output shows receipt rows and a bounded sample at ${width}px`, async ({ page }, testInfo) => {
-    const columns = [
-      { index: 0, name: "product", label: "Товар", type: "string" },
-      { index: 1, name: "sales_period", label: "Отчётный период по подтверждённым продажам", type: "string" },
-      { index: 2, name: "revenue", label: "Выручка", type: "real" },
-      { index: 3, name: "segment", label: "Сегмент", type: "string" },
-    ]
-
-    const row = (item: string) => [
-      { type: "string", is_null: false, value: item, precision: "source_text" },
-      { type: "string", is_null: false, value: "Ноябрь 2026", precision: "source_text" },
-      { type: "real", is_null: false, value: 0, precision: "exact" },
-      { type: "string", is_null: true, value: null, precision: "exact_null" },
-    ]
-
-    const outputStep = (input: { call: string; port: number; total: number; items: string[] }) =>
-      toolPart(
-        input.call,
-        "loginom_dock_node_wait",
-        "completed",
-        {},
-        {
-          output: "This model-facing text is not the table.",
-          metadata: {
-            loginom: {
-              version: 1,
-              operationId: `operation-${input.call}`,
-              executionId: `run-${input.call}`,
-              node: { document_id: "sales", workflow_id: "main", node_id: input.call },
-              ports: [
-                {
-                  port: input.port,
-                  portGuid: `port-${input.call}`,
-                  summary: { rowCount: input.total },
-                  detail: { kind: "delivered", sample: input.items.map(row) },
-                  expanded: {
-                    columns,
-                    sample: {
-                      targetRows: Math.min(input.total, 100),
-                      availableRows: input.items.length,
-                      limitation: "more_rows_not_delivered",
-                    },
-                  },
-                  signals: [{ kind: "seen_of_total", seen: input.items.length, total: input.total }],
-                },
-              ],
-              how: { configuration: { kind: "row_filter", conditions: ["Регион = Центр"] } },
-            },
-          },
-        },
-      )
-
-    const sample = {
-      kind: "available",
-      rows: Array.from({ length: 100 }, (_, index) => row(`Товар ${index + 1}`)),
-      targetRows: 100,
-    }
-
+    // Captured with loginomFeedMetadata from d4c352d4fe (#1504) and e92119e1c7 (#1484)
+    // and sampleFromReceipt from d4c352d4fe, using synthetic Loginom rows.
+    const rpc = "**/api/rpc/loginom.node-output/sample*"
     await setupTimeline(page, {
       locale: "ru",
       viewport: { width, height: 920 },
@@ -3638,27 +3585,34 @@ for (const width of [1280, 390]) {
       messages: [
         userMessage([userText("Покажи подтверждённый выход узлов.")]),
         assistantMessage([
-          outputStep({ call: "prt_sales_output", port: 0, total: 132, items: ["Товар 1", "Товар 2"] }),
+          toolPart(
+            "prt_sales_output",
+            "loginom_dock_node_wait",
+            "completed",
+            {},
+            {
+              metadata: { loginom: nodeOutput.sales },
+            },
+          ),
         ]),
         assistantMessage(
           [
-            outputStep({ call: "prt_filtered_output", port: 1, total: 12, items: ["Товар из Центра"] }),
             toolPart(
-              "prt_legacy_count",
-              "loginom_dock_node_read",
+              "prt_filtered_output",
+              "loginom_dock_node_wait",
               "completed",
               {},
               {
-                metadata: {
-                  loginom: {
-                    v: 1,
-                    operationId: "prior-operation",
-                    state: "settled",
-                    status: "SUCCEEDED",
-                    ports: [{ index: 0, guid: "prior-port", rowCount: 7, columnCount: 1 }],
-                    evidence: [{ kind: "tableRead", port: 0, portGuid: "prior-port", rowsRead: 2, rowCount: 7 }],
-                  },
-                },
+                metadata: { loginom: nodeOutput.filtered },
+              },
+            ),
+            toolPart(
+              "prt_legacy_count",
+              "loginom_dock_node_wait",
+              "completed",
+              {},
+              {
+                metadata: { loginom: nodeOutput.counters },
               },
             ),
           ],
@@ -3668,10 +3622,10 @@ for (const width of [1280, 390]) {
     })
 
     const calls: object[] = []
-    await page.route("**/api/rpc/loginom.node-output/sample*", async (route) => {
+    await page.route(rpc, async (route) => {
       const request = route.request().postDataJSON()
       calls.push(request.input)
-      const result = request.input.port === 0 ? sample : { kind: "unavailable", reason: "historical_only" }
+      const result = request.input.port === 0 ? nodeOutput.fresh : { kind: "unavailable", reason: "historical_only" }
       await route.fulfill({ json: { output: result } })
     })
     await page.context().grantPermissions(["clipboard-read", "clipboard-write"])
@@ -3681,7 +3635,7 @@ for (const width of [1280, 390]) {
     const agent = page.getByRole("table", { name: "Строки, которые видел агент" })
     await expect(brief).toHaveAttribute("aria-pressed", "true")
     await expect(page.getByText("132 строки", { exact: true })).toBeVisible()
-    await expect(page.getByText("12 строк", { exact: true })).toBeVisible()
+    await expect(page.getByText("16 строк", { exact: true })).toBeVisible()
     await expect(page.getByText("7 строк", { exact: true })).toBeVisible()
     await expect(page.getByText("132 строки · 4 столбца")).toHaveCount(0)
     await expect(agent).toHaveCount(0)
@@ -3689,7 +3643,7 @@ for (const width of [1280, 390]) {
     await detailed.click()
     await expect(page.getByText("7 строк · 1 столбец · Агент видел 2 из 7")).toBeVisible()
     const sales = page.getByRole("button", { name: "132 строки · 4 столбца" })
-    const filtered = page.getByRole("button", { name: "12 строк · 4 столбца" })
+    const filtered = page.getByRole("button", { name: "16 строк · 4 столбца" })
     await sales.click()
     await expect(agent.getByRole("row")).toHaveCount(3)
     await expect(agent.getByRole("cell", { name: "Товар 2", exact: true })).toBeVisible()
@@ -3733,21 +3687,40 @@ for (const width of [1280, 390]) {
     await dialog.getByRole("tab", { name: "Как получено" }).click()
     await expect(dialog.getByText("Регион = Центр", { exact: false })).toBeVisible()
     await expect(dialog.getByText("1", { exact: true })).toBeVisible()
+    await expect(dialog.getByRole("heading", { name: "Продажи" })).toBeVisible()
     await page.keyboard.press("Escape")
     await expect(dialog).toHaveCount(0)
 
     await filtered.click()
     await expect(sales).toHaveAttribute("aria-expanded", "false")
-    await expect(agent.getByRole("row")).toHaveCount(2)
-    await expect(agent.getByRole("cell", { name: "Товар из Центра" })).toBeVisible()
+    await expect(agent.getByRole("row")).toHaveCount(14)
+    await expect(agent.getByRole("cell", { name: "Товар из Центра 13", exact: true })).toHaveCount(1)
     await page.getByRole("button", { name: "Развернуть", exact: true }).click()
-    await expect(dialog.getByText("Для образца до 12 строк доступны только показанные строки.")).toBeVisible()
-    await expect(output.getByRole("row")).toHaveCount(2)
+    await expect(dialog.getByText("Для образца до 16 строк доступны только показанные строки.")).toBeVisible()
+    await expect(output.getByRole("row")).toHaveCount(14)
     expect(calls[1]).toEqual({
       sessionID,
       messageID: "msg_filtered_output",
       toolCallID: "prt_filtered_output",
       port: 1,
     })
+
+    if (width === 390) return
+    await page.keyboard.press("Escape")
+    await expect(dialog).toHaveCount(0)
+    await page.clock.install()
+    const pending = await holdRoute(page, rpc, { method: "POST" })
+
+    try {
+      await sales.click()
+      await page.getByRole("button", { name: "Развернуть", exact: true }).click()
+      await pending.arrived
+      await expect(dialog.getByText("Загружаем образец…", { exact: false })).toBeVisible()
+      await page.clock.fastForward(8_001)
+      await expect(dialog.getByText("Время ожидания образца истекло.", { exact: false })).toBeVisible()
+      await expect(output.getByRole("row")).toHaveCount(3)
+    } finally {
+      pending.release()
+    }
   })
 }

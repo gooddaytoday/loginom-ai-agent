@@ -1,7 +1,7 @@
 import type { ToolSeparation } from "@opencode/session-ui/context"
 import type { SessionMessageAssistantTool, SessionMessageInfo, SessionStatus } from "@opencode/client/promise"
-import type { Context } from "@opencode/plugin/gui"
-import { ToolRenderer } from "@opencode/plugin/gui/builtin"
+import { Slot, type Context } from "@opencode/plugin/gui"
+import { BuiltinSlot, ToolRenderer } from "@opencode/plugin/gui/builtin"
 import { DataProvider } from "@opencode/session-ui/context"
 import { timelinePresets } from "@opencode/session-ui/timeline/detail"
 import { createReactiveTimelineProjection } from "@opencode/session-ui/timeline/projection"
@@ -122,7 +122,17 @@ export function mountToolRendererHost(next: boolean) {
 }
 
 export async function checkToolRendererRegistration() {
-  const results = { duplicate: "", external: "", active: false, entries: 0 }
+  const results = {
+    duplicate: "",
+    external: "",
+    externalMobile: "",
+    externalTimeline: false,
+    builtinTimeline: false,
+    active: false,
+    entries: 0,
+    headerSlots: 0,
+  }
+
   const loadCompetitor = Promise.withResolvers<void>()
 
   const host = mountPluginHost({
@@ -153,13 +163,26 @@ export async function checkToolRendererRegistration() {
             } catch (error) {
               results.external = String(error)
             }
+
+            try {
+              ctx.add(BuiltinSlot, (): BuiltinSlot => ({ at: "session.header.mobile", render: () => null }))
+            } catch (error) {
+              results.externalMobile = String(error)
+            }
+
+            results.externalTimeline = "timeline" in ctx
+            ctx.add(Slot, { at: "session.header", render: () => null })
           },
         }),
       },
     ],
   })
 
-  const setup = (ctx: Context) => void ctx.add(ToolRenderer, demoTool)
+  const setup = (ctx: Context) => {
+    ctx.add(ToolRenderer, demoTool)
+    ctx.add(BuiltinSlot, { at: "session.header.mobile", render: () => null })
+    results.builtinTimeline = "timeline" in ctx
+  }
 
   try {
     host.load(setup)
@@ -174,6 +197,7 @@ export async function checkToolRendererRegistration() {
     await until(() => host.status() === "active")
     results.active = true
     results.entries = host.entries(ToolRenderer.id)
+    results.headerSlots = host.entries(Slot.id)
 
     return results
   } finally {

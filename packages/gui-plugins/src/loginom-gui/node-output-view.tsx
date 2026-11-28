@@ -3,14 +3,21 @@ import { Tabs } from "@opencode/ui/tabs"
 import { usePlugin } from "@opencode/plugin/gui"
 import type { ToolRendererProps } from "@opencode/plugin/gui/builtin"
 import { Option } from "effect"
-import { createResource, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js"
+import { createSignal, createUniqueId, For, onCleanup, Show } from "solid-js"
 import type definition from "./index"
-import { decodeOutputSample, type NodeOutput, type OutputPort, type OutputRows, type OutputSample } from "./node-output"
+import { requestSample, type SampleState } from "./node-output/machine"
+import {
+  decodeOutputSample,
+  deliveredRows,
+  type NodeOutput,
+  type OutputPort,
+  type OutputRows,
+  type OutputSample,
+} from "./node-output"
 
 export function NodeOutputPort(props: {
   output: NodeOutput
   port: OutputPort
-  nodeLabel?: string
   call: ToolRendererProps["call"]
   detailed: boolean
   open: boolean
@@ -18,21 +25,22 @@ export function NodeOutputPort(props: {
 }) {
   const ctx = usePlugin<typeof definition>()
   const contentID = createUniqueId()
-  const columns = () => props.port.expanded.columns
-  const rowCount = () => props.port.summary.rowCount
+  const columns = () => props.port.details?.columns ?? props.port.preview?.schema
+  const rowCount = () => props.port.rowCount
 
-  const delivered = () => {
-    const detail = props.port.detail
+  const rowsRead = () =>
+    props.output.reads.find(
+      (read) => read.portGuid === props.port.guid && read.port === props.port.index && read.rowCount === rowCount(),
+    )?.rowsRead
 
-    return detail.kind === "delivered" ? (detail.exactRows ?? detail.sample) : undefined
-  }
+  const delivered = () => deliveredRows(props.port, rowsRead())
+  const seen = () => delivered()?.length ?? rowsRead()
 
-  const title = () => {
-    const rows = ctx.plural("output.rows", rowCount())
-    const fields = columns()
-
-    return fields ? ctx.t("output.count", { rows, columns: ctx.plural("output.columns", fields.length) }) : rows
-  }
+  const title = () =>
+    ctx.t("output.count", {
+      rows: ctx.plural("output.rows", rowCount()),
+      columns: ctx.plural("output.columns", props.port.columnCount),
+    })
 
   let dialog: ReturnType<typeof ctx.dialogs.open> | undefined
   onCleanup(() => dialog?.close())
@@ -53,9 +61,9 @@ export function NodeOutputPort(props: {
           <div id={contentID} class="mt-1 flex min-w-0 flex-col items-start gap-2">
             <p class="text-v2-text-text-faint">
               {ctx.t("output.receipt")}
-              <Show when={(delivered()?.length ?? 0) < rowCount()}>
+              <Show when={seen() !== undefined && (seen() ?? 0) < rowCount()}>
                 {" · "}
-                {ctx.t("output.agentSeen", { seen: delivered()?.length ?? 0, total: rowCount() })}
+                {ctx.t("output.agentSeen", { seen: seen() ?? 0, total: rowCount() })}
               </Show>
             </p>
             <Show when={delivered()} fallback={<p>{ctx.t("output.noDelivery")}</p>}>
@@ -75,12 +83,12 @@ export function NodeOutputPort(props: {
                 const call = props.call
                 const output = props.output
                 const port = props.port
-                const label = props.nodeLabel
                 dialog = ctx.dialogs.open(() => (
                   <OutputDialog
                     port={port}
                     output={output}
-                    nodeLabel={label}
+                    delivered={delivered()}
+                    seen={seen()}
                     load={async (signal) => {
                       if (!session || !call) return
 
@@ -93,7 +101,7 @@ export function NodeOutputPort(props: {
                             sessionID: session.id,
                             messageID: call.messageID,
                             toolCallID: call.toolCallID,
-                            port: port.port,
+                            port: port.index,
                           },
                         },
                         { signal },
@@ -115,37 +123,29 @@ export function NodeOutputPort(props: {
 }
 
 function OutputDialog(props: {
-  nodeLabel?: string
   port: OutputPort
   output: NodeOutput
+  delivered: OutputRows | undefined
+  seen: number | undefined
   load: (signal: AbortSignal) => Promise<OutputSample | undefined>
 }) {
   const ctx = usePlugin<typeof definition>()
-  const controller = new AbortController()
-  onCleanup(() => controller.abort())
+  const port = props.port
+  const target = Math.min(100, port.rowCount)
+  const historical = (props.delivered ?? []).slice(0, target)
+  const columns = port.details?.columns ?? port.preview?.schema
+  const [sample, setSample] = createSignal<SampleState>({ kind: "historical" })
 
-  const { detail, expanded, summary } = props.port
-  const target = Math.min(expanded.sample.targetRows, summary.rowCount)
-  const delivered = detail.kind === "delivered" ? (detail.exactRows ?? detail.sample) : []
-  const historical = delivered.slice(0, target)
-
-  const [sample] = createResource(
-    () => historical.length < target && expanded.columns !== null,
-    () => props.load(controller.signal).catch(() => undefined),
-  )
+  if (historical.length < target && columns) onCleanup(requestSample({ load: props.load, update: setSample }))
 
   const rows = () => {
-    const result = sample()
+    const state = sample()
 
-    return result?.kind === "available" && result.targetRows === target && result.rows.length > historical.length
-      ? result.rows.slice(0, target)
-      : historical
+    return state.kind === "fresh" && state.rows.length >= historical.length ? state.rows.slice(0, target) : historical
   }
 
-  const columns = expanded.columns
-
   return (
-    <ctx.ui.Dialog title={props.nodeLabel || ctx.t("output.title")} size="large">
+    <ctx.ui.Dialog title={props.output.node?.label || ctx.t("output.title")} size="large">
       <Tabs variant="pill" defaultValue="sample" class="min-w-0 max-w-full">
         <Tabs.List aria-label={ctx.t("output.title")}>
           <Tabs.Trigger value="sample">{ctx.t("output.sample")}</Tabs.Trigger>
@@ -154,14 +154,21 @@ function OutputDialog(props: {
         </Tabs.List>
         <Tabs.Content value="sample" class="min-w-0 pt-3">
           <p class="mb-2 text-v2-text-text-muted" role="status">
-            {ctx.t("output.shown", { shown: rows().length, total: summary.rowCount })}
-            <Show when={delivered.length > 0 && delivered.length < summary.rowCount}>
+            {ctx.t("output.shown", { shown: rows().length, total: port.rowCount })}
+            <Show when={props.seen !== undefined && props.seen < port.rowCount}>
               {" "}
-              {ctx.t("output.agentSeen", { seen: delivered.length, total: summary.rowCount })}.
+              {ctx.t("output.agentSeen", { seen: props.seen ?? 0, total: port.rowCount })}.
             </Show>
             <Show
-              when={sample.loading}
-              fallback={<Show when={rows().length < target}> {ctx.t("output.sampleLimited", { target })}</Show>}
+              when={sample().kind === "loading"}
+              fallback={
+                <Show when={rows().length < target}>
+                  {" "}
+                  {sample().kind === "timeout"
+                    ? ctx.t("output.sampleTimeout")
+                    : ctx.t("output.sampleLimited", { target })}
+                </Show>
+              }
             >
               {" "}
               {ctx.t("output.loading")}
@@ -191,17 +198,15 @@ function OutputDialog(props: {
         <Tabs.Content value="source" class="min-w-0 pt-3">
           <dl class="grid gap-1 break-words">
             <dt class="font-semibold">{ctx.t("output.node")}</dt>
-            <dd class="mb-2">{props.nodeLabel || props.output.node.node_id}</dd>
+            <dd class="mb-2">{props.output.node?.label || props.output.node?.guid || "—"}</dd>
             <dt class="font-semibold">{ctx.t("output.configuration")}</dt>
             <dd class="mb-2">
-              <Show when={props.output.how.configuration !== null} fallback={ctx.t("output.noConfiguration")}>
-                <pre class="whitespace-pre-wrap break-all">
-                  {JSON.stringify(props.output.how.configuration, null, 2)}
-                </pre>
+              <Show when={props.output.configuration !== undefined} fallback={ctx.t("output.noConfiguration")}>
+                <pre class="whitespace-pre-wrap break-all">{JSON.stringify(props.output.configuration, null, 2)}</pre>
               </Show>
             </dd>
             <dt class="font-semibold">{ctx.t("output.port")}</dt>
-            <dd>{props.port.port + 1}</dd>
+            <dd>{props.port.index + 1}</dd>
           </dl>
         </Tabs.Content>
       </Tabs>

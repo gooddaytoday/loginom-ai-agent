@@ -4,9 +4,15 @@ import { Spinner } from "@opencode/ui/spinner"
 import { Option } from "effect"
 import { createMemo, createSignal, createUniqueId, For, lazy, onCleanup, Show, Suspense } from "solid-js"
 import { createKeyed, SettingsPage, Slot, usePlugin, type Plugin } from "@opencode/plugin/gui"
-import { builtinContext, BuiltinSlot, Page as PluginPage, ToolRenderer, type ToolRendererProps } from "@opencode/plugin/gui/builtin"
+import {
+  builtinContext,
+  BuiltinSlot,
+  Page as PluginPage,
+  ToolRenderer,
+  type ToolRendererProps,
+} from "@opencode/plugin/gui/builtin"
 import type definition from "./index"
-import { decodeNodeOutput, decodeOutputCounters } from "./node-output"
+import { decodeNodeOutput } from "./node-output"
 import { NodeOutputPort } from "./node-output-view"
 import { decodeFacts, decodeProgress, failureTitle, loginomStepPhrase, stepDetails } from "./step-phrase"
 
@@ -104,17 +110,30 @@ function Step(props: ToolRendererProps & { selection: OutputSelection }) {
   const timeline = builtinContext(ctx).timeline
   const outcome = createMemo(() => decodeFacts(props.metadata.loginom))
   const facts = () => Option.getOrUndefined(outcome())
-  const output = createMemo(() => Option.getOrUndefined(decodeNodeOutput(props.metadata.loginom)))
+  const output = createMemo(() => decodeNodeOutput(props.metadata.loginom))
+  const ports = createMemo(() => output()?.ports.filter((port) => port.details) ?? [])
 
   const counters = createMemo(() => {
-    if (output()) return []
-    const receipt = Option.getOrUndefined(decodeOutputCounters(props.metadata.loginom))
+    const receipt = output()
 
-    return (receipt?.evidence ?? []).flatMap((fact) =>
-      fact.kind === "tableRead"
-        ? [{ ...fact, columns: receipt?.ports?.find((port) => port.guid === fact.portGuid)?.columnCount }]
-        : [],
-    )
+    if (!receipt) return []
+
+    const fallback = receipt.ports
+      .filter((port) => !port.details)
+      .map((port) => ({
+        rowCount: port.rowCount,
+        columns: port.columnCount,
+        rowsRead: receipt.reads.find(
+          (read) => read.portGuid === port.guid && read.port === port.index && read.rowCount === port.rowCount,
+        )?.rowsRead,
+      }))
+
+    return [
+      ...fallback,
+      ...receipt.reads
+        .filter((read) => !receipt.ports.some((port) => port.guid === read.portGuid))
+        .map((read) => ({ rowCount: read.rowCount, rowsRead: read.rowsRead, columns: undefined })),
+    ]
   })
 
   const rowID = createUniqueId()
@@ -167,7 +186,7 @@ function Step(props: ToolRendererProps & { selection: OutputSelection }) {
   }
 
   const details = createMemo(() => {
-    const values = stepDetails(ctx, facts(), { outputCounts: !output() && counters().length === 0 })
+    const values = stepDetails(ctx, facts(), { outputCounts: ports().length === 0 && counters().length === 0 })
     const substep = progress()?.substep
 
     return substep ? [...values, ctx.t("phase.fields", substep)] : values
@@ -221,15 +240,14 @@ function Step(props: ToolRendererProps & { selection: OutputSelection }) {
       </ul>
       <Show when={output()}>
         {(receipt) => (
-          <For each={receipt().ports}>
+          <For each={ports()}>
             {(port) => {
-              const id = () => JSON.stringify([props.call?.messageID, props.call?.toolCallID ?? rowID, port.portGuid])
+              const id = () => JSON.stringify([props.call?.messageID, props.call?.toolCallID ?? rowID, port.guid])
 
               return (
                 <NodeOutputPort
                   output={receipt()}
                   port={port}
-                  nodeLabel={facts()?.node?.label}
                   call={props.call}
                   detailed={detailed()}
                   open={props.selection.current(turnID()) === id()}
@@ -249,9 +267,9 @@ function Step(props: ToolRendererProps & { selection: OutputSelection }) {
                   columns: ctx.plural("output.columns", counter.columns),
                 })
               : ctx.plural("output.rows", counter.rowCount)}
-            <Show when={detailed() && counter.rowsRead < counter.rowCount}>
+            <Show when={detailed() && counter.rowsRead !== undefined && counter.rowsRead < counter.rowCount}>
               {" · "}
-              {ctx.t("output.agentSeen", { seen: counter.rowsRead, total: counter.rowCount })}
+              {ctx.t("output.agentSeen", { seen: counter.rowsRead ?? 0, total: counter.rowCount })}
             </Show>
           </div>
         )}

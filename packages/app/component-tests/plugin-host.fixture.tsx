@@ -388,6 +388,7 @@ export function mountLoadingPluginPage() {
   history.set({ value: "/page/fixture/overview" })
 
   const settings = Promise.withResolvers<readonly Installed[]>()
+
   const bridge: Bridge = {
     packaged: false,
     call: async () => undefined,
