@@ -17,6 +17,7 @@ import { Credential } from "../credential.js"
 import { Formatter } from "../formatter.js"
 import { ManagedPolicy } from "../managed-policy.js"
 import { ModelResolver } from "../model-resolver.js"
+import { ModelsDev } from "../models-dev.js"
 import { Provider } from "../provider.js"
 import type { InternalPlugin } from "./internal.js"
 import { PluginPromise } from "./promise.js"
@@ -48,6 +49,7 @@ export const plugins: readonly InternalPlugin[] = [
         yield* product.effect(ctx)
         const config = yield* Config.Service
         const credential = yield* Credential.Service
+        const models = yield* ModelsDev.Service
         const allowed = (id: string) =>
           config
             .entries()
@@ -63,6 +65,7 @@ export const plugins: readonly InternalPlugin[] = [
           .register(
             ModelServerRpc,
             modelServerHandlers({
+              catalogAvailable: models.remoteAvailable ?? Effect.succeed(false),
               allowed,
               save: (id, provider, key) =>
                 mutate(
@@ -107,7 +110,15 @@ export const plugins: readonly InternalPlugin[] = [
                     const profile = yield* config.profile()
                     const stored = yield* credential.list(Integration.ID.make(id))
                     yield* Effect.forEach(stored, (entry) => credential.remove(entry.id))
-                    if (profile?.providers?.[id]) yield* config.update({ providers: { [id]: undefined } })
+                    if (!profile?.providers?.[id]) return
+                    return yield* config.update({ providers: { [id]: undefined } }).pipe(
+                      Effect.as(undefined),
+                      Effect.catch((error) =>
+                        stored.length
+                          ? Effect.succeed("modelServerRemoveProfileFailed" as const)
+                          : Effect.fail(error),
+                      ),
+                    )
                   }),
                 ),
             }),

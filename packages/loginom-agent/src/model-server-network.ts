@@ -110,6 +110,59 @@ export async function resolveModelServer(input: string, signal: AbortSignal) {
   } as const
 }
 
+function redactEventStream(body: ReadableStream<Uint8Array>, key: string, mask: string) {
+  const redact = (frame: string) => {
+    const data = frame
+      .split("\n")
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).replace(/^ /u, ""))
+      .join("\n")
+    if (!data || data === "[DONE]" || data === ": keepalive") return frame
+
+    try {
+      const event: unknown = JSON.parse(data)
+      if (typeof event !== "object" || event === null || !("error" in event) || !event.error) return frame
+      const error = event.error
+      if (typeof error === "object" && "message" in error && typeof error.message === "string") {
+        const code = "code" in error ? error.code : undefined
+        return `data: ${JSON.stringify({
+          error: {
+            message: error.message.replaceAll(key, mask),
+            code: typeof code === "string" ? code.replaceAll(key, mask) : typeof code === "number" ? code : undefined,
+          },
+        })}`
+      }
+    } catch {}
+
+    return `data: ${data
+      .replaceAll(JSON.stringify(key).slice(1, -1), mask)
+      .replaceAll(key, mask)
+      .replaceAll("\n", "\ndata: ")}`
+  }
+
+  let pending = ""
+  let endedWithCR = false
+  return body
+    .pipeThrough(new TextDecoderStream())
+    .pipeThrough(
+      new TransformStream<string, string>({
+        transform(chunk, stream) {
+          if (!chunk) return
+          const text = endedWithCR && chunk.startsWith("\n") ? chunk.slice(1) : chunk
+          endedWithCR = chunk.endsWith("\r")
+          const frames = (pending + text.replace(/\r\n?/gu, "\n")).split("\n\n")
+          pending = frames.pop() ?? ""
+          if (pending.length > 10 * 1024 * 1024) throw new Error("Model server event is too large")
+          for (const frame of frames) stream.enqueue(redact(frame) + "\n\n")
+        },
+        flush(stream) {
+          if (pending) stream.enqueue(redact(pending))
+        },
+      }),
+    )
+    .pipeThrough(new TextEncoderStream())
+}
+
 export const modelServerFetch = Object.assign(
   async (input: Request | string | URL, init?: RequestInit) => {
     const request = input instanceof Request ? new Request(input, init) : new Request(input.toString(), init)
@@ -117,18 +170,26 @@ export const modelServerFetch = Object.assign(
     if (!target.ok) throw new Error("Model server address is not allowed")
     const reply = await target.request(request)
     const key = request.headers.get("authorization")?.match(/^Bearer (.+)$/iu)?.[1]
-    if (!key || reply.status < 400 || !reply.body) return reply
+    if (!key || !reply.body) return reply
+
+    const mask = "[redacted]".includes(key) ? "…" : "[redacted]"
+    const headers = new Headers(reply.headers)
+    headers.delete("content-length")
+    const response = { status: reply.status, statusText: reply.statusText, headers }
+    if (reply.ok) {
+      const isEventStream =
+        headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() === "text/event-stream" ||
+        new URL(request.url).pathname.endsWith("/chat/completions")
+      return isEventStream ? new Response(redactEventStream(reply.body, key, mask), response) : reply
+    }
 
     const text = await reply.text()
     let body = text
     try {
       body = JSON.stringify(JSON.parse(text))
     } catch {}
-    const mask = "[redacted]".includes(key) ? "…" : "[redacted]"
     body = body.replaceAll(JSON.stringify(key).slice(1, -1), mask).replaceAll(key, mask)
-    const headers = new Headers(reply.headers)
-    headers.delete("content-length")
-    return new Response(body, { status: reply.status, statusText: reply.statusText, headers })
+    return new Response(body, response)
   },
   { preconnect: fetch.preconnect },
 )

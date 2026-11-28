@@ -592,12 +592,14 @@ test.each([
 test("settings save waits for the current turn, including first setup, and survives a Host restart", async () => {
   const f = await fixture("")
   const root = join(f.root, "service")
+  const completed = Promise.withResolvers<Parameters<Loginom.ConnectionApplicationListener>>()
   const options = {
     node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
     entry: await buildNodeHost(f.root),
     root,
     resources: f.resources,
     headless: true,
+    onConnectionApplication: (...event: Parameters<Loginom.ConnectionApplicationListener>) => completed.resolve(event),
   }
   const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources: f.resources }))
   const readCheck = (reply: unknown) => Schema.decodeUnknownSync(Loginom.Validation)(reply)
@@ -610,19 +612,21 @@ test("settings save waits for the current turn, including first setup, and survi
       await expect(host.request("connection.settings.save", { revision: 0, validationId: legacy.validationId }))
         .rejects.toThrow("LOGINOM_VALIDATION_EXPIRED")
 
-      await host.request("connection.settings.turn", { id: "existing-turn", active: true })
+      await host.request("connection.settings.turn", { id: "existing-turn", session: "first", active: true })
       const checked = readCheck(await host.request("connection.settings.check", candidate))
       expect(await host.request("connection.status", {})).toMatchObject({ revision: 0, generation: 0 })
       expect(await host.request("connection.settings.save", { revision: 0, validationId: checked.validationId }))
-        .toMatchObject({ revision: 1, generation: 0, state: "pending" })
+        .toMatchObject({ revision: 1, generation: 0, state: "pending", application: { state: "pending", tasks: 1 } })
       expect(await store.read()).toBeUndefined()
 
-      await host.request("connection.settings.turn", { id: "new-turn", active: true })
-      await host.request("connection.settings.turn", { id: "existing-turn", active: false })
-      const deadline = Date.now() + 5000
-      while (readStatus(await host.request("connection.status", {})).state !== "ready" && Date.now() < deadline)
-        await Bun.sleep(25)
-      expect(readStatus(await host.request("connection.status", {}))).toMatchObject({ generation: 1, state: "ready" })
+      await host.request("connection.settings.turn", { id: "new-turn", session: "next", active: true })
+      await host.request("connection.settings.turn", { id: "existing-turn", session: "first", active: false })
+      expect(await completed.promise).toEqual(["applied", { revision: 1, generation: 1 }])
+      expect(readStatus(await host.request("connection.ready", {}))).toMatchObject({
+        generation: 1,
+        state: "ready",
+        application: { state: "applied" },
+      })
       expect(await store.read())
         .toMatchObject({ username: "user", url: candidate.url, generation: 1 })
       const wrongServer = { revision: 1, url: "http://other.example", username: "user", password: { operation: "preserve" } }
@@ -645,10 +649,11 @@ test("settings save waits for the current turn, including first setup, and survi
 }, 30_000)
 
 
-test("settings Save acknowledges persistence while activation is still blocked", async () => {
+test("settings Save acknowledges persistence before the Node Host reports a catalog failure", async () => {
   const f = await fixture("")
   const root = join(f.root, "service")
   const gate = join(f.root, "allow-activation")
+  const completed = Promise.withResolvers<Parameters<Loginom.ConnectionApplicationListener>>()
   try {
     const host = await launchNodeHost({
       node: process.env.LOGINOM_AI_AGENT_TEST_NODE!,
@@ -656,6 +661,7 @@ test("settings Save acknowledges persistence while activation is still blocked",
       root,
       resources: f.resources,
       headless: true,
+      onConnectionApplication: (...event) => completed.resolve(event),
     })
     try {
       const candidate = { ...f.candidate, url: "http://loginom.example/" }
@@ -675,7 +681,7 @@ test("settings Save acknowledges persistence while activation is still blocked",
               process.send({id:message.id,result:{protocol:1,generation:message.input.generation,started:true}});
             }, 10);
           }
-          if (message.operation === 'list') process.send({id:message.id,result:{tools:[]}});
+          if (message.operation === 'list') process.send({id:message.id,error:'LOGINOM_KNOWLEDGE_UNAVAILABLE'});
           if (message.operation === 'interrupt') process.send({id:message.id,result:{interrupted:true}});
           if (message.operation === 'close') process.send({id:message.id,result:{closed:true}},()=>process.disconnect());
         });
@@ -684,6 +690,11 @@ test("settings Save acknowledges persistence while activation is still blocked",
         .toMatchObject({ revision: 1, generation: 0, state: "starting" })
       const store = connectionStore(join(root, "connection"), cliCredentials(process.platform, { root, resources: f.resources }))
       expect(await store.pending()).toMatchObject({ revision: 1, url: candidate.url, username: candidate.username })
+      await writeFile(gate, "")
+      expect(await completed.promise).toEqual(["failed", { revision: 1, generation: 1 }])
+      const status = Schema.decodeUnknownSync(Loginom.View)(await host.request("connection.status", {}))
+      expect(status).toMatchObject({ generation: 1, state: "recoverable-error", failure: "LOGINOM_RUNTIME_START_FAILED" })
+      expect(status.application).toBeUndefined()
     } finally {
       await writeFile(gate, "")
       await host.close()
@@ -691,7 +702,7 @@ test("settings Save acknowledges persistence while activation is still blocked",
   } finally {
     await f.close()
   }
-}, 15_000)
+}, 30_000)
 
 test("aborting a settings check stops its browser without closing the node Host", async () => {
   const f = await fixture("", "shipped", true)

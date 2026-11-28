@@ -39,15 +39,17 @@ const usable = Schema.is(ModelID)
 const providerIDFor = (address: string) => `${providerPrefix}${createHash("sha256").update(address).digest("hex")}`
 
 export function modelServerHandlers(options: {
+  catalogAvailable: Effect.Effect<boolean>
   allowed: (id: string) => Effect.Effect<boolean>
   save: (
     id: string,
     provider: ConfigProvider.Info,
     key: string | undefined,
   ) => Effect.Effect<string | undefined, unknown>
-  remove: (id: string) => Effect.Effect<void, unknown>
+  remove: (id: string) => Effect.Effect<"modelServerRemoveProfileFailed" | undefined, unknown>
 }) {
   return {
+    catalogAvailable: () => Effect.map(options.catalogAvailable, (value) => ({ ok: true, value }) as const),
     discover: (input) =>
       Effect.gen(function* () {
         const baseURL = addressOf(input.address)
@@ -107,7 +109,7 @@ export function modelServerHandlers(options: {
       }),
     remove: ({ providerID }) =>
       options.remove(providerID).pipe(
-        Effect.as({ ok: true, value: true } as const),
+        Effect.map((issue) => (issue ? ({ ok: false, issue } as const) : ({ ok: true, value: true } as const))),
         Effect.catchCause(() => Effect.succeed({ ok: false, issue: "modelServerRemoveFailed" } as const)),
       ),
   } satisfies RpcHandlers<typeof ModelServerRpc>

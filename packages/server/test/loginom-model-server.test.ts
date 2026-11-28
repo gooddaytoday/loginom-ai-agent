@@ -31,6 +31,11 @@ const fixture = (ids: readonly string[]) =>
             if (messages.includes("Fixture only: rejected")) {
               const key = request.headers.get("authorization")?.slice("Bearer ".length)
               const message = `Fixture rejected credential ${key}`
+              if (messages.includes("(sse)"))
+                return new Response(`data: ${JSON.stringify({ error: { message } })}\r\n\r\n`, {
+                  headers: { "content-type": "text/event-stream" },
+                })
+
               return messages.includes("(plain)")
                 ? new Response(message, { status: 401 })
                 : Response.json({ error: { message } }, { status: 401 })
@@ -67,18 +72,35 @@ it.live(
       const fixtureKey = "fixture-secret-not-an-api-key"
       const first = yield* fixture(["alpha", "beta", "model", "alpha", "{env:HOME}", "__proto__"])
       const second = yield* fixture(["alpha"])
-      const routes = yield* serveRoutes({
-        database: { path: ":memory:" },
-        config: { directory: path, project: false, claude: false },
-        fs: { filewatcher: false },
-        models: { fetch: false },
-        fetch: (input, init) => {
-          const request = new Request(input, init)
-          if (![first.server.url.origin, second.server.url.origin].includes(new URL(request.url).origin))
-            throw new Error("Tests must not call an external model")
-          return fetch(request)
+      let failProfileWrite = false
+      const filesystem = Layer.effect(
+        FSUtil.Service,
+        Effect.gen(function* () {
+          const fs = yield* FSUtil.Service
+          return FSUtil.Service.of({
+            ...fs,
+            writeWithDirs: (target, content, mode) =>
+              failProfileWrite && target === config
+                ? Effect.fail(new FSUtil.FileSystemError({ method: "writeWithDirs" }))
+                : fs.writeWithDirs(target, content, mode),
+          })
+        }),
+      ).pipe(Layer.provide(LayerNode.compile(FSUtil.node)))
+      const routes = yield* serveRoutes(
+        {
+          database: { path: ":memory:" },
+          config: { directory: path, project: false, claude: false },
+          fs: { filewatcher: false },
+          models: { fetch: false },
+          fetch: (input, init) => {
+            const request = new Request(input, init)
+            if (![first.server.url.origin, second.server.url.origin].includes(new URL(request.url).origin))
+              throw new Error("Tests must not call an external model")
+            return fetch(request)
+          },
         },
-      })
+        [FSUtil.node.replace(filesystem)],
+      )
       yield* routes.pluginsLoaded(path)
       const client = OpenCode.make({
         baseUrl: "http://opencode.local",
@@ -179,7 +201,7 @@ it.live(
         expect(target.requests.at(-1)).toEqual({ path: "/v1/chat/completions", authorization })
       }
 
-      for (const format of ["json", "plain"]) {
+      for (const format of ["json", "plain", "sse"]) {
         const rejected = yield* Effect.promise(() =>
           routes.fetch("http://opencode.local/api/experimental/generate/text", {
             method: "POST",
@@ -233,10 +255,20 @@ it.live(
           Effect.map((result) => !result.data.some((model) => model.providerID === id)),
           Effect.repeat({ until: (gone) => gone, times: 50, schedule: Schedule.spaced(40) }),
         )
+      failProfileWrite = true
+      expect(yield* Effect.promise(() => rpc.remove({ providerID: firstID }, options))).toEqual({
+        ok: false,
+        issue: "modelServerRemoveProfileFailed",
+      })
+      expect(yield* credentials()).toEqual([])
+      expect(yield* Effect.promise(() => Bun.file(config).text())).toContain(firstID)
+      failProfileWrite = false
+
       for (const providerID of [firstID, secondID]) {
         expect(yield* Effect.promise(() => rpc.remove({ providerID }, options))).toEqual({ ok: true, value: true })
         expect(yield* isGone(providerID)).toBe(true)
       }
+      expect(yield* Effect.promise(() => rpc.remove({ providerID: firstID }, options))).toEqual({ ok: true, value: true })
       expect(yield* credentials()).toEqual([])
       const after = yield* Effect.promise(() => Bun.file(config).text())
       expect(after).not.toContain(firstID)

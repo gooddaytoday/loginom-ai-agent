@@ -3,6 +3,46 @@ import { createServer } from "node:http"
 import { connect } from "node:net"
 import { modelServerFetch } from "../src/model-server-network"
 
+test("model server SSE keeps ordinary deltas live and masks a key split between chunks", async () => {
+  const key = 'fixture-"private"-key'
+  const delta = `data: ${JSON.stringify({ choices: [{ delta: { content: "Считаю" } }] })}`
+  const release = Promise.withResolvers<void>()
+  const encoder = new TextEncoder()
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: () => {
+      const body = new ReadableStream<Uint8Array>({
+        async start(stream) {
+          stream.enqueue(encoder.encode(delta + "\r\n\r"))
+          await release.promise
+          stream.enqueue(encoder.encode('\ndata: {"error":{"message":"Invalid fixture-'))
+          stream.enqueue(encoder.encode('\\\"private\\\"-key"}}\r\n\r\ndata: [DONE]\r\n\r\n'))
+          stream.close()
+        },
+      })
+      return new Response(body, { headers: { "content-type": "text/event-stream; charset=utf-8" } })
+    },
+  })
+  try {
+    const reply = await modelServerFetch(server.url, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(3000),
+    })
+    if (!reply.body) throw new Error("Missing fixture response body")
+    const reader = reply.body.pipeThrough(new TextDecoderStream()).getReader()
+    expect((await reader.read()).value).toBe(delta + "\n\n")
+    release.resolve()
+
+    let rest = ""
+    for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) rest += chunk.value
+    expect(rest).toBe('data: {"error":{"message":"Invalid [redacted]"}}\n\ndata: [DONE]\n\n')
+  } finally {
+    release.resolve()
+    await server.stop(true)
+  }
+})
+
 test("the service proxy tunnels to the checked address unless NO_PROXY matches", async () => {
   const requests: string[] = []
   const target = Bun.serve({

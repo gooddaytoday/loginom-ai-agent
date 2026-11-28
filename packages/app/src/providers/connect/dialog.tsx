@@ -12,6 +12,7 @@ import { TextInput } from "@opencode/ui/text-input"
 import { BuiltinProviderSetup, type ProviderSetup } from "@opencode/plugin/gui/builtin"
 import {
   type Component,
+  createEffect,
   createMemo,
   createSignal,
   createUniqueId,
@@ -303,17 +304,27 @@ function ProviderPicker(props: {
 }) {
   const integrations = useIntegrations(() => props.directory)
   const language = useLanguage()
-  const [offline, setOffline] = createSignal(false)
+  const sdk = useServerSDK()
+  const [preferred, setPreferred] = createSignal<string[]>([])
 
-  // Until stage F, use the browser's connectivity signal; it does not detect all WAN outages.
-  onMount(() => {
-    const update = () => setOffline(!navigator.onLine)
-    update()
-    window.addEventListener("online", update)
-    window.addEventListener("offline", update)
-    onCleanup(() => {
-      window.removeEventListener("online", update)
-      window.removeEventListener("offline", update)
+  createEffect(() => {
+    const lifetime = new AbortController()
+    const directory = props.directory
+
+    const checks = props.setups.flatMap((entry) =>
+      entry.preferFirst
+        ? [
+            entry.preferFirst(sdk.api, directory, lifetime.signal).then(
+              (first) => (first ? [entry.id] : []),
+              () => [],
+            ),
+          ]
+        : [],
+    )
+
+    onCleanup(() => lifetime.abort())
+    void Promise.all(checks).then((ids) => {
+      if (!lifetime.signal.aborted) setPreferred(ids.flat())
     })
   })
 
@@ -363,12 +374,12 @@ function ProviderPicker(props: {
   })
 
   const groups = () => [
-    ...(offline() ? [{ title: "", items: actions }] : []),
+    { title: "", items: () => actions().filter((row) => preferred().includes(row.id)) },
     { title: language.t("dialog.provider.connected"), items: connected },
     { title: language.t("dialog.provider.group.popular"), items: popular },
     {
       title: language.t("dialog.provider.group.services"),
-      items: () => (offline() ? services() : [...actions(), ...services()]),
+      items: () => [...actions().filter((row) => !preferred().includes(row.id)), ...services()],
     },
   ]
 
@@ -436,7 +447,7 @@ function ProviderPicker(props: {
           <For each={groups()}>
             {(group) => (
               <Show when={group.items().length > 0}>
-                <section class="flex flex-col gap-0.5">
+                <section aria-label={group.title || undefined} class="flex flex-col gap-0.5">
                   <Show when={group.title}>
                     <div class="px-2 pt-2.5 pb-0.5 text-[12px] font-[440] leading-[18px] tracking-[0.05px] text-v2-text-text-faint">
                       {group.title}

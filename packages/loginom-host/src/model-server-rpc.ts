@@ -32,6 +32,7 @@ export const Issue = Schema.Literals([
   "modelServerDenied",
   "modelServerAddressBlocked",
   "modelServerRemoveFailed",
+  "modelServerRemoveProfileFailed",
 ])
 const failure = Schema.Struct({ ok: Schema.Literal(false), issue: Issue })
 const output = <S extends Schema.ConstraintDecoder<unknown>>(value: S) =>
@@ -40,6 +41,7 @@ const output = <S extends Schema.ConstraintDecoder<unknown>>(value: S) =>
 export const ModelServerRpc = Rpc.define({
   id: "loginom.model-server",
   methods: {
+    catalogAvailable: { input: input(Schema.Struct({})), output: output(Schema.Boolean) },
     discover: { input: input(Schema.Struct(fields)), output: output(Models) },
     save: {
       input: input(Schema.Struct({ ...fields, models: Models })),

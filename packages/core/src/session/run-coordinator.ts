@@ -13,7 +13,7 @@ export interface Coordinator<Key, E, Reason = never> {
   readonly isActive: (key: Key) => Effect.Effect<boolean>
   /** Starts an execution while idle, or joins the active execution and returns its exit. */
   readonly run: (key: Key, options?: { readonly continuation?: boolean }) => Effect.Effect<void, E>
-  /** A queue wake starts idle work, but only follows a successful active execution. */
+  /** A queue wake starts idle work, follows a success, or starts a new turn after a stop already in progress. */
   readonly wake: (key: Key, scope?: Promotable | "queue") => Effect.Effect<void>
   /**
    * Stops the active execution and clears its doorbell. No-op when idle. Resolves once the
@@ -123,8 +123,8 @@ export const make = <Key, E, Reason = never>(options: {
       return execution
     }
 
-    // A late wake starts a fresh execution for the remaining work. A queue-only wake
-    // waits for success, including when it arrives during terminal settlement.
+    // A late wake starts a fresh execution for the remaining work. Queue wakes wait for success
+    // unless recorded after a stop cleared the old wakes.
     const settle = (key: Key, execution: Execution<E, Reason>, exit: Exit.Exit<void, E>) =>
       Effect.gen(function* () {
         const succeeded = Exit.isSuccess(exit)
@@ -141,11 +141,12 @@ export const make = <Key, E, Reason = never>(options: {
             ),
           ))
         const pending = execution.pendingWake
-        const next = failed
-          ? pending && (hasSteering || pending !== wake) && "steer"
-          : succeeded && execution.pendingQueueWake
+        const next =
+          (succeeded || execution.stopping) && execution.pendingQueueWake
             ? "input"
-            : pending?.scope
+            : failed
+              ? pending && (hasSteering || pending !== wake) && "steer"
+              : pending?.scope
         if (next) start(key, false, next)
         else {
           executions.delete(key)

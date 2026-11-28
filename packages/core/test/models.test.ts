@@ -887,6 +887,24 @@ describe("ModelsDev Service", () => {
     }),
   )
 
+  it.live("reports remote catalog failure and recovery separately from the cached catalog", () =>
+    Effect.gen(function* () {
+      const cache = makeCache()
+      writeCache(cache, fixture, Date.now())
+      const state = yield* Ref.make({ ...initialState, body: "<html>Not a provider catalog</html>" })
+      yield* Effect.gen(function* () {
+        const svc = yield* ModelsDev.Service
+        if (!svc.remoteAvailable) throw new Error("Remote refresh is disabled")
+        expect(yield* svc.get()).toEqual(fixtureSnapshot)
+        expect(yield* svc.remoteAvailable).toBe(false)
+        yield* Ref.update(state, (previous) => ({ ...previous, body: JSON.stringify(fixture2) }))
+        yield* svc.refresh(true)
+        expect(yield* svc.remoteAvailable).toBe(true)
+        expect(yield* svc.get()).toEqual(fixture2Snapshot)
+      }).pipe(Effect.provide(buildLayer(state, cache, { fetch: true })))
+    }),
+  )
+
   it.live("refresh(false) fetches when the KV entry is stale", () =>
     Effect.gen(function* () {
       const cache = makeCache()

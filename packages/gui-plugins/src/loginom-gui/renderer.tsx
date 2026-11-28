@@ -5,6 +5,7 @@ import {
   builtinContext,
   BuiltinProviderSetup,
   Page,
+  QuestionRenderer,
   subscribeBuiltinDeepLinks,
   type ProviderSetupProps,
 } from "@opencode/plugin/gui/builtin"
@@ -14,6 +15,7 @@ import { unwrap } from "solid-js/store"
 import { DashboardLink } from "./contract"
 import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
+import { LoginomRepeatDock } from "./repeat-dock"
 import { registerStartScreen } from "./start-screen"
 
 const decodeLink = Schema.decodeUnknownOption(DashboardLink)
@@ -29,6 +31,19 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       return ctx.t("modelServerTitle")
     },
     matchesProvider: isModelServerID,
+    async preferFirst(client, directory, signal) {
+      const { ModelServerRpc } = await import("@loginom-ai-agent/loginom-host/model-server-rpc")
+
+      const result = await client.rpc(ModelServerRpc).catalogAvailable(
+        {},
+        {
+          location: directory ? { directory } : undefined,
+          signal: AbortSignal.any([signal, AbortSignal.timeout(25_000)]),
+        },
+      )
+
+      return result.ok && !result.value
+    },
     removal: {
       get title() {
         return ctx.t("modelServerRemove")
@@ -46,17 +61,30 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
         try {
           const { ModelServerRpc } = await import("@loginom-ai-agent/loginom-host/model-server-rpc")
 
-          const result = await client
-            .rpc(ModelServerRpc)
-            .remove(
-              { providerID: provider.id },
-              {
-                location: directory ? { directory } : undefined,
-                signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
-              },
-            )
+          while (!signal.aborted) {
+            const result = await client
+              .rpc(ModelServerRpc)
+              .remove(
+                { providerID: provider.id },
+                {
+                  location: directory ? { directory } : undefined,
+                  signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
+                },
+              )
 
-          if (result.ok) return true
+            if (result.ok) return true
+
+            if (result.issue !== "modelServerRemoveProfileFailed") break
+
+            if (signal.aborted) return false
+
+            const retry = await ctx.dialogs.confirm({
+              title: ctx.t("modelServerRemoveProfileFailed"),
+              confirm: ctx.t("modelServerRemoveRetry"),
+            })
+
+            if (!retry) return false
+          }
         } catch {}
 
         if (!signal.aborted) ctx.toast.show({ variant: "error", title: ctx.t("modelServerRemoveFailed") })
@@ -99,6 +127,11 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
         <Settings />
       </Suspense>
     ),
+  })
+
+  ctx.add(QuestionRenderer, {
+    matches: (request) => request.metadata?.loginomRepeat === true,
+    render: (props) => <LoginomRepeatDock {...props} />,
   })
 
   if (!ctx.desktop) return

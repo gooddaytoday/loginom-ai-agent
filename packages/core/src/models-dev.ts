@@ -1,4 +1,4 @@
-import { Cause, Context, Duration, Effect, Layer, Option, Result, Schedule, Schema, Semaphore } from "effect"
+import { Cause, Context, Deferred, Duration, Effect, Layer, Option, Result, Schedule, Schema, Semaphore } from "effect"
 import { HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http"
 import { ConfigProvider } from "@opencode/schema/config/provider"
 import { MaxTokensField, MediaInput } from "@opencode/schema/model-compatibility"
@@ -476,6 +476,7 @@ export { Event } from "@opencode/schema/models-dev"
 export interface Interface {
   readonly get: () => Effect.Effect<readonly Snapshot[]>
   readonly refresh: (force?: boolean) => Effect.Effect<void>
+  readonly remoteAvailable?: Effect.Effect<boolean>
 }
 
 export const Options = Schema.Struct({
@@ -556,11 +557,18 @@ export const layer = (options?: Options) =>
 
       const source = options?.url || defaultSource
       const fetch = options?.fetch ?? true
+      const refreshEnabled = fetch && !process.argv.includes("--get-yargs-completions")
       const userAgent = App.useragent(app)
       const key = cacheKey(source)
       const metaKey = `${key}:meta`
       const ttl = Duration.minutes(5)
       const lock = Semaphore.makeUnsafe(1)
+      const firstCheck = yield* Deferred.make<boolean>()
+      let available: boolean | undefined
+      const markAvailability = Effect.fnUntraced(function* (result: boolean) {
+        available = result
+        yield* Deferred.succeed(firstCheck, result)
+      })
       // The v1 catalog was cached under unversioned keys; free that multi-MB row.
       yield* kv.remove(key.replace("models-dev:v2:", "models-dev:"))
       yield* kv.remove(`${key.replace("models-dev:v2:", "models-dev:")}:meta`)
@@ -675,9 +683,22 @@ export const layer = (options?: Options) =>
               const stored = Option.getOrUndefined(
                 Schema.decodeUnknownOption(CacheMeta)((yield* kv.get(metaKey)) ?? (yield* kv.get(key))),
               )
-              if (!force && stored && Date.now() - stored.updatedAt < Duration.toMillis(ttl)) return
-              const response = yield* fetchApi(force ? undefined : stored?.etag)
-              const digest = response && bodyDigest(response.text)
+              if (
+                !force &&
+                (!refreshEnabled || available !== undefined) &&
+                stored &&
+                Date.now() - stored.updatedAt < Duration.toMillis(ttl)
+              )
+                return
+              const { response, digest } = yield* Effect.gen(function* () {
+                const response = yield* fetchApi(force ? undefined : stored?.etag)
+                const digest = response && bodyDigest(response.text)
+                if (response && (force || stored?.digest !== digest)) yield* decodeCatalog(response.text)
+                return { response, digest }
+              }).pipe(
+                Effect.tap(() => markAvailability(true)),
+                Effect.tapError(() => markAvailability(false)),
+              )
               // models.dev rarely changes between polls; skip invalidation and
               // the Refreshed event for a byte-identical body so downstream
               // provider/model update listeners stay quiet.
@@ -686,7 +707,6 @@ export const layer = (options?: Options) =>
                 return
               }
               if (!response) return
-              yield* decodeCatalog(response.text)
               yield* writeCache(response.text, response.etag, digest)
               yield* invalidate
               yield* bus.publish(ModelsDev.Event.Refreshed, {}, { global: true })
@@ -698,12 +718,18 @@ export const layer = (options?: Options) =>
           )
       })
 
-      if (fetch && !process.argv.includes("--get-yargs-completions")) {
+      if (refreshEnabled) {
         // Schedule.spaced runs the effect once, then waits between completions.
         yield* Effect.forkScoped(refresh().pipe(Effect.repeat(Schedule.spaced(ttl)), Effect.ignore))
       }
 
-      return Service.of({ get, refresh })
+      return Service.of({
+        get,
+        refresh,
+        remoteAvailable: refreshEnabled
+          ? Effect.suspend(() => (available === undefined ? Deferred.await(firstCheck) : Effect.succeed(available)))
+          : undefined,
+      })
     }),
   )
 
