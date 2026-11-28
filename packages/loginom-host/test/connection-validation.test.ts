@@ -776,8 +776,8 @@ test.skipIf(!hasConnectionFixture)("settings cancellation drains a 23-second log
       await checking.catch(() => undefined)
     }
     const first = f.logins.find((login) => login.username === "first-user")
-    expect(first).toBeDefined()
-    expect(f.requests).toContainEqual({ method: "POST", path: "/logout", cookie: first?.cookie })
+    if (!first) throw Error("The cancelled login never authenticated")
+    expect(f.requests).toContainEqual({ method: "POST", path: "/logout", cookie: first.cookie })
     expect(await host.exited).toEqual({ code: 0, signal: null })
   } finally {
     await f.close()

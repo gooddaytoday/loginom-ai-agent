@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@loginom-ai-agent/product": "workspace:*",
+    "@loginom-ai-agent/runtime": "workspace:*",
     "@opencode/schema": "workspace:*",
     "@xmldom/xmldom": "0.8.15",
     "@zip.js/zip.js": "2.7.62",
