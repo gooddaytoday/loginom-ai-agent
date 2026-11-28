@@ -3,7 +3,7 @@ export default {
   connectTitle: "Connect to Loginom",
   connectPublic: "Connect to the public demo server",
   publicStandDescription:
-    "app.loginom.ai is a public Loginom training server. Sign in as user without a password. Use your own Loginom server for work data.",
+    "app.loginom.ai is a public Loginom demo server. Sign in as user without a password. For work data, connect to your own server.",
   ownServer: "Your own Loginom server",
   connect: "Connect",
   connectionSettings: "Connection settings",

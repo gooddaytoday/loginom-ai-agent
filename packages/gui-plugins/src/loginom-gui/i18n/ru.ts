@@ -3,7 +3,7 @@ export default {
   connectTitle: "Подключиться к Loginom",
   connectPublic: "Подключить публичный стенд",
   publicStandDescription:
-    "app.loginom.ai — учебный сервер Loginom в интернете, вход под user без пароля. Для рабочих данных — свой сервер Loginom.",
+    "app.loginom.ai — публичный стенд Loginom: вход под user без пароля. Для рабочих данных подключите свой сервер.",
   ownServer: "Свой сервер Loginom",
   connect: "Подключить",
   connectionSettings: "Настройки подключения",

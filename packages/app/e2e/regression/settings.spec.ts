@@ -127,6 +127,12 @@ for (const viewport of [
     await page.reload()
     await expect(card).toBeVisible()
     await expect(pill).toBeVisible()
+    await expect(
+      card.getByText(
+        "app.loginom.ai — публичный стенд Loginom: вход под user без пароля. Для рабочих данных подключите свой сервер.",
+        { exact: true },
+      ),
+    ).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath(`loginom-card-${viewport.width}.png`) })
 
     if (own) {
@@ -144,7 +150,6 @@ for (const viewport of [
       await page.getByRole("button", { name: "Сохранить", exact: true }).click()
       await expect(page).toHaveURL(new RegExp(id))
     } else {
-      await expect(card.getByText(/учебный сервер Loginom/)).toBeVisible()
       await card.getByRole("button", { name: "Подключить публичный стенд" }).click()
     }
 
