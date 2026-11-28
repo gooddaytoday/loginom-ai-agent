@@ -19,6 +19,8 @@ export const RecoveryMetadata = Schema.Struct({
   state: Schema.Literals(["running", "settled"]),
   kind: Schema.optional(Schema.Literals(["add", "configure", "execute", "export", "read"])),
   status: Schema.optional(Schema.Literals(["SUCCEEDED", "FAILED", "NOT_APPLIED", "AMBIGUOUS"])),
+  phase: Schema.optional(Schema.String),
+  node: Schema.optional(Schema.Struct({ guid: Schema.NonEmptyString })),
   step: Schema.optional(step),
 })
 

@@ -37,8 +37,6 @@ export default function Block(props: {
   const waiting = () => pending(props.state, props.retry)
   let refresh = () => {}
 
-  onCleanup(() => lifetime.abort())
-
   const statusClient = () => {
     const server = props.session.server
 
@@ -92,9 +90,21 @@ export default function Block(props: {
     { otherwise: () => setConnection("unknown") },
   )
 
-  const dispatch = (event: Event) => props.update(transition(props.state, event))
+  const dispatch = (event: Event) => {
+    const state = props.state
+    const next = transition(state, event)
+
+    if (next !== state) props.update(next)
+  }
+
+  onCleanup(() => {
+    lifetime.abort()
+    dispatch({ type: "detach" })
+  })
+
   const operation = () => (props.failure.kind === "write" ? props.failure.operationId : undefined)
   const pendingCheck = () => needsCheck(props.failure, props.state, props.retry)
+
   const canCheck = () =>
     pendingCheck() &&
     !waiting() &&
@@ -102,6 +112,7 @@ export default function Block(props: {
     props.state.kind !== "checking" &&
     props.session.server.connected &&
     !!operation()
+
   const historyStep = () => (props.failure.kind === "write" ? props.failure.step : undefined)
   const saved = () => (historyStep()?.save ?? checked()?.step?.save)?.throughStep.label
   const unsaved = () => historyStep()?.persistence === "step_unsaved" || checked()?.step?.persistence === "step_unsaved"
@@ -115,10 +126,12 @@ export default function Block(props: {
     const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(40_000)])
     const options = { signal, location: props.session.location }
     let result: Check = { kind: "unknown", operationId }
+
     const response = await props.session.server.client
       .rpc(WriteOutcomeRpc)
       .check({ sessionID, operationId }, options)
       .catch(() => undefined)
+
     const decoded = await WriteOutcomeRpc.methods.check.output["~standard"].validate(response)
 
     if (!decoded.issues && decoded.value.operationId === operationId && operation() === operationId) {
