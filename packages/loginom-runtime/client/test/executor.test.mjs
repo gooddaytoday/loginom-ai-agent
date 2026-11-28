@@ -1682,6 +1682,36 @@ test('keep-open Save does not publish breadcrumbs if the destination changes dur
  assert.deepEqual(receipt.crumbs,originalCrumbs);
 });
 
+test('keep-open Save does not publish breadcrumbs if the graph changes at publication',async()=>{
+ const {page}=await continuationPage(),receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ const originalCrumbs=page.elements().filter(e=>['save_crumb','save_nav_parent'].includes(e.kind))
+   .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent}));
+ receipt.crumbs=originalCrumbs;
+ let returned=false;
+ const returnToWorkflow=page.afterDoubleClick;
+ page.afterDoubleClick=async()=>{await returnToWorkflow();returned=true;};
+ const getCmp=page.context.Ext.getCmp;
+ page.context.Ext.getCmp=id=>{
+  const component=getCmp(id);
+  if(returned&&id==='save-crumb-4'){
+   returned=false;
+   page.addNode('Поздний_узел',600,104);
+   const graph=page.model.FDiagram.FmxGraph.container;
+   graph.children=page.elements().find(e=>e.symbol==='workflow.graph').children;
+   for(const child of graph.children)child.parentElement=graph;
+  }
+  return component;
+ };
+ const path='/user/data/packages/graph-race.lgp';
+ const result=await run(page,'package.save_checkpoint',{path,conflict_policy:'fail'});
+ assert.equal(page.storage.get(path).nodes.length,2);
+ assert.equal(page.nodes.length,3);
+ assert.equal(result.status,'AMBIGUOUS');
+ assert.match(result.error.message,/Saved graph changed/);
+ assert.equal(result.effect_possible,true);
+ assert.deepEqual(receipt.crumbs,originalCrumbs);
+});
+
 for(const action of ['package.save_checkpoint','package.save_as'])test(action+' accepts the observed builtin without a Label;Label',async()=>{
   const page=linkPage();
   page.addNode('Переменные_сценария',0,0,['Output_Var-4']);

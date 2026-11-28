@@ -954,13 +954,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if (!(name in bindings)) throw new Error(`Missing selector binding ${name}`);
     return encode(bindings[name], definition.parameters[name], name === 'node_label' ? graph?.nodes.map(node => node.label) : undefined);
   });
-  const ownedGraph = async (prefix, saveSnapshot = false) => {
-    if(await activePrefix()!==prefix)throw new Error('Graph workflow changed');
-    const containerTid=prefix+';ModelForm;cmpDiagram',container=tid('',containerTid);
-    if(await container.count()!==1 || !(await container.isVisible()))throw new Error('Unique visible owned graph container is required');
-    const box=await container.boundingBox(),viewport=page.viewportSize();
-    if(!box || box.x+box.width<=0 || box.y+box.height<=0 || viewport && (box.x>=viewport.width || box.y>=viewport.height))throw new Error('Graph container is outside the visible viewport');
-    const data=await container.evaluate((element,{ownerPrefix,saveSnapshot})=>{
+  const inspectCapabilityGraph = (target, scanOptions) => {
+    const scan = (element,{ownerPrefix,saveSnapshot})=>{
       const started=Date.now();let work=0;
       const charge=()=>{if(++work>250000 || Date.now()-started>500)throw new Error('Graph scan budget exceeded');};
       const visible=e=>{
@@ -1010,12 +1005,115 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       }
       return {native_prefix:native,node_keys:nodeKeys,nodes:labels.map(label=>({label,ports:tids.filter(t=>t.startsWith(native+label+';') && /;(?:Input|Output)_[^;]+$/.test(t)).sort()})),
         links:tids.filter(t=>{const body=t.slice(native.length);return /^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body);}).sort()};
-    },{ownerPrefix:prefix,saveSnapshot});
+    };
+    const snapshot = captured => {
+      const sorted = values => [...values].sort();
+      const nodeKeys=new Map(captured.node_keys);
+      if(nodeKeys.size!==captured.node_keys.length)throw Error('Saved graph native node binding is ambiguous');
+      const key=node=>nodeKeys.get(node)??node;
+      const nodes=captured.nodes.map(node=>node.label);
+      if(new Set(nodes.map(key)).size!==nodes.length)throw Error('Saved graph node keys are ambiguous');
+      const mappings = new Map();
+      const canonicalPorts = new Map();
+      for (const node of nodes) {
+        const rawPorts = captured.nodes.find(item=>item.label===node).ports.map(value => value.split(';Graph;')[1].slice((node+';').length));
+        const groups = new Map(), mapping = new Map();
+        for (const port of rawPorts) {
+          const match = /^(.*)-(\d+)$/.exec(port);
+          if (!match) { mapping.set(port, port); continue; }
+          const kind = match[1], list = groups.get(kind) ?? [];
+          list.push({ raw: port, index: Number(match[2]) }); groups.set(kind, list);
+        }
+        for (const [kind, group] of groups) {
+          group.sort((left, right) => left.index - right.index);
+          group.forEach((port, ordinal) => mapping.set(port.raw, `${kind}[${ordinal}]`));
+        }
+        mappings.set(node, mapping);
+        canonicalPorts.set(key(node),{ node_label: key(node), tids: sorted([...mapping.values()].map(port => `${key(node)};${port}`)) });
+      }
+      // Loginom recreates live port indices on reopen (observed 0,1,3 -> 0,1,2).
+      // Preserve type/direction/count and ordinal, and remap each link endpoint
+      // through the same bijection. A different ordinal still changes the graph.
+      const canonicalLinks = captured.links.map(value => {
+        const [source, output, target, input] = value.split(';Graph;')[1].split('|');
+        const sourcePort = mappings.get(source)?.get(output), targetPort = mappings.get(target)?.get(input);
+        if (!sourcePort || !targetPort) throw new Error('Graph link endpoint is absent from its node port snapshot');
+        return `${key(source)}|${sourcePort}|${key(target)}|${targetPort}`;
+      });
+      const ordered=sorted(nodes.map(key));
+      return { nodes:ordered, ports:ordered.map(node=>canonicalPorts.get(node)), links:sorted(canonicalLinks) };
+    };
+    if(scanOptions){
+      const data=scan(target,scanOptions);
+      return scanOptions.saveSnapshot?{...data,snapshot:snapshot(data)}:data;
+    }
+    const {binding,publication}=target,previous=publication?.previous;
+    const preparation=globalThis.__loginomDockPreparationV1, app=globalThis.bg?.app;
+    if(!preparation || preparation.document!==document){
+      if(previous?.length)throw Error('Saved continuation identities changed');
+      return [];
+    }
+    const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
+    const tabs=exact(binding.tab_tid);
+    if(tabs.length!==1 || !tabs[0].classList.contains('x-tab-active'))throw Error('Saved continuation tab changed');
+    const card=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab();
+    let node=card?.Controller?.Node?.data?.node,packageNode,workflowNode;
+    const seen=new Set();for(let i=0;node&&i<32&&!seen.has(node);i++,node=node.ParentNode){seen.add(node);
+      if(!workflowNode&&app.WorkFlowTreeNode&&node instanceof app.WorkFlowTreeNode)workflowNode=node;
+      if(app.PackageTreeNode&&node instanceof app.PackageTreeNode){packageNode=node;break;}}
+    const graph=exact(binding.prefix+';ModelForm;cmpDiagram');
+    if(!(card?.Controller?.FController instanceof app.ModelForm)||graph.length!==1
+        ||card.Controller.FController.FDiagram?.FmxGraph?.container!==graph[0])throw Error('Saved continuation graph changed');
+    const elements=[...document.querySelectorAll('[data-tid^='+JSON.stringify(binding.prefix+';cnrNaviMode;b.s_')+']')];
+    if(elements.length<3||elements.length>32)throw Error('Saved continuation navigation unavailable');
+    const workflowCrumbs=elements.filter(element=>{
+      const component=globalThis.Ext?.getCmp?.(element.id);
+      return component?.el?.dom===element&&component?._node?.data?.node===workflowNode;
+    });
+    const crumbs=elements.slice(0,elements.indexOf(workflowCrumbs[0])+1).map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
+    const result=new Map(),records=[];
+    for(const record of preparation.receipts.values()) {
+      if(record.phase!=='verified'||record.tab!==tabs[0]||typeof record.workflowId!=='string')continue;
+      // An opened package may be copied before any node read populates this
+      // cache. Bind it against the original prepared path before Save, so the
+      // existing navigation refresh is not skipped for that workflow.
+      if(!record.nodeTargetWorkflowNode) {
+        if(record.packageNode!==packageNode||!workflowNode||(record.stepWorkflowNode&&record.stepWorkflowNode!==workflowNode)
+            ||JSON.stringify(record.crumbs)!==JSON.stringify(crumbs))
+          throw Error('Saved continuation initial native identity changed');
+        record.nodeTargetWorkflowNode=workflowNode;
+      }
+      if(record.packageNode!==packageNode||record.nodeTargetWorkflowNode!==workflowNode)throw Error('Saved continuation native identity changed');
+      if(workflowCrumbs.length!==1||crumbs.length<3)throw Error('Saved continuation workflow breadcrumb unavailable');
+      records.push(record);
+      result.set(record.workflowId,{document_id:preparation.id,workflow_ref:{...binding,workflow_id:record.workflowId,navigation_path:crumbs}});
+      if(result.size>32)throw Error('Saved continuation bound exceeded');
+    }
+    const continuations=[...result.values()];
+    if(!publication)return continuations;
+    const identity=({document_id,workflow_ref:{workflow_id,tab_tid,prefix}})=>({document_id,workflow_id,tab_tid,prefix});
+    if(JSON.stringify(previous.map(identity))!==JSON.stringify(continuations.map(identity)))throw Error('Saved continuation identities changed');
+    const path=packageNode?.PackageFileName;
+    if(typeof path!=='string'||!path.trim()||('/'+path.replaceAll('\\','/')).replace(/\/+/g,'/')!==publication.path)
+      throw Error('Saved destination changed while refreshing navigation');
+    const current=scan(graph[0],{ownerPrefix:binding.prefix,saveSnapshot:true});
+    if((publication.nativePrefix!==null&&current.native_prefix!==publication.nativePrefix)
+        ||JSON.stringify(snapshot(current))!==JSON.stringify(publication.graph))throw Error('Saved graph changed while refreshing navigation');
+    for(const record of records)record.crumbs=crumbs;
+    return continuations.map((value,index)=>({...value,previous_workflow_ref:previous[index].workflow_ref}));
+  };
+  const ownedGraph = async (prefix, saveSnapshot = false) => {
+    if(await activePrefix()!==prefix)throw new Error('Graph workflow changed');
+    const containerTid=prefix+';ModelForm;cmpDiagram',container=tid('',containerTid);
+    if(await container.count()!==1 || !(await container.isVisible()))throw new Error('Unique visible owned graph container is required');
+    const box=await container.boundingBox(),viewport=page.viewportSize();
+    if(!box || box.x+box.width<=0 || box.y+box.height<=0 || viewport && (box.x>=viewport.width || box.y>=viewport.height))throw new Error('Graph container is outside the visible viewport');
+    const data=await container.evaluate(inspectCapabilityGraph,{ownerPrefix:prefix,saveSnapshot});
     const binding={container_tid:containerTid,native_prefix:data.native_prefix};
     if(graphBinding && (graphBinding.container_tid!==containerTid || graphBinding.native_prefix!==null && graphBinding.native_prefix!==binding.native_prefix))
       throw new Error('Native graph binding changed after preflight');
     graphBinding=binding;
-    return {container,binding,nodes:data.nodes,links:data.links,node_keys:data.node_keys};
+    return {container,binding,nodes:data.nodes,links:data.links,snapshot:data.snapshot};
   };
   const graphPrefixFor=async prefix=>{const native=(await ownedGraph(prefix)).binding.native_prefix;if(!native)throw new Error('No observed native graph namespace');return native;};
   const resolve = async (symbol, bindings = {}, options = {}) => {
@@ -1098,42 +1196,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
   const ports=async(prefix,nodeLabel)=>(await ownedGraph(prefix)).nodes.find(node=>node.label===nodeLabel)?.ports??[];
   const graphLinks=async prefix=>(await ownedGraph(prefix)).links;
   const rawGraph=async prefix=>{const graph=await ownedGraph(prefix);return {nodes:graph.nodes,links:graph.links};};
-  const graphSnapshot = async prefix => {
-    const captured=await ownedGraph(prefix,true),nodeKeys=new Map(captured.node_keys);
-    if(nodeKeys.size!==captured.node_keys.length)throw Error('Saved graph native node binding is ambiguous');
-    const key=node=>nodeKeys.get(node)??node;
-    const nodes=captured.nodes.map(node=>node.label);
-    if(new Set(nodes.map(key)).size!==nodes.length)throw Error('Saved graph node keys are ambiguous');
-    const mappings = new Map();
-    const canonicalPorts = new Map();
-    for (const node of nodes) {
-      const rawPorts = captured.nodes.find(item=>item.label===node).ports.map(value => value.split(';Graph;')[1].slice((node+';').length));
-      const groups = new Map(), mapping = new Map();
-      for (const port of rawPorts) {
-        const match = /^(.*)-(\d+)$/.exec(port);
-        if (!match) { mapping.set(port, port); continue; }
-        const kind = match[1], list = groups.get(kind) ?? [];
-        list.push({ raw: port, index: Number(match[2]) }); groups.set(kind, list);
-      }
-      for (const [kind, group] of groups) {
-        group.sort((left, right) => left.index - right.index);
-        group.forEach((port, ordinal) => mapping.set(port.raw, `${kind}[${ordinal}]`));
-      }
-      mappings.set(node, mapping);
-      canonicalPorts.set(key(node),{ node_label: key(node), tids: sorted([...mapping.values()].map(port => `${key(node)};${port}`)) });
-    }
-    // Loginom recreates live port indices on reopen (observed 0,1,3 -> 0,1,2).
-    // Preserve type/direction/count and ordinal, and remap each link endpoint
-    // through the same bijection. A different ordinal still changes the graph.
-    const canonicalLinks = captured.links.map(value => {
-      const [source, output, target, input] = value.split(';Graph;')[1].split('|');
-      const sourcePort = mappings.get(source)?.get(output), targetPort = mappings.get(target)?.get(input);
-      if (!sourcePort || !targetPort) throw new Error('Graph link endpoint is absent from its node port snapshot');
-      return `${key(source)}|${sourcePort}|${key(target)}|${targetPort}`;
-    });
-    const ordered=sorted(nodes.map(key));
-    return { nodes:ordered, ports:ordered.map(node=>canonicalPorts.get(node)), links:sorted(canonicalLinks) };
-  };
+  const graphSnapshot = async prefix => (await ownedGraph(prefix,true)).snapshot;
   const nodeRef = nodeLabel => ({ kind: 'node', node_label: nodeLabel, workflow_ref: { ...workflow } });
   const checkNodeRef = node => {
     if (!node.workflow_ref || node.workflow_ref.tab_tid !== workflow.tab_tid || node.workflow_ref.prefix !== workflow.prefix) throw new Error('Node reference belongs to a different workflow');
@@ -1519,58 +1582,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     value = value.replaceAll('\\', '/').replace(/\/+/g, '/');
     return value.startsWith('/') ? value : '/' + value;
   };
-  const packageContinuations = async (binding, previous = null, expectedPath = null) => page.evaluate(({binding,previous,expectedPath}) => {
-    const preparation=globalThis.__loginomDockPreparationV1, app=globalThis.bg?.app;
-    if(!preparation || preparation.document!==document){
-      if(previous?.length)throw Error('Saved continuation identities changed');
-      return [];
-    }
-    const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
-    const tabs=exact(binding.tab_tid);
-    if(tabs.length!==1 || !tabs[0].classList.contains('x-tab-active'))throw Error('Saved continuation tab changed');
-    const card=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab();
-    let node=card?.Controller?.Node?.data?.node,packageNode,workflowNode;
-    const seen=new Set();for(let i=0;node&&i<32&&!seen.has(node);i++,node=node.ParentNode){seen.add(node);
-      if(!workflowNode&&app.WorkFlowTreeNode&&node instanceof app.WorkFlowTreeNode)workflowNode=node;
-      if(app.PackageTreeNode&&node instanceof app.PackageTreeNode){packageNode=node;break;}}
-    const graph=exact(binding.prefix+';ModelForm;cmpDiagram');
-    if(!(card?.Controller?.FController instanceof app.ModelForm)||graph.length!==1
-        ||card.Controller.FController.FDiagram?.FmxGraph?.container!==graph[0])throw Error('Saved continuation graph changed');
-    const elements=[...document.querySelectorAll('[data-tid^='+JSON.stringify(binding.prefix+';cnrNaviMode;b.s_')+']')];
-    if(elements.length<3||elements.length>32)throw Error('Saved continuation navigation unavailable');
-    const workflowCrumbs=elements.filter(element=>{
-      const component=globalThis.Ext?.getCmp?.(element.id);
-      return component?.el?.dom===element&&component?._node?.data?.node===workflowNode;
-    });
-    const crumbs=elements.slice(0,elements.indexOf(workflowCrumbs[0])+1).map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
-    const result=new Map(),records=[];
-    for(const record of preparation.receipts.values()) {
-      if(record.phase!=='verified'||record.tab!==tabs[0]||typeof record.workflowId!=='string')continue;
-      // An opened package may be copied before any node read populates this
-      // cache. Bind it against the original prepared path before Save, so the
-      // existing navigation refresh is not skipped for that workflow.
-      if(!record.nodeTargetWorkflowNode) {
-        if(record.packageNode!==packageNode||!workflowNode||(record.stepWorkflowNode&&record.stepWorkflowNode!==workflowNode)
-            ||JSON.stringify(record.crumbs)!==JSON.stringify(crumbs))
-          throw Error('Saved continuation initial native identity changed');
-        record.nodeTargetWorkflowNode=workflowNode;
-      }
-      if(record.packageNode!==packageNode||record.nodeTargetWorkflowNode!==workflowNode)throw Error('Saved continuation native identity changed');
-      if(workflowCrumbs.length!==1||crumbs.length<3)throw Error('Saved continuation workflow breadcrumb unavailable');
-      records.push(record);
-      result.set(record.workflowId,{document_id:preparation.id,workflow_ref:{...binding,workflow_id:record.workflowId,navigation_path:crumbs}});
-      if(result.size>32)throw Error('Saved continuation bound exceeded');
-    }
-    const continuations=[...result.values()];
-    if(!previous)return continuations;
-    const identity=({document_id,workflow_ref:{workflow_id,tab_tid,prefix}})=>({document_id,workflow_id,tab_tid,prefix});
-    if(JSON.stringify(previous.map(identity))!==JSON.stringify(continuations.map(identity)))throw Error('Saved continuation identities changed');
-    const path=packageNode?.PackageFileName;
-    if(typeof path!=='string'||!path.trim()||('/'+path.replaceAll('\\','/')).replace(/\/+/g,'/')!==expectedPath)
-      throw Error('Saved destination changed while refreshing navigation');
-    for(const record of records)record.crumbs=crumbs;
-    return continuations.map((value,index)=>({...value,previous_workflow_ref:previous[index].workflow_ref}));
-  },{binding,previous,expectedPath});
+  const packageContinuations = (binding, publication = null) => page.evaluate(inspectCapabilityGraph,{binding,publication});
   const bindSavedContinuations = async (before, previous, mode) => page.evaluate(({previous,current,path,nativeNodes,binding,mode})=>{
       const prep=globalThis.__loginomDockPreparationV1,app=globalThis.bg?.app;
       if(!binding)return [];
@@ -1863,7 +1875,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         await ensureReady();
         if(!same(await graphSnapshot(workflow.prefix),before.graph))throw Error('Saved graph changed while refreshing navigation');
       }
-      const continuations=recovered.length?recovered:await packageContinuations(before.workflow_ref,continuationsBefore,before.path);
+      const continuations=recovered.length?recovered:await packageContinuations(before.workflow_ref,
+        {previous:continuationsBefore,path:before.path,graph:before.graph,nativePrefix:graphBinding.native_prefix});
       record('save_continuations_observed', { continuations,...(recovered.length?{recovered_reopen:true,native_identity_verified:true}:{}) });
       transientDialog = false; phase = 'verified';
       record('postcondition_verified', { proof: 'awaited_save_flow_same_open_workflow', package_path: actualPath,
