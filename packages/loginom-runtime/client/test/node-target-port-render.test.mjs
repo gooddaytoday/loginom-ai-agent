@@ -18,7 +18,8 @@ function fixture({portIndex=0}={}){
  let bodyRendered=true,rendered=true,labelRendered=true,onPaint=()=>{},pausedPaint=false;
  const extraStates=new Map();
  const graph={container:root,getCellAt:()=>wrongHit?{}:port.FCell,view:{getState:cell=>extraStates.get(cell)??(cell===node.FCell?(bodyRendered?{shape:{node:body}}:null):cell===node.FLabel.FCell?(labelRendered?{text:{node:labelDom}}:null):rendered?{shape:{node:duplicateShape?alternatePortDom:portDom}}:null)}};
- const model=Object.assign(new ModelForm(),{FCreateDraggedNodeStarted:false,FDraggingOverGraph:false,FDiagram:{FmxGraph:graph,FNodes:{FCollection:[node]}}});
+ const nativeLinks=[];
+ const model=Object.assign(new ModelForm(),{FCreateDraggedNodeStarted:false,FDraggingOverGraph:false,FDiagram:{FmxGraph:graph,FNodes:{FCollection:[node]},FLinks:{FCollection:nativeLinks}}});
  const packageNode=new PackageTreeNode(),workflowNode=Object.assign(new WorkFlowTreeNode(),{ParentNode:packageNode});
  const activeNode={data:{node:workflowNode}};
  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:activeNode,FController:model}})}}}}}};
@@ -41,7 +42,9 @@ function fixture({portIndex=0}={}){
   const source=add('connection','bg-vendor-icon-restclientconnection',sourceSuffix),target=add('rest','bg-vendor-icon-restclient',targetSuffix);
   if(tree)for(const [index,p] of [source.port,target.port].entries())Object.assign(p,{FGuid:'tree-port-'+index,data:{},FType:index===0?1:0});
   const tid='MF;TF-1;Graph;connection|'+sourceSuffix+'|rest|'+targetSuffix,dom=element(tid),edge={source:source.port.FCell,target:target.port.FCell};
-  source.port.FCell.edges=[edge];inside.push(dom);extraStates.set(edge,{shape:{node:dom}});return {source,target,edge,tid,dom};
+  const native={FSourcePort:source.port,FTargetPort:target.port};
+  nativeLinks.push(native);
+  source.port.FCell.edges=[edge];inside.push(dom);extraStates.set(edge,{shape:{node:dom}});return {source,target,edge,tid,dom,native,detach:()=>nativeLinks.splice(nativeLinks.indexOf(native),1)};
  };
  const addService=(tid=null)=>{
   const port={parent:node,FType:1,FSubType:10,FCell:{parent:node.FCell,visible:true}},dom=element(tid);
@@ -99,6 +102,26 @@ for(const [name,change] of [
 });
 
 const stepRead=f=>readGraph(f.page,{request:f.request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',step_rebaseline:true});
+
+test('a graph snapshot has native endpoint GUIDs and does not rebind a manually renamed port',async()=>{
+ const f=fixture(),link=f.restLink(true);
+ const snapshot=()=>readGraph(f.page,{request:f.request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',
+   snapshot_only:true});
+ await f.read();
+ assert.deepEqual(structuredClone((await snapshot()).links),[
+  {source:'connection',output:'tree-port-0',target:'rest',input:'tree-port-1'},
+ ]);
+ f.renameByHand({alternate:true});
+ f.removeLink(link);
+ assert.equal((await snapshot()).links.length,1);
+ link.detach();
+ const fresh=structuredClone(await snapshot());
+ assert.deepEqual(fresh.links,[]);
+ assert.deepEqual(fresh.nodes.find(node=>node.guid==='n'),{
+  guid:'n',type:'transform.calculator',label:'Renamed Calculator',position:{x:10,y:10},
+ });
+ await assert.rejects(f.binding(),/Visible port identity is not rendered/);
+});
 
 test('the new step commits the renamed port for subsequent strict graph reads',async()=>{
  const f=fixture();await f.read();

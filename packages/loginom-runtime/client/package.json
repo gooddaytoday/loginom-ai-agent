@@ -16,6 +16,8 @@
     "@modelcontextprotocol/sdk": "1.30.0",
     "@orama/stemmers": "3.1.18",
     "@playwright/mcp": "0.0.82",
+    "@xmldom/xmldom": "0.8.15",
+    "@zip.js/zip.js": "2.7.62",
     "acorn": "8.15.0",
     "cross-spawn": "7.0.6",
     "which": "2.0.2",

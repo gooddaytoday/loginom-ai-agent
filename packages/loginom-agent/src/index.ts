@@ -20,6 +20,7 @@ import { fileTools } from "./file-profile"
 import { ServiceHost } from "./host"
 import { localFiles } from "./local-file"
 import { packageDocs } from "./package-docs"
+import { registerPackageSchema } from "./package-schema"
 import {
   classify,
   declinedText,
@@ -506,6 +507,7 @@ export default Plugin.define({
       await binding.fork(event.sessionID)
     })
 
+    await registerPackageSchema(ctx, files)
     await ctx.rpc.register(runner, {
       start: async (value) => {
         // The RPC host validates the call against the JSON Schema above before the handler runs.

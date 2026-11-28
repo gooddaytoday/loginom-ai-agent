@@ -365,11 +365,38 @@ export function makeNodePortOutputCode(binding,request,options,quality=null) {
   ||!options||Object.keys(options).sort().join(',')!=='build,deadline,origin'
   ||typeof options.origin!=='string'||typeof options.build!=='string'||!Number.isSafeInteger(options.deadline))throw Error('Exact bounded completed port read required');
  if(quality&&(request.port!==4||typeof quality.binding_id!=='string'||typeof quality.read!=='function'||typeof quality.decode!=='function'))throw Error('Private Quality Moda capability required');
- return `async page=>(${readNodePortOutput.toString()})(page,${JSON.stringify(binding)},${JSON.stringify(request)},${JSON.stringify(options)},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${decodePortCell.toString()},${readTreePortSource.toString()},${quality?JSON.stringify({binding_id:quality.binding_id,read:quality.read.toString(),decode:quality.decode.toString()}):'null'},${JSON.stringify(variantCapability)})`;
+ return `async page=>(${readNodePortOutput.toString()})(page,${JSON.stringify(binding)},${JSON.stringify(request)},${JSON.stringify(options)},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${decodePortCell.toString()},${readTreePortSource.toString()},${quality?JSON.stringify({binding_id:quality.binding_id,read:quality.read.toString(),decode:quality.decode.toString()}):'null'},${JSON.stringify(variantCapability)},${inspectCompletedPortExecution.toString()})`;
+}
+
+function inspectCompletedPortExecution({documentId,execution,nodeData},need,expected) {
+ const trees=['ConsoleForm','MF;ConsoleForm'].flatMap(prefix=>
+  [...document.querySelectorAll('[data-tid="'+prefix+';ProgressForm;trpProgress;treepanel;tree"]')]);
+ need(trees.length===1,'execution_tree');
+ const store=Ext.getCmp(trees[0].id)?.getStore(),root=store?.getRoot();
+ need(store&&!store.isLoading()&&root?.data.loaded===true,'execution_store');
+ const prefix=documentId+':';need(execution.execution_id.startsWith(prefix),'foreign_execution');
+ const parts=execution.execution_id.slice(prefix.length).split(':');
+ need(parts.length===2&&String(root.internalId)===parts[0]&&/^[1-9][0-9]*$/.test(parts[1]),'execution_root_changed');
+ const records=[],parents=new Map(),seen=new Set();
+ const walk=parent=>{need(Array.isArray(parent.childNodes),'process_children');for(const r of parent.childNodes){need(!seen.has(r)&&records.length<2000&&!r.data.loading,'process_bound');seen.add(r);records.push(r);parents.set(r,parent);walk(r);}};walk(root);
+ const groups=records.filter(r=>String(r.data.id)===parts[1]);
+ need(groups.length===1&&parents.get(groups[0])===root&&groups[0].data.Status===3&&groups[0].data.ErrorDetails===''&&groups[0].data.loaded===true,'execution_incomplete');
+ const own=records.filter(r=>r.data.ModelNode===nodeData),children=own.filter(r=>String(r.data.id)===execution.process_id&&String(r.internalId)===execution.process_record_id);
+ need(children.length===1&&children[0].data.Status===3&&children[0].data.ErrorDetails===''
+  &&String(children[0].data.id).startsWith(parts[1]+'.')&&!own.some(r=>BigInt(String(r.data.id).split('.')[0])>BigInt(parts[1])),'stale_execution');
+ let ancestor=parents.get(children[0]);while(ancestor&&ancestor!==groups[0])ancestor=parents.get(ancestor);need(ancestor===groups[0],'execution_owner');
+ const relevant=[groups[0],...own];
+ const fingerprint=JSON.stringify(relevant.map(r=>[r.internalId,r.data.id,r.data.Status,r.data.ErrorDetails,r.data.loaded,r.data.ModelNode===nodeData]));
+ if(expected){
+  need(store===expected.store&&root===expected.root&&fingerprint===expected.fingerprint
+   &&relevant.length===expected.records.length&&relevant.every((record,index)=>record===expected.records[index]),'binding_changed');
+  return expected;
+ }
+ return {store,root,records:relevant,fingerprint};
 }
 
 // One dispatch retains native identity and owns only the proxies acquired here.
-export async function readNodePortOutput(page,binding,request,options,readNode=readPreparedNodeContext,readOutputs=readOutputContext,decodeCell=decodePortCell,treeReader=readTreePortSource,quality=null,variant=variantCapability) {
+export async function readNodePortOutput(page,binding,request,options,readNode=readPreparedNodeContext,readOutputs=readOutputContext,decodeCell=decodePortCell,treeReader=readTreePortSource,quality=null,variant=variantCapability,inspectExecution=inspectCompletedPortExecution) {
  const before=await readNode(page,binding);
  if(before.verified!==true||before.surface!=='graph')return {verified:false,cleanup_complete:false,reason:'node_context'};
  const inventory=await readOutputs(page,binding,readNode);
@@ -377,8 +404,8 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
  if(!inventory.verified||JSON.stringify(inventory.node_context)!==JSON.stringify(before))return {verified:false,cleanup_complete:false,reason:'output_context'};
  if(!target?.active)return {verified:false,cleanup_complete:true,reason:'inactive_output'};
  if((request.treeSchemaOnly||request.treePreview)&&target.kind!=='tree')return {verified:false,cleanup_complete:true,reason:'not_a_tree_output'};
- const result=await page.evaluate(async ({binding:b,request:q,options:o,before,target,decoder,treeReader,quality,variant})=>{
-  const decode=eval(' ('+decoder+')'),readTree=eval(' ('+treeReader+')');
+ const result=await page.evaluate(async ({binding:b,request:q,options:o,before,target,decoder,treeReader,quality,variant,inspectExecution})=>{
+  const decode=eval(' ('+decoder+')'),readTree=eval(' ('+treeReader+')'),inspect=eval(' ('+inspectExecution+')');
   const need=(ok,code)=>{if(!ok){reason=code;throw Error('Port read refused');}},value=(obj,key)=>Object.getOwnPropertyDescriptor(obj??{},key)?.value;
   const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
   const live=()=>need(Date.now()<o.deadline,'deadline');
@@ -409,28 +436,15 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
     &&roots[0].contains(dom)&&exact(tid).filter(e=>roots[0].contains(e)).length===1,'port_binding_changed');
    const images=[...dom.querySelectorAll('image')],icon=images.length===1?(images[0].getAttribute('href')??images[0].getAttribute('xlink:href'))?.split('/').at(-1):null;
    need(target.kind==='tree'?images.length===1&&typeof icon==='string':['output_table_active.svg','output_table_active_no_automapping.svg'].includes(icon),'inactive_output');
-   const trees=['ConsoleForm','MF;ConsoleForm'].flatMap(prefix=>exact(prefix+';ProgressForm;trpProgress;treepanel;tree'));
-   need(trees.length===1,'execution_tree');
-   const store=Ext.getCmp(trees[0].id)?.getStore(),root=store?.getRoot();
-   need(store&&!store.isLoading()&&root?.data.loaded===true,'execution_store');
-   const prefix=b.document_id+':';need(q.execution.execution_id.startsWith(prefix),'foreign_execution');
-   const parts=q.execution.execution_id.slice(prefix.length).split(':');
-   need(parts.length===2&&String(root.internalId)===parts[0]&&/^[1-9][0-9]*$/.test(parts[1]),'execution_root_changed');
-   const records=[],parents=new Map(),seen=new Set();
-   const walk=parent=>{need(Array.isArray(parent.childNodes),'process_children');for(const r of parent.childNodes){need(!seen.has(r)&&records.length<2000&&!r.data.loading,'process_bound');seen.add(r);records.push(r);parents.set(r,parent);walk(r);}};walk(root);
-   const groups=records.filter(r=>String(r.data.id)===parts[1]);
-   need(groups.length===1&&parents.get(groups[0])===root&&groups[0].data.Status===3&&groups[0].data.ErrorDetails===''&&groups[0].data.loaded===true,'execution_incomplete');
-   const own=records.filter(r=>r.data.ModelNode===node.data),children=own.filter(r=>String(r.data.id)===q.execution.process_id&&String(r.internalId)===q.execution.process_record_id);
-   need(children.length===1&&children[0].data.Status===3&&children[0].data.ErrorDetails===''
-    &&String(children[0].data.id).startsWith(parts[1]+'.')&&!own.some(r=>BigInt(String(r.data.id).split('.')[0])>BigInt(parts[1])),'stale_execution');
-   let ancestor=parents.get(children[0]);while(ancestor&&ancestor!==groups[0])ancestor=parents.get(ancestor);need(ancestor===groups[0],'execution_owner');
-   const relevant=[groups[0],...own];
+   const process=inspect({documentId:b.document_id,execution:q.execution,nodeData:node.data},need,baseline?.process);
    return {prep,receipt,tab:tabs[0],workflow,packageNode,model,diagram,node,nodeData:node.data,nodeCell:node.FCell,port,portData:port.data,portCell:port.FCell,portGuid:port.FGuid,
     portSubtype:port.FSubType,nodeSession:value(node.data,'$S'),nodeIdentity:value(node.data,'$'),nodeOwner:value(value(node.data,'$'),'$OW'),nodeObject:value(value(node.data,'$'),'$O'),
     portSession:value(port.data,'$S'),portIdentity:value(port.data,'$'),portOwner:value(value(port.data,'$'),'$OW'),portObject:value(value(port.data,'$'),'$O'),
-    store,root,records:relevant.map(r=>r),fingerprint:JSON.stringify(relevant.map(r=>[r.internalId,r.data.id,r.data.Status,r.data.ErrorDetails,r.data.loaded,r.data.ModelNode===node.data]))};
+    process};
   };
-  const same=(a,b)=>Object.keys(a).every(k=>k==='records'?a.records.length===b.records.length&&a.records.every((r,i)=>r===b.records[i]):a[k]===b[k]);
+  const same=(a,b)=>Object.keys(a).every(k=>a[k]===b[k]);
+  const links=new WeakMap();
+  let linked=false;
   const source=()=>{
    const helper=value(dataSource,'$FHelper'),identity=value(dataSource,'$'),outputIdentity=value(output,'$');
    const interfaceId=value(identity,'$I'),treeInterface=target.kind==='tree'?bg.IBGDataTree:null,treeInterfaceId=value(treeInterface,'__riid');
@@ -446,6 +460,15 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
   const stable=()=>{need(same(baseline,snapshot()),'binding_changed');if(sourceBaseline){need(same(sourceBaseline,source()),'source_changed');if(sourceBaseline.interfaceId===116&&!cacheBaseline&&value(sourceBaseline.helper,'$FCacheInitialized')===true)cacheBaseline={data:value(sourceBaseline.helper,'$FData'),initialized:true};}if(cacheBaseline)need(value(sourceBaseline.helper,'$FData')===cacheBaseline.data&&value(sourceBaseline.helper,'$FCacheInitialized')===cacheBaseline.initialized,'cache_changed');};
   try {
    live();baseline=snapshot();
+   const nativeLinks=baseline.diagram.FLinks?.FCollection;
+   if(target.kind!=='tree'&&Array.isArray(nativeLinks)&&nativeLinks.length<=400)for(const link of nativeLinks){
+    const input=link.FTargetPort,owner=input?.parent;
+    if(link.FSourcePort!==baseline.port||input?.FType!==0||input.FSubType!==1||!input.data||!input.FGuid
+     ||!owner?.data||!owner.FGuid||input.FCell?.parent!==owner.FCell)continue;
+    links.set(link,{input,owner,linkCell:link.FCell,inputCell:input.FCell,inputData:input.data,inputGuid:input.FGuid,
+     ownerCell:owner.FCell,ownerData:owner.data,ownerGuid:owner.FGuid});
+    linked=true;
+   }
    output=await baseline.portData.get_Output();live();stable();
    dataSource=await output.QueryInterface(target.kind==='tree'?bg.IBGDataTree:bg.IBGDataSource);live();sourceBaseline=source();stable();
    if(target.kind==='tree'){
@@ -589,9 +612,28 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
   if(qualityNativeUncertain)return {verified:false,cleanup_complete:false,reason:'quality_native_pending'};
   if(!released||!context)return {verified:false,cleanup_complete:false,reason:released?'context_changed':'dispose_failed'};
   if(!result)return {verified:false,cleanup_complete:true,reason,...(readDiagnostic?{read_diagnostic:readDiagnostic}:{})};
-  return {verified:true,cleanup_complete:true,output:result};
- },{binding,request,options,before,target,decoder:decodeCell.toString(),treeReader:treeReader.toString(),quality,variant});
+  // Publish the native link bindings only after the outer node check succeeds.
+  let schema_sequence;
+  if(linked&&Number.isSafeInteger(result.row_count)){
+   const {prep,workflow,diagram,node,nodeCell,nodeData,port,portCell,portData,process}=baseline;
+   schema_sequence=prep.schemaPortSequence=(prep.schemaPortSequence??0)+1;
+   prep.pendingSchemaPortReceipt={schema_sequence,workflow,diagram,node,nodeCell,nodeData,port,portCell,portData,process,links,inspect,
+    nodeGuid:b.node.node_id,port_guid:result.port_guid,row_count:result.row_count,
+    execution:{execution_id:result.execution_id,process_id:q.execution.process_id,process_record_id:q.execution.process_record_id}};
+  }
+  return {verified:true,cleanup_complete:true,output:result,schema_sequence};
+ },{binding,request,options,before,target,decoder:decodeCell.toString(),treeReader:treeReader.toString(),quality,variant,inspectExecution:inspectExecution.toString()});
  const after=await readNode(page,binding);
- if(JSON.stringify(before)!==JSON.stringify(after))return {verified:false,cleanup_complete:false,reason:'node_context_changed'};
- return result.verified?{...result,node_context:after}:result;
+ const verified=JSON.stringify(before)===JSON.stringify(after);
+ const schema_sequence=result.schema_sequence;
+ if(schema_sequence!==undefined)await page.evaluate(({documentId,sequence,verified})=>{
+  const prep=globalThis.__loginomDockPreparationV1,pending=prep?.pendingSchemaPortReceipt;
+  if(prep?.document!==document||prep.id!==documentId||pending?.schema_sequence!==sequence)return;
+  delete prep.pendingSchemaPortReceipt;
+  if(verified)(prep.schemaPortReceipts??=new WeakMap()).set(pending.port,pending);
+ },{documentId:binding.document_id,sequence:schema_sequence,verified}).catch(()=>{});
+ if(!verified)return {verified:false,cleanup_complete:false,reason:'node_context_changed'};
+ if(!result.verified)return result;
+ delete result.schema_sequence;
+ return {...result,node_context:after};
 }

@@ -2,7 +2,7 @@ import { inputStore, type InputFile } from "./inputs"
 import { appendFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path"
 import { tmpdir } from "node:os"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { Option, Schema } from "effect"
 import { Loginom } from "./loginom"
 import { RuntimeStartupError, supervise, superviseKnowledge } from "./supervisor"
@@ -17,6 +17,11 @@ import { verifyResources } from "../../loginom-runtime/src/resources.mjs"
 import release from "../../product/loginom-release.json"
 import { startupDiagnostic } from "../../loginom-runtime/client/lib/catalog.mjs"
 import { launchNodeHost, NodeHostStartupError } from "./node-client"
+import { windowPackageSchema } from "./package-schema"
+
+export function runtimeChat(sessionID: string) {
+  return createHash("sha256").update(sessionID).digest("hex")
+}
 
 // Installer and CLI setup share the exact Host cache identity and verifier.
 export async function verifyInstallationResources(options: {
@@ -809,6 +814,21 @@ export async function createLoginomHost(options: {
     },
     hasRuntime(generation: number, chat: string) {
       return generations.get(generation)?.children.has(chat) === true
+    },
+    async packageSchema(sessionID: string) {
+      const chat = runtimeChat(sessionID)
+      const before = await service.api.status()
+      const generation = generations.get(before.generation)
+      const child = generation?.children.get(chat)
+      if (!child || stale.has(chat) || journal.pending().length || recoveries.has(chat)) return null
+      const result = await (await child).request("packageSchema", undefined, 12_000)
+      const after = await service.api.status()
+      if (
+        before.generation !== after.generation || generation?.children.get(chat) !== child ||
+        stale.has(chat) || journal.pending().length || recoveries.has(chat)
+      ) return null
+      const snapshot = windowPackageSchema(result)
+      return snapshot ? { ...snapshot, generation: before.generation } : null
     },
     async workState(generation: number, chat: string) {
       // Inspect only the existing owner. Losing it is uncertainty, not evidence of idle work.

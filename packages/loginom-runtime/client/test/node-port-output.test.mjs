@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {decodePortCell,makeNodePortOutputCode,readNodePortOutput,variantCapability} from '../lib/node-port-output.mjs';
+import {readGraph} from '../lib/node-target-browser.mjs';
 import {collectNativeRuntime} from '../lib/collapse-native-runtime.mjs';
 import {nativeRuntimePins} from '../lib/collapse-native-runtime-pins.mjs';
 import {directNativeRuntimePins} from '../lib/direct-source-native-pins.mjs';
@@ -35,22 +36,102 @@ function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '900719925474
   dataSource.get_RootNodeDef=async()=>treeRoot;dataSource.GetReader=async()=>reader;
  }
  const output=proxy('output',{$S:session,$:{$OW:0,$O:9},QueryInterface:async()=>dataSource});
- const node={FGuid:'node',FCell:{},FStatus:1,FRunning:false,FLocked:false,data:{$S:session}};
+ const node={FGuid:'node',FIconCls:'bg-vendor-icon-importtextfile',FCell:{geometry:{x:0,y:0}},FStatus:1,FRunning:false,FLocked:false,data:{$S:session}};
+ node.FLabel={parent:node,FCell:{parent:node.FCell},FRawValue:'Import'};
  const port={FGuid:portGuid,FCell:{},FStatus:1,FType:1,FSubType:1,FParam:0,FPortIndex:0,parent:node,data:{$S:session,get_Output:async()=>output}};node.FPorts=[{FCollection:[port]}];
- if(treeOutput){port.FSubType=4;port.FCell.parent=node.FCell;}
- const d={FNodes:{FCollection:[node]},FmxGraph:{container:graph,view:{getState:cell=>({shape:{node:cell===node.FCell?body:portDom}})},getSelectionCells:()=>[node.FCell]}};
- const model=Object.assign(new ModelForm(),{FDiagram:d});
+ port.FCell.parent=node.FCell;
+ if(treeOutput)port.FSubType=4;
+ const shapes=new Map([[node.FCell,body],[port.FCell,portDom]]);
+ const d={FNodes:{FCollection:[node]},FLinks:{FCollection:[]},FmxGraph:{container:graph,view:{getState:cell=>({shape:{node:shapes.get(cell)}})},getSelectionCells:()=>[node.FCell]}};
+ const model=Object.assign(new ModelForm(),{FDiagram:d,FCreateDraggedNodeStarted:false,FDraggingOverGraph:false});
  const child={internalId:'child',data:{id:'1.1',Status:3,ErrorDetails:'',ModelNode:node.data},childNodes:[]};
  const group={internalId:'group',data:{id:'1',Status:3,ErrorDetails:'',loaded:true},childNodes:[child]};
  const root={internalId:'root',data:{loaded:true},childNodes:[group]},store={getRoot:()=>root,isLoading:()=>false};
  const tree=el('ConsoleForm;ProgressForm;trpProgress;treepanel;tree');
  const prep={document:null,id:'doc',receipts:new Map([['prepared',{phase:'verified',workflowId:'flow',tab,packageNode,nodeTargetWorkflowNode:workflow}]])};
- const document={querySelectorAll:q=>{if(q.startsWith('[data-tid^='))return [crumb];const tid=JSON.parse(q.slice(10,-1));return elements.has(tid)?[elements.get(tid)]:[];}};prep.document=document;
+ const document={querySelectorAll:q=>{if(q.startsWith('[data-tid^='))return [crumb];if(!q.startsWith('[data-tid='))return [];const tid=JSON.parse(q.slice(10,-1));return elements.has(tid)?[elements.get(tid)]:[];}};prep.document=document;
  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model,Node:{data:{node:workflow}}}})}}}}}};
  const context=vm.createContext({document,bg:{app,IBGDataSource:{},IBGDataTree:{__riid:83},rpc:{TIBGDataSourceRpcCachedInternal_Proxy:{GetValues:batch},TIBGDataSource_Proxy:{prototype:{GetValueAsString:getValueAsString}}}},Out:class {},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date:clock?class extends Date{static now(){return clock.now;}}:Date});
  const page={evaluate:async(fn,arg)=>structuredClone(await vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context))};
- return {page,binding,columnItems,columns,node,port,portDom,integerColumn,dataSource,helper,child,group,root,store,output,disposed,rpcCalls,uiCalls,run:request=>vm.runInNewContext('('+makeNodePortOutputCode(binding,request,{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000})+')')(page)};
+ const addLink=(id,source=port,subtype=1)=>{
+  const target={FGuid:id,FIconCls:'bg-vendor-icon-filter',data:{},FCell:{geometry:{x:50,y:50}}};
+  target.FLabel={parent:target,FCell:{parent:target.FCell},FRawValue:id};
+  const input={FGuid:id+'-input',FCell:{parent:target.FCell},FType:0,FSubType:subtype,parent:target,data:{}};
+  target.FPorts=[{FCollection:[input]}];
+  d.FNodes.FCollection.push(target);
+  const link={FSourcePort:source,FTargetPort:input,FCell:{}};
+  d.FLinks.FCollection.push(link);
+  return link;
+ };
+ const schema=()=>readGraph(page,{request:binding,types:[],origin:'http://example.test',build:'7.4.2',snapshot_only:true,snapshot_details:true});
+ return {page,binding,columnItems,columns,node,port,portDom,integerColumn,dataSource,helper,child,group,root,store,output,disposed,rpcCalls,uiCalls,addLink,schema,diagram:d,
+  run:request=>vm.runInNewContext('('+makeNodePortOutputCode(binding,request,{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000})+')')(page)};
 }
+
+const schemaPortRequest={port:0,execution,sampleRows:0,requireExactNumbers:true};
+
+test('a completed table port receipt labels each confirmed outgoing edge, including zero rows',async()=>{
+ const f=fixture({rows:[]}),otherPort={...f.port,FGuid:'another-output',FCell:{parent:f.node.FCell}};
+ const variablePort={...otherPort,FGuid:'variable-output',FSubType:3,FCell:{parent:f.node.FCell}};
+ f.node.FPorts[0].FCollection.push(otherPort,variablePort);
+ f.addLink('filter');f.addLink('export');f.addLink('other-filter',otherPort);f.addLink('variable-user',variablePort,3);
+ const before=await f.schema();
+ assert.deepEqual(before.links,[
+  {source:'node',output:portGuid,target:'filter',input:'filter-input'},
+  {source:'node',output:portGuid,target:'export',input:'export-input'},
+  {source:'node',output:'another-output',target:'other-filter',input:'other-filter-input'},
+  {source:'node',output:'variable-output',target:'variable-user',input:'variable-user-input'},
+ ]);
+ assert.equal((await f.run(schemaPortRequest)).output.row_count,0);
+ const {links,nodes}=await f.schema();
+ const receipt={execution_id:execution.execution_id,port_guid:portGuid,row_count:0};
+ assert.deepEqual(links,[...before.links.slice(0,2).map(link=>({...link,row_count_receipt:receipt})),...before.links.slice(2)]);
+ assert.equal(nodes[0].ports.find(port=>port.guid==='variable-output').kind,'variables');
+});
+
+test('a rejected port read leaves the graph without a count',async()=>{
+ const f=fixture();
+ f.addLink('filter');
+ const before=await f.schema(),evaluate=f.page.evaluate;
+ const dispose=f.output.dispose;
+ let rejectNodeContext=false;
+ f.output.dispose=async()=>{await dispose();rejectNodeContext=true;};
+ f.page.evaluate=async(fn,arg)=>{
+  if(rejectNodeContext){
+   rejectNodeContext=false;
+   return {verified:false,reason:'graph_node'};
+  }
+  return evaluate(fn,arg);
+ };
+ const result=await f.run(schemaPortRequest);
+ assert.equal(result.reason,'node_context_changed');
+ assert.deepEqual((await f.schema()).links,before.links);
+});
+
+for(const [change,edit] of [
+ ['the node is replaced with the same GUID',f=>{
+  // Even the old port and edge can point to a new owner.
+  const replacement={...f.node};
+  replacement.FLabel={...f.node.FLabel,parent:replacement};
+  f.port.parent=replacement;
+  f.diagram.FNodes.FCollection[0]=replacement;
+ }],
+ ['the native link is replaced with the same endpoints',f=>{
+  f.diagram.FLinks.FCollection[0]={...f.diagram.FLinks.FCollection[0]};
+ }],
+ ['a later run has no port receipt',f=>{
+  const child={...f.child,internalId:'later-child',data:{...f.child.data,id:'2.1'}};
+  f.root.childNodes.push({...f.group,internalId:'later-group',data:{...f.group.data,id:'2'},childNodes:[child]});
+ }],
+])test('the schema omits the previous count when '+change,async()=>{
+ const f=fixture();
+ f.addLink('filter');
+ const edge=(await f.schema()).links[0];
+ assert.equal((await f.run(schemaPortRequest)).verified,true);
+ assert.equal((await f.schema()).links[0].row_count_receipt.row_count,1);
+ edit(f);
+ assert.deepEqual((await f.schema()).links,[edge]);
+});
 
 test('tree_io serialized reader retains completed-port ownership and disposes every acquired proxy',async()=>{
  const f=fixture({treeOutput:true}),result=await f.run({port:0,execution,sampleRows:0,requireExactNumbers:true});

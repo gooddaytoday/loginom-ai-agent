@@ -90,6 +90,13 @@ export async function start(input: {
   return { recovered, close }
 }
 
+/** Read the conversation's existing runtime without taking a run lease. */
+export async function packageSchema(sessionID: string) {
+  if (!connected()) return null
+  const connection = await state.current?.ready
+  return connection?.request?.("package.schema", { sessionID }, 14_000) ?? null
+}
+
 /** Whether the Host finished its handshake: before that, `acquire` waits for it (up to the handshake's 180 s). */
 export function connected() {
   return !!state.current?.connected && !state.current.closing
