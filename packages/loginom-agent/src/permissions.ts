@@ -17,11 +17,13 @@
 //   applies in its `permission.evaluate` hook after every rule and before the product's. The product never lifts it
 //   (`settle`), refuses the conversation grant for a kind it touches, and tells the model who denied (`refusal`).
 import { setTimeout } from "node:timers/promises"
+import { permissionEffect, permissionTable, settingRules, type Kind } from "@loginom-ai-agent/product/permissions"
 import type { Plugin } from "@opencode/plugin"
 import type { ToolContext } from "@opencode/plugin/promise/tool"
 import type { Permission } from "@opencode/schema/permission"
+import { Wildcard } from "@opencode/util/wildcard"
 
-export type Kind = "read" | "write" | "save" | "export" | "web" | "terminal"
+export type { Kind } from "@loginom-ai-agent/product/permissions"
 
 /** The kinds as the user sees them in «Настройки → Разрешения». */
 export const kinds: Record<Kind, string> = {
@@ -33,50 +35,14 @@ export const kinds: Record<Kind, string> = {
   terminal: "Терминал",
 }
 
-type Entry = {
-  readonly action: string
-  readonly resource: string
-  readonly kind: Kind
-  readonly effect: Permission.Effect
-}
+type Entry = (typeof permissionTable)[number]
 
 /**
  * Every permission action of the server's tools and Dock operations that belongs to a kind, with its default (В-30).
  * An action that is not here — `question`, `skill`, `subagent`, `todowrite`, CodeMode `execute`, MCP tools, the other
  * Dock operations — belongs to no kind and keeps OpenCode's rules.
  */
-export const table: readonly Entry[] = [
-  // Project files are read without a question: OpenCode's file tools and the Loginom file tools (each also asks `read`
-  // for the file). `package_docs_run` asks `read` and `edit` itself.
-  ...[
-    "read",
-    "glob",
-    "grep",
-    "loginom_file_admit",
-    "loginom_file_profile",
-    "loginom_file_scan",
-    "loginom_file_sample",
-  ].map((action) => ({ action, resource: "*", kind: "read" as const, effect: "allow" as const })),
-  // The kind covers the project only: OpenCode asks `external_directory` before it touches anything outside, and the
-  // product keeps that question (OpenCode's `build` agent allows it without one).
-  { action: "external_directory", resource: "*", kind: "read", effect: "ask" },
-  // `edit`, `write`, `patch`, image generation and `package_docs_run` all write through the `edit` action.
-  { action: "edit", resource: "*", kind: "write", effect: "ask" },
-  // In the product's Dock profile `dock_action_run` only saves the package (`package.save_as`, `package.save_checkpoint`).
-  { action: "loginom_dock_action_run", resource: "*", kind: "save", effect: "ask" },
-  // A local package opened through `local_package_path` is uploaded into Loginom as a copy (В-75).
-  { action: "loginom_dock_prepare", resource: "local_package", kind: "save", effect: "ask" },
-  // Dashboards (B2.9): publishing sends sources to Loginom, deleting removes the published versions there.
-  { action: "dashboard_publish", resource: "*", kind: "save", effect: "ask" },
-  { action: "dashboard_delete", resource: "*", kind: "save", effect: "ask" },
-  // An export node writes outside the package; the Dock call names the node type as its resource.
-  { action: "loginom_dock_node_apply", resource: "exports.*", kind: "export", effect: "ask" },
-  { action: "webfetch", resource: "*", kind: "web", effect: "ask" },
-  { action: "websearch", resource: "*", kind: "web", effect: "ask" },
-  // The terminal is off until the user turns it on (decision 12, В-68); on, it asks for every command (В-31), and a
-  // schedule's `run` check never runs (`settle`).
-  { action: "shell", resource: "*", kind: "terminal", effect: "deny" },
-]
+export const table = permissionTable
 
 /** The product's defaults as rules. */
 export const rules: Permission.Ruleset = table.map((entry) => ({
@@ -99,13 +65,20 @@ export function classify(action: string, resources: readonly string[]) {
 }
 
 /**
- * The kinds a conversation grant may cover: where the product asks by default, except the terminal (В-31) and a
- * dashboard's deletion (В-102), which ask every time.
+ * Whether a request can share a conversation grant. External-directory access isn't part of the project read grant.
  */
-export function grantable(entry: Entry | undefined) {
+export function grantable(entry: Entry | undefined, effect = entry?.effect) {
   return (
-    entry !== undefined && entry.kind !== "terminal" && entry.action !== "dashboard_delete" && entry.effect === "ask"
+    entry !== undefined &&
+    entry.kind !== "terminal" &&
+    entry.action !== "dashboard_delete" &&
+    entry.action !== "external_directory" &&
+    effect === "ask"
   )
+}
+
+export function conversationGrantable(entry: Entry | undefined, rules: readonly Permission.Rule[]) {
+  return entry !== undefined && grantable(entry, permissionEffect(entry, rules, Wildcard.match) ?? entry.effect)
 }
 
 type Request = {
@@ -120,7 +93,13 @@ type Request = {
  * for a subagent's request, `granted` holds the session's conversation grants, `own` marks a read in the product's own
  * directories (`ownRead`).
  */
-export function settle(request: Request, subagent: boolean, granted: ReadonlySet<Kind>, own = false) {
+export function settle(
+  request: Request,
+  subagent: boolean,
+  granted: ReadonlySet<Kind>,
+  own = false,
+  eligible = grantable,
+) {
   // A deny reaches this hook only from an earlier one: the administrator's policy (B2.6c). Nothing the product allows
   // lifts it, and its text stays.
   if (request.effect === "deny") return { effect: "deny" as const }
@@ -140,7 +119,7 @@ export function settle(request: Request, subagent: boolean, granted: ReadonlySet
     return { effect: request.effect === "allow" ? ("ask" as const) : request.effect }
   // A subagent's own rules (`explore` allows sites and reading outside the project) do not loosen the defaults.
   const effect = subagent && entry.effect === "ask" && request.effect === "allow" ? "ask" : request.effect
-  if (effect === "ask" && grantable(entry) && granted.has(entry.kind)) return { effect: "allow" as const }
+  if (effect === "ask" && eligible(entry) && granted.has(entry.kind)) return { effect: "allow" as const }
   return { effect }
 }
 
@@ -201,13 +180,7 @@ export function deniedKinds(rules: readonly Permission.Rule[]) {
   return (Object.keys(kinds) as Kind[]).filter(
     (kind) =>
       kind !== "terminal" &&
-      table
-        .filter((entry) => entry.kind === kind)
-        .every(
-          (entry) =>
-            rules.findLast((rule) => wildcard(entry.action, rule.action) && wildcard(entry.resource, rule.resource))
-              ?.effect === "deny",
-        ),
+      settingRules(kind).every((entry) => permissionEffect(entry, rules, Wildcard.match) === "deny"),
   )
 }
 
@@ -273,18 +246,6 @@ function blockedError(value: unknown) {
   }
 }
 
-// OpenCode's `Wildcard.match` (`core/src/util/wildcard.ts`), which the plugin cannot import: `*` and `?` in the pattern,
-// `/` for `\`, and a pattern ending in ` *` also matches without its arguments.
-function wildcard(input: string, pattern: string) {
-  const escaped = pattern
-    .replaceAll("\\", "/")
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*/g, ".*")
-    .replace(/\?/g, ".")
-  const tail = escaped.endsWith(" .*") ? escaped.slice(0, -3) + "( .*)?" : escaped
-  return new RegExp("^" + tail + "$", process.platform === "win32" ? "si" : "s").test(input.replaceAll("\\", "/"))
-}
-
 /**
  * `permission.assert` for a tool call that a stop withdraws (B2.9f, B2.9g; the dashboard's and the local file's questions).
  * 0.4 raced the question with the call's abort; the plugin's `assert` outlives a stopped call, so a stop withdraws the
@@ -317,7 +278,9 @@ export async function askWithdrawn(
         open
           .filter((item) => item.source?.messageID === call.messageID && item.source.id === call.id)
           .map((item) =>
-            permission.reply({ sessionID: call.sessionID, requestID: item.id, decision: "once" }).catch(() => undefined),
+            permission
+              .reply({ sessionID: call.sessionID, requestID: item.id, decision: "once" })
+              .catch(() => undefined),
           ),
       )
       await setTimeout(50)

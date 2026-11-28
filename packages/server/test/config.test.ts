@@ -46,6 +46,7 @@ it.live("returns ordered config entries for the requested directory", () =>
       { action: "shell", resource: "git status", effect: "allow" },
     ])
     expect(document?.path).toBe(AbsolutePath.make(config))
+    expect(document?.permissionCaseInsensitive).toBe(process.platform === "win32" ? true : undefined)
     if (!Array.isArray(body)) throw new Error("Expected a config entry array")
     const raw = body.find((entry) => isRecord(entry) && entry["type"] === "document" && entry["path"] === config)
     if (!isRecord(raw) || !isRecord(raw["info"])) throw new Error("Expected a config document")
@@ -96,6 +97,47 @@ it.live("updates the global shell without replacing unrelated JSONC", () =>
     )
     expect(shells.status).toBe(200)
     expect(Array.isArray(yield* Effect.promise(() => shells.json()))).toBe(true)
+  }),
+)
+
+const itWithPermissions = process.getuid?.() === 0 ? it.live.skip : it.live
+
+itWithPermissions("a read-only JSONC file prevents a partial profile reset", () =>
+  Effect.gen(function* () {
+    const tmp = yield* Effect.acquireDisposable(Effect.promise(() => tmpdir("opencode-config-readonly-")))
+    const global = path.join(tmp.path, "global")
+    const json = path.join(global, "loginom-ai-agent.json")
+    const jsonc = path.join(global, "loginom-ai-agent.jsonc")
+    const originalJson = '{"permissions":[{"action":"edit","resource":"*","effect":"deny"}]}\n'
+    const originalJsonc =
+      '{\n  // Keep this comment\n  "permissions":[{"action":"read","resource":"*","effect":"ask"}]\n}\n'
+    yield* Effect.promise(async () => {
+      await fs.mkdir(global)
+      await fs.writeFile(json, originalJson)
+      await fs.writeFile(jsonc, originalJsonc)
+      await fs.chmod(jsonc, 0o444)
+    })
+    yield* Effect.addFinalizer(() => Effect.promise(() => fs.chmod(jsonc, 0o600)))
+    const server = yield* startServer(global)
+    const response = yield* Effect.promise(() =>
+      fetch(new URL("/api/experimental/config", server.base), {
+        method: "PATCH",
+        headers: { ...server.headers, "content-type": "application/json" },
+        body: JSON.stringify({
+          removePermissions: [
+            { action: "edit", resource: "*" },
+            { action: "read", resource: "*" },
+          ],
+        }),
+      }),
+    )
+    expect(response.status).toBe(500)
+    expect(yield* Effect.promise(() => fs.readFile(json, "utf8"))).toBe(originalJson)
+    expect(yield* Effect.promise(() => fs.readFile(jsonc, "utf8"))).toBe(originalJsonc)
+    expect((yield* Effect.promise(() => fs.readdir(global))).sort()).toEqual([
+      "loginom-ai-agent.json",
+      "loginom-ai-agent.jsonc",
+    ])
   }),
 )
 

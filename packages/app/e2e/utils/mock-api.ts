@@ -1,5 +1,6 @@
 import { Predicate, Schema, SchemaGetter } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api"
+import { Patch as ConfigPatch } from "@opencode/schema/config"
 import { PersistentPty } from "@opencode/schema/persistent-pty"
 import { Pty } from "@opencode/schema/pty"
 import { Worktree } from "@opencode/schema/worktree"
@@ -230,7 +231,7 @@ const Group = HttpApiGroup.make("mock")
   .add(HttpApiEndpoint.get("configShells", "/api/config/shell", { success: Json }))
   .add(
     HttpApiEndpoint.patch("configUpdate", "/api/experimental/config", {
-      payload: Schema.Struct({ shell: Schema.NullOr(Schema.String) }),
+      payload: ConfigPatch,
       success: HttpApiSchema.NoContent,
     }),
   )

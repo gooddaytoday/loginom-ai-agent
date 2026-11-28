@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test"
 import type { OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise"
 import { Permission } from "@opencode/schema/permission"
+import type { Patch as ConfigPatch } from "@opencode/schema/config"
 import { artifactKind, artifactMime } from "@opencode/util/artifact"
 import { Model } from "@opencode/schema/model"
 import { Worktree } from "@opencode/schema/worktree"
@@ -70,6 +71,7 @@ export interface MockServerConfig {
   // Without it, writes answer 501 MockUnsupported.
   onFileWrite?: (input: { path: string; directory: string; body: string }) => void
   configEntries?: unknown[]
+  onConfigUpdate?: (patch: ConfigPatch) => void
   directory: string
   project: unknown
   // Replaces the `/api/project` inventory, which defaults to `[project]`. A location inside a listed project
@@ -949,7 +951,7 @@ function mockHandlers(
             canonical: projectSeed(config)?.canonical ?? config.directory,
           }),
         configShells: () => Effect.succeed(config.shells ?? []),
-        configUpdate: () => noContent,
+        configUpdate: ({ payload }) => Effect.sync(() => config.onConfigUpdate?.(payload)).pipe(Effect.andThen(noContent)),
         websearchProviders: () =>
           Effect.sync(() => ({ location: location(config), data: resolve(config.websearchProviders ?? []) })),
         // No scenario signs in to an OpenCode Console workspace, so none has usage limits.
@@ -1251,16 +1253,21 @@ function mockHandlers(
         // The goal plugin's pill reads each routed session's goal; no scenario sets one.
         rpcCall: (ctx) => {
           const url = new URL(ctx.request.url, config.server ?? SERVER)
+
           const response = config.onRpc?.({
             ...ctx.params,
             directory: url.searchParams.get("location[directory]"),
             body: ctx.payload,
           })
+
           if (response && "unavailable" in response)
             return Effect.fail(new MockServiceUnavailable({ message: "RPC unavailable" }))
+
           if (response) return Effect.succeed(response)
+
           if (ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get")
             return Effect.succeed({ output: null })
+
           return Effect.fail(
             new MockUnsupported({ message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC` }),
           )

@@ -15,6 +15,7 @@ import { define } from "@opencode/plugin/effect/plugin"
 import { Location } from "@opencode/schema/location"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Global } from "@opencode/util/global"
+import { Wildcard } from "@opencode/util/wildcard"
 import { Context, Effect, Fiber, Layer, Schema, type Scope } from "effect"
 import { HttpEffect, HttpRouter, HttpServer } from "effect/http"
 import { LanguageModel, LLMClient, type LLMRequest } from "../../ai/src/effect"
@@ -32,6 +33,7 @@ import {
   type Kind,
 } from "../../loginom-agent/src/permissions"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
+import { settingEffect, settingRules } from "../../product/src/permissions"
 import { createEmbeddedRoutes } from "../src/routes"
 import { pluginsLoaded } from "./fixture/routes"
 
@@ -135,11 +137,11 @@ const boot = (
     const handler = Context.get(context, HttpRouter.HttpRouter)
       .asHttpEffect()
       .pipe(HttpEffect.toWebHandlerWith(context))
-    const call = (route: string, body?: unknown) =>
+    const call = (route: string, body?: unknown, method = body === undefined ? "GET" : "POST") =>
       Effect.promise(async () => {
         const response = await handler(
           new Request(`http://opencode.local${route}`, {
-            method: body === undefined ? "GET" : "POST",
+            method,
             headers: { "content-type": "application/json" },
             body: body === undefined ? undefined : JSON.stringify(body),
           }),
@@ -243,6 +245,282 @@ const boot = (
   })
 
 describe("loginom.product permissions (B2.6a)", () => {
+  it.live("preserves both concurrent profile PATCHes from different workspaces", () =>
+    Effect.gen(function* () {
+      const test = yield* boot()
+      const profile = path.join(test.dir, "global", "config", "loginom-ai-agent.jsonc")
+      const workspaces = [path.join(test.dir, "first"), path.join(test.dir, "second")]
+      yield* Effect.promise(async () => {
+        await Promise.all(workspaces.map((workspace) => fs.mkdir(workspace)))
+        await Bun.write(profile, JSON.stringify({ shell: "bash" }))
+      })
+      const at = workspaces.map((workspace) => `location[directory]=${encodeURIComponent(workspace)}`)
+      for (const query of at) expect((yield* test.call(`/api/config?${query}`)).status).toBe(200)
+
+      const patches = yield* Effect.all(
+        [
+          test.call(`/api/experimental/config?${at[0]}`, { permissions: settingRules("read", "ask") }, "PATCH"),
+          test.call(`/api/experimental/config?${at[1]}`, { permissions: settingRules("write", "deny") }, "PATCH"),
+        ],
+        { concurrency: "unbounded" },
+      )
+      expect(patches.map((response) => response.status)).toEqual([204, 204])
+      const saved = yield* Effect.promise(() => Bun.file(profile).json())
+      expect(saved.shell).toBe("bash")
+      expect(settingEffect("read", saved.permissions, Wildcard.match)).toBe("ask")
+      expect(settingEffect("write", saved.permissions, Wildcard.match)).toBe("deny")
+    }),
+  )
+
+  it.live(
+    "a profile save denial blocks a package save requested by the model without changing other settings",
+    () =>
+      Effect.gen(function* () {
+        const commits: string[] = []
+        const test = yield* boot({}, (ctx) =>
+          ctx.tool.transform((editor) =>
+            editor.add({
+              name: "package_save_probe",
+              description: "Save a package to the fake Loginom host",
+              input: Schema.Struct({ path: Schema.String }),
+              output: Schema.String,
+              options: { codemode: false },
+              execute: (input, call) =>
+                ctx.permission
+                  .assert({
+                    sessionID: call.sessionID,
+                    action: "loginom_dock_action_run",
+                    resources: ["*"],
+                    source: { type: "tool", messageID: call.messageID, id: call.id },
+                  })
+                  .pipe(
+                    Effect.map(() => {
+                      commits.push(input.path)
+                      return { output: "saved", content: "saved" }
+                    }),
+                  ),
+            }),
+          ),
+        )
+        const profile = path.join(test.dir, "global", "config", "loginom-ai-agent.jsonc")
+        const at = `location[directory]=${encodeURIComponent(test.dir)}`
+        const other = { action: "other_tool", resource: "*", effect: "deny" }
+        const edit = { action: "edit", resource: "*", effect: "deny" }
+        const exception = { action: "edit", resource: "docs/*", effect: "allow" }
+        const agents = () =>
+          test.call(`/api/agent?${at}`).pipe(
+            Effect.map((response) => {
+              expect(response.status).toBe(200)
+              return response.body.data
+            }),
+          )
+        const installed = yield* agents()
+        yield* Effect.promise(() =>
+          Bun.write(
+            profile,
+            `{
+  // keep this comment
+  "shell": "bash",
+  "permissions": ${JSON.stringify([other, edit, exception])}
+}\n`,
+          ),
+        )
+        const rules = (effect: "allow" | "deny" | "ask") =>
+          Effect.gen(function* () {
+            const patch = yield* test.call(
+              `/api/experimental/config?${at}`,
+              effect === "ask"
+                ? { removePermissions: settingRules("save") }
+                : { permissions: settingRules("save", effect) },
+              "PATCH",
+            )
+            expect(patch.status).toBe(204)
+            return yield* until(() =>
+              test.call(`/api/config?${at}`).pipe(
+                Effect.map((response) => {
+                  const entry = response.body.find((entry: { profile?: boolean }) => entry.profile)
+                  return entry && settingEffect("save", entry.info.permissions, Wildcard.match) === effect
+                    ? entry.info
+                    : undefined
+                }),
+              ),
+            )
+          })
+
+        yield* rules("allow")
+        const allowed = yield* test.create("package save allowed")
+        yield* test.prompt(allowed, script({ tool: "package_save_probe", input: { path: "allowed.lgp" } }))
+        expect(commits).toEqual(["allowed.lgp"])
+
+        const denied = yield* rules("deny")
+        const id = yield* test.create("package save denied")
+        yield* test.prompt(id, script({ tool: "package_save_probe", input: { path: "denied.lgp" } }))
+        expect(commits).toEqual(["allowed.lgp"])
+        expect(yield* test.open(id)).toEqual([])
+        expect(yield* test.tools(id)).toMatchObject([{ state: { status: "error" } }])
+        expect(denied.permissions).toEqual([other, edit, exception, ...settingRules("save", "deny")])
+        expect(denied.shell).toBe("bash")
+        expect(yield* Effect.promise(() => Bun.file(profile).text())).toContain("// keep this comment")
+
+        const reset = yield* rules("ask")
+        expect(reset.permissions).toEqual([other, edit, exception])
+        const patch = (body: object) =>
+          test
+            .call(`/api/experimental/config?${at}`, body, "PATCH")
+            .pipe(Effect.map((response) => expect(response.status).toBe(204)))
+        for (const effect of ["ask", "deny"] as const) {
+          yield* patch(
+            effect === "ask"
+              ? { removePermissions: settingRules("write") }
+              : { permissions: settingRules("write", effect) },
+          )
+          const expected = effect === "ask" ? [other, exception] : [other, ...settingRules("write", effect), exception]
+          const current = yield* until(() =>
+            test.call(`/api/config?${at}`).pipe(
+              Effect.map((response) => {
+                const rules = response.body.find((entry: { profile?: boolean }) => entry.profile)?.info.permissions
+                if (!rules) return
+                const broad = rules.find(
+                  (rule: { action: string; resource: string }) =>
+                    rule.action === edit.action && rule.resource === edit.resource,
+                )
+                return (effect === "ask" ? !broad : broad?.effect === effect) ? rules : undefined
+              }),
+            ),
+          )
+          expect(current).toEqual(expected)
+        }
+        yield* until(() =>
+          agents().pipe(
+            Effect.map((current) => {
+              const build = current.find((agent: { id: string }) => agent.id === "build")
+              return build && settingEffect("write", build.permissions, Wildcard.match) === "deny" ? true : undefined
+            }),
+          ),
+        )
+        const editor = yield* test.create("docs edit exception")
+        expect((yield* test.ask(editor, { action: "edit", resources: ["src/main.ts"], source })).effect).toBe("deny")
+        expect((yield* test.ask(editor, { action: "edit", resources: ["docs/report.md"], source })).effect).toBe("allow")
+        yield* patch({ removePermissions: [...settingRules("write"), exception, other] })
+        yield* until(() =>
+          agents().pipe(
+            Effect.map((current) => (JSON.stringify(current) === JSON.stringify(installed) ? true : undefined)),
+          ),
+        )
+        yield* patch({ permissions: [...settingRules("read", "ask"), ...settingRules("terminal", "allow")] })
+        yield* until(() =>
+          agents().pipe(
+            Effect.map((current) => (JSON.stringify(current) !== JSON.stringify(installed) ? true : undefined)),
+          ),
+        )
+        const reader = yield* test.create("read asks")
+        const read = { action: "read", resources: ["inside.txt"], source }
+        const outside = { action: "external_directory", resources: ["/elsewhere/*"], source }
+        const external = yield* test.ask(reader, outside)
+        expect(external.effect).toBe("ask")
+        const first = yield* test.ask(reader, read)
+        expect(first.effect).toBe("ask")
+        expect((yield* test.conversation(reader, first.id)).body).toEqual({ output: { kind: "read" } })
+        expect((yield* test.open(reader)).map((item) => item.id)).toEqual([external.id])
+        expect((yield* test.ask(reader, read)).effect).toBe("allow")
+        expect((yield* test.ask(reader, outside)).effect).toBe("ask")
+        expect((yield* test.conversation(reader, external.id)).body).toMatchObject({
+          type: "not_grantable",
+          data: { action: "external_directory" },
+        })
+        expect((yield* test.ask(reader, { action: "shell", resources: ["echo test"], source })).effect).toBe("ask")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "profile settings cannot enable edits outside the Plan directory or shadow a narrower wildcard deny",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const profile = path.join(test.dir, "global", "config", "loginom-ai-agent.jsonc")
+        const at = `location[directory]=${encodeURIComponent(test.dir)}`
+        const secret = { action: "*", resource: "*.secret", effect: "deny" }
+        yield* Effect.promise(() => Bun.write(profile, JSON.stringify({ permissions: [secret] })))
+        const response = yield* test.call(
+          `/api/experimental/config?${at}`,
+          { permissions: [...settingRules("write", "allow"), ...settingRules("read", "ask")] },
+          "PATCH",
+        )
+        expect(response.status).toBe(204)
+        const config = yield* test.call(`/api/config?${at}`)
+        expect(config.body.find((entry: { profile?: boolean }) => entry.profile)?.info.permissions.at(-1)).toEqual(
+          secret,
+        )
+        yield* until(() =>
+          test.call(`/api/agent?${at}`).pipe(
+            Effect.map((result) => {
+              const build = result.body.data.find((agent: { id: string }) => agent.id === "build")
+              return build && settingEffect("read", build.permissions, Wildcard.match) === "ask" ? true : undefined
+            }),
+          ),
+        )
+        const id = yield* test.create("profile change")
+        const edit = { action: "edit", resources: ["src/main.ts"], source }
+        expect((yield* test.ask(id, edit)).effect).toBe("allow")
+        expect((yield* test.ask(id, { ...edit, agent: "plan" })).effect).toBe("deny")
+        const planFile = path.join(test.dir, "home", ".loginom-ai-agent", "plan", "review.md")
+        expect((yield* test.ask(id, { ...edit, resources: [planFile], agent: "plan" })).effect).toBe("allow")
+        expect((yield* test.ask(id, { action: "read", resources: ["data.secret"], source })).effect).toBe("deny")
+        expect((yield* test.ask(id, { action: "read", resources: ["inside.txt"], source })).effect).toBe("ask")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "PATCH keeps narrower profile rules effective across files and for a non-universal resource glob",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot()
+        const profile = path.join(test.dir, "global", "config", "loginom-ai-agent")
+        const at = `location[directory]=${encodeURIComponent(test.dir)}`
+        const secret = { action: "*", resource: "*.secret", effect: "deny" }
+        const excel = { action: "loginom_dock_node_apply", resource: "exports.excel", effect: "deny" }
+        yield* Effect.promise(async () => {
+          await Bun.write(`${profile}.json`, JSON.stringify({ permissions: [secret] }))
+          await Bun.write(
+            `${profile}.jsonc`,
+            `{ "permissions": [\n  // Keep Excel exports blocked.\n  ${JSON.stringify(excel)}\n] }\n`,
+          )
+        })
+        const patch = (kind: "read" | "export", effect: "ask" | "allow") =>
+          test.call(`/api/experimental/config?${at}`, { permissions: settingRules(kind, effect) }, "PATCH")
+        expect((yield* patch("read", "ask")).status).toBe(204)
+        const session = yield* test.create("narrower profile rules")
+        yield* until(() =>
+          test.call(`/api/agent?${at}`).pipe(
+            Effect.map((result) => {
+              const build = result.body.data.find((agent: { id: string }) => agent.id === "build")
+              return build && settingEffect("read", build.permissions, Wildcard.match) === "ask" ? true : undefined
+            }),
+          ),
+        )
+        expect((yield* test.ask(session, { action: "read", resources: ["data.secret"], source })).effect).toBe("deny")
+        expect((yield* test.ask(session, { action: "read", resources: ["inside.txt"], source })).effect).toBe("ask")
+
+        expect((yield* patch("export", "allow")).status).toBe(204)
+        yield* until(() =>
+          test.call(`/api/agent?${at}`).pipe(
+            Effect.map((result) => {
+              const build = result.body.data.find((agent: { id: string }) => agent.id === "build")
+              return build && settingEffect("export", build.permissions, Wildcard.match) === "allow" ? true : undefined
+            }),
+          ),
+        )
+        const exportTo = (resource: string) =>
+          test.ask(session, { action: "loginom_dock_node_apply", resources: [resource], source })
+        expect((yield* exportTo("exports.excel")).effect).toBe("deny")
+        expect((yield* exportTo("exports.text")).effect).toBe("allow")
+        expect(yield* Effect.promise(() => Bun.file(`${profile}.jsonc`).text())).toContain("// Keep Excel exports blocked.")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
   it.live(
     "defaults: project files without a question, the other kinds ask, reading outside the project asks, the terminal is off",
     () =>
@@ -294,8 +572,7 @@ describe("loginom.product permissions (B2.6a)", () => {
     () =>
       Effect.gen(function* () {
         const test = yield* boot()
-        // A dashboard's deletion asks every time (В-102): below.
-        for (const request of asked.filter((item) => item.action !== "dashboard_delete")) {
+        for (const request of asked.filter((item) => !["dashboard_delete", "external_directory"].includes(item.action))) {
           const id = yield* test.create(`conversation ${request.action}`)
           const first = yield* test.ask(id, request)
           expect(first.effect).toBe("ask")
@@ -333,6 +610,26 @@ describe("loginom.product permissions (B2.6a)", () => {
         expect((yield* test.conversation(id, first.id)).status).toBe(200)
         expect((yield* test.open(id)).map((item) => item.id)).toEqual([web.id])
         expect(second.effect).toBe("ask")
+      }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
+    timeout,
+  )
+
+  it.live(
+    "a read rule that matches on the host can grant conversation reads without granting other asks",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* boot({
+          permissions: [{ action: process.platform === "win32" ? "READ" : "read", resource: "*", effect: "ask" }],
+        })
+        const session = yield* test.create("read rule")
+        const read = { action: "read", resources: ["inside.txt"], source }
+        const first = yield* test.ask(session, read)
+        expect(first.effect).toBe("ask")
+        expect((yield* test.conversation(session, first.id)).body).toEqual({ output: { kind: "read" } })
+        expect((yield* test.ask(session, read)).effect).toBe("allow")
+        expect(
+          (yield* test.ask(session, { action: "external_directory", resources: ["/elsewhere/*"], source })).effect,
+        ).toBe("ask")
       }).pipe(Effect.scoped, Effect.provideService(Flag.Overrides, undefined)),
     timeout,
   )

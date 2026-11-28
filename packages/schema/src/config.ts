@@ -117,13 +117,19 @@ export class Info extends Schema.Class<Info>("Config.Info")({
 }) {}
 
 export const Patch = Schema.Struct({
-  shell: Schema.NullOr(Schema.String),
+  shell: Schema.NullOr(Schema.String).pipe(optional),
+  permissions: Permission.Ruleset.pipe(optional).annotate({
+    description: "Replace matching rules in place and insert new catch-all resources before narrower matching rules",
+  }),
+  removePermissions: Schema.Array(Schema.Struct({ action: Schema.String, resource: Schema.String })).pipe(optional),
 }).annotate({ identifier: "Config.Patch" })
 export interface Patch extends Schema.Schema.Type<typeof Patch> {}
 
 export class Document extends Schema.Class<Document>("Config.Document")({
   type: Schema.Literal("document"),
   path: AbsolutePath.pipe(optional),
+  profile: Schema.Literal(true).pipe(optional),
+  permissionCaseInsensitive: Schema.Literal(true).pipe(optional),
   info: Info,
 }) {}
 

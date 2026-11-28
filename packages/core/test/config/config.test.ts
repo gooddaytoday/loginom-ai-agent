@@ -1,7 +1,7 @@
 import path from "path"
 import fs from "fs/promises"
 import { describe, expect, test } from "bun:test"
-import { Arbitrary, Effect, Fiber, Layer, Logger, Schema, Stream } from "effect"
+import { Arbitrary, Effect, Fiber, Layer, Logger, PlatformError, Schema, Stream } from "effect"
 import { Config } from "@opencode/core/config"
 import { ConfigDiscovery } from "@opencode/core/config/discovery"
 import { ConfigIntegration } from "@opencode/core/config/integration"
@@ -60,8 +60,9 @@ function testLayer(
   watcher: Layer.Layer<Watcher.Service | Watcher.Test> = Watcher.testLayer,
   credentialNode = emptyCredentialNode,
   wellknownNode = emptyWellknownNode,
-  options?: Config.Options,
+  options?: Config.Options & { filesystem?: Layer.Layer<FSUtil.Service> },
 ) {
+  const { filesystem, ...config } = options ?? {}
   const locationLayer = Layer.succeed(
     Location.Service,
     Location.Service.of(
@@ -72,12 +73,13 @@ function testLayer(
     ),
   )
   const built = AppNodeBuilder.build(LayerNode.group([Config.node, Bus.node]), [
-    Config.node.replace(Config.configured({ system: false, ...options })),
+    Config.node.replace(Config.configured({ system: false, ...config })),
     Location.node.replace(locationLayer),
     Global.node.replace(Global.layerWith({ config: globalDirectory, home: path.join(globalDirectory, "home") })),
     Credential.node.replace(credentialNode),
     WellKnown.node.replace(wellknownNode),
     Watcher.node.replace(watcher),
+    ...(filesystem ? [FSUtil.node.replace(filesystem)] : []),
   ])
   // Merge the watcher layer by reference so Watcher.Test resolves to the same
   // memoized instance the built graph uses.
@@ -95,6 +97,62 @@ const provider = {
 }
 
 describe("Config", () => {
+  it.live("restores the first profile file if installing the second file fails", () =>
+    Effect.gen(function* () {
+      const tmp = yield* Effect.acquireDisposable(Effect.promise(() => tmpdir()))
+      const global = path.join(tmp.path, "global")
+      const json = path.join(global, "loginom-ai-agent.json")
+      const jsonc = path.join(global, "loginom-ai-agent.jsonc")
+      const originalJson = '{"permissions":[{"action":"edit","resource":"*","effect":"deny"}]}\n'
+      const originalJsonc =
+        '{\n  // keep this comment\n  "permissions":[{"action":"read","resource":"*","effect":"ask"}]\n}\n'
+      yield* Effect.promise(async () => {
+        await fs.mkdir(global)
+        await fs.writeFile(json, originalJson, { mode: 0o640 })
+        await fs.writeFile(jsonc, originalJsonc)
+      })
+      const filesystem = yield* FSUtil.Service.pipe(Effect.provide(LayerNode.compile(FSUtil.node)))
+      const jsoncPath = yield* filesystem.resolve(jsonc)
+      const originalMode = (yield* filesystem.stat(json)).mode
+      const failing = Layer.succeed(FSUtil.Service, {
+        ...filesystem,
+        rename: (from, to) =>
+          to === jsoncPath
+            ? Effect.fail(
+                PlatformError.systemError({
+                  _tag: "Busy",
+                  module: "FileSystem",
+                  method: "rename",
+                  pathOrDescriptor: to,
+                }),
+              )
+            : filesystem.rename(from, to),
+      })
+      const error = yield* Config.Service.use((config) =>
+        config.update!({
+          removePermissions: [
+            { action: "edit", resource: "*" },
+            { action: "read", resource: "*" },
+          ],
+        }),
+      ).pipe(
+        Effect.provide(
+          testLayer(tmp.path, global, undefined, undefined, undefined, undefined, undefined, { filesystem: failing }),
+        ),
+        Effect.flip,
+      )
+
+      expect(error).toMatchObject({ reason: { _tag: "Busy" } })
+      expect(yield* Effect.promise(() => fs.readFile(json, "utf8"))).toBe(originalJson)
+      expect((yield* filesystem.stat(json)).mode).toBe(originalMode)
+      expect(yield* Effect.promise(() => fs.readFile(jsonc, "utf8"))).toBe(originalJsonc)
+      expect((yield* Effect.promise(() => fs.readdir(global))).sort()).toEqual([
+        "loginom-ai-agent.json",
+        "loginom-ai-agent.jsonc",
+      ])
+    }),
+  )
+
   it.live("excludes home-level claude and agents directories when global is disabled", () =>
     Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
       Effect.flatMap((tmp) => {

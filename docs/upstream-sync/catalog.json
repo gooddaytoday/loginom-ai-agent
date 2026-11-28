@@ -70,6 +70,19 @@
     },
     { "id": "CAT-05", "title": "Session, tools, attachments, permissions, server", "paths": [], "pending": "B2.5, B2.6, B2.9" },
     {
+      "id": "CAT-20",
+      "title": "Profile permission settings",
+      "paths": [
+        "packages/core/src/config.ts", "packages/core/src/plugin/plan.ts", "packages/core/test/plugin/plan.test.ts", "packages/schema/src/config.ts",
+        "packages/core/src/util/wildcard.ts", "packages/util/src/wildcard.ts", "packages/core/test/config/config.test.ts",
+        "packages/server/src/handlers/config.ts", "packages/server/test/config.test.ts",
+        "packages/protocol/openapi.json",
+        "packages/plugin/src/gui/registries.ts", "packages/app/src/settings/shell.tsx",
+        "packages/app/src/runtime/plugin/settings-page-view.tsx", "packages/app/e2e/regression/settings.spec.ts",
+        "packages/app/e2e/utils/mock-api.ts", "packages/app/e2e/utils/mock-server.ts"
+      ]
+    },
+    {
       "id": "CAT-06",
       "title": "Skills and commands",
       "paths": [

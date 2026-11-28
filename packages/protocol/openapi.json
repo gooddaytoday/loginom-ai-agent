@@ -16389,6 +16389,14 @@
           "path": {
             "$ref": "#/components/schemas/AbsolutePath"
           },
+          "profile": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "permissionCaseInsensitive": {
+            "type": "boolean",
+            "enum": [true]
+          },
           "info": {
             "$ref": "#/components/schemas/Config.InfoEncoded"
           }
@@ -17241,9 +17249,27 @@
                 "type": "null"
               }
             ]
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/Permission.Ruleset"
+          },
+          "removePermissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string"
+                },
+                "resource": {
+                  "type": "string"
+                }
+              },
+              "required": ["action", "resource"],
+              "additionalProperties": false
+            }
           }
         },
-        "required": ["shell"],
         "additionalProperties": false
       },
       "Config.Plugin.EntryEncoded": {

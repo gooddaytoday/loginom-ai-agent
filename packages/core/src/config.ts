@@ -5,6 +5,7 @@ import path from "path"
 import { isDeepStrictEqual } from "node:util"
 import { applyEdits, modify, type ParseError, parse } from "jsonc-parser"
 import { Context, Effect, FiberMap, Layer, Option, PubSub, Ref, Schema, Semaphore, Stream } from "effect"
+import type { PlatformError } from "effect/PlatformError"
 import { Directory, Document, Info, type Patch, type Entry, Event } from "@opencode/schema/config"
 import { Credential } from "./credential.js"
 import { Bus } from "./bus.js"
@@ -24,6 +25,7 @@ import { Connection } from "@opencode/schema/connection"
 import { WellKnown } from "./wellknown.js"
 import { AppProcess } from "@opencode/util/process"
 import { ChildProcess } from "effect/process"
+import { Wildcard } from "./util/wildcard.js"
 
 export function latest<K extends keyof Info>(entries: readonly Entry[], key: K): Info[K] | undefined {
   return entries.findLast((entry): entry is Document => entry.type === "document" && entry.info[key] !== undefined)
@@ -116,6 +118,27 @@ export const testLayer = (
     }),
   )
 
+const profileUpdateLocks = new Map<string, { semaphore: Semaphore.Semaphore; users: number }>()
+
+export const withProfileUpdate = <A, E, R>(directory: string, effect: Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    const fs = yield* FSUtil.Service
+    const resolved = yield* fs.resolve(directory)
+    const key = process.platform === "win32" ? resolved.toLowerCase() : resolved
+    return yield* Effect.acquireUseRelease(
+      Effect.sync(() => {
+        const lock = profileUpdateLocks.get(key) ?? { semaphore: Semaphore.makeUnsafe(1), users: 0 }
+        lock.users++
+        profileUpdateLocks.set(key, lock)
+        return lock
+      }),
+      (lock) => lock.semaphore.withPermit(effect),
+      (lock) => Effect.sync(() => {
+        if (--lock.users === 0) profileUpdateLocks.delete(key)
+      }),
+    )
+  })
+
 export const layer = (options?: Options) =>
   Layer.effect(
     Service,
@@ -129,10 +152,8 @@ export const layer = (options?: Options) =>
       const wellknown = yield* WellKnown.Service
       const processes = yield* AppProcess.Service
       const integrations = new Map<string, ConfigIntegration.Document>()
-      // Integrations set their documents from outside this layer, so their reloads run with its services.
       const context = yield* Effect.context<FSUtil.Service | Global.Service | Location.Service>()
       const reloadLock = Semaphore.makeUnsafe(1)
-      const updateLock = Semaphore.makeUnsafe(1)
       const decodeOptions = { errors: "all", onExcessProperty: "ignore" } as const
       const decodeInfo = Schema.decodeUnknownOption(Info, decodeOptions)
       const parseInfo = Effect.fn("Config.parseInfo")(function* (text: string, source: string) {
@@ -170,13 +191,13 @@ export const layer = (options?: Options) =>
         })
       })
 
-      const loadFile = Effect.fnUntraced(function* (filepath: string) {
+      const loadFile = Effect.fnUntraced(function* (filepath: string, profile?: true) {
         const text = yield* fs.readFileStringSafe(filepath)
         if (text === undefined) return
         const substituted = yield* ConfigVariable.substitute({ type: "path", path: filepath, text })
         const info = yield* parseInfo(substituted, filepath)
         if (!info) return
-        return new Document({ type: "document", path: AbsolutePath.make(filepath), info })
+        return new Document({ type: "document", path: AbsolutePath.make(filepath), info, ...(profile && { profile }) })
       })
 
       const loadWellknownEntry = Effect.fnUntraced(function* (entry: WellKnown.Entry) {
@@ -186,13 +207,15 @@ export const layer = (options?: Options) =>
         // Logging out drops the saved remote config, so the source supplies nothing until a fresh fetch succeeds.
         if (!variables) return yield* wellknown.clearCached(entry.origin).pipe(Effect.as([]))
         // A failed refresh keeps the last resolved config so remote providers and allowlists do not disappear.
-        const configs = yield* wellknown.resolve(entry, variables).pipe(
-          Effect.catch((error) =>
-            Effect.logWarning("failed to load wellknown config", { source: entry.origin, error }).pipe(
-              Effect.andThen(wellknown.cached(entry.origin)),
+        const configs = yield* wellknown
+          .resolve(entry, variables)
+          .pipe(
+            Effect.catch((error) =>
+              Effect.logWarning("failed to load wellknown config", { source: entry.origin, error }).pipe(
+                Effect.andThen(wellknown.cached(entry.origin)),
+              ),
             ),
-          ),
-        )
+          )
         return yield* Effect.forEach(configs, (config) =>
           ConfigVariable.substitute({
             type: "virtual",
@@ -267,11 +290,11 @@ export const layer = (options?: Options) =>
         return info ? [new Document({ type: "document", path: plist, info })] : []
       })
 
-      const loadDirectory = Effect.fnUntraced(function* (directory: AbsolutePath) {
+      const loadDirectory = Effect.fnUntraced(function* (directory: AbsolutePath, profile?: true) {
         return [
-          ...(yield* Effect.forEach(ConfigDiscovery.names, (file) => loadFile(path.join(directory, file))).pipe(
-            Effect.map((configs) => configs.filter((config): config is Document => config !== undefined)),
-          )),
+          ...(yield* Effect.forEach(ConfigDiscovery.names, (file) =>
+            loadFile(path.join(directory, file), profile),
+          ).pipe(Effect.map((configs) => configs.filter((config): config is Document => config !== undefined)))),
           new Directory({ type: "directory", path: directory }),
         ]
       })
@@ -331,7 +354,7 @@ export const layer = (options?: Options) =>
         // Integration documents load right after managed policies: every remote, user, and project layer overrides
         // their settings, and since policies evaluate earliest-loaded first, only managed policies outrank theirs.
         // Global entries sit below explicit and direct files; project directories rank above them.
-        const globalSupplementary = sources.global ? yield* loadDirectory(sources.global).pipe(Effect.orDie) : []
+        const globalSupplementary = sources.global ? yield* loadDirectory(sources.global, true).pipe(Effect.orDie) : []
         const projectSupplementary = yield* Effect.forEach(
           sources.project.filter((root) => root.present),
           (root) => loadDirectory(root.path),
@@ -378,6 +401,7 @@ export const layer = (options?: Options) =>
       })
 
       const initial = yield* ConfigDiscovery.discover(options)
+      const profileDirectory = initial.global ?? AbsolutePath.make(globalService.config)
       let sources = initial
       let configs = yield* load(initial)
       const updates = yield* PubSub.unbounded<Watcher.Update>()
@@ -468,25 +492,35 @@ export const layer = (options?: Options) =>
 
       const update = Effect.fn("Config.update")(
         function* (patch: Patch) {
-          const directory = initial.global ?? AbsolutePath.make(globalService.config)
-          const candidates = ConfigDiscovery.names.map((name) => path.join(directory, name))
-          const filepath =
-            (yield* Effect.filter(candidates, fs.isFile)).at(-1) ?? path.join(directory, "loginom-ai-agent.jsonc")
-          const text = (yield* fs.readFileStringSafe(filepath)) ?? "{}\n"
-          const updated = yield* Effect.try({
-            try: () =>
-              applyEdits(
-                text,
-                modify(text, ["shell"], patch.shell ?? undefined, {
-                  formattingOptions: { tabSize: 2, insertSpaces: true },
-                }),
-              ),
+          if (patch.shell === undefined && !patch.permissions?.length && !patch.removePermissions?.length) return
+          const candidates = ConfigDiscovery.names.map((name) => path.join(profileDirectory, name))
+          const existing = yield* Effect.filter(candidates, (file) =>
+            fs.stat(file).pipe(
+              Effect.map((info) => info.type === "File"),
+              Effect.catchIf(profileFileMissing, () => Effect.succeed(false)),
+            ),
+          )
+          const fallback = existing.at(-1) ?? path.join(profileDirectory, "loginom-ai-agent.jsonc")
+          const permissions = Boolean(patch.permissions?.length || patch.removePermissions?.length)
+          const files = permissions && existing.length ? existing : [fallback]
+          const documents = yield* Effect.forEach(files, (file) =>
+            fs.readFileString(file).pipe(
+              Effect.catchIf(profileFileMissing, () => Effect.succeed("{}\n")),
+              Effect.map((text) => ({ file, text })),
+            ),
+          )
+          const edits = yield* Effect.try({
+            try: () => patchDocuments(documents, patch, permissions),
             catch: (cause) => new FSUtil.FileSystemError({ method: "config.update", cause }),
           })
-          yield* fs.writeWithDirs(filepath, updated.endsWith("\n") ? updated : `${updated}\n`)
-          yield* requestReload
+          yield* writeProfileDocuments(
+            fs,
+            edits.filter(({ text, updated }) => text !== updated),
+          )
+          if (permissions) yield* reload().pipe(Effect.provide(context))
+          else yield* requestReload
         },
-        (effect) => updateLock.withPermit(effect),
+        (effect) => withProfileUpdate(profileDirectory, effect).pipe(Effect.provide(context)),
       )
 
       return Service.of({
@@ -528,6 +562,133 @@ export function configured(options?: Options) {
       AppProcess.node,
     ],
   })
+}
+
+const profileFileMissing = (error: PlatformError) => error.reason._tag === "NotFound"
+
+function writeProfileDocuments(fs: FSUtil.Interface, edits: readonly { file: string; updated: string }[]) {
+  return Effect.scoped(
+    Effect.gen(function* () {
+      const recovery = new Set<string>()
+      const staged = yield* Effect.forEach(edits, (edit) =>
+        Effect.gen(function* () {
+          const destination = yield* fs.resolve(edit.file)
+          const previous = yield* fs.stat(destination).pipe(Effect.catchIf(profileFileMissing, () => Effect.undefined))
+          if (previous) yield* fs.access(destination, { writable: true })
+          const parent = path.dirname(destination)
+          yield* fs.ensureDir(parent)
+          const directory = yield* Effect.acquireRelease(
+            fs.makeTempDirectory({ directory: parent, prefix: ".profile-" }),
+            (directory) =>
+              recovery.has(directory)
+                ? Effect.void
+                : fs
+                    .remove(directory, { recursive: true, force: true })
+                    .pipe(
+                      Effect.catchCause((cause) =>
+                        Effect.logWarning("failed to remove staged profile files", { directory, cause }),
+                      ),
+                    ),
+          )
+          const backup = previous ? path.join(directory, "previous") : undefined
+          if (backup) yield* fs.copyFile(destination, backup)
+          const next = path.join(directory, "next")
+          const content = edit.updated.endsWith("\n") ? edit.updated : `${edit.updated}\n`
+          yield* fs.writeFileString(next, content, { mode: 0o600 })
+          if (previous) yield* fs.chmod(next, previous.mode & 0o777)
+          return { destination, directory, next, backup }
+        }),
+      )
+      const installed: typeof staged = []
+      yield* Effect.forEach(
+        staged,
+        (edit) =>
+          fs.rename(edit.next, edit.destination).pipe(Effect.tap(() => Effect.sync(() => installed.push(edit)))),
+        { discard: true },
+      ).pipe(
+        Effect.onError(() =>
+          Effect.forEach(
+            installed.toReversed(),
+            ({ destination, directory, backup }) =>
+              (backup ? fs.rename(backup, destination) : fs.remove(destination)).pipe(
+                Effect.catchCause((cause) => {
+                  recovery.add(directory)
+                  return Effect.logError("failed to restore profile document", { destination, backup, cause })
+                }),
+              ),
+            { discard: true },
+          ),
+        ),
+        Effect.uninterruptible,
+      )
+    }),
+  )
+}
+
+const isPermissionPair = Schema.is(Schema.Struct({ action: Schema.String, resource: Schema.String }))
+
+function parseDocument(text: string) {
+  const errors: ParseError[] = []
+  const document: unknown = parse(text, errors, { allowTrailingComma: true, allowEmptyContent: true })
+  if (
+    errors.length ||
+    (document !== undefined && (!document || typeof document !== "object" || Array.isArray(document)))
+  )
+    throw new Error("Invalid configuration document")
+  return document
+}
+
+function patchDocuments(files: readonly { file: string; text: string }[], patch: Patch, permissions: boolean) {
+  const options = { formattingOptions: { tabSize: 2, insertSpaces: true } }
+  const documents = files.map((file) => {
+    const value = parseDocument(file.text)
+    const rules = permissions && value && "permissions" in value ? value.permissions : undefined
+    if (rules !== undefined && !Array.isArray(rules)) throw new Error("Invalid configuration permissions")
+    const entries: unknown[] = rules ?? []
+    return { ...file, updated: file.text, rules: entries }
+  })
+  const fallback = documents.at(-1)
+  if (!fallback) return documents
+  if (patch.shell !== undefined)
+    fallback.updated = applyEdits(fallback.updated, modify(fallback.updated, ["shell"], patch.shell ?? undefined, options))
+
+  const key = (rule: { action: string; resource: string }) => JSON.stringify([rule.action, rule.resource])
+  const removed = new Set(patch.removePermissions?.map(key))
+  for (const document of documents) {
+    for (const [index, rule] of Array.from(document.rules.entries()).reverse()) {
+      if (!isPermissionPair(rule) || !removed.has(key(rule))) continue
+      document.updated = applyEdits(document.updated, modify(document.updated, ["permissions", index], undefined, options))
+      document.rules.splice(index, 1)
+    }
+  }
+
+  const incoming = new Map(patch.permissions?.map((rule) => [key(rule), rule]))
+  for (const [pair, rule] of incoming) {
+    const matches = (entry: unknown) => isPermissionPair(entry) && key(entry) === pair
+    const existing = documents.findLast((document) => document.rules.some(matches))
+    if (existing) {
+      const index = existing.rules.findLastIndex(matches)
+      if (isDeepStrictEqual(existing.rules[index], rule)) continue
+      existing.updated = applyEdits(existing.updated, modify(existing.updated, ["permissions", index], rule, options))
+      existing.rules[index] = rule
+      continue
+    }
+
+    const narrower = (entry: unknown) =>
+      isPermissionPair(entry) &&
+      Wildcard.match(rule.action, entry.action) &&
+      entry.resource !== rule.resource &&
+      Wildcard.match(entry.resource, rule.resource)
+    const target = documents.find((document) => document.rules.some(narrower)) ?? fallback
+    const before = target.rules.findIndex(narrower)
+    const index = before < 0 ? target.rules.length : before
+    target.updated = applyEdits(
+      target.updated,
+      modify(target.updated, ["permissions", index], rule, { ...options, isArrayInsertion: true }),
+    )
+    target.rules.splice(index, 0, rule)
+  }
+  return documents
 }
 
 export const node = configured()

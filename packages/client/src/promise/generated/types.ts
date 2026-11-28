@@ -2419,6 +2419,8 @@ export type ConfigEntry =
   | {
       type: "document"
       path?: AbsolutePath
+      profile?: true
+      permissionCaseInsensitive?: true
       info: {
         $schema?: string
         shell?: string
@@ -4961,7 +4963,13 @@ export type ConfigGetOutput = Array<ConfigEntry>
 
 export type ConfigShellsOutput = Array<ConfigShellOption>
 
-export type ExperimentalConfigUpdateInput = { readonly shell: string | null }
+export type ExperimentalConfigUpdateInput = {
+  readonly shell?: string | null | undefined
+  readonly permissions?:
+    | ReadonlyArray<{ readonly action: string; readonly resource: string; readonly effect: "allow" | "deny" | "ask" }>
+    | undefined
+  readonly removePermissions?: ReadonlyArray<{ readonly action: string; readonly resource: string }> | undefined
+}
 
 export type ExperimentalConfigUpdateOutput = void
 

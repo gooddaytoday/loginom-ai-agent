@@ -45,6 +45,20 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     ),
   })
 
+  const Permissions = lazy(() => import("./permissions-page"))
+  ctx.add(SettingsPage, {
+    id: "permissions",
+    icon: "lock",
+    get title() {
+      return ctx.t("permissionsTitle")
+    },
+    render: (input) => (
+      <Suspense>
+        <Permissions workspace={input.workspace} />
+      </Suspense>
+    ),
+  })
+
   ctx.add(QuestionRenderer, {
     matches: (request) => request.metadata?.loginomRepeat === true,
     render: (props) => <LoginomRepeatDock {...props} />,

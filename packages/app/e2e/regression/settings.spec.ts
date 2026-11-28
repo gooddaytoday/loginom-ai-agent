@@ -1,6 +1,12 @@
 import { readFile } from "node:fs/promises"
 import { expect, test, type Page } from "@playwright/test"
-import type { ConfigEntry, OpenCodeEvent, SessionMessageInfo, WorktreeDirectory } from "@opencode/client/promise"
+import type {
+  ConfigEntry,
+  OpenCodeEvent,
+  PermissionRule,
+  SessionMessageInfo,
+  WorktreeDirectory,
+} from "@opencode/client/promise"
 import { NO_PROVIDER, REMOTE_SERVER, SERVER, holdRoute, project, seed, session } from "../utils/app"
 import { mockMissingLocation, mockOpenCodeServer } from "../utils/mock-server"
 import { mockRemoteServer, mockWorkspace, openSession, openSettings, type WorkspaceInput } from "../utils/workspace"
@@ -87,6 +93,7 @@ for (const [issue, text, address] of [
       },
     ])
     expect(fixture.saves).toEqual([])
+
     for (const secret of [loginomPassword, loginomDiagnosticKey]) {
       await expect(form).not.toContainText(secret)
       expect(journal.join("\n")).not.toContain(secret)
@@ -112,9 +119,11 @@ test("Loginom sends preserve, replace and passwordless operations through the se
   await expect(password).toBeDisabled()
   await check.click()
   await expect(checked).toBeVisible()
+
   const saved = page.waitForResponse(
     (response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/save",
   )
+
   await form.getByRole("button", { name: "Save", exact: true }).click()
   expect((await saved).ok()).toBe(true)
   await expect(checked).toBeHidden()
@@ -153,6 +162,7 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
     onRpc: (request) => {
       if (request.rpcID !== "loginom.connection") return
       expect(request.directory).toBe(serviceDirectory)
+
       switch (request.method) {
         case "status":
           return {
@@ -172,11 +182,13 @@ test("Loginom settings use the service Location and recover an unconfirmed Save"
           }
         case "check":
           checks.push(request.body)
+
           return { output: { ok: true, value: { validationId: "checked", expiresAt: 4102444800000 } } }
         case "save":
           expect(request.body).toMatchObject({ input: { revision: 0, validationId: "checked" } })
           username = "analyst"
           revision = 1
+
           return { unavailable: true }
       }
     },
@@ -271,6 +283,7 @@ async function loginomApplication(page: Page, outcome: "applied" | "failed") {
       page.waitForResponse((response) => new URL(response.url()).pathname === "/api/rpc/loginom.connection/status"),
       page.clock.fastForward(duration),
     ])
+
     expect(response.ok()).toBe(true)
   }
 
@@ -295,6 +308,7 @@ async function loginomApplication(page: Page, outcome: "applied" | "failed") {
       data: { revision, generation },
     },
   ])
+
   if (outcome === "failed") {
     await expect(notice).toHaveText("Служба не применила подключение. Проверьте настройки и попробуйте снова.")
     await expect(notice.getByText("Применено", { exact: true })).toHaveCount(0)
@@ -343,6 +357,76 @@ test("a settings page survives refresh", async ({ page }) => {
   await expect(appearance).toHaveAttribute("aria-selected", "true")
   await expect(page).toHaveURL("/settings?tab=appearance")
 })
+
+for (const width of [1280, 390]) {
+  test(`permissions show the persisted result when other profile rules win (${width}px)`, async ({ page }) => {
+    const exception: PermissionRule = { action: "edit", resource: "docs/*", effect: "allow" }
+    const fallback: PermissionRule = { action: "*", resource: "*", effect: "ask" }
+    const profile = [exception, fallback]
+
+    const configEntries: ConfigEntry[] = [
+      { type: "document", path: "/profile/loginom-ai-agent.jsonc", profile: true, info: { permissions: profile } },
+      {
+        type: "document",
+        path: `${directory}/loginom-ai-agent.jsonc`,
+        info: {
+          permissions: [
+            { action: "webfetch", resource: "*", effect: "deny" },
+            { action: "websearch", resource: "*", effect: "deny" },
+          ],
+        },
+      },
+    ]
+
+    await page.setViewportSize({ width, height: 844 })
+    await openSession(page, {
+      name: "Permissions demo",
+      directory,
+      configEntries,
+      onConfigUpdate(patch) {
+        const edit = patch.permissions?.find((rule) => rule.action === "edit" && rule.resource === "*")
+
+        if (edit) profile.unshift(edit)
+
+        if (patch.removePermissions?.some((rule) => rule.action === "edit" && rule.resource === "*")) {
+          profile.splice(0, profile.length, exception, fallback)
+        }
+      },
+    })
+    await page.keyboard.press("Control+,")
+    const settings = page.getByTestId("settings-screen")
+
+    if (width === 390) {
+      await settings.getByRole("button", { name: "Preferences", exact: true }).click()
+      await page.getByRole("menuitemradio", { name: "Permissions", exact: true }).click()
+    } else {
+      await settings.getByRole("tab", { name: "Permissions", exact: true }).click()
+    }
+
+    const writeControl = { name: "Create and change project files", exact: true }
+    const write = settings.getByRole("combobox", writeControl)
+    const writeRow = settings.locator('[data-component="settings-row"]').filter({ has: page.getByRole("combobox", writeControl) })
+    const overridden = writeRow.getByText("Other profile rules override your choice: Ask.", { exact: true })
+    await expect(write).toHaveValue("ask")
+    await expect(write).toHaveAccessibleDescription("Default")
+    await expect(settings.getByRole("combobox", { name: "Read project files", exact: true })).toHaveAccessibleDescription(
+      "You changed this · default: “Allowed”",
+    )
+    await expect(
+      settings.getByRole("switch", { name: "Allow the agent to use the terminal", exact: true }),
+    ).toHaveAccessibleDescription("You changed this · default: “Off”")
+    await expect(settings.getByText("In this workspace: Denied", { exact: true })).toBeVisible()
+    await write.selectOption("deny")
+    await expect(overridden).toBeVisible()
+    await expect(write).toHaveValue("ask")
+    await settings.getByRole("button", { name: "Reset to defaults", exact: true }).click()
+    await expect(write).toBeEnabled()
+    await expect(overridden).toHaveCount(0)
+    await expect(write).toHaveValue("ask")
+    await expect(write).toHaveAccessibleDescription("Default")
+    expect(profile).toEqual([exception, fallback])
+  })
+}
 
 // The Arabic dictionary chunks: built (`_assets/ar-<hash>.js`) and dev (`.../i18n/ar.ts`), for the app and the UI.
 const arabic = /\/(?:_assets\/ar-[\w-]+\.js|i18n\/ar\.ts)(?:\?|$)/
@@ -2227,15 +2311,19 @@ test("providers: settings and the connect dialog list popular providers in the s
     { id: "anthropic", name: "Anthropic" },
     { id: "google", name: "Google" },
   ]
+
   const { settings } = await open(page, {
     integrations: popular.toReversed().map((item) => ({ ...item, methods: [{ type: "key" }], connections: [] })),
   })
+
   const names = popular.map((item) => item.name)
 
   await settings.getByRole("tab", { name: "Providers", exact: true }).click()
+
   const section = settings.locator(".settings-section").filter({
     has: page.getByRole("heading", { name: "Popular providers", exact: true }),
   })
+
   await expect(section.locator(".settings-provider-name")).toHaveText(names)
 
   await settings.getByRole("button", { name: "Show more providers", exact: true }).click()

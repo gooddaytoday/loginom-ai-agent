@@ -1,12 +1,26 @@
 import { Config } from "@opencode/core/config"
 import { ShellSelect } from "@opencode/core/shell/select"
+import { Document } from "@opencode/schema/config"
+import { Wildcard } from "@opencode/util/wildcard"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/http-api"
 import { Api } from "../api"
 
 export const ConfigHandler = HttpApiBuilder.group(Api, "server.config", (handlers) =>
   handlers
-    .handle("config.get", () => Config.Service.use((config) => config.entries()))
+    .handle("config.get", () =>
+      Config.Service.use((config) =>
+        config.entries().pipe(
+          Effect.map((entries) =>
+            Wildcard.caseInsensitive()
+              ? entries.map((entry) =>
+                  entry.type === "document" ? new Document({ ...entry, permissionCaseInsensitive: true }) : entry,
+                )
+              : entries,
+          ),
+        ),
+      ),
+    )
     .handle(
       "config.update",
       Effect.fn(function* (ctx) {

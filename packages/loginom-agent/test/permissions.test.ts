@@ -116,14 +116,15 @@ describe("permission kinds", () => {
     expect(withDefaults(denied)).toEqual([...rules, ...denied])
   })
 
-  test("a conversation grant covers what the product asks by default, never the terminal (В-31) or a deletion (В-102)", () => {
+  test("a conversation grant excludes external directories, terminal commands and dashboard deletion", () => {
     expect(grantable(classify("edit", ["a"]))).toBe(true)
-    expect(grantable(classify("external_directory", ["/x/*"]))).toBe(true)
+    expect(grantable(classify("external_directory", ["/x/*"]), "ask")).toBe(false)
     expect(grantable(classify("webfetch", ["https://example.com"]))).toBe(true)
     expect(grantable(classify("dashboard_publish", ["Заказы", "/a.lgp"]))).toBe(true)
     expect(grantable(classify("dashboard_delete", ["Заказы", "/a.lgp"]))).toBe(false)
     // Asked only by OpenCode's own rules (a `.env` file) or never asked by the product.
     expect(grantable(classify("read", [".env"]))).toBe(false)
+    expect(grantable(classify("read", ["inside.txt"]), "ask")).toBe(true)
     expect(grantable(classify("shell", ["ls"]))).toBe(false)
     expect(grantable(classify("question", ["*"]))).toBe(false)
   })
