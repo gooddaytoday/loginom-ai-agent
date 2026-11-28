@@ -16,7 +16,7 @@
     },
     {
       "id": "calculation",
-      "text": "Для каждой из восьми функций сопоставь конверсию использовавших и не использовавших её клиентов; это описательные доли, не причинный эффект. Используй ровно поля feature_dashboard, feature_reports, feature_settings, feature_integrations, feature_api, feature_notifications, feature_export, feature_team. feature — полное исходное имя такого поля, used — его исходный целый флаг 0 или 1. Для каждой пары feature,used посчитай users — количество строк; converters — сумму converted; conversion_pct=100*converters/users. Не фильтруй по signup_date, days_active или plan_type.",
+      "text": "Для каждой из восьми функций сопоставь конверсию использовавших и не использовавших её клиентов; это описательные доли, не причинный эффект. Используй ровно поля feature_dashboard, feature_reports, feature_settings, feature_integrations, feature_api, feature_notifications, feature_export, feature_team. feature — полное исходное имя такого поля, used — его исходный целый флаг 0 или 1. Для каждой пары feature,used посчитай users — количество строк; converters — сумму converted; conversion_pct=100*converters/users. Не фильтруй по signup_date, days_active или plan_type. В узле «Группировка» Loginom gdCount по конкретному полю считает все строки группы, включая строки с пустым значением или NULL в этом поле. gdNullCount считает только NULL, а gdUniqueCount — различные значения. Они не заменяют подсчёт всех строк, даже если итог на этих данных совпадает.",
       "required": true
     },
     {
