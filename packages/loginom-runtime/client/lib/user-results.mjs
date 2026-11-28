@@ -288,12 +288,11 @@ export function loginomFeedMetadata(reply, {tool, outputFiles = [], knownSecrets
     if (remaining <= 0) break;
     const rows = port.sample ?? [];
     if (!rows.length && (table.rowCount !== 0 || !port.sample_complete)) continue;
-    const sensitive = port.schema.map(column => {
-      const name = `${column.name} ${column.label}`;
+    const sensitive = port.schema.map(column => [column.name, column.label].some(name => {
+      if (typeof name !== 'string') return false;
       const words = name.replace(/(\p{Ll})(\p{Lu})/gu, '$1 $2');
-      return /password|passwd|secret|token|api.?key|access.?key|authorization|cookie|private.?key|пароль|токен|credential/i.test(name)
-        || /(?:^|[^\p{L}\p{N}])(?:pwd|pass|ключ)(?=$|[^\p{L}\p{N}])/iu.test(words);
-    });
+      return /(?:^|[^\p{L}\p{N}])(?:api[\s_-]?key|secret|token|password|pwd|pass|пароль|ключ[\s_-]+(?:api|доступа)|credential)(?=$|[^\p{L}\p{N}])/iu.test(words);
+    }));
     const schema = port.schema.map(column => ({index: column.index, name: text(column.name), label: text(column.label),
       type: text(column.type, 128), data_kind: text(column.data_kind, 128)}));
     const sample = [];

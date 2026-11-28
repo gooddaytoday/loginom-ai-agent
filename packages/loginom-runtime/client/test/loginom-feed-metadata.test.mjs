@@ -95,14 +95,19 @@ test('projection masks credential columns and recognizable tokens but preserves 
   assert.deepEqual(ports.map(table => table.preview.sample.map(row => row[0].value)), [['[redacted]', null], ['[redacted]', '[redacted]']]);
 });
 
-test('projection masks pwd, pass, ключ and credential columns without masking ordinary words', () => {
+test('projection masks explicit secret names and keeps analytics keys visible', () => {
   const tool = 'dock_node_wait';
-  const names = ['db_pwd', 'dbPass', 'Ключ доступа', 'credential', 'compass'];
-  const sample = {...port([names.map(() => cell('visible'))]), schema:names.map((name, index) => ({...column, name, index}))};
+  const secretNames = ['db_pwd', 'dbPass', 'Ключ доступа', 'credential', 'api_key', 'apikey', 'apiKey',
+    'secret', 'access_token', 'password', 'Пароль'];
+  const visibleNames = ['compass', 'Ключ клиента', 'Ключ заказа', 'tokenizer', 'Ключ'];
+  const schema = [...secretNames, 'service_auth', ...visibleNames].map((name, index) => ({
+    ...column, name, index, label: name === 'service_auth' ? 'Ключ API' : column.label,
+  }));
+  const sample = {...port([schema.map(() => cell('visible'))]), schema};
   const reply = nodeResultReply(receipt({ports:[sample]}), {userProfile:true, tool});
   const {ports} = loginomFeedMetadata(reply, {tool});
   assert.deepEqual(ports[0].preview.sample[0].map(cell => cell.value),
-    ['[redacted]', '[redacted]', '[redacted]', '[redacted]', 'visible']);
+    [...secretNames.map(() => '[redacted]'), '[redacted]', ...visibleNames.map(() => 'visible')]);
 });
 
 test('projection preserves identifiers that contain a known secret', () => {
