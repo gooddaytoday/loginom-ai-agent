@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { addAbortListener } from "node:events"
 import { Option, Schema } from "effect"
 import { Loginom } from "../loginom"
+import { Address, settingsAddress } from "../settings-rpc"
 import { Product } from "@loginom-ai-agent/product"
 import { connectionStore, type ActiveConnection } from "./connection-store"
 import type { recoveryStore } from "./recovery-store"
@@ -149,7 +150,7 @@ export async function connectionService(
       revision: state.revision,
       generation: current?.generation ?? 0,
       ...(state.setupRequired ? { setupRequired: state.setupRequired } : {}),
-      url: settingsAddress(current?.url ?? Product.connection.url),
+      url: legacyAddress(current?.url ?? Product.connection.url),
       username: current?.username ?? Product.connection.username,
       folder: `/${current?.username ?? Product.connection.username}`,
       hasPassword: !!current?.password,
@@ -307,7 +308,8 @@ export async function connectionService(
     async status() {
       return view()
     },
-    async check(input, settings = false) {
+    async check(input, settings = false, signal) {
+      signal?.throwIfAborted()
       requireProfile()
       const decoded = decodeCandidate(input)
       if (Option.isNone(decoded)) throw new Error("LOGINOM_CANDIDATE_INVALID")
@@ -315,13 +317,15 @@ export async function connectionService(
       if (candidate.revision !== state.revision) throw new Error("LOGINOM_REVISION_CONFLICT")
       if (state.applying || state.writing) throw new Error("LOGINOM_APPLICATION_PENDING")
       validateAddress(candidate.url, candidate.username)
+      if (settings && !Schema.is(Address)(candidate.url)) throw new Error("LOGINOM_URL_INVALID")
+      const url = settings ? settingsAddress(candidate.url) : legacyAddress(candidate.url)
       const stored = state.pending ?? state.active
       if (
         settings &&
         candidate.password.operation === "preserve" &&
         (!stored?.password ||
           stored.username !== candidate.username ||
-          new URL(settingsAddress(stored.url)).href !== new URL(candidate.url).href)
+          settingsAddress(stored.url) !== url)
       )
         throw new Error("LOGINOM_PASSWORD_REQUIRED")
       const password =
@@ -333,7 +337,7 @@ export async function connectionService(
       const record = {
         generation: state.generation + 1,
         revision: state.revision + 1,
-        url: settingsAddress(candidate.url),
+        url,
         // Retain private provenance for the validated user choice. Startup
         // preserves saved URLs independently of this marker.
         urlSource: "explicit" as const,
@@ -343,13 +347,14 @@ export async function connectionService(
         password,
       }
       const controller = new AbortController()
-      const checking = Promise.resolve().then(() => runtime.check(record, controller.signal, settings))
+      const checkSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
+      const checking = Promise.resolve().then(() => runtime.check(record, checkSignal, settings))
       checks.set(controller, checking)
       const browser = (await checking
         .catch((error: unknown) => {
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
             state.checkCleanupFailed = true
-          controller.signal.throwIfAborted()
+          checkSignal.throwIfAborted()
           const code =
             error instanceof Error &&
             [
@@ -366,6 +371,7 @@ export async function connectionService(
           throw new Error(code, { cause: error })
         })
         .finally(() => checks.delete(controller))) ?? { state: "unknown" as const }
+      checkSignal.throwIfAborted()
       if (state.closing) throw new Error("LOGINOM_HOST_CLOSED")
       if (candidate.revision !== state.revision || state.applying || state.writing)
         throw new Error("LOGINOM_REVISION_CONFLICT")
@@ -512,7 +518,7 @@ export async function connectionService(
 }
 
 // The browser adds its automation flag privately; old saved URLs may contain it.
-function settingsAddress(value: string) {
+function legacyAddress(value: string) {
   const url = new URL(value)
   if (!url.searchParams.has("testable")) return value
   url.searchParams.delete("testable")
