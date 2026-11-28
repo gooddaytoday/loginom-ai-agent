@@ -107,13 +107,6 @@
         "packages/ui/src/i18n/en.ts"
       ]
     },
-    {
-      "id": "CAT-15",
-      "title": "Server acceptance tests for confirmed exports (C3.13)",
-      "paths": [
-        "packages/server/test/loginom-dock-catalog.test.ts", "packages/server/test/loginom-local-file.test.ts"
-      ]
-    },
     { "id": "CAT-09", "title": "Desktop main process, preload, renderer and window tests", "paths": ["packages/desktop/**"] },
     {
       "id": "CAT-21",
