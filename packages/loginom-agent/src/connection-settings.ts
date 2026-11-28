@@ -1,6 +1,13 @@
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import { Loginom } from "@loginom-ai-agent/loginom-host/loginom"
-import { Address, Definition, Status, type Candidate, type Issue } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import {
+  Address,
+  ConnectionSettingsRpc,
+  settingsAddress,
+  type Candidate,
+  type Issue,
+  type Status,
+} from "@loginom-ai-agent/loginom-host/settings-rpc"
 import type { RpcHandlers } from "@opencode/plugin/promise/rpc"
 import { Schema } from "effect"
 import { ServiceHost } from "./host"
@@ -16,18 +23,16 @@ export function connectionSettings(
     url.hostname === "localhost" ||
     url.hostname === "[::1]" ||
     /^127(?:\.\d{1,3}){3}$/.test(url.hostname)
+
   const readStatus = (reply: unknown): Status => {
     const view = Schema.decodeUnknownSync(Loginom.View)(reply)
-    const url = new URL(view.url)
-    url.username = ""
-    url.password = ""
-    url.search = ""
-    url.hash = ""
-    const blocked = !allowed(url)
+    const url = settingsAddress(view.url)
+    const blocked = !allowed(new URL(url))
+
     return {
       revision: view.revision,
       generation: view.generation,
-      url: blocked ? "" : url.href,
+      url: blocked ? "" : url,
       username: view.username,
       folder: view.folder,
       hasPassword: !blocked && view.hasPassword,
@@ -46,12 +51,12 @@ export function connectionSettings(
   }
   return {
     status: () => status("connection.status", {}),
-    async check(candidate: Candidate) {
+    async check(candidate: Candidate, context: { signal: AbortSignal }) {
       try {
         if (!Schema.is(Address)(candidate.url)) return { ok: false, issue: "invalidAddress" }
         if (!allowed(new URL(candidate.url))) return { ok: false, issue: "deviceAddress" }
         const { validationId, expiresAt } = Schema.decodeUnknownSync(Loginom.Validation)(
-          await request("connection.settings.check", candidate, 240_000),
+          await request("connection.settings.check", candidate, 240_000, context.signal),
         )
         return { ok: true, value: { validationId, expiresAt } }
       } catch (error) {
@@ -59,7 +64,7 @@ export function connectionSettings(
       }
     },
     save: (input: typeof Loginom.Save.Type) => status("connection.settings.save", input),
-  } satisfies RpcHandlers<typeof Definition>
+  } satisfies RpcHandlers<typeof ConnectionSettingsRpc>
 }
 
 function issue(error: unknown, fallback: Issue): Issue {

@@ -1,92 +1,23 @@
-import { Definition, type Issue, type Status } from "@loginom-ai-agent/loginom-host/settings-rpc"
-import { createKeyed, usePlugin, type ServerRef } from "@opencode/plugin/gui"
+import type { Issue } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import { usePlugin } from "@opencode/plugin/gui"
 import { Checkbox } from "@opencode/ui/checkbox"
 import { TextField } from "@opencode/ui/text-field"
-import { createMemo, createSignal, onCleanup, Show, untrack } from "solid-js"
+import { onCleanup, onMount, Show } from "solid-js"
 import type definition from "./index"
-import { initial, transition, view } from "./machine"
+import type { profileService } from "./target"
 
 export default function Page(props: {
-  server?: ServerRef
-  blank?: boolean
-  onSaved(status: Status): void
+  service: ReturnType<typeof profileService>
+  onOpen(): void
   onClose(): void
 }) {
   const ctx = usePlugin<typeof definition>()
   const ui = ctx.ui
-  const [state, setState] = createSignal(initial)
-  const page = createMemo(() => view(state()))
-
+  const { page, dispatch } = props.service
   const errorText = (issue: Issue | undefined) => (issue ? ctx.t(issue) : undefined)
 
-  const client = () => props.server?.client
-  let saved = false
-
-  let controller: AbortController | undefined
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const dispatch = (event: Parameters<typeof transition>[1]) => {
-    const next = transition(untrack(state), event)
-    setState(next.state)
-    next.effects.forEach(run)
-  }
-
-  function run(effect: ReturnType<typeof transition>["effects"][number]) {
-    if (effect.type === "cancel") {
-      clearTimeout(timer)
-      controller?.abort()
-      return
-    }
-    const request = async () => {
-      controller = new AbortController()
-      const signal = AbortSignal.any([
-        controller.signal,
-        AbortSignal.timeout(effect.type === "check" ? 245_000 : 12_000),
-      ])
-      const rpc = untrack(client)?.rpc(Definition)
-      switch (effect.type) {
-        case "status": {
-          const result = await rpc?.status({}, { signal }).catch(() => undefined)
-          const active = untrack(state).attempt === effect.attempt
-          dispatch({
-            type: "status",
-            attempt: effect.attempt,
-            blank: props.blank,
-            result: result ?? { ok: false, issue: "unavailable" },
-          })
-          if (active && saved && result?.ok && result.value.state === "ready") props.onSaved(result.value)
-          break
-        }
-        case "check": {
-          const result = await rpc?.check(effect.input, { signal }).catch(() => undefined)
-          dispatch({ type: "checked", attempt: effect.attempt, result: result ?? { ok: false, issue: "unavailable" } })
-          break
-        }
-        case "save": {
-          const result = await rpc?.save(effect.input, { signal }).catch(() => undefined)
-          const active = untrack(state).attempt === effect.attempt
-          if (active) saved = result?.ok ?? false
-          dispatch({ type: "saved", attempt: effect.attempt, result: result ?? { ok: false, issue: "saveFailed" } })
-          if (active && result?.ok && result.value.state === "ready") props.onSaved(result.value)
-          break
-        }
-      }
-    }
-    if (effect.type === "status" && effect.delay) {
-      timer = setTimeout(() => void request(), effect.delay)
-      return
-    }
-    void request()
-  }
-
-  const reload = () => {
-    saved = false
-    dispatch({ type: "target", available: !!client() })
-  }
-  createKeyed(client, reload, { otherwise: reload })
-  onCleanup(() => {
-    dispatch({ type: "disposed" })
-    props.onClose()
-  })
+  onMount(() => props.onOpen())
+  onCleanup(() => props.onClose())
 
   return (
     <ui.SettingsLayout title={ctx.t("title")} description={ctx.t("description")}>
@@ -177,7 +108,7 @@ export default function Page(props: {
                 </ui.Button>
               </Show>
               <Show when={page().retry}>
-                <ui.Button onClick={reload}>{ctx.t("retry")}</ui.Button>
+                <ui.Button onClick={() => dispatch({ type: "refresh" })}>{ctx.t("retry")}</ui.Button>
               </Show>
             </div>
           </Show>

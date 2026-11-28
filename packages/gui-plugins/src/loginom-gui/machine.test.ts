@@ -16,7 +16,8 @@ const fresh = {
 
 function form(status: Status = fresh) {
   const loaded = transition(initial, { type: "target", available: true }).state
-  return transition(loaded, { type: "status", attempt: loaded.attempt, result: { ok: true, value: status } }).state
+  return transition(loaded, { type: "status", now: 1000, attempt: loaded.attempt, result: { ok: true, value: status } })
+    .state
 }
 
 function check(state = form()) {
@@ -72,13 +73,15 @@ test("Save checks first and reports pending activation until the service applies
   expect(saved.effects).toMatchObject([{ type: "save", input: { validationId: "checked" } }])
   const pending = transition(saved.state, {
     type: "saved",
+    now: 1000,
     attempt: saved.state.attempt,
     result: { ok: true, value: { ...fresh, revision: 1, state: "pending" } },
   })
-  expect(view(pending.state)).toMatchObject({ message: "pending", readOnly: true })
+  expect(view(pending.state)).toMatchObject({ message: "pending", readOnly: false })
   expect(pending.effects).toMatchObject([{ type: "status" }])
   const applied = transition(pending.state, {
     type: "status",
+    now: 2000,
     attempt: pending.state.attempt,
     result: { ok: true, value: { ...fresh, revision: 1, generation: 1, state: "ready" } },
   }).state
@@ -95,6 +98,7 @@ test("unavailable, changed targets and disposal ignore late completions", () => 
   const loading = transition(gone, { type: "target", available: true }).state
   const timedOut = transition(loading, {
     type: "status",
+    now: 2000,
     attempt: loading.attempt,
     result: { ok: false, issue: "unavailable" },
   }).state
@@ -108,4 +112,61 @@ test("the saved password can only be reused for its own Loginom address and user
   expect(check(stored).effects).toMatchObject([{ type: "check", input: { password: { operation: "preserve" } } }])
   const changed = transition(stored, { type: "edit", patch: { url: "https://other.example/" } }).state
   expect(view(check(changed).state).fieldErrors.password).toBe("passwordRequired")
+})
+
+test("a disconnected check preserves the address and username for a retry", () => {
+  const draft = { url: "https://other.example/", username: "analyst" }
+  const edited = transition(form(), { type: "edit", patch: draft }).state
+  const checking = check(edited).state
+  const failed = transition(checking, {
+    type: "checked",
+    attempt: checking.attempt,
+    result: { ok: false, issue: "unavailable" },
+  }).state
+  expect(view(failed)).toMatchObject({ draft, issue: "unavailable", busy: false })
+  expect(check(failed).effects).toMatchObject([{ type: "check", input: draft }])
+})
+
+test("a lost Save reply refreshes the revision before another check", () => {
+  const checking = check().state
+  const verified = transition(checking, { type: "checked", attempt: checking.attempt, result: validation }).state
+  const saving = transition(verified, { type: "submit", submit: "save", now: 3000 }).state
+  const refreshing = transition(saving, {
+    type: "saved",
+    attempt: saving.attempt,
+    now: 4000,
+    result: { ok: false, issue: "saveFailed" },
+  })
+  expect(refreshing.effects).toMatchObject([{ type: "status", attempt: refreshing.state.attempt }])
+  expect(view(refreshing.state).issue).toBeUndefined()
+  const edited = transition(refreshing.state, { type: "edit", patch: { username: "next-user" } }).state
+  const current = transition(edited, {
+    type: "status",
+    attempt: refreshing.state.attempt,
+    now: 5000,
+    result: { ok: true, value: { ...fresh, revision: 1, generation: 1, state: "ready" } },
+  }).state
+  expect(view(current)).toMatchObject({
+    issue: undefined,
+    connected: { username: "user" },
+    draft: { username: "next-user" },
+  })
+  expect(check(current).effects).toMatchObject([{ type: "check", input: { revision: 1, username: "next-user" } }])
+})
+
+test("polling is bounded and keeps edits made while the connection is pending", () => {
+  const loading = transition(initial, { type: "target", available: true }).state
+  const pending = { ok: true, value: { ...fresh, revision: 1, state: "pending" } } as const
+  const applying = transition(loading, { type: "status", attempt: loading.attempt, now: 1000, result: pending }).state
+  const edited = transition(applying, { type: "edit", patch: { username: "next-user" } }).state
+  expect(view(edited)).toMatchObject({ message: "pending", readOnly: false, draft: { username: "next-user" } })
+  const paused = transition(edited, { type: "status", attempt: edited.attempt, now: 16000, result: pending })
+  expect(paused.effects).toEqual([])
+  expect(view(paused.state)).toMatchObject({
+    message: "applicationPaused",
+    busy: false,
+    retry: true,
+    draft: { username: "next-user" },
+  })
+  expect(check(paused.state).effects).toMatchObject([{ type: "check", input: { revision: 1, username: "next-user" } }])
 })

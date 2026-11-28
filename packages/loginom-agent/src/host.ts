@@ -18,7 +18,7 @@ export type Lease = NonNullable<Awaited<ReturnType<typeof LoginomHost.acquire>>>
 export type Connection = {
   port: Port
   close(): Promise<void>
-  request?: (method: string, input: unknown, timeout?: number) => Promise<unknown>
+  request?: (method: string, input: unknown, timeout?: number, signal?: AbortSignal) => Promise<unknown>
 }
 
 type Started = {
@@ -156,11 +156,11 @@ export const connectionSettings = {
   },
 }
 
-async function request(method: string, input: unknown, timeout?: number) {
+async function request(method: string, input: unknown, timeout?: number, signal?: AbortSignal) {
   const current = state.current
   const connection = await current?.ready
   if (!connection?.request || current?.closing) throw new Error("LOGINOM_HOST_NOT_READY")
-  return connection.request(method, input, timeout)
+  return connection.request(method, input, timeout, signal)
 }
 
 /** Releases every lease still held, disconnects and closes the Host. Idempotent: soft stop (B2.3b) may call it first. */

@@ -2,11 +2,8 @@
 // reserved ID (seam U1, `packages/core/src/plugin/product.ts`). The Host itself belongs to the server process
 // (`./host`); this plugin leases it for its sessions (B2.3) and offers its Dock catalog (B2.5d).
 import { join } from "node:path"
-import {
-  connectionRequiredTool,
-  Definition as ConnectionSettingsRpc,
-} from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { connectionRequiredTool, ConnectionSettingsRpc } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Plugin } from "@opencode/plugin"
 import type { SessionContext } from "@opencode/plugin/promise/session"
 import type { Permission } from "@opencode/schema/permission"
@@ -346,7 +343,7 @@ export default Plugin.define({
     const needsConnection = async () => {
       if (!ServiceHost.connected()) return false
       const status = await loginomSettings.status()
-      return status.ok && status.value.state === "unconfigured"
+      return status.ok && (status.value.state === "unconfigured" || status.value.failed)
     }
     await ctx.tool.transform((editor) => {
       editor.add({
@@ -425,7 +422,14 @@ export default Plugin.define({
       void hold(event.sessionID)
       await dock.refresh(event.sessionID, profile(event.sessionID), event.model)
       hide(event)
-      if (event.tools[connectionRequiredTool] && !(await needsConnection())) delete event.tools[connectionRequiredTool]
+      if (event.tools[connectionRequiredTool]) {
+        if (await needsConnection()) {
+          event.system.push({
+            type: "text",
+            text: `Loginom is not connected. If the current user task needs to open or change a Loginom server package, call ${connectionRequiredTool} first to show the connection card, then stop and wait. Answer other requests normally, without showing the card.`,
+          })
+        } else delete event.tools[connectionRequiredTool]
+      }
       offered.set(event.sessionID, new Set(Object.keys(event.tools)))
       dock.system(event.sessionID).forEach((text) => event.system.push({ type: "text", text }))
       // The kinds the settings deny, named before the model tries them: OpenCode does not offer their tools (B2.6b2).

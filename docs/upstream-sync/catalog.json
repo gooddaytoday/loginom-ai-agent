@@ -110,7 +110,7 @@
       ]
     },
     {
-      "id": "CAT-15",
+      "id": "CAT-22",
       "title": "Composer status dot and Loginom connection card browser acceptance",
       "paths": [
         "packages/app/src/session/composer/plugin-pills.tsx", "packages/plugin/src/gui/registries.ts",

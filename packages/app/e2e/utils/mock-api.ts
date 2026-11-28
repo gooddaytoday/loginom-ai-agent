@@ -369,7 +369,7 @@ const Group = HttpApiGroup.make("mock")
       params: { rpcID: Schema.String, method: Schema.String },
       payload: JsonPayload,
       success: Json,
-      error: Unsupported,
+      error: [Unsupported, MockServiceUnavailable.pipe(HttpApiSchema.status(503))],
     }),
   )
   .add(

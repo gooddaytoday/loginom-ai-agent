@@ -1,110 +1,96 @@
-import { connectionRequiredTool, Definition, type Status } from "@loginom-ai-agent/loginom-host/settings-rpc"
+import { connectionRequiredTool, type Status } from "@loginom-ai-agent/loginom-host/settings-rpc"
 import { Product } from "@loginom-ai-agent/product"
 import { ComposerPill, createKeyed, SettingsPage, type MountedSession, type Plugin } from "@opencode/plugin/gui"
 import { ToolRenderer } from "@opencode/plugin/gui/builtin"
-import { createMemo, createSignal, lazy, Show, Suspense } from "solid-js"
+import { lazy, onCleanup, onMount, Show, Suspense } from "solid-js"
 import type definition from "./index"
+import { profileService } from "./target"
+
+const publicAddress = new URL(Product.connection.url).href
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
   const Page = lazy(() => import("./page"))
-  const server = createMemo(() => {
-    const servers = ctx.servers.list().flatMap((id) => ctx.servers.get(id) ?? [])
-    if (ctx.desktop) return servers.find((item) => item.builtin)
-    const serving = ctx.servers.get(location.origin)
-    if (serving) return serving
-    const local = servers.filter((item) => item.local)
-    if (local.length === 1) return local.at(0)
-  })
-  const rpc = () => server()?.client?.rpc(Definition)
-  const [status, setStatus] = createSignal<Status>()
-  const [busy, setBusy] = createSignal(false)
-  const [settings, setSettings] = createSignal<{ blank: boolean; session?: MountedSession }>()
+  const service = profileService(ctx, activated)
+  const { server, client, page, dispatch } = service
+  const current = ctx.sessions.current
   const matches = (session: MountedSession | undefined) => !!session && session.server.id === server()?.id
-  const ready = () => status()?.state === "ready"
   const publicStand = () => {
-    const value = status()
+    const status = page().status
+
     return (
-      value &&
-      !value.deviceOnly &&
-      value.url === new URL(Product.connection.url).href &&
-      value.username === Product.connection.username &&
-      !value.hasPassword
+      status &&
+      !status.deviceOnly &&
+      status.url === publicAddress &&
+      status.username === Product.connection.username &&
+      !status.hasPassword
     )
   }
 
+  let settingsOpen = false
+  let intent:
+    | { source: "settings" | "card" | "pill"; client: ReturnType<typeof client>; session?: MountedSession }
+    | undefined
+
+  const refresh = () => {
+    if (!settingsOpen && !document.hidden && client()) dispatch({ type: "refresh", background: true })
+  }
+
   createKeyed(
-    () => server()?.client,
-    (client) => {
-      setStatus(undefined)
-      const signal = AbortSignal.timeout(12_000)
-      void client
-        .rpc(Definition)
-        .status({}, { signal })
-        .then((result) => {
-          if (result.ok && server()?.client === client) setStatus(result.value)
-        })
-        .catch(() => undefined)
+    () => {
+      const session = current()
+      return matches(session) ? session?.visit : undefined
+    },
+    () => {
+      refresh()
+      const timer = setInterval(refresh, 3000)
+      document.addEventListener("visibilitychange", refresh)
+      window.addEventListener("focus", refresh)
+      onCleanup(() => {
+        clearInterval(timer)
+        document.removeEventListener("visibilitychange", refresh)
+        window.removeEventListener("focus", refresh)
+      })
     },
   )
 
-  const openSettings = (blank: boolean, session?: MountedSession) => {
-    setSettings({ blank, session })
+  function openSettings(session?: MountedSession) {
+    if (page().busy) return
+
+    intent = session ? { source: "settings", client: client(), session } : undefined
+    dispatch({ type: "reset", blank: !!session })
     ctx.layout.settings("loginom")
   }
-  const connected = async (value: Status, session?: MountedSession) => {
-    setStatus(value)
-    ctx.toast.show({ title: ctx.t("connectedTo", { url: value.url }) })
-    if (!session) return
-    try {
-      if (!session.server.client) throw new Error("Session server unavailable")
-      await session.server.client.session.synthetic({
-        sessionID: session.id,
-        text: ctx.t("continueTask"),
-        resume: true,
+
+  function activated(status: Status) {
+    const action = intent
+    intent = undefined
+    if (!action || action.client !== client() || ctx.signal.aborted) return
+
+    ctx.toast.show({ title: ctx.t("connectedTo", { url: status.url }) })
+    if (action.source === "settings") ctx.commands.run("common.goBack")
+
+    const session = action.session
+    if (!session || (action.source === "card" && session.visit !== current()?.visit)) return
+
+    const target = session.server.client
+    if (target !== action.client || !target) return
+
+    void target.session
+      .synthetic({ sessionID: session.id, text: ctx.t("continueTask"), resume: true }, { signal: ctx.signal })
+      .catch(() => {
+        if (!ctx.signal.aborted) ctx.toast.show({ title: ctx.t("resumeFailed"), variant: "error" })
       })
-    } catch {
-      ctx.toast.show({ title: ctx.t("resumeFailed"), variant: "error" })
-    }
   }
-  const connect = async (session?: MountedSession) => {
-    const value = status()
-    const client = rpc()
-    if (!value || !client || !publicStand() || ready() || busy()) return
-    setBusy(true)
-    const report = (title: string) => ctx.toast.show({ title, variant: "error" })
-    try {
-      const check = await client.check(
-        {
-          revision: value.revision,
-          url: Product.connection.url,
-          username: Product.connection.username,
-          password: { operation: "empty" },
-        },
-        { signal: AbortSignal.timeout(245_000) },
-      )
-      if (!check.ok) return report(ctx.t(check.issue))
-      let result = await client.save(
-        { revision: value.revision, validationId: check.value.validationId },
-        { signal: AbortSignal.timeout(12_000) },
-      )
-      const deadline = Date.now() + 240_000
-      while (
-        result.ok &&
-        !result.value.failed &&
-        (result.value.state === "pending" || result.value.state === "starting") &&
-        Date.now() < deadline
-      ) {
-        await new Promise<void>((resolve) => setTimeout(resolve, 1000))
-        result = await client.status({}, { signal: AbortSignal.timeout(12_000) })
-      }
-      if (!result.ok) return report(ctx.t(result.issue))
-      if (result.value.state !== "ready") return report(ctx.t("activationFailed"))
-      await connected(result.value, session)
-    } catch {
-      report(ctx.t("serviceUnavailable"))
-    } finally {
-      setBusy(false)
-    }
+
+  function connect(session?: MountedSession) {
+    if (!publicStand() || page().connected || page().busy) return
+
+    intent = { source: session ? "card" : "pill", client: client(), session }
+    dispatch({
+      type: "edit",
+      patch: { url: Product.connection.url, username: Product.connection.username, password: "", noPassword: true },
+    })
+    dispatch({ type: "submit", submit: "save", now: Date.now() })
   }
 
   ctx.add(SettingsPage, {
@@ -116,13 +102,19 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     render: () => (
       <Suspense>
         <Page
-          server={server()}
-          blank={settings()?.blank}
-          onClose={() => setSettings(undefined)}
-          onSaved={(value) => {
-            const intent = settings()
-            if (intent) ctx.commands.run("common.goBack")
-            void connected(value, intent?.session)
+          service={service}
+          onOpen={() => {
+            settingsOpen = true
+            if (intent?.source === "settings") return
+
+            intent = undefined
+            dispatch({ type: "reset" })
+            if (client()) dispatch({ type: "refresh" })
+          }}
+          onClose={() => {
+            settingsOpen = false
+            intent = undefined
+            dispatch({ type: "reset" })
           }}
         />
       </Suspense>
@@ -136,25 +128,52 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     },
     separate: true,
     render: (props) => (
-      <Show
-        when={props.metadata.connectionRequired === true && matches(ctx.sessions.current()) && status() && !ready()}
-      >
-        <section class="grid min-w-0 gap-3 rounded-lg border border-border-base p-4" aria-label={ctx.t("connectTitle")}>
-          <h3 class="text-14-medium text-text-strong">{ctx.t("connectTitle")}</h3>
-          <Show when={publicStand()}>
-            <p class="text-13-regular text-text-base">{ctx.t("publicStandDescription")}</p>
+      <Show when={props.metadata.connectionRequired === true && matches(current())}>
+        <Show
+          when={!page().connected}
+          fallback={<p class="text-13-regular text-text-base">{ctx.t("connectedTrace")}</p>}
+        >
+          <Show when={props.latest}>
+            <section class="grid min-w-0 gap-3 rounded-lg border border-border-base p-4" aria-label={ctx.t("connectTitle")}>
+              <h3 class="text-14-medium text-text-strong">{ctx.t("connectTitle")}</h3>
+              <Show when={publicStand()}>
+                <p class="text-13-regular text-text-base">{ctx.t("publicStandDescription")}</p>
+              </Show>
+              <div class="flex flex-wrap gap-2">
+                <Show when={publicStand()}>
+                  <ctx.ui.Button
+                    variant="contrast"
+                    disabled={page().busy}
+                    onClick={() => {
+                      if (props.latest) connect(current())
+                    }}
+                  >
+                    {ctx.t(page().checking ? "checking" : page().saving ? "saving" : "connectPublic")}
+                  </ctx.ui.Button>
+                </Show>
+                <ctx.ui.Button
+                  disabled={page().busy || !page().status}
+                  onClick={() => {
+                    if (props.latest) openSettings(current())
+                  }}
+                >
+                  {ctx.t("ownServer")}
+                </ctx.ui.Button>
+              </div>
+              <Show
+                when={
+                  page().issue ??
+                  page().fieldErrors.url ??
+                  page().fieldErrors.username ??
+                  page().fieldErrors.password ??
+                  (page().message !== "disconnected" && page().message)
+                }
+              >
+                {(message) => <p role="status" class="text-12-regular text-text-base">{ctx.t(message())}</p>}
+              </Show>
+            </section>
           </Show>
-          <div class="flex flex-wrap gap-2">
-            <Show when={publicStand()}>
-              <ctx.ui.Button variant="contrast" disabled={busy()} onClick={() => void connect(ctx.sessions.current())}>
-                {ctx.t(busy() ? "checking" : "connectPublic")}
-              </ctx.ui.Button>
-            </Show>
-            <ctx.ui.Button disabled={busy()} onClick={() => openSettings(true, ctx.sessions.current())}>
-              {ctx.t("ownServer")}
-            </ctx.ui.Button>
-          </div>
-        </section>
+        </Show>
       </Show>
     ),
   })
@@ -163,21 +182,33 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
     id: "loginom",
     show: ({ session }) => {
       if (!matches(session)) return
-      const value = status()
+
       return {
         label: ctx.t("title"),
-        title: ready() ? ctx.t("title") : `${ctx.t("title")} · ${ctx.t("disconnected")}`,
-        tone: ready() ? "success" : "warning",
-        rows: [
-          ...(value?.url ? [{ id: "url", label: value.url }] : []),
-          ...(value?.username ? [{ id: "username", label: value.username }] : []),
-          {
-            id: "settings",
-            label: ctx.t(!ready() && publicStand() ? "connect" : "connectionSettings"),
-            run: () => (!ready() && publicStand() ? void connect() : openSettings(false)),
-          },
-        ],
+        title: page().connected ? ctx.t("title") : `${ctx.t("title")} · ${ctx.t("disconnected")}`,
+        tone: page().connected ? "success" : "warning",
       }
+    },
+    menu: (input) => {
+      onMount(refresh)
+      const direct = () => !page().connected && publicStand()
+
+      return (
+        <div class="flex flex-col items-start gap-2 p-2">
+          <Show when={page().status?.url}>{(url) => <span class="max-w-full truncate">{url()}</span>}</Show>
+          <Show when={page().status?.username}>{(name) => <span>{name()}</span>}</Show>
+          <ctx.ui.Button
+            disabled={page().busy}
+            onClick={() => {
+              input.close()
+              if (direct()) connect()
+              else openSettings()
+            }}
+          >
+            {ctx.t(direct() ? "connect" : "connectionSettings")}
+          </ctx.ui.Button>
+        </div>
+      )
     },
   })
 }

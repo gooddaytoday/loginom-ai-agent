@@ -39,8 +39,11 @@ for (const viewport of [
     let prompted = false
     let saved = false
     let ready = false
+    let disconnected = false
+    let reads = 0
+    let readsAtSave = 0
     const task: SessionMessageInfo[] = [
-      { id: "msg_loginom_user", type: "user", text: request, time: { created: 1 } },
+      { id: "msg_loginom_user", type: "user", text: request, time: { created: 3 } },
       {
         id: "msg_loginom_assistant",
         type: "assistant",
@@ -57,12 +60,24 @@ for (const viewport of [
               content: [{ type: "text", text: "Loginom is not connected." }],
               metadata: { connectionRequired: true },
             },
-            time: { created: 2, completed: 3 },
+            time: { created: 4, completed: 5 },
           },
         ],
-        time: { created: 2 },
+        time: { created: 4 },
       },
     ]
+    const previous: SessionMessageInfo[] = task.map((message) =>
+      message.type === "assistant"
+        ? {
+            ...message,
+            id: "msg_loginom_previous_assistant",
+            time: { created: 2 },
+            content: message.content.map((part) =>
+              part.type === "tool" ? { ...part, id: "call_loginom_previous", time: { created: 2, completed: 3 } } : part,
+            ),
+          }
+        : { ...message, id: "msg_loginom_previous_user", time: { created: 1 } },
+    )
     const view = () => ({
       ok: true,
       value: {
@@ -72,33 +87,35 @@ for (const viewport of [
         username: ready ? username : "user",
         folder: ready ? `/${username}` : "/user",
         hasPassword: false,
-        failed: false,
+        failed: disconnected,
         deviceOnly: false,
-        state: ready ? "ready" : saved ? "pending" : "unconfigured",
+        state: disconnected ? "recoverable-error" : ready ? "ready" : saved ? "pending" : "unconfigured",
       },
     })
     const { editor } = await openSession(page, {
       name: "Loginom setup",
       sessions: [{ id, title: "Loginom setup" }],
       seed: { locale: "ru" },
-      pageMessages: () => ({ items: prompted ? task : [] }),
+      pageMessages: () => ({ items: prompted ? [...previous, ...task] : [] }),
       onPrompt: ({ sessionID, body }) => {
         prompted = sessionID === id && body.text === request
       },
       onRpc: ({ rpcID, method, body }) => {
         if (rpcID !== "loginom.connection") return
         if (method === "status") {
-          ready = saved
-          return view()
+          if (++reads === 1) return { unavailable: true }
+          if (saved && reads > readsAtSave + 1) ready = true
+          return { output: view() }
         }
         if (method === "check") {
           checks.push(body)
-          return { ok: true, value: { validationId: "fixture-check", expiresAt: Date.now() + 60_000 } }
+          return { output: { ok: true, value: { validationId: "fixture-check", expiresAt: Date.now() + 60_000 } } }
         }
         if (method === "save") {
           saves.push(body)
           saved = true
-          return view()
+          readsAtSave = reads
+          return own ? { unavailable: true } : { output: view() }
         }
       },
       onSynthetic: (input) => {
@@ -125,6 +142,7 @@ for (const viewport of [
     await editor.press("Enter")
     await expect.poll(() => prompted).toBe(true)
     await page.reload()
+    await expect(card).toHaveCount(1)
     await expect(card).toBeVisible()
     await expect(pill).toBeVisible()
     await expect(
@@ -155,6 +173,7 @@ for (const viewport of [
 
     await expect(page.getByText(`Подключено к ${address}`, { exact: true })).toBeVisible()
     await expect(card).toHaveCount(0)
+    await expect(page.getByText("Подключено", { exact: true })).toHaveCount(2)
     await expect(page.getByRole("button", { name: "Loginom", exact: true })).toBeVisible()
     await expect
       .poll(() => captures)
@@ -175,6 +194,8 @@ for (const viewport of [
       },
     ])
     expect(saves).toEqual([{ input: { revision: 0, validationId: "fixture-check" } }])
+    disconnected = true
+    await expect(pill).toBeVisible({ timeout: 8_000 })
   })
 }
 
@@ -214,6 +235,64 @@ const patched = (page: Page) =>
   page.waitForRequest(
     (request) => request.method() === "PATCH" && new URL(request.url()).pathname === `/api/project/${projectID}`,
   )
+
+test("Loginom settings use the service Location and recover an unconfirmed Save", async ({ page }) => {
+  const serviceDirectory = "/service"
+  const loginom = "https://loginom.example/app/"
+  let username = "user"
+  let revision = 0
+  const checks: unknown[] = []
+  await mockWorkspace(page, {
+    name: "Loginom",
+    sessions: [],
+    directory: serviceDirectory,
+    provider: NO_PROVIDER,
+    onRpc: (request) => {
+      if (request.rpcID !== "loginom.connection") return
+      expect(request.directory).toBe(serviceDirectory)
+      switch (request.method) {
+        case "status":
+          return {
+            output: {
+              ok: true,
+              value: {
+                revision,
+                generation: revision,
+                url: loginom,
+                username,
+                folder: `/${username}`,
+                hasPassword: false,
+                failed: false,
+                deviceOnly: false,
+                state: revision ? "ready" : "unconfigured",
+              },
+            },
+          }
+        case "check":
+          checks.push(request.body)
+          return { output: { ok: true, value: { validationId: "checked", expiresAt: 4102444800000 } } }
+        case "save":
+          expect(request.body).toMatchObject({ input: { revision: 0, validationId: "checked" } })
+          username = "analyst"
+          revision = 1
+          return { unavailable: true }
+      }
+    },
+  })
+  await page.goto("/settings?tab=loginom")
+  const settings = page.getByRole("tabpanel", { name: "Loginom", exact: true })
+  const user = settings.getByRole("textbox", { name: "Username" })
+  await expect(user).toHaveValue("user")
+  await user.fill("analyst")
+  await settings.getByRole("button", { name: "Save", exact: true }).click()
+  await expect(settings.getByText("Connected as analyst · folder /analyst")).toBeVisible()
+  await settings.getByRole("button", { name: "Check", exact: true }).click()
+  await expect(settings.getByText("Checked, not yet saved")).toBeVisible()
+  expect(checks).toMatchObject([
+    { input: { revision: 0, url: loginom, username: "analyst" } },
+    { input: { revision: 1, url: loginom, username: "analyst" } },
+  ])
+})
 
 test("settings has its own route and returns through app history", async ({ page }) => {
   const { settings } = await open(page)
