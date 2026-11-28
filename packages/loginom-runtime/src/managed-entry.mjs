@@ -37,6 +37,7 @@ const state = {
   windowPage: undefined,
   windowBaseline: undefined,
   windowPlacement: undefined,
+  windowAttempt: undefined,
   placingWindow: undefined,
   browserProfile: undefined,
   browserServer: undefined,
@@ -313,6 +314,8 @@ async function handle(message) {
       const placing = placeBrowserWindow(state.windowPage, message.input, {
         baseline: state.windowBaseline,
         confirmed: state.windowPlacement,
+        attempted: state.windowAttempt,
+        onAttempt: expected => { state.windowAttempt = expected },
         shutdown: state.startupController.signal,
       })
       state.placingWindow = placing
@@ -320,6 +323,7 @@ async function handle(message) {
         const result = await placing
         if (result === "moved") state.windowPlacement = null
         else if (typeof result !== "string") state.windowPlacement = result
+        if (state.windowPlacement !== undefined) state.windowAttempt = undefined
         send({ id: message.id, result: result === "moved" ? "unchanged" : typeof result === "string" ? result : "placed" })
       } finally {
         state.placingWindow = undefined

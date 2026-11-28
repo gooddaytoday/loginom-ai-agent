@@ -1,72 +1,72 @@
 import type { Rectangle } from "electron"
 import type { Focus, WindowFeedback } from "./contract"
-import { equal, layout, type Snapshot } from "./layout"
+import { layout } from "./layout"
+import { initial, pending, same, transition, type Plan, type State, type WindowSnapshot } from "./window/machine"
 
-type Plan = NonNullable<ReturnType<typeof layout>>
-type Split = Extract<Plan, { kind: "split" }>
-type WindowSnapshot = Snapshot & { restored: Rectangle }
 type LayoutFeedback = typeof WindowFeedback.Type.layout
+
 export type PlacementStatus = "placed" | "unchanged" | "layout-unavailable" | "starting" | "no-window"
 
-function same(before: Snapshot, after: Snapshot) {
-  return equal(before.app, after.app) && before.display.id === after.display.id &&
-    equal(before.display.workArea, after.display.workArea) && before.display.scaleFactor === after.display.scaleFactor &&
-    before.others.length === after.others.length && before.maximized === after.maximized && before.fullscreen === after.fullscreen
-}
-
-function restored(before: WindowSnapshot, after: WindowSnapshot) {
-  return (before.maximized || before.fullscreen) &&
-    same({ ...before, app: before.restored, maximized: false, fullscreen: false }, after)
+type ShowOptions = {
+  sessionID: string
+  current: () => WindowSnapshot | undefined
+  place: (plan: Plan) => Promise<PlacementStatus | undefined>
+  resize: (bounds: Rectangle, restoreStarted: () => void) => Promise<boolean>
 }
 
 export function windowPlacement() {
-  let baseline: WindowSnapshot | undefined
-  let moved = false
-  let split: { sessionID: string; plan: Split } | undefined
-
-  function observe(current: WindowSnapshot, allowRestore = false) {
-    if (baseline && !same(baseline, current)) {
-      if (allowRestore && restored(baseline, current)) baseline = current
-      else moved = true
-    }
-    baseline ??= current
-  }
+  let state: State = initial
 
   return {
     startup(current: WindowSnapshot) {
-      observe(current)
+      state = transition(state, { type: "observed", current })
+
       return layout(current, "startup")
     },
-    async show(options: {
-      sessionID: string
-      current: () => WindowSnapshot | undefined
-      place: (plan: Plan) => Promise<PlacementStatus | undefined>
-      resize: (bounds: Rectangle) => Promise<boolean>
-    }): Promise<LayoutFeedback> {
+    async show(options: ShowOptions): Promise<LayoutFeedback> {
       const before = options.current()
+
       if (!before) return
-      if (split?.sessionID !== options.sessionID) split = undefined
-      observe(before, !!split)
-      if (moved) split = undefined
-      if (moved) return
-      const plan = split?.plan ?? layout(before, "show")
+
+      const { sessionID } = options
+      state = transition(state, { type: "observed", current: before, sessionID })
+
+      if (state.type === "manual") return
+
+      const plan = pending(state) ?? layout(before, "show")
+
       if (!plan) return
 
       const placed = await options.place(plan)
+      const current = options.current()
+
+      if (current) state = transition(state, { type: "observed", current })
+
       if (placed !== "placed" || plan.kind !== "split") {
-        if (split) return "split-incomplete"
+        if (pending(state)) return "split-incomplete"
+
         if (placed === undefined || placed === "layout-unavailable") return "layout-unavailable"
+
         return
       }
 
-      split = { sessionID: options.sessionID, plan }
-      const current = options.current()
       if (!current || !same(before, current)) return "split-incomplete"
-      const resized = await options.resize(plan.app).catch(() => false)
+
+      state = transition(state, { type: "browser-placed", sessionID, plan })
+
+      if (!pending(state)) return "split-incomplete"
+
+      const resized = await options
+        .resize(plan.app, () => {
+          state = transition(state, { type: "restore-started" })
+        })
+        .catch(() => false)
+
       const after = options.current()
-      if (after && (resized || restored(before, after))) baseline = after
+
+      if (after) state = transition(state, { type: resized ? "resized" : "observed", current: after })
+
       if (!resized) return "split-incomplete"
-      split = undefined
     },
   }
 }

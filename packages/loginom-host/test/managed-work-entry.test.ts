@@ -62,6 +62,7 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
         let bounds = { left: 800, top: 0, width: 800, height: 900, windowState: 'normal' };
         let stall = true;
         let refusal = true;
+        let loseReply = true;
         const cdp = {
           async send(method, input) {
             if (method === 'Browser.getWindowForTarget') return { windowId: 8, bounds };
@@ -71,8 +72,15 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
                 stall = false;
                 await new Promise(() => {});
               }
-              if (!refusal) bounds = { ...bounds, ...input.bounds };
-              refusal = false;
+              if (refusal) {
+                refusal = false;
+                return;
+              }
+              bounds = { ...bounds, ...input.bounds };
+              if (loseReply) {
+                loseReply = false;
+                await new Promise(() => {});
+              }
             }
           },
           async detach() {},
@@ -219,6 +227,8 @@ test("actual managed entry relays work, dispatch and Dock tool progress over pri
       { result: { content: [] }, recoveryPending: false, activeWork: false },
     ])
     expect(await runtime.request("placeWindow", windowBounds)).toBe("layout-unavailable")
+    expect(await runtime.request("placeWindow", windowBounds, 2500)).toBe("layout-unavailable")
+    expect(await runtime.request("placeWindow", { ...windowBounds, x: 800 })).toBe("unchanged")
     expect(await runtime.request("placeWindow", windowBounds)).toBe("placed")
     expect(await runtime.request("placeWindow", windowBounds)).toBe("placed")
     expect(await runtime.request("placeWindow", { ...windowBounds, x: 800 })).toBe("unchanged")

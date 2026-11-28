@@ -2,11 +2,14 @@ import { Ipc } from "@opencode/plugin/gui"
 import { Schema } from "effect"
 
 const Session = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))
+
 export const Focus = Schema.Literals(["focused", "no-window", "starting", "taskbar", "manual"])
+
 export const WindowFeedback = Schema.Struct({
   focus: Focus,
   layout: Schema.optional(Schema.Literals(["layout-unavailable", "split-incomplete"])),
 })
+
 export const LoginomWindow = Ipc.define({
   id: "loginom-gui.window",
   methods: {

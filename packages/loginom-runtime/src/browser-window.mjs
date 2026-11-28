@@ -94,13 +94,14 @@ export async function prepareBrowserWindow(page, rect, shutdown) {
   return readWindowBounds(page, signal);
 }
 
-export function placeBrowserWindow(page, rect, { baseline, confirmed, shutdown } = {}) {
+export function placeBrowserWindow(page, rect, { baseline, confirmed, attempted, onAttempt, shutdown } = {}) {
   if (!validWindowBounds(rect)) return 'layout-unavailable';
   const signal = deadline(shutdown);
   return withWindow(page, 'layout-unavailable', async (send, windowId, bounds) => {
     const requested = {left:rect.x, top:rect.y, width:rect.width, height:rect.height};
     const expected = {...requested, windowState:'normal'};
     const previous = confirmed ?? baseline;
+    if (!confirmed && attempted && matches(bounds, attempted)) return matches(bounds, expected) ? bounds : 'unchanged';
     if (previous && !matches(bounds, previous, 0)) return 'moved';
     if (matches(bounds, expected)) return bounds;
     if (confirmed) return 'unchanged';
@@ -115,6 +116,8 @@ export function placeBrowserWindow(page, rect, { baseline, confirmed, shutdown }
       await send('Browser.setWindowBounds', {windowId, bounds:{windowState:'normal'}});
       if (!await waitForBounds(bounds => bounds.windowState === 'normal')) return 'layout-unavailable';
     }
+    signal.throwIfAborted();
+    onAttempt?.(expected);
     await send('Browser.setWindowBounds', {windowId, bounds:requested});
     return await waitForBounds(observed => matches(observed, expected)) ?? 'layout-unavailable';
   }, signal);
