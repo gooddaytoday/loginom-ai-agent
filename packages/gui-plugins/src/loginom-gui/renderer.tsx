@@ -1,195 +1,124 @@
-import { CodeBlock, Slot, Style, type MountedSession, type Plugin } from "@opencode/plugin/gui"
-import { Page, ToolRenderer, builtinContext } from "@opencode/plugin/gui/builtin"
-import { Button } from "@opencode/ui/button"
-import { Option } from "effect"
-import { createMemo, createSignal, lazy, onCleanup, Show, Suspense, untrack } from "solid-js"
-import { decodePackageChanges, packageChangesTool, type ChangesWithSchema } from "./package-changes-data"
-import { PackageSchema, readFinding, type Finding } from "./contract"
-import { transition, type Event, type Request, type State } from "./machine"
+import { SettingsPage, type Plugin } from "@opencode/plugin/gui"
+import { builtinContext, Page, subscribeBuiltinDeepLinks } from "@opencode/plugin/gui/builtin"
+import { dashboardLinkChannel } from "@loginom-ai-agent/product/dashboard-link"
+import { Option, Schema } from "effect"
+import { lazy, onCleanup, Show, Suspense } from "solid-js"
+import { unwrap } from "solid-js/store"
+import { DashboardLink } from "./contract"
+import { transitionDashboard, type DashboardState, type DashboardStore } from "./dashboard-machine"
 import type definition from "./index"
-import styles from "./schema.css?inline"
+import { registerSchema } from "./schema-renderer"
+import { registerStartScreen } from "./start-screen"
 
-const pageID = "package-schema"
-
-const SchemaPage = lazy(() => import("./page"))
-
-const Card = lazy(async () => {
-  const { PackageChangesCard } = await import("./package-changes")
-
-  return { default: PackageChangesCard }
-})
+const decodeLink = Schema.decodeUnknownOption(DashboardLink)
 
 const setup: Plugin.Setup<typeof definition> = (ctx) => {
-  ctx.add(Style, styles)
-  const [state, setState] = createSignal<State>({ status: "closed" })
-  const dispatch = (event: Event) => setState((current) => transition(current, event))
-  let controller: AbortController | undefined
+  registerStartScreen(ctx)
+  registerSchema(ctx)
+  const Catalog = lazy(() => import("./catalog-page"))
 
-  const close = () => {
-    controller?.abort()
-    dispatch({ type: "close" })
-  }
+  ctx.add(Page, {
+    id: "catalog",
+    nav: {},
+    get title() {
+      return ctx.t("catalog.title")
+    },
+    render: () => (
+      <Suspense>
+        <Catalog />
+      </Suspense>
+    ),
+  })
 
-  onCleanup(close)
+  const Settings = lazy(() => import("./page"))
 
-  const load = (request: Request) => {
-    controller?.abort()
-    controller = new AbortController()
-    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)])
-    dispatch({ type: "open", request })
-    void Promise.try(() => {
-      const server = ctx.servers.get(request.serverID)
+  ctx.add(SettingsPage, {
+    id: "loginom",
+    icon: "arrow-up-right",
+    get title() {
+      return ctx.t("title")
+    },
+    render: () => (
+      <Suspense>
+        <Settings />
+      </Suspense>
+    ),
+  })
 
-      if (!server) throw new Error("Server unavailable")
+  if (!ctx.desktop) return
 
-      const input = request.finding
-        ? { sessionID: request.sessionID, source: "saved" as const }
-        : { sessionID: request.sessionID }
+  const Dashboard = lazy(() => import("./dashboard"))
+  const router = builtinContext(ctx).router
 
-      return server.client.rpc(PackageSchema).schema(input, { location: { directory: request.directory }, signal })
-    }).then(
-      ({ snapshot }) => dispatch({ type: "loaded", request, snapshot }),
-      () => dispatch({ type: "failed", request }),
-    )
-  }
+  const [store, setStore] = ctx.storage.memory<{ dashboard: DashboardState }>("dashboard", {
+    initial: { dashboard: { nextAttempt: 1 } },
+  })
 
-  const openChanges = (session: MountedSession, changes: ChangesWithSchema) => {
-    controller?.abort()
-    dispatch({
-      type: "open-changes",
-      request: { sessionID: session.id, serverID: session.server.id, directory: session.directory },
-      changes,
-    })
-    builtinContext(ctx).layout.openPage(pageID)
-  }
+  const dashboard: DashboardStore = {
+    state: () => store.dashboard,
+    dispatch(event) {
+      const previous = unwrap(store.dashboard)
+      const next = transitionDashboard(previous, event)
 
-  const open = (session: MountedSession, finding?: Finding) => {
-    load({ sessionID: session.id, serverID: session.server.id, directory: session.directory, finding })
-    builtinContext(ctx).layout.openPage(pageID)
-  }
+      if (next === previous) return
 
-  const back = () => {
-    const current = untrack(state)
+      setStore((draft) => {
+        draft.dashboard = next
+      })
 
-    if (current.status === "closed") return
-    ctx.tabs.open({ server: current.request.serverID, id: current.request.sessionID }, { focus: true })
+      return next
+    },
   }
 
   ctx.add(Page, {
-    id: pageID,
+    id: "dashboard",
     get title() {
-      return ctx.t("schema")
+      return ctx.t("dashboard")
     },
-    render() {
-      onCleanup(close)
-
-      return (
-        <Suspense fallback={<p role="status">{ctx.t("loading")}</p>}>
-          <SchemaPage
-            state={state}
-            t={ctx.t}
-            dispatch={dispatch}
-            retry={() => {
-              const current = untrack(state)
-
-              if (current.status !== "closed") load({ ...current.request })
-            }}
-            back={back}
-          />
-        </Suspense>
-      )
-    },
-  })
-
-  ctx.add(Slot, {
-    at: "session.header",
-    render: (input) => (
-      <Button
-        type="button"
-        size="small"
-        variant="ghost"
-        aria-label={ctx.t("schema")}
-        title={ctx.t("schema")}
-        disabled={!input.active}
-        onClick={() => open(input.session)}
-      >
-        {input.compact ? "↗" : ctx.t("schema")}
-      </Button>
-    ),
-  })
-
-  ctx.add(Slot, {
-    at: "session.location.menu",
-    render: (input) => (
-      <Show when={ctx.layout.narrow()}>
-        <ctx.ui.MenuItem label={ctx.t("schema")} icon="branch" onSelect={() => open(input.session)} />
-      </Show>
-    ),
-  })
-
-  ctx.add(CodeBlock, {
-    languages: ["loginom-finding"],
-    render(block) {
-      const finding = readFinding(block.code)
-
-      if (!finding || !block.session) return
-
-      return (
-        <div class="flex flex-col items-start gap-2 p-3">
-          <p>{finding.text}</p>
-          <Button
-            type="button"
-            size="small"
-            variant="neutral"
-            onClick={() => {
-              const session = block.session
-
-              if (session) open(session, finding)
-            }}
-          >
-            {ctx.t("showOnSchema")}
-          </Button>
-        </div>
-      )
-    },
-  })
-
-  ctx.add(ToolRenderer, {
-    tool: packageChangesTool,
-    separate: true,
-    get title() {
-      return ctx.t("changes.title")
-    },
-    render(props) {
-      const changes = createMemo(() =>
-        props.status === "completed"
-          ? Option.getOrUndefined(decodePackageChanges(props.metadata))?.loginom.packageChanges
-          : undefined,
-      )
-
-      const target = createMemo(() => {
-        const session = ctx.sessions.current()
-
-        if (session && session.id === changes()?.sessionID && !session.pending) {
-          return { sessionID: session.id, serverID: session.server.id, directory: session.directory }
-        }
-      })
-
-      return (
-        <Show when={target()} keyed>
-          {(request) => (
-            <Show when={changes()?.edits.length || changes()?.schemas ? changes() : undefined} keyed>
-              {(value) => (
-                <Suspense>
-                  <Card changes={value} target={request} openSchema={openChanges} />
-                </Suspense>
-              )}
-            </Show>
-          )}
+    render: () => (
+      <Suspense>
+        <Show
+          when={dashboard.state().current?.link}
+          keyed
+          fallback={
+            <p class="p-4" role="status">
+              {ctx.t("dashboardOpenStudio")}
+            </p>
+          }
+        >
+          {(link) => <Dashboard link={link} dashboard={dashboard} />}
         </Show>
-      )
-    },
+      </Suspense>
+    ),
   })
+
+  onCleanup(subscribeBuiltinDeepLinks(dashboardLinkChannel, (data) => {
+    const decoded = decodeLink(data)
+
+    if (Option.isNone(decoded)) return
+
+    const link = decoded.value
+
+    if ("code" in link) {
+      const issue =
+        link.code === "DASHBOARD_SNAPSHOT_UNAVAILABLE" || link.code === "DASHBOARD_SNAPSHOT_INVALID"
+          ? "dashboardSnapshotGone"
+          : link.code === "LOGINOM_CONFIG_REQUIRED"
+            ? "dashboardConnect"
+            : "dashboardOpenFailed"
+
+      if (router.path().split("?")[0] === `/page/${ctx.id}/dashboard`) {
+        if (dashboard.dispatch({ type: "link.failed", id: link.id, issue })) return
+      }
+
+      ctx.toast.show({ variant: "error", title: ctx.t(issue) })
+
+      return
+    }
+
+    dashboard.dispatch({ type: "link.opened", link })
+    router.openPage("dashboard")
+  }))
 }
 
 export default setup

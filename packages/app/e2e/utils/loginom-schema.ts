@@ -1,3 +1,4 @@
+import { Predicate } from "effect"
 import type { Page } from "@playwright/test"
 import type { SessionMessageInfo } from "@opencode/client/promise"
 import { pageMessagesFrom, T0 } from "./app"
@@ -151,9 +152,9 @@ export function openLoginomSchemaConversation(page: Page, source: "saved" | "win
     sessions: [{ id: sessionID, title: "Продажи" }],
     seed: { locale: "ru" },
     pageMessages: pageMessagesFrom({ [sessionID]: source === "saved" ? messages : messages.slice(0, 1) }),
-    rpc: ({ id, method, input }) => {
-      if (id !== "loginom.package" || method !== "schema") return
-      const requested = JSON.stringify(input)
+    onRpc: ({ rpcID, method, body }) => {
+      if (rpcID !== "loginom.package" || method !== "schema") return
+      const requested = JSON.stringify(Predicate.hasProperty(body, "input") ? body.input : undefined)
 
       if (requested === JSON.stringify({ sessionID, source: "saved" })) return { output: { snapshot: saved } }
 

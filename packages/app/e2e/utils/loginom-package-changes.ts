@@ -1,3 +1,4 @@
+import { Predicate } from "effect"
 import type { JsonValue } from "@opencode/client/promise"
 import type { Page } from "@playwright/test"
 import { packageSchemaDiffFixture } from "./loginom-schema"
@@ -196,9 +197,9 @@ export async function setupPackageChanges(
     locale: "ru",
     viewport: { width: options.width ?? 1280, height: options.diagram ? (options.width === 390 ? 844 : 1024) : 900 },
     messages,
-    rpc({ id, method, input }) {
-      if (id !== "loginom.package-copy") return
-      calls.push({ method, input })
+    onRpc({ rpcID, method, body }) {
+      if (rpcID !== "loginom.package-copy") return
+      calls.push({ method, input: Predicate.hasProperty(body, "input") ? body.input : undefined })
 
       if (method === "replace-original" && options.busy)
         return new MockRpcError({

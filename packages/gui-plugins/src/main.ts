@@ -14,7 +14,7 @@ import wsl from "./wsl"
 import microsoftOffice from "./microsoft-office"
 import sources from "./sources"
 import goal from "./goal"
-import loginomGui from "./loginom-gui"
+import loginom from "./loginom-gui"
 
 /** Built-in plugins with their main entries, by id. Lists every built-in so their ids stay reserved. */
 export const builtins = compose({
@@ -33,5 +33,5 @@ export const builtins = compose({
   "microsoft-office": microsoftOffice,
   sources,
   goal,
-  "loginom-gui": loginomGui,
+  "loginom-gui": { ...loginom, mainEntry: () => import("./loginom-gui/main") },
 })

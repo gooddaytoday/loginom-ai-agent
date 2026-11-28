@@ -2,7 +2,7 @@ import { usePlugin, type SessionRef } from "@opencode/plugin/gui"
 import { Button } from "@opencode/ui/button"
 import { Match, Show, Switch } from "solid-js"
 import type definition from "./index"
-import type { Request } from "./machine"
+import type { Request } from "./schema-machine"
 import { initial, transition, type Action, type Outcome } from "./package-changes-machine"
 import { packageChangesTool, type PackageChanges } from "./package-changes-data"
 import {

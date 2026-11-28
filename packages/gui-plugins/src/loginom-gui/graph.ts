@@ -1,4 +1,4 @@
-import type { Endpoint, Graph, Node, Port } from "./contract"
+import type { Endpoint, Graph, Node, Port } from "./schema-contract"
 
 export const cardWidth = 152
 

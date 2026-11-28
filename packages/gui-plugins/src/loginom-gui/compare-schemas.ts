@@ -1,4 +1,4 @@
-import type { Endpoint, Link, Node, SchemaPair, Workflow } from "./contract"
+import type { Endpoint, Link, Node, SchemaPair, Workflow } from "./schema-contract"
 import { cardHeight, cardWidth } from "./graph"
 
 function key(workflow: Workflow) {

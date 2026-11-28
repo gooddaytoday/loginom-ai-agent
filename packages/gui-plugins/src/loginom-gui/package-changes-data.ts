@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { schemaNodeChanges } from "./compare-schemas"
-import type { SchemaPair } from "./contract"
+import type { SchemaPair } from "./schema-contract"
 import {
   compareFacts,
   diagramSchemas,

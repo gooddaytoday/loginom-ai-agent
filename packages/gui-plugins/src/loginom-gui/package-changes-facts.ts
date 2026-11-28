@@ -1,5 +1,5 @@
 import { Effect, Option, Schema } from "effect"
-import { SchemaPair } from "./contract"
+import { SchemaPair } from "./schema-contract"
 import type en from "./i18n/en"
 
 const direction = Schema.Literals(["input", "output"])
